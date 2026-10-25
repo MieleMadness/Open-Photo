@@ -344,6 +344,7 @@ pub fn run() {
         .manage(std::sync::Mutex::new(watch::WatchState::default()))
         .invoke_handler(tauri::generate_handler![
             ai_models::ai_model_status,
+            ai_models::ai_remove_model,
             ai_models::ai_import_model,
             scan_library,
             preview_image,
