@@ -40,7 +40,7 @@ export default function App() {
   const syncGeneration=useRef(0);
   useEffect(()=>{localStorage.setItem("openphoto.autosync",String(autoSync))},[autoSync]);
   const [lastSync,setLastSync]=useState("");
-  const [syncChanges,setSyncChanges]=useState<{added:number;updated:number;removed:number;incomplete:boolean}|null>(null);
+  const [syncChanges,setSyncChanges]=useState<{added:number;updated:number;unchanged:number;removed:number;incomplete:boolean}|null>(null);
   const [duplicates, setDuplicates] = useState<{paths:string[];bytes:number}[]>([]);
   const [duplicateBusy, setDuplicateBusy] = useState(false);
   const [similarGroups,setSimilarGroups]=useState<{paths:string[];max_distance:number}[]>([]);
@@ -107,7 +107,7 @@ export default function App() {
     setBusy(true); setError("");
     try {
       const scans = await Promise.allSettled(paths.map(async path=>{
-        const response=await invoke<{scan:ScanResult;changes:{added:number;updated:number;removed:number;incomplete:boolean}}>("scan_indexed_with_changes",{root:path});
+        const response=await invoke<{scan:ScanResult;changes:{added:number;updated:number;unchanged:number;removed:number;incomplete:boolean}}>("scan_indexed_with_changes",{root:path});
         const data=response.scan;
         return {...data,changes:response.changes,photos:data.photos.map(photo=>({...photo,libraryRoot:path}))};
       }));
@@ -119,7 +119,7 @@ export default function App() {
       if(generation!==syncGeneration.current)return;
       setResult({photos:[...merged.values()],scanned_files:success.reduce((n,s)=>n+s.value.scanned_files,0),truncated:success.some(s=>s.value.truncated)});
       if(failures.length)setError(failures.map(x=>String(x.reason)).join("; "));
-      setSyncChanges(success.reduce<{added:number;updated:number;removed:number;incomplete:boolean}>((summary,entry)=>({added:summary.added+entry.value.changes.added,updated:summary.updated+entry.value.changes.updated,removed:summary.removed+entry.value.changes.removed,incomplete:summary.incomplete||entry.value.changes.incomplete}),{added:0,updated:0,removed:0,incomplete:false}));
+      setSyncChanges(success.reduce<{added:number;updated:number;unchanged:number;removed:number;incomplete:boolean}>((summary,entry)=>({added:summary.added+entry.value.changes.added,updated:summary.updated+entry.value.changes.updated,unchanged:summary.unchanged+entry.value.changes.unchanged,removed:summary.removed+entry.value.changes.removed,incomplete:summary.incomplete||entry.value.changes.incomplete}),{added:0,updated:0,unchanged:0,removed:0,incomplete:false}));
       setLastSync(new Date().toLocaleString());setDuplicates([]);
     } catch(e){if(generation===syncGeneration.current)setError(String(e))}finally{if(syncRunning.current===generation)syncRunning.current=null;if(generation===syncGeneration.current)setBusy(false)}
   };
