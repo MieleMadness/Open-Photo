@@ -313,7 +313,8 @@ pub fn run() {
             open_video,
             geo::gps_for_photos,
             index::scan_indexed,
-            index::find_exact_duplicates
+            index::find_exact_duplicates,
+            index::find_workspace_duplicates
         ])
         .run(tauri::generate_context!())
         .expect("error while running Open-Photo");
