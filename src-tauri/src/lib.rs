@@ -1,6 +1,7 @@
 mod cache_disk;
 mod geo;
 mod index;
+mod watch;
 use base64::Engine;
 use image::ImageReader;
 use serde::Serialize;
@@ -315,6 +316,7 @@ fn open_video(root: String, path: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(std::sync::Mutex::new(watch::WatchState::default()))
         .invoke_handler(tauri::generate_handler![
             scan_library,
             preview_image,
@@ -324,7 +326,8 @@ pub fn run() {
             index::scan_indexed,
             index::scan_indexed_with_changes,
             index::find_exact_duplicates,
-            index::find_workspace_duplicates
+            index::find_workspace_duplicates,
+            watch::set_watched_folders
         ])
         .run(tauri::generate_context!())
         .expect("error while running Open-Photo");
