@@ -4,7 +4,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import PhotoMap, {type PhotoLocation} from "./PhotoMap";
 import { Images, FolderOpen, Users, Tags, Settings2, Search, Moon, Sun, Monitor, ShieldCheck, ImageOff, HardDrive, ListFilter, ChevronRight, X, LayoutGrid, List, ZoomIn, ZoomOut, ArrowUpDown } from "lucide-react";
 
-type View = "library" | "folders" | "map" | "people" | "tags" | "settings";
+type View = "library" | "folders" | "collections" | "timeline" | "map" | "people" | "tags" | "settings";
+type Collection = {id:string;workspaceId:string;name:string;paths:string[]};
 type Workspace = { id: string; name: string; root: string; roots?: string[] };
 type Theme = "light" | "dark" | "system";
 type PhotoView = "grid" | "list";
@@ -15,6 +16,8 @@ const NAV: {id: View; title: string; icon: typeof Images}[] = [
   { id: "library", title: "Library", icon: Images },
   { id: "folders", title: "Folders", icon: FolderOpen },
   { id: "map", title: "Map", icon: Monitor },
+  { id: "collections", title: "Collections", icon: Images },
+  { id: "timeline", title: "Timeline", icon: List },
   { id: "people", title: "People", icon: Users },
   { id: "tags", title: "Tags", icon: Tags },
   { id: "settings", title: "Settings", icon: Settings2 }
@@ -26,6 +29,9 @@ export default function App() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>(()=>{try{return JSON.parse(localStorage.getItem("openphoto.workspaces")||"[]") as Workspace[]}catch{return []}});
   const [activeWorkspace,setActiveWorkspace] = useState<string>(()=>localStorage.getItem("openphoto.activeWorkspace")||"");
   const [folderFilter,setFolderFilter] = useState("");
+  const [collectionFilter,setCollectionFilter]=useState("");
+  const [collections,setCollections]=useState<Collection[]>(()=>{try{return JSON.parse(localStorage.getItem("openphoto.collections")||"[]") as Collection[]}catch{return []}});
+  useEffect(()=>localStorage.setItem("openphoto.collections",JSON.stringify(collections)),[collections]);
   const [geoPoints,setGeoPoints]=useState<PhotoLocation[]>([]);
   const [geoBusy,setGeoBusy]=useState(false);
   const [autoSync,setAutoSync]=useState(false);
@@ -119,8 +125,9 @@ export default function App() {
     return ()=>{active=false};
   },[root,result,view]);
   const folders=useMemo(()=>[...new Set((result?.photos||[]).map(p=>p.path.slice(0,Math.max(p.path.lastIndexOf("\\"),p.path.lastIndexOf("/"))).replace(p.libraryRoot||root,"").replace(/^[\\/]/,"")||"(root)"))].sort(),[result,root]);
+  const currentCollection=collections.find(c=>c.id===collectionFilter&&c.workspaceId===activeWorkspace);
   const visible = useMemo(() => {
-    const photos = result?.photos.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) && (!folderFilter || p.path.includes(folderFilter)) && (mediaType==="all" || (mediaType==="video" ? ["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension) : !["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension)))) || [];
+    const photos = result?.photos.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) && (!folderFilter || p.path.includes(folderFilter)) && (!currentCollection || currentCollection.paths.includes(p.path)) && (mediaType==="all" || (mediaType==="video" ? ["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension) : !["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension)))) || [];
     return photos.sort((a,b) => {
       switch (sortBy) {
         case "name": return a.name.localeCompare(b.name) || a.path.localeCompare(b.path);
@@ -130,7 +137,7 @@ export default function App() {
         case "smallest": return a.bytes - b.bytes || a.path.localeCompare(b.path);
       }
     });
-  }, [result, query, sortBy, folderFilter, mediaType]);
+  }, [result, query, sortBy, folderFilter, mediaType, currentCollection]);
   useEffect(() => setScrollTop(0), [query, sortBy, photoView, tileSize, root, folderFilter, mediaType]);
   const gridGap = 14;
   const columns = Math.max(1, Math.floor((gridWidth - 48 + gridGap) / (tileSize + gridGap)));
@@ -184,7 +191,7 @@ export default function App() {
               <label className="sort-control"><ArrowUpDown size={16}/><span>Sort:</span><select value={sortBy} aria-label="Sort photos" onChange={e=>setSortBy(e.target.value as SortBy)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">Name A–Z</option><option value="largest">Largest first</option><option value="smallest">Smallest first</option></select></label>
               {photoView === "grid" && <div className="zoom-control"><ZoomOut size={17}/><input aria-label="Thumbnail size" type="range" min="110" max="300" step="10" value={tileSize} onChange={e=>setTileSize(Number(e.target.value))}/><ZoomIn size={17}/><span>{tileSize}px</span></div>}
             </div>
-            {result && <div className="selection-toolbar"><label className="sort-control">Media <select aria-label="Media type" value={mediaType} onChange={e=>setMediaType(e.target.value as "all"|"photo"|"video")}><option value="all">All media</option><option value="photo">Photos</option><option value="video">Videos</option></select></label><span>{selection.length} selected</span><button className="secondary-button" onClick={()=>setSelection(visible.map(p=>p.path))}>Select matching</button><button className="secondary-button" onClick={()=>setSelection([])}>Clear selection</button><input aria-label="New XMP tags (comma separated)" placeholder="Tags separated by commas" value={tagText} onChange={e=>setTagText(e.target.value)}/><button className="primary-button" disabled={!selection.length || !tagText.trim() || applying} onClick={applyTags}>{applying?"Writing…":"Add tags to new sidecars"}</button></div>}
+            {result && <div className="selection-toolbar">{collectionFilter&&<button className="secondary-button" onClick={()=>setCollectionFilter("")}>Show all (clear collection)</button>}<label className="sort-control">Media <select aria-label="Media type" value={mediaType} onChange={e=>setMediaType(e.target.value as "all"|"photo"|"video")}><option value="all">All media</option><option value="photo">Photos</option><option value="video">Videos</option></select></label><span>{selection.length} selected</span><button className="secondary-button" onClick={()=>setSelection(visible.map(p=>p.path))}>Select matching</button><button className="secondary-button" onClick={()=>setSelection([])}>Clear selection</button><input aria-label="New XMP tags (comma separated)" placeholder="Tags separated by commas" value={tagText} onChange={e=>setTagText(e.target.value)}/><button className="primary-button" disabled={!selection.length || !tagText.trim() || applying} onClick={applyTags}>{applying?"Writing…":"Add tags to new sidecars"}</button></div>}
             {tagMessage && <div className="results-note" role="status">{tagMessage}</div>}
             {error && <div role="alert" className="error">{error}</div>}
             {busy && <div className="empty"><div className="empty-symbol"><Images size={28}/></div><h3>Scanning your folder</h3><p>Reading file names and sizes. No photos are being changed.</p></div>}
@@ -198,6 +205,8 @@ export default function App() {
         </>}
         {view === "folders" && <><span className="eyebrow">LIBRARY ORGANIZATION</span><h1>Folders</h1><p>Browse the folder structure from your selected workspace.</p><div className="folder-list">{folders.map(folder=><button key={folder} className="folder-item" onClick={()=>{setFolderFilter(folder==="(root)"?"":folder);setView("library")}}><FolderOpen size={20}/>{folder}<ChevronRight size={16}/></button>)}{folders.length===0&&<p>Open a workspace folder to browse its subfolders.</p>}</div></>}
         {view === "map" && <><span className="eyebrow">PHOTO LOCATIONS</span><h1>Map</h1><p>Zoom and explore GPS-tagged photos from your current workspace. Select a marker to preview its photo.</p>{geoBusy?<p>Reading embedded GPS locations…</p>:<p>{geoPoints.length} photo locations found. Currently supports GPS from JPEG and TIFF; HEIC/MOV location metadata is planned.</p>}{root&&result?<PhotoMap points={geoPoints} onChoose={path=>{const photo=result.photos.find(p=>p.path===path);if(photo)setSelected(photo)}}/>:<div className="placeholder-panel"><p>Open a workspace and scan a photo folder first.</p></div>}</>}
+        {view === "collections" && <><span className="eyebrow">VIRTUAL ORGANIZATION</span><h1>Collections</h1><p>Group media without moving original files.</p><button className="primary-button" onClick={()=>{const name=window.prompt("Collection name");if(name?.trim())setCollections(old=>[...old,{id:crypto.randomUUID(),workspaceId:activeWorkspace,name:name.trim(),paths:[...selection]}])}}>Create collection {selection.length? `with ${selection.length} selected` : ""}</button><div className="folder-list">{collections.filter(c=>c.workspaceId===activeWorkspace).map(c=><div key={c.id} className="collection-row"><button className="folder-item" onClick={()=>{setCollectionFilter(c.id);setView("library")}}><Images size={18}/>{c.name} · {c.paths.length} items</button><button className="secondary-button" onClick={()=>setCollections(old=>old.filter(x=>x.id!==c.id))}>Remove</button></div>)}</div></>}
+        {view === "timeline" && <><span className="eyebrow">BY MODIFIED DATE</span><h1>Timeline</h1><p>Browse files by modification month. Capture-date sorting will follow when EXIF and QuickTime date extraction is complete.</p><div className="folder-list">{[...new Set((result?.photos||[]).map(p=>new Date(p.modified_unix*1000).toLocaleDateString(undefined,{year:"numeric",month:"long"})))].map(month=><button className="folder-item" key={month} onClick={()=>{setQuery("");setSortBy("newest");setView("library")}}>{month}</button>)}</div></>}
         {view === "people" && <Placeholder title="People" subtitle="Organize familiar faces without giving up control of your data." icon={Users} description="Coming in a later milestone: local, opt-in face detection, human-reviewed identities, and portable XMP regions."/>}
         {view === "tags" && <Placeholder title="Tags" subtitle="Give every memory context that travels with the file." icon={Tags} description="Coming in a later milestone: hierarchical tags and verified, reversible XMP sidecar editing."/>}
         {view === "settings" && <div className="settings-view"><span className="eyebrow">PREFERENCES</span><h1>Settings</h1><p>Personalize the appearance of your workspace.</p><div className="settings-card"><div><h2>Appearance</h2><p>Choose your preferred color theme.</p></div><div className="theme-options">{([{id:"system",label:"System",Icon:Monitor},{id:"light",label:"Light",Icon:Sun},{id:"dark",label:"Dark",Icon:Moon}] as const).map(({id,label,Icon})=><button key={id} className={theme === id ? "theme-option selected" : "theme-option"} onClick={()=>setTheme(id)}><Icon size={17}/>{label}</button>)}</div></div><div className="settings-card"><div><h2>File safety</h2><p>Open-Photo currently indexes paths, sizes, and modification times only. File writes and deletions are not implemented.</p></div><span className="safety-pill">Protected</span></div></div>}
