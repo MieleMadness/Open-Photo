@@ -322,6 +322,7 @@ pub fn run() {
             open_video,
             geo::gps_for_photos,
             index::scan_indexed,
+            index::scan_indexed_with_changes,
             index::find_exact_duplicates,
             index::find_workspace_duplicates
         ])
