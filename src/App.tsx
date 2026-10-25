@@ -103,7 +103,7 @@ export default function App() {
       for(const scan of success)for(const photo of scan.value.photos)merged.set(photo.path,photo);
       setResult({photos:[...merged.values()],scanned_files:success.reduce((n,s)=>n+s.value.scanned_files,0),truncated:success.some(s=>s.value.truncated)});
       if(failures.length)setError(failures.map(x=>String(x.reason)).join("; "));
-      setSyncChanges(success.reduce((summary,entry)=>({added:summary.added+entry.value.changes.added,updated:summary.updated+entry.value.changes.updated,removed:summary.removed+entry.value.changes.removed,incomplete:summary.incomplete||entry.value.changes.incomplete}),{added:0,updated:0,removed:0,incomplete:false}));
+      setSyncChanges(success.reduce<{added:number;updated:number;removed:number;incomplete:boolean}>((summary,entry)=>({added:summary.added+entry.value.changes.added,updated:summary.updated+entry.value.changes.updated,removed:summary.removed+entry.value.changes.removed,incomplete:summary.incomplete||entry.value.changes.incomplete}),{added:0,updated:0,removed:0,incomplete:false}));
       setLastSync(new Date().toLocaleString());setDuplicates([]);
     } catch(e){setError(String(e))}finally{setBusy(false)}
   };
