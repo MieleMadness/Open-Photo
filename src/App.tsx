@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import PhotoMap, {type PhotoLocation} from "./PhotoMap";
 import { Images, FolderOpen, Users, Tags, Settings2, Search, Moon, Sun, Monitor, ShieldCheck, ImageOff, HardDrive, ListFilter, ChevronRight, X, LayoutGrid, List, ZoomIn, ZoomOut, ArrowUpDown } from "lucide-react";
 
 type View = "library" | "folders" | "map" | "people" | "tags" | "settings";
@@ -25,6 +26,8 @@ export default function App() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>(()=>{try{return JSON.parse(localStorage.getItem("openphoto.workspaces")||"[]") as Workspace[]}catch{return []}});
   const [activeWorkspace,setActiveWorkspace] = useState<string>(()=>localStorage.getItem("openphoto.activeWorkspace")||"");
   const [folderFilter,setFolderFilter] = useState("");
+  const [geoPoints,setGeoPoints]=useState<PhotoLocation[]>([]);
+  const [geoBusy,setGeoBusy]=useState(false);
   const [mediaType,setMediaType] = useState<"all"|"photo"|"video">("all");
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("openphoto.theme") as Theme) || "system");
   const [root, setRoot] = useState("");
@@ -70,6 +73,13 @@ export default function App() {
   };
 
   const openWorkspace=async(id:string)=>{const item=workspaces.find(w=>w.id===id);if(!item)return;setActiveWorkspace(id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter("");if(item.root){setBusy(true);try{setResult(await invoke<ScanResult>("scan_library",{root:item.root}))}catch(e){setError(String(e))}finally{setBusy(false)}}};
+  useEffect(()=>{
+    if(view!=="map"||!root||!result){setGeoPoints([]);return;}
+    let active=true;setGeoBusy(true);
+    const paths=result.photos.filter(p=>["jpg","jpeg","tif","tiff"].includes(p.extension)).slice(0,5000).map(p=>p.path);
+    invoke<PhotoLocation[]>("gps_for_photos",{root,paths}).then(x=>{if(active)setGeoPoints(x)}).catch(e=>{if(active)setError(String(e))}).finally(()=>{if(active)setGeoBusy(false)});
+    return ()=>{active=false};
+  },[root,result,view]);
   const folders=useMemo(()=>[...new Set((result?.photos||[]).map(p=>p.path.slice(0,p.path.lastIndexOf("\\")).replace(root,"").replace(/^[\\/]/,"")||"(root)"))].sort(),[result,root]);
   const visible = useMemo(() => {
     const photos = result?.photos.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) && (!folderFilter || p.path.includes(folderFilter)) && (mediaType==="all" || (mediaType==="video" ? ["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension) : !["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension)))) || [];
@@ -147,7 +157,7 @@ export default function App() {
           </section>
         </>}
         {view === "folders" && <><span className="eyebrow">LIBRARY ORGANIZATION</span><h1>Folders</h1><p>Browse the folder structure from your selected workspace.</p><div className="folder-list">{folders.map(folder=><button key={folder} className="folder-item" onClick={()=>{setFolderFilter(folder==="(root)"?"":folder);setView("library")}}><FolderOpen size={20}/>{folder}<ChevronRight size={16}/></button>)}{folders.length===0&&<p>Open a workspace folder to browse its subfolders.</p>}</div></>}
-        {view === "map" && <Placeholder title="Photo Map" subtitle="Explore the places behind your memories." icon={Monitor} description="GPS extraction, geographic basemap, marker clustering, and click-to-open photo pins are the next development milestone. Location is not inferred from filenames."/>}
+        {view === "map" && <><span className="eyebrow">PHOTO LOCATIONS</span><h1>Map</h1><p>Zoom and explore GPS-tagged photos from your current workspace. Select a marker to preview its photo.</p>{geoBusy?<p>Reading embedded GPS locations…</p>:<p>{geoPoints.length} photo locations found. Currently supports GPS from JPEG and TIFF; HEIC/MOV location metadata is planned.</p>}{root&&result?<PhotoMap points={geoPoints} onChoose={path=>{const photo=result.photos.find(p=>p.path===path);if(photo)setSelected(photo)}}/>:<div className="placeholder-panel"><p>Open a workspace and scan a photo folder first.</p></div>}</>}
         {view === "people" && <Placeholder title="People" subtitle="Organize familiar faces without giving up control of your data." icon={Users} description="Coming in a later milestone: local, opt-in face detection, human-reviewed identities, and portable XMP regions."/>}
         {view === "tags" && <Placeholder title="Tags" subtitle="Give every memory context that travels with the file." icon={Tags} description="Coming in a later milestone: hierarchical tags and verified, reversible XMP sidecar editing."/>}
         {view === "settings" && <div className="settings-view"><span className="eyebrow">PREFERENCES</span><h1>Settings</h1><p>Personalize the appearance of your workspace.</p><div className="settings-card"><div><h2>Appearance</h2><p>Choose your preferred color theme.</p></div><div className="theme-options">{([{id:"system",label:"System",Icon:Monitor},{id:"light",label:"Light",Icon:Sun},{id:"dark",label:"Dark",Icon:Moon}] as const).map(({id,label,Icon})=><button key={id} className={theme === id ? "theme-option selected" : "theme-option"} onClick={()=>setTheme(id)}><Icon size={17}/>{label}</button>)}</div></div><div className="settings-card"><div><h2>File safety</h2><p>Open-Photo currently indexes paths, sizes, and modification times only. File writes and deletions are not implemented.</p></div><span className="safety-pill">Protected</span></div></div>}
