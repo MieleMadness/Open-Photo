@@ -236,6 +236,73 @@ pub fn update_indexed_path(root: String, path: String) -> Result<IncrementalChan
     Ok(change)
 }
 
+/// Read-only library integrity summary; no missing files are deleted from the index.
+#[derive(Serialize)]
+pub struct LibraryHealth {
+    pub indexed: usize,
+    pub available: usize,
+    pub missing: usize,
+    pub inaccessible: usize,
+    pub modified: usize,
+}
+
+fn classify_indexed_files<I>(entries: I) -> LibraryHealth
+where
+    I: IntoIterator<Item = (String, i64, i64)>,
+{
+    let mut health = LibraryHealth {
+        indexed: 0,
+        available: 0,
+        missing: 0,
+        inaccessible: 0,
+        modified: 0,
+    };
+    for (path, expected_bytes, expected_modified) in entries {
+        health.indexed += 1;
+        match std::fs::metadata(path) {
+            Ok(meta) if meta.is_file() => {
+                health.available += 1;
+                let modified = meta
+                    .modified()
+                    .ok()
+                    .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map_or(0, |duration| duration.as_secs());
+                if meta.len() as i64 != expected_bytes || modified as i64 != expected_modified {
+                    health.modified += 1;
+                }
+            }
+            Ok(_) => health.inaccessible += 1,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => health.missing += 1,
+            Err(_) => health.inaccessible += 1,
+        }
+    }
+    health
+}
+
+#[tauri::command]
+pub fn library_health(root: String) -> Result<LibraryHealth, String> {
+    let directory = std::fs::canonicalize(&root).map_err(|e| e.to_string())?;
+    if !directory.is_dir() {
+        return Err("Library root is unavailable".into());
+    }
+    let db = database()?;
+    let mut statement = db
+        .prepare("SELECT path, bytes, modified_unix FROM media WHERE root = ?1")
+        .map_err(|e| e.to_string())?;
+    let records = statement
+        .query_map([&root], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(classify_indexed_files(records))
+}
+
 #[derive(Serialize)]
 pub struct DuplicateGroup {
     pub paths: Vec<String>,
@@ -363,6 +430,33 @@ mod tests {
         assert!(result.is_err(), "Directory events must trigger a full scan");
         std::fs::remove_dir_all(directory).unwrap();
     }
+    #[test]
+    fn health_inspection_counts_missing_without_mutating_sources() {
+        let directory = std::env::temp_dir().join(format!(
+            "openphoto-health-{}", std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let existing = directory.join("existing.jpg");
+        std::fs::write(&existing, b"photo").unwrap();
+        let metadata = std::fs::metadata(&existing).unwrap();
+        let modified = metadata
+            .modified()
+            .unwrap()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let health = classify_indexed_files(vec![
+            (existing.to_string_lossy().into_owned(), 5, modified),
+            (directory.join("absent.jpg").to_string_lossy().into_owned(), 0, 0),
+        ]);
+        assert_eq!(health.indexed, 2);
+        assert_eq!(health.available, 1);
+        assert_eq!(health.missing, 1);
+        assert_eq!(health.modified, 0);
+        assert_eq!(std::fs::read(existing).unwrap(), b"photo");
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     #[test]
     fn finds_duplicates_across_roots_without_double_counting() {
         let base = std::env::temp_dir().join(format!("openphoto-crossroot-{}", std::process::id()));
