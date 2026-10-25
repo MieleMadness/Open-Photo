@@ -1,0 +1,32 @@
+# Local builds and dependencies
+node_modules/
+dist/
+target/
+src-tauri/target/
+*.log
+.env
+.env.*
+!.env.example
+
+# Local index / user data / credentials
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.key
+*.pem
+*.p12
+*.pfx
+.cache/
+thumbs/
+thumbnails/
+local-library/
+test-private/
+*.xmp.bak
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
