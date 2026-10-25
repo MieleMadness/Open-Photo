@@ -198,6 +198,20 @@ export default function App() {
     return ()=>{active=false};
   },[root,result,view]);
   const folders=useMemo(()=>[...new Set((result?.photos||[]).map(p=>p.path.slice(0,Math.max(p.path.lastIndexOf("\\"),p.path.lastIndexOf("/"))).replace(p.libraryRoot||root,"").replace(/^[\\/]/,"")||"(root)"))].sort(),[result,root]);
+  const livePhotoPairs=useMemo(()=>{
+    const names=new Map<string,Set<string>>();
+    for(const photo of result?.photos||[]){
+      const normalized=photo.path.toLowerCase().replace(/\\\\/g,"/");
+      const separator=normalized.lastIndexOf(".");
+      if(separator<0)continue;
+      const key=normalized.slice(0,separator);
+      const extension=normalized.slice(separator+1);
+      const types=names.get(key)||new Set<string>();
+      types.add(extension);
+      names.set(key,types);
+    }
+    return [...names.values()].filter(types=>types.has("mov")&&["heic","heif","jpg","jpeg"].some(type=>types.has(type))).length;
+  },[result]);
   const currentCollection=collections.find(c=>c.id===collectionFilter&&c.workspaceId===activeWorkspace);
   const visible = useMemo(() => {
     const photos = result?.photos.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) && (!folderFilter || p.path.includes(folderFilter)) && (!currentCollection || currentCollection.paths.includes(p.path)) && (mediaType==="all" || (mediaType==="video" ? ["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension) : !["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension)))) || [];
@@ -265,6 +279,7 @@ export default function App() {
               {photoView === "grid" && <div className="zoom-control"><ZoomOut size={17}/><input aria-label="Thumbnail size" type="range" min="110" max="300" step="10" value={tileSize} onChange={e=>setTileSize(Number(e.target.value))}/><ZoomIn size={17}/><span>{tileSize}px</span></div>}
             </div>
             {result && <div className="selection-toolbar">{collectionFilter&&<button className="secondary-button" onClick={()=>setCollectionFilter("")}>Show all (clear collection)</button>}<label className="sort-control">Media <select aria-label="Media type" value={mediaType} onChange={e=>setMediaType(e.target.value as "all"|"photo"|"video")}><option value="all">All media</option><option value="photo">Photos</option><option value="video">Videos</option></select></label><span>{selection.length} selected</span><button className="secondary-button" onClick={()=>setSelection(visible.map(p=>p.path))}>Select matching</button><button className="secondary-button" onClick={()=>setSelection([])}>Clear selection</button><input aria-label="New XMP tags (comma separated)" placeholder="Tags separated by commas" value={tagText} onChange={e=>setTagText(e.target.value)}/><button className="primary-button" disabled={!selection.length || !tagText.trim() || applying} onClick={applyTags}>{applying?"Writing…":"Add tags to new sidecars"}</button></div>}
+            {result && livePhotoPairs>0 && <p className="results-note">{livePhotoPairs} potential iPhone Live Photo pairs found (same folder and filename stem). Original image and video files remain separate.</p>}
             {result && <div className="duplicate-bar"><button className="secondary-button" disabled={duplicateBusy} onClick={inspectDuplicates}>Find Exact Duplicates</button><button className="secondary-button" disabled={duplicateBusy} onClick={inspectSimilar}>Find Similar Photos</button>{duplicateBusy&&<span>Analyzing local files…</span>}{duplicates.length>0&&<span>{duplicates.length} identical-file groups</span>}{similarGroups.length>0&&<span>{similarGroups.length} visually similar groups</span>}{[...duplicates.map(group=>({paths:group.paths,label:"Identical files"})),...similarGroups.map(group=>({paths:group.paths,label:"Visually similar photos"}))].map((group,i)=><div className="duplicate-group" key={i}><strong>{group.label}</strong>{group.paths.map(path=><small key={path}>{path}</small>)}</div>)}</div>}
             {tagMessage && <div className="results-note" role="status">{tagMessage}</div>}
             {error && <div role="alert" className="error">{error}</div>}
