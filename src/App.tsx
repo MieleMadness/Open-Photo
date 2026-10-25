@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import PhotoMap, {type PhotoLocation} from "./PhotoMap";
 import { Images, FolderOpen, Users, Tags, Settings2, Search, Moon, Sun, Monitor, ShieldCheck, ImageOff, HardDrive, ListFilter, ChevronRight, X, LayoutGrid, List, ZoomIn, ZoomOut, ArrowUpDown } from "lucide-react";
@@ -131,6 +132,32 @@ export default function App() {
     if(!autoSync||!roots.length)return;
     const timer=window.setInterval(()=>{if(syncRunning.current!==syncGeneration.current)void syncFolders(roots)},120000);
     return ()=>window.clearInterval(timer);
+  },[autoSync,activeWorkspace,workspaces]);
+  useEffect(()=>{
+    if(!isDesktop)return;
+    let disposed=false;
+    let unlisten: (()=>void)|undefined;
+    let debounce: number|undefined;
+    const activeRoots=autoSync?roots:[];
+    const setup=async()=>{
+      try{
+        await invoke("set_watched_folders",{roots:activeRoots});
+        if(disposed||!autoSync)return;
+        unlisten=await listen("openphoto-folder-changed",()=>{
+          if(debounce!==undefined)window.clearTimeout(debounce);
+          debounce=window.setTimeout(()=>{
+            if(syncRunning.current!==syncGeneration.current)void syncFolders(activeRoots);
+          },1500);
+        });
+        if(disposed)unlisten();
+      }catch(error){if(!disposed)setError(String(error))}
+    };
+    void setup();
+    return ()=>{
+      disposed=true;
+      unlisten?.();
+      if(debounce!==undefined)window.clearTimeout(debounce);
+    };
   },[autoSync,activeWorkspace,workspaces]);
   const openWorkspace=async(id:string)=>{
     const item=workspaces.find(w=>w.id===id);if(!item)return;
