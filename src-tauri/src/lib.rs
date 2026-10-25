@@ -309,7 +309,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scan_library,
             preview_image,
-            bulk_create_tags
+            bulk_create_tags,
+            open_video,
+            geo::gps_for_photos,
+            index::scan_indexed,
+            index::find_exact_duplicates
         ])
         .run(tauri::generate_context!())
         .expect("error while running Open-Photo");
