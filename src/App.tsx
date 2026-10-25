@@ -36,6 +36,8 @@ export default function App() {
   const [geoBusy,setGeoBusy]=useState(false);
   const [autoSync,setAutoSync]=useState(false);
   const [lastSync,setLastSync]=useState("");
+  const [duplicates, setDuplicates] = useState<{paths:string[];bytes:number}[]>([]);
+  const [duplicateBusy, setDuplicateBusy] = useState(false);
   const [mediaType,setMediaType] = useState<"all"|"photo"|"video">("all");
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("openphoto.theme") as Theme) || "system");
   const [root, setRoot] = useState("");
