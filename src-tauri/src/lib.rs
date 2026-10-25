@@ -1,3 +1,4 @@
+mod cache_disk;
 mod geo;
 mod index;
 use base64::Engine;
@@ -253,6 +254,12 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
             return Ok(image.clone());
         }
     }
+    if let Some(bytes) = cache_disk::read(&key) {
+        return Ok(format!(
+            "data:image/png;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        ));
+    }
     let edge = max_edge.clamp(64, 1920);
     let reader = ImageReader::open(&file)
         .map_err(|e| e.to_string())?
@@ -266,9 +273,11 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
     thumb
         .write_to(&mut bytes, image::ImageFormat::Png)
         .map_err(|e| e.to_string())?;
+    let png = bytes.into_inner();
+    cache_disk::write(&key, &png);
     let result = format!(
         "data:image/png;base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(bytes.into_inner())
+        base64::engine::general_purpose::STANDARD.encode(png)
     );
     if let Ok(mut guard) = cache().lock() {
         if !guard.0.contains_key(&key) {
