@@ -146,6 +146,7 @@ export default function App() {
     if(!isDesktop)return;
     let disposed=false;
     let unlisten: (()=>void)|undefined;
+    let unlistenRenames: (()=>void)|undefined;
     let debounce: number|undefined;
     const activeRoots=autoSync?roots:[];
     const setup=async()=>{
@@ -158,6 +159,20 @@ export default function App() {
             if(syncRunning.current!==syncGeneration.current)void syncFolders(activeRoots);
           },1500);
         });
+        unlistenRenames=await listen<{from:string;to:string}>("openphoto-file-renamed",(event)=>{
+          const from=event.payload.from.toLowerCase().replace(/\\/g,"/");
+          const to=event.payload.to.toLowerCase().replace(/\\/g,"/");
+          const within=activeRoots.some(folder=>{
+            const base=folder.toLowerCase().replace(/\\/g,"/").replace(/\/$/,"");
+            return to.startsWith(base+"/");
+          });
+          if(!within)return;
+          setCollections(existing=>existing.map(collection=>{
+            if(collection.workspaceId!==activeWorkspace)return collection;
+            return {...collection,paths:collection.paths.map(path=>path.toLowerCase().replace(/\\/g,"/")===from?event.payload.to:path)};
+          }));
+        });
+        if(disposed)unlistenRenames();
         if(disposed)unlisten();
       }catch(error){if(!disposed)setError(String(error))}
     };
@@ -165,6 +180,7 @@ export default function App() {
     return ()=>{
       disposed=true;
       unlisten?.();
+      unlistenRenames?.();
       if(debounce!==undefined)window.clearTimeout(debounce);
     };
   },[autoSync,activeWorkspace,workspaces]);
