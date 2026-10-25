@@ -5,11 +5,11 @@ import PhotoMap, {type PhotoLocation} from "./PhotoMap";
 import { Images, FolderOpen, Users, Tags, Settings2, Search, Moon, Sun, Monitor, ShieldCheck, ImageOff, HardDrive, ListFilter, ChevronRight, X, LayoutGrid, List, ZoomIn, ZoomOut, ArrowUpDown } from "lucide-react";
 
 type View = "library" | "folders" | "map" | "people" | "tags" | "settings";
-type Workspace = { id: string; name: string; root: string };
+type Workspace = { id: string; name: string; root: string; roots?: string[] };
 type Theme = "light" | "dark" | "system";
 type PhotoView = "grid" | "list";
 type SortBy = "name" | "newest" | "oldest" | "largest" | "smallest";
-type Photo = { path: string; name: string; extension: string; bytes: number; modified_unix: number };
+type Photo = { path: string; name: string; extension: string; bytes: number; modified_unix: number; libraryRoot?: string };
 type ScanResult = { photos: Photo[]; scanned_files: number; truncated: boolean };
 const NAV: {id: View; title: string; icon: typeof Images}[] = [
   { id: "library", title: "Library", icon: Images },
@@ -28,6 +28,8 @@ export default function App() {
   const [folderFilter,setFolderFilter] = useState("");
   const [geoPoints,setGeoPoints]=useState<PhotoLocation[]>([]);
   const [geoBusy,setGeoBusy]=useState(false);
+  const [autoSync,setAutoSync]=useState(false);
+  const [lastSync,setLastSync]=useState("");
   const [mediaType,setMediaType] = useState<"all"|"photo"|"video">("all");
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("openphoto.theme") as Theme) || "system");
   const [root, setRoot] = useState("");
@@ -57,22 +59,50 @@ export default function App() {
     return () => media.removeEventListener("change", update);
   }, [theme]);
 
-  const chooseFolder = async () => {
-    if (!isDesktop) { setError("Choose folders inside the installed Windows application, not the web preview."); return; }
-    setError("");
+  const workspace = workspaces.find(w=>w.id===activeWorkspace);
+  const roots = workspace ? (workspace.roots?.length ? workspace.roots : workspace.root ? [workspace.root] : []) : [];
+  const syncFolders = async (paths: string[]) => {
+    if (!isDesktop || !paths.length) return;
+    setBusy(true); setError("");
     try {
-      const path = await open({ directory: true, multiple: false, title: "Select a photo library (read-only scan)" });
-      if (typeof path !== "string") return;
-      const id=activeWorkspace||crypto.randomUUID();
-      setWorkspaces(old=>old.some(w=>w.id===id)?old.map(w=>w.id===id?{...w,root:path}:w):[...old,{id,name:`Workspace ${old.length+1}`,root:path}]);
-      setActiveWorkspace(id);
-      setRoot(path); setBusy(true); setResult(null); setSelected(null); setSelection([]); setTagMessage("");
-      const items = await invoke<ScanResult>("scan_library", { root: path });
-      setResult(items);
-    } catch (e) { setError(String(e)); } finally { setBusy(false); }
+      const scans = await Promise.allSettled(paths.map(async path=>{
+        const data=await invoke<ScanResult>("scan_library",{root:path});
+        return {...data,photos:data.photos.map(photo=>({...photo,libraryRoot:path}))};
+      }));
+      const success=scans.filter((s):s is PromiseFulfilledResult<ScanResult>=>s.status==="fulfilled");
+      const failures=scans.filter((s):s is PromiseRejectedResult=>s.status==="rejected");
+      if (!success.length) throw Error(failures.map(x=>String(x.reason)).join("; "));
+      const merged=new Map<string,Photo>();
+      for(const scan of success)for(const photo of scan.value.photos)merged.set(photo.path,photo);
+      setResult({photos:[...merged.values()],scanned_files:success.reduce((n,s)=>n+s.value.scanned_files,0),truncated:success.some(s=>s.value.truncated)});
+      if(failures.length)setError(failures.map(x=>String(x.reason)).join("; "));
+      setLastSync(new Date().toLocaleString());
+    } catch(e){setError(String(e))}finally{setBusy(false)}
   };
-
-  const openWorkspace=async(id:string)=>{const item=workspaces.find(w=>w.id===id);if(!item)return;setActiveWorkspace(id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter("");if(item.root){setBusy(true);try{setResult(await invoke<ScanResult>("scan_library",{root:item.root}))}catch(e){setError(String(e))}finally{setBusy(false)}}};
+  const chooseFolder = async () => {
+    if (!isDesktop) { setError("Folders must be selected in the Windows app."); return; }
+    try {
+      const path=await open({directory:true,multiple:false,title:"Add local media folder"});
+      if(typeof path!=="string")return;
+      const id=activeWorkspace||crypto.randomUUID();
+      const current=workspaces.find(w=>w.id===id);
+      const nextRoots=[...new Set([...(current?.roots?.length?current.roots:current?.root?[current.root]:[]),path])];
+      setWorkspaces(old=>old.some(w=>w.id===id)?old.map(w=>w.id===id?{...w,root:nextRoots[0],roots:nextRoots}:w):[...old,{id,name:`Workspace ${old.length+1}`,root:path,roots:nextRoots}]);
+      setActiveWorkspace(id);setRoot(nextRoots[0]);setSelection([]);setSelected(null);setFolderFilter("");
+      await syncFolders(nextRoots);
+    }catch(e){setError(String(e))}
+  };
+  useEffect(()=>{
+    if(!autoSync||!roots.length)return;
+    const timer=window.setInterval(()=>{if(!busy)void syncFolders(roots)},120000);
+    return ()=>window.clearInterval(timer);
+  },[autoSync,activeWorkspace,workspaces,busy]);
+  const openWorkspace=async(id:string)=>{
+    const item=workspaces.find(w=>w.id===id);if(!item)return;
+    setActiveWorkspace(id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter("");
+    const folders=item.roots?.length?item.roots:item.root?[item.root]:[];
+    if(folders.length)await syncFolders(folders);
+  };
   useEffect(()=>{
     if(view!=="map"||!root||!result){setGeoPoints([]);return;}
     let active=true;setGeoBusy(true);
@@ -80,7 +110,7 @@ export default function App() {
     invoke<PhotoLocation[]>("gps_for_photos",{root,paths}).then(x=>{if(active)setGeoPoints(x)}).catch(e=>{if(active)setError(String(e))}).finally(()=>{if(active)setGeoBusy(false)});
     return ()=>{active=false};
   },[root,result,view]);
-  const folders=useMemo(()=>[...new Set((result?.photos||[]).map(p=>p.path.slice(0,p.path.lastIndexOf("\\")).replace(root,"").replace(/^[\\/]/,"")||"(root)"))].sort(),[result,root]);
+  const folders=useMemo(()=>[...new Set((result?.photos||[]).map(p=>p.path.slice(0,Math.max(p.path.lastIndexOf("\\"),p.path.lastIndexOf("/"))).replace(p.libraryRoot||root,"").replace(/^[\\/]/,"")||"(root)"))].sort(),[result,root]);
   const visible = useMemo(() => {
     const photos = result?.photos.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) && (!folderFilter || p.path.includes(folderFilter)) && (mediaType==="all" || (mediaType==="video" ? ["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension) : !["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension)))) || [];
     return photos.sort((a,b) => {
@@ -109,7 +139,9 @@ export default function App() {
     if (!window.confirm(`Write NEW XMP sidecars containing ${tags.join(", ")} for ${selection.length} photos? Existing XMP sidecars will be skipped and originals never modified.`)) return;
     setApplying(true); setTagMessage("");
     try {
-      const r = await invoke<{created:number;skipped:number;errors:string[]}>("bulk_create_tags", {root,paths:selection,tags});
+      const groups=new Map<string,string[]>();for(const path of selection){const parent=result?.photos.find(p=>p.path===path)?.libraryRoot||root;groups.set(parent,[...(groups.get(parent)||[]),path]);}
+      const outcomes=await Promise.all([...groups].map(([parent,paths])=>invoke<{created:number;skipped:number;errors:string[]}>("bulk_create_tags",{root:parent,paths,tags})));
+      const r={created:outcomes.reduce((n,x)=>n+x.created,0),skipped:outcomes.reduce((n,x)=>n+x.skipped,0),errors:outcomes.flatMap(x=>x.errors)};
       setTagMessage(`Created ${r.created} sidecars; skipped ${r.skipped}. ${r.errors.length ? r.errors.slice(0,3).join("; ") : ""}`);
       if (!r.errors.length) setSelection([]);
     } catch(e) { setTagMessage(String(e)); } finally {setApplying(false);}
@@ -133,7 +165,7 @@ export default function App() {
       <main className="page">
         {view === "library" && <>
           <div className="page-heading"><div><span className="eyebrow">YOUR COLLECTION</span><h1>Photo Library</h1><p>Browse your memories privately, right from your computer.</p></div><button className="primary-button" onClick={chooseFolder} disabled={busy}><FolderOpen size={18}/>{busy ? "Scanning..." : root ? "Change Folder" : "Open Folder"}</button></div>
-          <div className="stats"><div className="stat"><div className="stat-icon"><Images size={20}/></div><div><span>Indexed photos</span><strong>{result?.photos.length.toLocaleString() ?? "—"}</strong></div></div><div className="stat"><div className="stat-icon"><HardDrive size={20}/></div><div><span>Selected files size</span><strong>{result ? formatBytes(bytes) : "—"}</strong></div></div><div className="stat"><div className="stat-icon"><ShieldCheck size={20}/></div><div><span>File protection</span><strong>Read-only</strong></div></div></div>
+          <div className="sync-toolbar"><strong>{roots.length} folders</strong><button className="secondary-button" onClick={chooseFolder}>+ Add folder</button><button className="secondary-button" disabled={!roots.length||busy} onClick={()=>syncFolders(roots)}>{busy?"Scanning…":"Sync Now"}</button><label><input type="checkbox" checked={autoSync} onChange={e=>setAutoSync(e.target.checked)}/> Auto-sync every 2 minutes</label><small>{lastSync&&`Last indexed: ${lastSync}`}</small>{roots.map(p=><span key={p} className="folder-chip" title={p}>{p}<button aria-label={`Remove ${p}`} onClick={()=>{const remaining=roots.filter(x=>x!==p);setWorkspaces(old=>old.map(w=>w.id===activeWorkspace?{...w,roots:remaining,root:remaining[0]||""}:w));setRoot(remaining[0]||"");setResult(null);if(remaining.length)void syncFolders(remaining)}}>×</button></span>)}</div><div className="stats"><div className="stat"><div className="stat-icon"><Images size={20}/></div><div><span>Indexed photos</span><strong>{result?.photos.length.toLocaleString() ?? "—"}</strong></div></div><div className="stat"><div className="stat-icon"><HardDrive size={20}/></div><div><span>Selected files size</span><strong>{result ? formatBytes(bytes) : "—"}</strong></div></div><div className="stat"><div className="stat-icon"><ShieldCheck size={20}/></div><div><span>File protection</span><strong>Read-only</strong></div></div></div>
           <section className="library-panel">
             <div className="panel-toolbar"><div><h2>All Photos</h2>{folderFilter&&<button className="secondary-button" onClick={()=>setFolderFilter("")}>Clear folder: {folderFilter}</button>}<p>{root ? root : "Select a folder to begin browsing"}</p></div><div className="search-box"><Search size={17}/><input aria-label="Filter photos by filename" placeholder="Search filenames..." value={query} onChange={e => setQuery(e.target.value)} disabled={!result}/><ListFilter size={16}/></div></div>
             <div className="view-toolbar">
@@ -151,7 +183,7 @@ export default function App() {
             {!busy && !result && <div className="empty"><div className="empty-symbol"><ImageOff size={32}/></div><h3>Your library starts here</h3><p>Choose a folder on your computer to discover supported photo files. Images display as thumbnails where supported, with local-only processing.</p><button className="secondary-button" onClick={chooseFolder}><FolderOpen size={16}/> Select Photo Folder</button></div>}
             {!busy && result && <><div className="results-note">{visible.length} matching files · {result.scanned_files.toLocaleString()} filesystem entries scanned {result.truncated ? "· scan limit reached" : ""}</div><div className={photoView === "grid" ? "photo-grid virtual-photo-grid" : "file-list"} onScroll={e=>setScrollTop(e.currentTarget.scrollTop)} ref={el=>{if(el && Math.abs(el.clientWidth-gridWidth)>5)setGridWidth(el.clientWidth);}} style={photoView === "grid" ? { display:"block", padding:0 } : undefined}>
               {photoView === "grid" ? <div style={{height:rowCount*rowHeight,position:"relative"}}><div className="virtual-rows" style={{position:"absolute",top:windowStart*rowHeight,left:24,right:24,display:"grid",gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`,gridAutoRows:rowHeight,gap:0}}>
-                {windowPhotos.map(p=><div className="tile-cell" key={p.path}><button className={selection.includes(p.path) ? "photo-tile is-selected" : "photo-tile"} onClick={e=>e.ctrlKey||e.metaKey ? toggleSelection(p.path):setSelected(p)}><PhotoThumb root={root} photo={p} maxEdge={Math.max(360,tileSize*2)} /><span className="tile-name" title={p.name}>{p.name}</span></button><input type="checkbox" aria-label={`Select ${p.name}`} checked={selection.includes(p.path)} onChange={()=>toggleSelection(p.path)}/></div>)}
+                {windowPhotos.map(p=><div className="tile-cell" key={p.path}><button className={selection.includes(p.path) ? "photo-tile is-selected" : "photo-tile"} onClick={e=>e.ctrlKey||e.metaKey ? toggleSelection(p.path):setSelected(p)}><PhotoThumb root={p.libraryRoot||root} photo={p} maxEdge={Math.max(360,tileSize*2)} /><span className="tile-name" title={p.name}>{p.name}</span></button><input type="checkbox" aria-label={`Select ${p.name}`} checked={selection.includes(p.path)} onChange={()=>toggleSelection(p.path)}/></div>)}
               </div></div> : visible.map(p=><div key={p.path} className="selectable-row"><input type="checkbox" aria-label={`Select ${p.name}`} checked={selection.includes(p.path)} onChange={()=>toggleSelection(p.path)}/><button className="file-row" onClick={()=>setSelected(p)}><div className="file-avatar"><PhotoThumb root={root} photo={p} maxEdge={96}/></div><div className="file-name"><strong>{p.name}</strong><small>{p.extension.toUpperCase()} · {formatBytes(p.bytes)}</small></div><ChevronRight size={16}/></button></div>)}
             </div>{visible.length === 0 && <div className="empty"><p>No supported photos matched this search.</p></div>}</>}
           </section>
@@ -163,7 +195,7 @@ export default function App() {
         {view === "settings" && <div className="settings-view"><span className="eyebrow">PREFERENCES</span><h1>Settings</h1><p>Personalize the appearance of your workspace.</p><div className="settings-card"><div><h2>Appearance</h2><p>Choose your preferred color theme.</p></div><div className="theme-options">{([{id:"system",label:"System",Icon:Monitor},{id:"light",label:"Light",Icon:Sun},{id:"dark",label:"Dark",Icon:Moon}] as const).map(({id,label,Icon})=><button key={id} className={theme === id ? "theme-option selected" : "theme-option"} onClick={()=>setTheme(id)}><Icon size={17}/>{label}</button>)}</div></div><div className="settings-card"><div><h2>File safety</h2><p>Open-Photo currently indexes paths, sizes, and modification times only. File writes and deletions are not implemented.</p></div><span className="safety-pill">Protected</span></div></div>}
       </main>
     </div>
-    {selected && <div className="modal-backdrop" role="presentation" onClick={()=>setSelected(null)}><section className="details" role="dialog" aria-modal="true" aria-label="Photo details" onClick={e=>e.stopPropagation()}><div className="details-header"><h2>File Details</h2><button className="icon-button" onClick={()=>setSelected(null)} aria-label="Close details"><X size={20}/></button></div><div className="detail-preview">{["mov","mp4","m4v","avi","mkv","webm"].includes(selected.extension)?<div className="photo-fallback"><Images size={42}/><span>Embedded playback is planned. Open this video using your default Windows player.</span></div>:<PhotoThumb root={root} photo={selected} maxEdge={1600}/>}</div>{["mov","mp4","m4v","avi","mkv","webm"].includes(selected.extension)&&<button className="primary-button" onClick={()=>invoke("open_video",{root,path:selected.path}).catch(e=>setError(String(e)))}>Open in Windows player</button>}<dl><dt>Name</dt><dd>{selected.name}</dd><dt>Location</dt><dd className="break-anywhere">{selected.path}</dd><dt>File size</dt><dd>{formatBytes(selected.bytes)}</dd><dt>File format</dt><dd>{selected.extension.toUpperCase()}</dd><dt>Modified</dt><dd>{selected.modified_unix ? new Date(selected.modified_unix*1000).toLocaleString() : "Unknown"}</dd></dl><div className="details-foot"><ShieldCheck size={16}/> File opened read-only</div></section></div>}
+    {selected && <div className="modal-backdrop" role="presentation" onClick={()=>setSelected(null)}><section className="details" role="dialog" aria-modal="true" aria-label="Photo details" onClick={e=>e.stopPropagation()}><div className="details-header"><h2>File Details</h2><button className="icon-button" onClick={()=>setSelected(null)} aria-label="Close details"><X size={20}/></button></div><div className="detail-preview">{["mov","mp4","m4v","avi","mkv","webm"].includes(selected.extension)?<div className="photo-fallback"><Images size={42}/><span>Embedded playback is planned. Open this video using your default Windows player.</span></div>:<PhotoThumb root={selected.libraryRoot||root} photo={selected} maxEdge={1600}/>}</div>{["mov","mp4","m4v","avi","mkv","webm"].includes(selected.extension)&&<button className="primary-button" onClick={()=>invoke("open_video",{root:selected.libraryRoot||root,path:selected.path}).catch(e=>setError(String(e)))}>Open in Windows player</button>}<dl><dt>Name</dt><dd>{selected.name}</dd><dt>Location</dt><dd className="break-anywhere">{selected.path}</dd><dt>File size</dt><dd>{formatBytes(selected.bytes)}</dd><dt>File format</dt><dd>{selected.extension.toUpperCase()}</dd><dt>Modified</dt><dd>{selected.modified_unix ? new Date(selected.modified_unix*1000).toLocaleString() : "Unknown"}</dd></dl><div className="details-foot"><ShieldCheck size={16}/> File opened read-only</div></section></div>}
   </div>;
 }
 
