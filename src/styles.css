@@ -67,3 +67,8 @@
 .duplicate-bar>span{font-size:12px;color:var(--muted)}
 .duplicate-group{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:5px}
 .duplicate-group small{color:var(--muted);overflow-wrap:anywhere}
+
+/* Phase 4: immersive viewer retains read-only originals. */
+.details-fullscreen{width:calc(100vw - 32px);max-width:none;height:calc(100vh - 32px);max-height:none;overflow-y:auto}
+.details-fullscreen .detail-preview{height:min(72vh,900px);min-height:300px}
+.details-fullscreen .detail-preview .photo-image{max-width:100%;max-height:100%;object-fit:contain}
