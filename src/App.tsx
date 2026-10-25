@@ -36,6 +36,7 @@ export default function App() {
   const [geoBusy,setGeoBusy]=useState(false);
   const [autoSync,setAutoSync]=useState(false);
   const [lastSync,setLastSync]=useState("");
+  const [syncChanges,setSyncChanges]=useState<{added:number;updated:number;removed:number;incomplete:boolean}|null>(null);
   const [duplicates, setDuplicates] = useState<{paths:string[];bytes:number}[]>([]);
   const [duplicateBusy, setDuplicateBusy] = useState(false);
   const [mediaType,setMediaType] = useState<"all"|"photo"|"video">("all");
@@ -91,8 +92,9 @@ export default function App() {
     setBusy(true); setError("");
     try {
       const scans = await Promise.allSettled(paths.map(async path=>{
-        const data=await invoke<ScanResult>("scan_indexed",{root:path});
-        return {...data,photos:data.photos.map(photo=>({...photo,libraryRoot:path}))};
+        const response=await invoke<{scan:ScanResult;changes:{added:number;updated:number;removed:number;incomplete:boolean}}>("scan_indexed_with_changes",{root:path});
+        const data=response.scan;
+        return {...data,changes:response.changes,photos:data.photos.map(photo=>({...photo,libraryRoot:path}))};
       }));
       const success=scans.filter(s=>s.status==="fulfilled");
       const failures=scans.filter((s):s is PromiseRejectedResult=>s.status==="rejected");
@@ -101,6 +103,7 @@ export default function App() {
       for(const scan of success)for(const photo of scan.value.photos)merged.set(photo.path,photo);
       setResult({photos:[...merged.values()],scanned_files:success.reduce((n,s)=>n+s.value.scanned_files,0),truncated:success.some(s=>s.value.truncated)});
       if(failures.length)setError(failures.map(x=>String(x.reason)).join("; "));
+      setSyncChanges(success.reduce((summary,entry)=>({added:summary.added+entry.value.changes.added,updated:summary.updated+entry.value.changes.updated,removed:summary.removed+entry.value.changes.removed,incomplete:summary.incomplete||entry.value.changes.incomplete}),{added:0,updated:0,removed:0,incomplete:false}));
       setLastSync(new Date().toLocaleString());setDuplicates([]);
     } catch(e){setError(String(e))}finally{setBusy(false)}
   };
@@ -191,7 +194,7 @@ export default function App() {
       <main className="page">
         {view === "library" && <>
           <div className="page-heading"><div><span className="eyebrow">YOUR COLLECTION</span><h1>Photo Library</h1><p>Browse your memories privately, right from your computer.</p></div><button className="primary-button" onClick={chooseFolder} disabled={busy}><FolderOpen size={18}/>{busy ? "Scanning..." : root ? "Change Folder" : "Open Folder"}</button></div>
-          <div className="sync-toolbar"><strong>{roots.length} folders</strong><button className="secondary-button" onClick={chooseFolder}>+ Add folder</button><button className="secondary-button" disabled={!roots.length||busy} onClick={()=>syncFolders(roots)}>{busy?"Scanning…":"Sync Now"}</button><label><input type="checkbox" checked={autoSync} onChange={e=>setAutoSync(e.target.checked)}/> Auto-sync every 2 minutes</label><small>{lastSync&&`Last indexed: ${lastSync}`}</small>{roots.map(p=><span key={p} className="folder-chip" title={p}>{p}<button aria-label={`Remove ${p}`} onClick={()=>{const remaining=roots.filter(x=>x!==p);setWorkspaces(old=>old.map(w=>w.id===activeWorkspace?{...w,roots:remaining,root:remaining[0]||""}:w));setRoot(remaining[0]||"");setResult(null);if(remaining.length)void syncFolders(remaining)}}>×</button></span>)}</div><div className="stats"><div className="stat"><div className="stat-icon"><Images size={20}/></div><div><span>Indexed photos</span><strong>{result?.photos.length.toLocaleString() ?? "—"}</strong></div></div><div className="stat"><div className="stat-icon"><HardDrive size={20}/></div><div><span>Selected files size</span><strong>{result ? formatBytes(bytes) : "—"}</strong></div></div><div className="stat"><div className="stat-icon"><ShieldCheck size={20}/></div><div><span>File protection</span><strong>Read-only</strong></div></div></div>
+          <div className="sync-toolbar"><strong>{roots.length} folders</strong><button className="secondary-button" onClick={chooseFolder}>+ Add folder</button><button className="secondary-button" disabled={!roots.length||busy} onClick={()=>syncFolders(roots)}>{busy?"Scanning…":"Sync Now"}</button><label><input type="checkbox" checked={autoSync} onChange={e=>setAutoSync(e.target.checked)}/> Auto-sync every 2 minutes</label><small>{lastSync&&`Last indexed: ${lastSync}`}</small>{syncChanges&&<small>{`Changes: +${syncChanges.added} added, ${syncChanges.updated} updated, ${syncChanges.removed} removed${syncChanges.incomplete?" (partial scan)":""}`}</small>}{roots.map(p=><span key={p} className="folder-chip" title={p}>{p}<button aria-label={`Remove ${p}`} onClick={()=>{const remaining=roots.filter(x=>x!==p);setWorkspaces(old=>old.map(w=>w.id===activeWorkspace?{...w,roots:remaining,root:remaining[0]||""}:w));setRoot(remaining[0]||"");setResult(null);if(remaining.length)void syncFolders(remaining)}}>×</button></span>)}</div><div className="stats"><div className="stat"><div className="stat-icon"><Images size={20}/></div><div><span>Indexed photos</span><strong>{result?.photos.length.toLocaleString() ?? "—"}</strong></div></div><div className="stat"><div className="stat-icon"><HardDrive size={20}/></div><div><span>Selected files size</span><strong>{result ? formatBytes(bytes) : "—"}</strong></div></div><div className="stat"><div className="stat-icon"><ShieldCheck size={20}/></div><div><span>File protection</span><strong>Read-only</strong></div></div></div>
           <section className="library-panel">
             <div className="panel-toolbar"><div><h2>All Photos</h2>{folderFilter&&<button className="secondary-button" onClick={()=>setFolderFilter("")}>Clear folder: {folderFilter}</button>}<p>{root ? root : "Select a folder to begin browsing"}</p></div><div className="search-box"><Search size={17}/><input aria-label="Filter photos by filename" placeholder="Search filenames..." value={query} onChange={e => setQuery(e.target.value)} disabled={!result}/><ListFilter size={16}/></div></div>
             <div className="view-toolbar">
