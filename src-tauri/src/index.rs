@@ -144,6 +144,64 @@ pub fn scan_indexed_with_changes(root: String) -> Result<IndexedScan, String> {
     Ok(IndexedScan { scan, changes })
 }
 
+/// Apply a single confirmed file event without traversing the entire library.
+/// Directory, ambiguous and missed events continue to use full scan fallback.
+#[derive(Serialize)]
+pub struct IncrementalChange {
+    pub path: String,
+    pub present: bool,
+    pub bytes: u64,
+    pub modified_unix: u64,
+}
+
+#[tauri::command]
+pub fn update_indexed_path(root: String, path: String) -> Result<IncrementalChange, String> {
+    let base = std::fs::canonicalize(&root).map_err(|e| e.to_string())?;
+    if !base.is_dir() {
+        return Err("Library root is not a folder".into());
+    }
+    let candidate = PathBuf::from(&path);
+    if !candidate.is_absolute() || !candidate.starts_with(&base) {
+        return Err("Changed file is outside the selected library".into());
+    }
+    let actual = std::fs::canonicalize(&candidate).ok();
+    if actual.as_ref().is_some_and(|resolved| !resolved.starts_with(&base)) {
+        return Err("Changed file resolves outside the library".into());
+    }
+    let metadata = actual.as_ref().and_then(|resolved| std::fs::metadata(resolved).ok());
+    if metadata.as_ref().is_some_and(|meta| meta.is_dir()) {
+        return Err("Directory change requires full scan".into());
+    }
+    let extension = candidate.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    if !crate::SUPPORTED.contains(&extension.as_str()) {
+        return Err("Unsupported media extension".into());
+    }
+    let mut change = IncrementalChange {
+        path: path.clone(),
+        present: false,
+        bytes: 0,
+        modified_unix: 0,
+    };
+    let db = database()?;
+    if let Some(meta) = metadata.filter(|meta| meta.is_file()) {
+        let modified = meta.modified().ok()
+            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+            .map_or(0, |duration| duration.as_secs());
+        db.execute(
+            "INSERT INTO media(root,path,bytes,modified_unix) VALUES (?1,?2,?3,?4)
+             ON CONFLICT(root,path) DO UPDATE SET bytes=excluded.bytes,modified_unix=excluded.modified_unix",
+            params![root, path, meta.len() as i64, modified as i64],
+        ).map_err(|e| e.to_string())?;
+        change.present = true;
+        change.bytes = meta.len();
+        change.modified_unix = modified;
+    } else {
+        db.execute("DELETE FROM media WHERE root=?1 AND path=?2", params![root,path])
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(change)
+}
+
 #[derive(Serialize)]
 pub struct DuplicateGroup {
     pub paths: Vec<String>,
