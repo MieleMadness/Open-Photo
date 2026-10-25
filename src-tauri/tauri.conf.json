@@ -11,8 +11,7 @@
   },
   "app": {
     "windows": [{"title": "Open-Photo", "width": 1220, "height": 780, "minWidth": 800, "minHeight": 580}],
-    "security": {"csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'"},
-    "capabilities": ["default"]
+    "security": {"csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'"}
   },
   "bundle": { "active": true, "targets": ["nsis"], "icon": [] }
 }
