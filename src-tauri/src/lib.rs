@@ -46,7 +46,7 @@ struct BulkTagResult {
 #[tauri::command]
 fn bulk_create_tags(root: String, paths: Vec<String>, tags: Vec<String>) -> Result<BulkTagResult, String> {
     if paths.is_empty() || paths.len() > 1000 { return Err("Select 1–1000 photos per batch".into()); }
-    if tags.is_empty() || tags.len() > 50 || tags.iter().any(|t| t.trim().is_empty() || t.len() > 128 || t.contains(['\0', '\n', '\r'])) {
+    if tags.is_empty() || tags.len() > 50 || tags.iter().any(|t| t.trim().is_empty() || t.len() > 128 || t.chars().any(|c| c == '\0' || c == '\n' || c == '\r')) {
         return Err("Invalid tags; use 1–50 tags of up to 128 characters".into());
     }
     let mut output = BulkTagResult { created: 0, skipped: 0, errors: Vec::new() };
