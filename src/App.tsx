@@ -26,7 +26,12 @@ export default function App() {
   const [photoView, setPhotoView] = useState<PhotoView>("grid");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
   const [tileSize, setTileSize] = useState(180);
-  const [pageSize, setPageSize] = useState(80);
+  const [selection, setSelection] = useState<string[]>([]);
+  const [tagText, setTagText] = useState("");
+  const [applying, setApplying] = useState(false);
+  const [tagMessage, setTagMessage] = useState("");
+  const [scrollTop, setScrollTop] = useState(0);
+  const [gridWidth, setGridWidth] = useState(940);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<Photo | null>(null);
@@ -46,7 +51,7 @@ export default function App() {
     try {
       const path = await open({ directory: true, multiple: false, title: "Select a photo library (read-only scan)" });
       if (typeof path !== "string") return;
-      setRoot(path); setBusy(true); setResult(null); setSelected(null);
+      setRoot(path); setBusy(true); setResult(null); setSelected(null); setSelection([]); setTagMessage("");
       const items = await invoke<ScanResult>("scan_library", { root: path });
       setResult(items);
     } catch (e) { setError(String(e)); } finally { setBusy(false); }
@@ -64,7 +69,27 @@ export default function App() {
       }
     });
   }, [result, query, sortBy]);
-  useEffect(() => setPageSize(80), [query, sortBy, photoView, root]);
+  useEffect(() => setScrollTop(0), [query, sortBy, photoView, tileSize, root]);
+  const gridGap = 14;
+  const columns = Math.max(1, Math.floor((gridWidth - 48 + gridGap) / (tileSize + gridGap)));
+  const rowHeight = Math.max(tileSize + 52, (gridWidth - 48 - (columns - 1) * gridGap) / columns + 43);
+  const windowStart = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
+  const rowCount = Math.ceil(visible.length / columns);
+  const windowEnd = Math.min(rowCount, windowStart + Math.ceil(700 / rowHeight) + 6);
+  const windowPhotos = visible.slice(windowStart * columns, windowEnd * columns);
+  const toggleSelection = (path: string) => setSelection(old => old.includes(path) ? old.filter(p => p !== path) : [...old, path]);
+  const applyTags = async () => {
+    if (!root || !selection.length || !tagText.trim()) return;
+    const tags = [...new Set(tagText.split(",").map(x=>x.trim()).filter(Boolean))];
+    if (!tags.length) return;
+    if (!window.confirm(`Write NEW XMP sidecars containing ${tags.join(", ")} for ${selection.length} photos? Existing XMP sidecars will be skipped and originals never modified.`)) return;
+    setApplying(true); setTagMessage("");
+    try {
+      const r = await invoke<{created:number;skipped:number;errors:string[]}>("bulk_create_tags", {root,paths:selection,tags});
+      setTagMessage(`Created ${r.created} sidecars; skipped ${r.skipped}. ${r.errors.length ? r.errors.slice(0,3).join("; ") : ""}`);
+      if (!r.errors.length) setSelection([]);
+    } catch(e) { setTagMessage(String(e)); } finally {setApplying(false);}
+  };
   const bytes = result?.photos.reduce((n, p) => n + p.bytes, 0) || 0;
   const title = NAV.find(x => x.id === view)?.title || "Library";
   return <div className="app-shell">
@@ -93,15 +118,16 @@ export default function App() {
               <label className="sort-control"><ArrowUpDown size={16}/><span>Sort:</span><select value={sortBy} aria-label="Sort photos" onChange={e=>setSortBy(e.target.value as SortBy)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">Name A–Z</option><option value="largest">Largest first</option><option value="smallest">Smallest first</option></select></label>
               {photoView === "grid" && <div className="zoom-control"><ZoomOut size={17}/><input aria-label="Thumbnail size" type="range" min="110" max="300" step="10" value={tileSize} onChange={e=>setTileSize(Number(e.target.value))}/><ZoomIn size={17}/><span>{tileSize}px</span></div>}
             </div>
+            {result && <div className="selection-toolbar"><span>{selection.length} selected</span><button className="secondary-button" onClick={()=>setSelection(visible.map(p=>p.path))}>Select matching</button><button className="secondary-button" onClick={()=>setSelection([])}>Clear selection</button><input aria-label="New XMP tags (comma separated)" placeholder="Tags separated by commas" value={tagText} onChange={e=>setTagText(e.target.value)}/><button className="primary-button" disabled={!selection.length || !tagText.trim() || applying} onClick={applyTags}>{applying?"Writing…":"Add tags to new sidecars"}</button></div>}
+            {tagMessage && <div className="results-note" role="status">{tagMessage}</div>}
             {error && <div role="alert" className="error">{error}</div>}
             {busy && <div className="empty"><div className="empty-symbol"><Images size={28}/></div><h3>Scanning your folder</h3><p>Reading file names and sizes. No photos are being changed.</p></div>}
-            {!busy && !result && <div className="empty"><div className="empty-symbol"><ImageOff size={32}/></div><h3>Your library starts here</h3><p>Choose a folder on your computer to discover supported photo files. This first milestone lists files; image thumbnails come next.</p><button className="secondary-button" onClick={chooseFolder}><FolderOpen size={16}/> Select Photo Folder</button></div>}
-            {!busy && result && <><div className="results-note">{visible.length} matching files · {result.scanned_files.toLocaleString()} filesystem entries scanned {result.truncated ? "· scan limit reached" : ""}</div><div className={photoView === "grid" ? "photo-grid" : "file-list"} style={photoView === "grid" ? { gridTemplateColumns: `repeat(auto-fill, minmax(${tileSize}px, 1fr))` } : undefined}>
-              {visible.slice(0,pageSize).map(p => photoView === "grid"
-                ? <button key={p.path} className="photo-tile" onClick={()=>setSelected(p)}><PhotoThumb root={root} photo={p} maxEdge={Math.max(360,tileSize*2)}/><span title={p.name} className="tile-name">{p.name}</span></button>
-                : <button key={p.path} className="file-row" onClick={() => setSelected(p)}><div className="file-avatar"><PhotoThumb root={root} photo={p} maxEdge={96}/></div><div className="file-name"><strong>{p.name}</strong><small>{p.extension.toUpperCase()} · {formatBytes(p.bytes)}</small></div><ChevronRight size={16}/></button>
-              )}
-            </div>{visible.length > pageSize && <div className="load-more"><button className="secondary-button" onClick={()=>setPageSize(n=>n+80)}>Show more ({visible.length-pageSize} remaining)</button></div>}{visible.length === 0 && <div className="empty"><p>No supported photos matched this search.</p></div>}</>}
+            {!busy && !result && <div className="empty"><div className="empty-symbol"><ImageOff size={32}/></div><h3>Your library starts here</h3><p>Choose a folder on your computer to discover supported photo files. Images display as thumbnails where supported, with local-only processing.</p><button className="secondary-button" onClick={chooseFolder}><FolderOpen size={16}/> Select Photo Folder</button></div>}
+            {!busy && result && <><div className="results-note">{visible.length} matching files · {result.scanned_files.toLocaleString()} filesystem entries scanned {result.truncated ? "· scan limit reached" : ""}</div><div className={photoView === "grid" ? "photo-grid virtual-photo-grid" : "file-list"} onScroll={e=>setScrollTop(e.currentTarget.scrollTop)} ref={el=>{if(el && Math.abs(el.clientWidth-gridWidth)>5)setGridWidth(el.clientWidth);}} style={photoView === "grid" ? { display:"block", padding:0 } : undefined}>
+              {photoView === "grid" ? <div style={{height:rowCount*rowHeight,position:"relative"}}><div className="virtual-rows" style={{position:"absolute",top:windowStart*rowHeight,left:24,right:24,display:"grid",gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`,gridAutoRows:rowHeight,gap:0}}>
+                {windowPhotos.map(p=><div className="tile-cell" key={p.path}><button className={selection.includes(p.path) ? "photo-tile is-selected" : "photo-tile"} onClick={e=>e.ctrlKey||e.metaKey ? toggleSelection(p.path):setSelected(p)}><PhotoThumb root={root} photo={p} maxEdge={Math.max(360,tileSize*2)} /><span className="tile-name" title={p.name}>{p.name}</span></button><input type="checkbox" aria-label={`Select ${p.name}`} checked={selection.includes(p.path)} onChange={()=>toggleSelection(p.path)}/></div>)}
+              </div></div> : visible.map(p=><div key={p.path} className="selectable-row"><input type="checkbox" aria-label={`Select ${p.name}`} checked={selection.includes(p.path)} onChange={()=>toggleSelection(p.path)}/><button className="file-row" onClick={()=>setSelected(p)}><div className="file-avatar"><PhotoThumb root={root} photo={p} maxEdge={96}/></div><div className="file-name"><strong>{p.name}</strong><small>{p.extension.toUpperCase()} · {formatBytes(p.bytes)}</small></div><ChevronRight size={16}/></button></div>)}
+            </div>{visible.length === 0 && <div className="empty"><p>No supported photos matched this search.</p></div>}</>}
           </section>
         </>}
         {view === "people" && <Placeholder title="People" subtitle="Organize familiar faces without giving up control of your data." icon={Users} description="Coming in a later milestone: local, opt-in face detection, human-reviewed identities, and portable XMP regions."/>}
