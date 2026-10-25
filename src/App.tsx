@@ -3,7 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Images, FolderOpen, Users, Tags, Settings2, Search, Moon, Sun, Monitor, ShieldCheck, ImageOff, HardDrive, ListFilter, ChevronRight, X, LayoutGrid, List, ZoomIn, ZoomOut, ArrowUpDown } from "lucide-react";
 
-type View = "library" | "people" | "tags" | "settings";
+type View = "library" | "folders" | "map" | "people" | "tags" | "settings";
+type Workspace = { id: string; name: string; root: string };
 type Theme = "light" | "dark" | "system";
 type PhotoView = "grid" | "list";
 type SortBy = "name" | "newest" | "oldest" | "largest" | "smallest";
@@ -11,6 +12,8 @@ type Photo = { path: string; name: string; extension: string; bytes: number; mod
 type ScanResult = { photos: Photo[]; scanned_files: number; truncated: boolean };
 const NAV: {id: View; title: string; icon: typeof Images}[] = [
   { id: "library", title: "Library", icon: Images },
+  { id: "folders", title: "Folders", icon: FolderOpen },
+  { id: "map", title: "Map", icon: Monitor },
   { id: "people", title: "People", icon: Users },
   { id: "tags", title: "Tags", icon: Tags },
   { id: "settings", title: "Settings", icon: Settings2 }
@@ -19,8 +22,14 @@ const isDesktop = typeof window !== "undefined" && "__TAURI_INTERNALS__" in wind
 
 export default function App() {
   const [view, setView] = useState<View>("library");
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(()=>{try{return JSON.parse(localStorage.getItem("openphoto.workspaces")||"[]") as Workspace[]}catch{return []}});
+  const [activeWorkspace,setActiveWorkspace] = useState<string>(()=>localStorage.getItem("openphoto.activeWorkspace")||"");
+  const [folderFilter,setFolderFilter] = useState("");
+  const [mediaType,setMediaType] = useState<"all"|"photo"|"video">("all");
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("openphoto.theme") as Theme) || "system");
   const [root, setRoot] = useState("");
+  useEffect(()=>{localStorage.setItem("openphoto.workspaces",JSON.stringify(workspaces))},[workspaces]);
+  useEffect(()=>{localStorage.setItem("openphoto.activeWorkspace",activeWorkspace)},[activeWorkspace]);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [query, setQuery] = useState("");
   const [photoView, setPhotoView] = useState<PhotoView>("grid");
@@ -51,14 +60,19 @@ export default function App() {
     try {
       const path = await open({ directory: true, multiple: false, title: "Select a photo library (read-only scan)" });
       if (typeof path !== "string") return;
+      const id=activeWorkspace||crypto.randomUUID();
+      setWorkspaces(old=>old.some(w=>w.id===id)?old.map(w=>w.id===id?{...w,root:path}:w):[...old,{id,name:`Workspace ${old.length+1}`,root:path}]);
+      setActiveWorkspace(id);
       setRoot(path); setBusy(true); setResult(null); setSelected(null); setSelection([]); setTagMessage("");
       const items = await invoke<ScanResult>("scan_library", { root: path });
       setResult(items);
     } catch (e) { setError(String(e)); } finally { setBusy(false); }
   };
 
+  const openWorkspace=async(id:string)=>{const item=workspaces.find(w=>w.id===id);if(!item)return;setActiveWorkspace(id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter("");if(item.root){setBusy(true);try{setResult(await invoke<ScanResult>("scan_library",{root:item.root}))}catch(e){setError(String(e))}finally{setBusy(false)}}};
+  const folders=useMemo(()=>[...new Set((result?.photos||[]).map(p=>p.path.slice(0,p.path.lastIndexOf("\\")).replace(root,"").replace(/^[\\/]/,"")||"(root)"))].sort(),[result,root]);
   const visible = useMemo(() => {
-    const photos = result?.photos.filter(p => p.name.toLowerCase().includes(query.toLowerCase())) || [];
+    const photos = result?.photos.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) && (!folderFilter || p.path.includes(folderFilter)) && (mediaType==="all" || (mediaType==="video" ? ["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension) : !["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension)))) || [];
     return photos.sort((a,b) => {
       switch (sortBy) {
         case "name": return a.name.localeCompare(b.name) || a.path.localeCompare(b.path);
@@ -68,8 +82,8 @@ export default function App() {
         case "smallest": return a.bytes - b.bytes || a.path.localeCompare(b.path);
       }
     });
-  }, [result, query, sortBy]);
-  useEffect(() => setScrollTop(0), [query, sortBy, photoView, tileSize, root]);
+  }, [result, query, sortBy, folderFilter, mediaType]);
+  useEffect(() => setScrollTop(0), [query, sortBy, photoView, tileSize, root, folderFilter, mediaType]);
   const gridGap = 14;
   const columns = Math.max(1, Math.floor((gridWidth - 48 + gridGap) / (tileSize + gridGap)));
   const rowHeight = Math.max(tileSize + 52, (gridWidth - 48 - (columns - 1) * gridGap) / columns + 43);
@@ -96,9 +110,11 @@ export default function App() {
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark"><Images size={23}/></div><div><strong>Open-Photo</strong><small>YOUR PHOTO LIBRARY</small></div></div>
       <div className="sidebar-label">WORKSPACE</div>
+      <select className="workspace-select" aria-label="Active workspace" value={activeWorkspace} onChange={e=>openWorkspace(e.target.value)}><option value="">Select a workspace</option>{workspaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>
+      <button className="workspace-create" onClick={()=>{const name=window.prompt("Name this workspace");if(!name?.trim())return;const id=crypto.randomUUID();setWorkspaces(old=>[...old,{id,name:name.trim(),root:""}]);setActiveWorkspace(id);setRoot("");setResult(null);setSelection([]);setView("library")}}>+ New workspace</button>
       <nav aria-label="Main navigation">{NAV.map(({ id, title, icon: Icon }) => <button key={id} className={view === id ? "nav-button active" : "nav-button"} onClick={() => setView(id)} aria-current={view === id ? "page" : undefined}><Icon size={18}/>{title}{view === id && <ChevronRight size={15} className="nav-chevron"/>}</button>)}</nav>
       <div className="sidebar-spacer"/>
-      <div className="privacy-note"><ShieldCheck size={17}/><div><strong>Private by default</strong><span>No cloud upload. Original files stay untouched.</span></div></div>
+
       <div className="sidebar-footer">Open-Photo <span>v0.1.0 preview</span></div>
     </aside>
 
@@ -109,7 +125,7 @@ export default function App() {
           <div className="page-heading"><div><span className="eyebrow">YOUR COLLECTION</span><h1>Photo Library</h1><p>Browse your memories privately, right from your computer.</p></div><button className="primary-button" onClick={chooseFolder} disabled={busy}><FolderOpen size={18}/>{busy ? "Scanning..." : root ? "Change Folder" : "Open Folder"}</button></div>
           <div className="stats"><div className="stat"><div className="stat-icon"><Images size={20}/></div><div><span>Indexed photos</span><strong>{result?.photos.length.toLocaleString() ?? "—"}</strong></div></div><div className="stat"><div className="stat-icon"><HardDrive size={20}/></div><div><span>Selected files size</span><strong>{result ? formatBytes(bytes) : "—"}</strong></div></div><div className="stat"><div className="stat-icon"><ShieldCheck size={20}/></div><div><span>File protection</span><strong>Read-only</strong></div></div></div>
           <section className="library-panel">
-            <div className="panel-toolbar"><div><h2>All Photos</h2><p>{root ? root : "Select a folder to begin browsing"}</p></div><div className="search-box"><Search size={17}/><input aria-label="Filter photos by filename" placeholder="Search filenames..." value={query} onChange={e => setQuery(e.target.value)} disabled={!result}/><ListFilter size={16}/></div></div>
+            <div className="panel-toolbar"><div><h2>All Photos</h2>{folderFilter&&<button className="secondary-button" onClick={()=>setFolderFilter("")}>Clear folder: {folderFilter}</button>}<p>{root ? root : "Select a folder to begin browsing"}</p></div><div className="search-box"><Search size={17}/><input aria-label="Filter photos by filename" placeholder="Search filenames..." value={query} onChange={e => setQuery(e.target.value)} disabled={!result}/><ListFilter size={16}/></div></div>
             <div className="view-toolbar">
               <div className="view-switch" role="group" aria-label="Photo view">
                 <button className={photoView === "grid" ? "active" : ""} title="Icon grid" aria-label="Icon grid" aria-pressed={photoView === "grid"} onClick={()=>setPhotoView("grid")}><LayoutGrid size={18}/></button>
@@ -118,7 +134,7 @@ export default function App() {
               <label className="sort-control"><ArrowUpDown size={16}/><span>Sort:</span><select value={sortBy} aria-label="Sort photos" onChange={e=>setSortBy(e.target.value as SortBy)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">Name A–Z</option><option value="largest">Largest first</option><option value="smallest">Smallest first</option></select></label>
               {photoView === "grid" && <div className="zoom-control"><ZoomOut size={17}/><input aria-label="Thumbnail size" type="range" min="110" max="300" step="10" value={tileSize} onChange={e=>setTileSize(Number(e.target.value))}/><ZoomIn size={17}/><span>{tileSize}px</span></div>}
             </div>
-            {result && <div className="selection-toolbar"><span>{selection.length} selected</span><button className="secondary-button" onClick={()=>setSelection(visible.map(p=>p.path))}>Select matching</button><button className="secondary-button" onClick={()=>setSelection([])}>Clear selection</button><input aria-label="New XMP tags (comma separated)" placeholder="Tags separated by commas" value={tagText} onChange={e=>setTagText(e.target.value)}/><button className="primary-button" disabled={!selection.length || !tagText.trim() || applying} onClick={applyTags}>{applying?"Writing…":"Add tags to new sidecars"}</button></div>}
+            {result && <div className="selection-toolbar"><label className="sort-control">Media <select aria-label="Media type" value={mediaType} onChange={e=>setMediaType(e.target.value as "all"|"photo"|"video")}><option value="all">All media</option><option value="photo">Photos</option><option value="video">Videos</option></select></label><span>{selection.length} selected</span><button className="secondary-button" onClick={()=>setSelection(visible.map(p=>p.path))}>Select matching</button><button className="secondary-button" onClick={()=>setSelection([])}>Clear selection</button><input aria-label="New XMP tags (comma separated)" placeholder="Tags separated by commas" value={tagText} onChange={e=>setTagText(e.target.value)}/><button className="primary-button" disabled={!selection.length || !tagText.trim() || applying} onClick={applyTags}>{applying?"Writing…":"Add tags to new sidecars"}</button></div>}
             {tagMessage && <div className="results-note" role="status">{tagMessage}</div>}
             {error && <div role="alert" className="error">{error}</div>}
             {busy && <div className="empty"><div className="empty-symbol"><Images size={28}/></div><h3>Scanning your folder</h3><p>Reading file names and sizes. No photos are being changed.</p></div>}
@@ -130,12 +146,14 @@ export default function App() {
             </div>{visible.length === 0 && <div className="empty"><p>No supported photos matched this search.</p></div>}</>}
           </section>
         </>}
+        {view === "folders" && <><span className="eyebrow">LIBRARY ORGANIZATION</span><h1>Folders</h1><p>Browse the folder structure from your selected workspace.</p><div className="folder-list">{folders.map(folder=><button key={folder} className="folder-item" onClick={()=>{setFolderFilter(folder==="(root)"?"":folder);setView("library")}}><FolderOpen size={20}/>{folder}<ChevronRight size={16}/></button>)}{folders.length===0&&<p>Open a workspace folder to browse its subfolders.</p>}</div></>}
+        {view === "map" && <Placeholder title="Photo Map" subtitle="Explore the places behind your memories." icon={Monitor} description="GPS extraction, geographic basemap, marker clustering, and click-to-open photo pins are the next development milestone. Location is not inferred from filenames."/>}
         {view === "people" && <Placeholder title="People" subtitle="Organize familiar faces without giving up control of your data." icon={Users} description="Coming in a later milestone: local, opt-in face detection, human-reviewed identities, and portable XMP regions."/>}
         {view === "tags" && <Placeholder title="Tags" subtitle="Give every memory context that travels with the file." icon={Tags} description="Coming in a later milestone: hierarchical tags and verified, reversible XMP sidecar editing."/>}
         {view === "settings" && <div className="settings-view"><span className="eyebrow">PREFERENCES</span><h1>Settings</h1><p>Personalize the appearance of your workspace.</p><div className="settings-card"><div><h2>Appearance</h2><p>Choose your preferred color theme.</p></div><div className="theme-options">{([{id:"system",label:"System",Icon:Monitor},{id:"light",label:"Light",Icon:Sun},{id:"dark",label:"Dark",Icon:Moon}] as const).map(({id,label,Icon})=><button key={id} className={theme === id ? "theme-option selected" : "theme-option"} onClick={()=>setTheme(id)}><Icon size={17}/>{label}</button>)}</div></div><div className="settings-card"><div><h2>File safety</h2><p>Open-Photo currently indexes paths, sizes, and modification times only. File writes and deletions are not implemented.</p></div><span className="safety-pill">Protected</span></div></div>}
       </main>
     </div>
-    {selected && <div className="modal-backdrop" role="presentation" onClick={()=>setSelected(null)}><section className="details" role="dialog" aria-modal="true" aria-label="Photo details" onClick={e=>e.stopPropagation()}><div className="details-header"><h2>File Details</h2><button className="icon-button" onClick={()=>setSelected(null)} aria-label="Close details"><X size={20}/></button></div><div className="detail-preview"><PhotoThumb root={root} photo={selected} maxEdge={1600}/></div><dl><dt>Name</dt><dd>{selected.name}</dd><dt>Location</dt><dd className="break-anywhere">{selected.path}</dd><dt>File size</dt><dd>{formatBytes(selected.bytes)}</dd><dt>File format</dt><dd>{selected.extension.toUpperCase()}</dd><dt>Modified</dt><dd>{selected.modified_unix ? new Date(selected.modified_unix*1000).toLocaleString() : "Unknown"}</dd></dl><div className="details-foot"><ShieldCheck size={16}/> File opened read-only</div></section></div>}
+    {selected && <div className="modal-backdrop" role="presentation" onClick={()=>setSelected(null)}><section className="details" role="dialog" aria-modal="true" aria-label="Photo details" onClick={e=>e.stopPropagation()}><div className="details-header"><h2>File Details</h2><button className="icon-button" onClick={()=>setSelected(null)} aria-label="Close details"><X size={20}/></button></div><div className="detail-preview">{["mov","mp4","m4v","avi","mkv","webm"].includes(selected.extension)?<div className="photo-fallback"><Images size={42}/><span>Video preview and playback require a dedicated media decoder (planned)</span></div>:<PhotoThumb root={root} photo={selected} maxEdge={1600}/>}</div><dl><dt>Name</dt><dd>{selected.name}</dd><dt>Location</dt><dd className="break-anywhere">{selected.path}</dd><dt>File size</dt><dd>{formatBytes(selected.bytes)}</dd><dt>File format</dt><dd>{selected.extension.toUpperCase()}</dd><dt>Modified</dt><dd>{selected.modified_unix ? new Date(selected.modified_unix*1000).toLocaleString() : "Unknown"}</dd></dl><div className="details-foot"><ShieldCheck size={16}/> File opened read-only</div></section></div>}
   </div>;
 }
 
