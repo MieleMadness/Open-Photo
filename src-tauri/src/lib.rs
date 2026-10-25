@@ -1,4 +1,5 @@
 mod geo;
+mod index;
 use base64::Engine;
 use image::ImageReader;
 use serde::Serialize;
@@ -146,7 +147,7 @@ struct Photo {
 }
 
 #[derive(Serialize)]
-struct ScanResult {
+pub struct ScanResult {
     photos: Vec<Photo>,
     scanned_files: usize,
     truncated: bool,
