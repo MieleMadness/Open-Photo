@@ -148,16 +148,49 @@ export default function App() {
     let unlisten: (()=>void)|undefined;
     let unlistenRenames: (()=>void)|undefined;
     let debounce: number|undefined;
+    let pendingPaths=new Set<string>();
+    const fileExtensions=new Set(["jpg","jpeg","png","webp","gif","tif","tiff","bmp","heic","heif","avif","dng","cr2","nef","arw","mov","mp4","m4v","avi","mkv","webm"]);
+    const fullSync=()=>{if(syncRunning.current!==syncGeneration.current)void syncFolders(activeRoots)};
+    const flush=async()=>{
+      const changed=[...pendingPaths];pendingPaths=new Set();
+      if(!changed.length)return;
+      // A directory event or a large burst cannot be reconciled reliably one file at a time.
+      if(changed.length>64 || changed.some(path=>!fileExtensions.has(path.split(".").pop()?.toLowerCase()||"")) || syncRunning.current===syncGeneration.current){
+        fullSync();return;
+      }
+      try{
+        const changes=await Promise.all(changed.map(async path=>{
+          const normalized=path.toLowerCase().replace(/\\/g,"/");
+          const parent=activeRoots.find(root=>normalized.startsWith(root.toLowerCase().replace(/\\/g,"/").replace(/\/$/,"")+"/"));
+          if(!parent)throw Error("Change outside workspace");
+          const change=await invoke<{path:string;present:boolean;bytes:number;modified_unix:number}>("update_indexed_path",{root:parent,path});
+          return {...change,parent};
+        }));
+        if(disposed)return;
+        setResult(previous=>{
+          if(!previous)return previous;
+          const updated=new Map(previous.photos.map(photo=>[photo.path,photo]));
+          for(const change of changes){
+            if(change.present){
+              const filename=change.path.replace(/\\/g,"/").split("/").pop()||change.path;
+              updated.set(change.path,{path:change.path,name:filename,extension:filename.split(".").pop()?.toLowerCase()||"",bytes:change.bytes,modified_unix:change.modified_unix,libraryRoot:change.parent});
+            }else updated.delete(change.path);
+          }
+          return {...previous,photos:[...updated.values()]};
+        });
+        setLastSync(new Date().toLocaleString());
+      }catch{fullSync()}
+    };
     const activeRoots=autoSync?roots:[];
     const setup=async()=>{
       try{
         await invoke("set_watched_folders",{roots:activeRoots});
         if(disposed||!autoSync)return;
-        unlisten=await listen("openphoto-folder-changed",()=>{
+        unlisten=await listen<{paths:string[]}>("openphoto-media-event",(event)=>{
+          for(const path of event.payload.paths)pendingPaths.add(path);
+          if(!event.payload.paths.length)pendingPaths.add("");
           if(debounce!==undefined)window.clearTimeout(debounce);
-          debounce=window.setTimeout(()=>{
-            if(syncRunning.current!==syncGeneration.current)void syncFolders(activeRoots);
-          },1500);
+          debounce=window.setTimeout(()=>{void flush()},1500);
         });
         unlistenRenames=await listen<{from:string;to:string}>("openphoto-file-renamed",(event)=>{
           const from=event.payload.from.toLowerCase().replace(/\\/g,"/");
