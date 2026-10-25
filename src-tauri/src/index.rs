@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{safe_media_path, scan_library, ScanResult};
+use crate::{scan_library, ScanResult};
 
 fn database() -> Result<Connection, String> {
     let directory = dirs::data_local_dir()
@@ -81,14 +81,40 @@ pub fn find_exact_duplicates(
     root: String,
     paths: Vec<String>,
 ) -> Result<Vec<DuplicateGroup>, String> {
-    if paths.len() > 40_000 {
-        return Err("Too many files in a duplicate search".into());
+    find_workspace_duplicates(vec![root], paths)
+}
+
+/// Compare files across all selected workspace roots without touching originals.
+/// Resolve paths before reading so paths outside the selected roots are excluded.
+#[tauri::command]
+pub fn find_workspace_duplicates(
+    roots: Vec<String>,
+    paths: Vec<String>,
+) -> Result<Vec<DuplicateGroup>, String> {
+    if roots.is_empty() || roots.len() > 64 || paths.len() > 40_000 {
+        return Err("Select 1-64 roots and up to 40,000 media files".into());
+    }
+    let mut permitted = Vec::new();
+    for root in roots {
+        let canonical = std::fs::canonicalize(&root).map_err(|e| e.to_string())?;
+        if !canonical.is_dir() {
+            return Err("Workspace root is not a folder".into());
+        }
+        permitted.push(canonical);
     }
     let mut by_size: HashMap<u64, Vec<PathBuf>> = HashMap::new();
+    let mut visited = std::collections::HashSet::new();
     for path in paths {
-        let Ok(file) = safe_media_path(&root, &path) else {
+        let Ok(file) = std::fs::canonicalize(&path) else {
             continue;
         };
+        if !permitted.iter().any(|root| file.starts_with(root)) || !file.is_file() {
+            continue;
+        }
+        let extension = file.extension().and_then(|x| x.to_str()).unwrap_or("").to_ascii_lowercase();
+        if !crate::SUPPORTED.contains(&extension.as_str()) || !visited.insert(file.clone()) {
+            continue;
+        }
         let Ok(meta) = file.metadata() else {
             continue;
         };
@@ -135,6 +161,25 @@ fn sha256_file(path: &Path) -> std::io::Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn finds_duplicates_across_roots_without_double_counting() {
+        let base = std::env::temp_dir().join(format!("openphoto-crossroot-{}", std::process::id()));
+        let first = base.join("one");
+        let second = base.join("two");
+        std::fs::create_dir_all(&first).unwrap();
+        std::fs::create_dir_all(&second).unwrap();
+        let a = first.join("a.jpg");
+        let b = second.join("b.jpg");
+        std::fs::write(&a, b"identical").unwrap();
+        std::fs::write(&b, b"identical").unwrap();
+        let roots = vec![first.to_string_lossy().into_owned(), second.to_string_lossy().into_owned()];
+        let paths = vec![a.to_string_lossy().into_owned(), b.to_string_lossy().into_owned(), a.to_string_lossy().into_owned()];
+        let groups = find_workspace_duplicates(roots, paths).unwrap();
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].paths.len(), 2);
+        std::fs::remove_dir_all(base).unwrap();
+    }
 
     #[test]
     fn hashes_detect_identical_content() {
