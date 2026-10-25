@@ -114,7 +114,7 @@ pub fn find_exact_duplicates(
             }
         }
     }
-    groups.sort_by(|a, b| b.bytes.cmp(&a.bytes));
+    groups.sort_by_key(|group| std::cmp::Reverse(group.bytes));
     Ok(groups)
 }
 
