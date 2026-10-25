@@ -51,7 +51,13 @@ export default function App() {
   const [syncChanges,setSyncChanges]=useState<{added:number;updated:number;unchanged:number;removed:number;incomplete:boolean}|null>(null);
   const [duplicates, setDuplicates] = useState<{paths:string[];bytes:number}[]>([]);
   const [duplicateBusy, setDuplicateBusy] = useState(false);
-  const [duplicateReview,setDuplicateReview]=useState<Record<string,string>>({});
+  const [duplicateReview,setDuplicateReview]=useState<Record<string,string>>(()=>{
+    try {
+      const stored=JSON.parse(localStorage.getItem("openphoto.duplicateReview")||"{}") as Record<string,unknown>;
+      return Object.fromEntries(Object.entries(stored).filter((entry):entry is [string,string]=>typeof entry[1]==="string"));
+    } catch { return {}; }
+  });
+  useEffect(()=>localStorage.setItem("openphoto.duplicateReview",JSON.stringify(duplicateReview)),[duplicateReview]);
   const [similarGroups,setSimilarGroups]=useState<{paths:string[];max_distance:number}[]>([]);
   const [mediaType,setMediaType] = useState<"all"|"photo"|"video">("all");
   const [organizeFilter,setOrganizeFilter] = useState<"all"|"favorites"|"rated">("all");
