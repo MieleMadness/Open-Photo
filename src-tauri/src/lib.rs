@@ -1,8 +1,8 @@
 mod cache_disk;
 mod geo;
 mod index;
-mod watch;
 mod similar;
+mod watch;
 use base64::Engine;
 use image::ImageReader;
 use serde::Serialize;
