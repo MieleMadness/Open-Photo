@@ -14,5 +14,5 @@
     "security": {"csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'"},
     "capabilities": ["default"]
   },
-  "bundle": { "active": true, "targets": ["nsis"] }
+  "bundle": { "active": true, "targets": ["nsis"], "icon": [] }
 }
