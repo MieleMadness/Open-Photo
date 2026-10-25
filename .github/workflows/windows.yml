@@ -23,6 +23,17 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Verify consistent build version
+        shell: pwsh
+        run: |
+          $npm = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tauri = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $cargo = Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "([^"]+)"' | Select-Object -First 1
+          $rust = $cargo.Matches.Groups[1].Value
+          if (!$npm -or $npm -ne $tauri -or $npm -ne $rust) {
+            throw "Version mismatch: npm=$npm, Tauri=$tauri, Cargo=$rust"
+          }
+          Write-Output "Consistent Open-Photo version: $npm"
       - name: Typecheck and build frontend
         run: npm run build
       - name: Check Rust formatting
