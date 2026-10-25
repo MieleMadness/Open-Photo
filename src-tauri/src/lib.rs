@@ -1,7 +1,11 @@
-use serde::Serialize;
 use base64::Engine;
 use image::ImageReader;
-use std::io::Cursor;
+use serde::Serialize;
+use std::{
+    io::{Cursor, Write},
+    sync::{Mutex, OnceLock},
+    collections::{HashMap, VecDeque},
+};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -9,6 +13,73 @@ use std::{
 };
 
 const MAX_ENTRIES: usize = 40_000;
+const PREVIEW_CACHE_LIMIT: usize = 64;
+type PreviewCache = (HashMap<String, String>, VecDeque<String>);
+static PREVIEW_CACHE: OnceLock<Mutex<PreviewCache>> = OnceLock::new();
+
+fn cache() -> &'static Mutex<PreviewCache> {
+    PREVIEW_CACHE.get_or_init(|| Mutex::new((HashMap::new(), VecDeque::new())))
+}
+fn safe_media_path(root: &str, path: &str) -> Result<PathBuf, String> {
+    let root = fs::canonicalize(root).map_err(|_| "Library folder not found".to_string())?;
+    let file = fs::canonicalize(path).map_err(|_| "Photo not found".to_string())?;
+    if !file.starts_with(root) || !file.is_file() {
+        return Err("Photo is outside the selected library".into());
+    }
+    let extension = file.extension().and_then(|x| x.to_str()).unwrap_or("").to_ascii_lowercase();
+    if !SUPPORTED.contains(&extension.as_str()) {
+        return Err("Unsupported media type".into());
+    }
+    Ok(file)
+}
+fn xml_escape(value: &str) -> String {
+    value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+        .replace('"', "&quot;").replace('\'', "&apos;")
+}
+#[derive(Serialize)]
+struct BulkTagResult {
+    created: usize,
+    skipped: usize,
+    errors: Vec<String>,
+}
+/// Only create missing XMP sidecars. Never overwrite existing sidecars or original files.
+#[tauri::command]
+fn bulk_create_tags(root: String, paths: Vec<String>, tags: Vec<String>) -> Result<BulkTagResult, String> {
+    if paths.is_empty() || paths.len() > 1000 { return Err("Select 1–1000 photos per batch".into()); }
+    if tags.is_empty() || tags.len() > 50 || tags.iter().any(|t| t.trim().is_empty() || t.len() > 128 || t.contains(['\0', '\n', '\r'])) {
+        return Err("Invalid tags; use 1–50 tags of up to 128 characters".into());
+    }
+    let mut output = BulkTagResult { created: 0, skipped: 0, errors: Vec::new() };
+    for path in paths {
+        let file = match safe_media_path(&root, &path) {
+            Ok(file) => file,
+            Err(error) => { output.errors.push(format!("{path}: {error}")); continue; }
+        };
+        let sidecar = PathBuf::from(format!("{}.xmp", file.display()));
+        let mut handle = match fs::OpenOptions::new().write(true).create_new(true).open(&sidecar) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => { output.skipped += 1; continue; }
+            Err(error) => { output.errors.push(format!("{}: {error}", sidecar.display())); continue; }
+        };
+        let list = tags.iter().map(|tag| format!("<rdf:li>{}</rdf:li>", xml_escape(tag))).collect::<String>();
+        let xml = format!(r#"<?xml version="1.0" encoding="UTF-8"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<dc:subject><rdf:Bag>{list}</rdf:Bag></dc:subject>
+</rdf:Description></rdf:RDF></x:xmpmeta>
+"#);
+        if let Err(error) = handle.write_all(xml.as_bytes()).and_then(|_| handle.sync_all()) {
+            output.errors.push(format!("{}: {error}", sidecar.display()));
+            drop(handle);
+            let _ = fs::remove_file(&sidecar);
+        } else {
+            output.created += 1;
+        }
+    }
+    Ok(output)
+}
+
 const SUPPORTED: &[&str] = &[
     "jpg", "jpeg", "png", "webp", "gif", "tif", "tiff", "bmp", "heic", "heif", "avif", "dng",
     "cr2", "nef", "arw",
@@ -113,18 +184,16 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
 /// Decodes images locally and returns bounded image previews without exposing the filesystem.
 #[tauri::command]
 fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, String> {
-    let root = fs::canonicalize(root).map_err(|_| "Library folder not found".to_string())?;
-    let file = fs::canonicalize(path).map_err(|_| "Photo not found".to_string())?;
-    if !file.starts_with(&root) || !file.is_file() {
-        return Err("Photo is outside the selected library".into());
-    }
-    let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-    if !SUPPORTED.contains(&ext.as_str()) {
-        return Err("Unsupported media type".into());
-    }
+    let file = safe_media_path(&root, &path)?;
     let size = fs::metadata(&file).map_err(|e| e.to_string())?.len();
     if size > 75 * 1024 * 1024 {
         return Err("Preview unavailable for files larger than 75 MB".into());
+    }
+    let modified = fs::metadata(&file).ok().and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_nanos()).unwrap_or(0);
+    let key = format!("{}:{size}:{modified}:{}", file.display(), max_edge);
+    if let Ok(guard) = cache().lock() {
+        if let Some(image) = guard.0.get(&key) { return Ok(image.clone()); }
     }
     let edge = max_edge.clamp(64, 1920);
     let reader = ImageReader::open(&file).map_err(|e| e.to_string())?
@@ -133,14 +202,24 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
     let thumb = decoded.thumbnail(edge, edge);
     let mut bytes = Cursor::new(Vec::new());
     thumb.write_to(&mut bytes, image::ImageFormat::Png).map_err(|e| e.to_string())?;
-    Ok(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes.into_inner())))
+    let result = format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes.into_inner()));
+    if let Ok(mut guard) = cache().lock() {
+        if !guard.0.contains_key(&key) {
+            if guard.1.len() >= PREVIEW_CACHE_LIMIT {
+                if let Some(old) = guard.1.pop_front() { guard.0.remove(&old); }
+            }
+            guard.1.push_back(key.clone());
+            guard.0.insert(key, result.clone());
+        }
+    }
+    Ok(result)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_library, preview_image])
+        .invoke_handler(tauri::generate_handler![scan_library, preview_image, bulk_create_tags])
         .run(tauri::generate_context!())
         .expect("error while running Open-Photo");
 }
@@ -200,6 +279,24 @@ mod tests {
         assert!(result.is_err());
         fs::remove_dir_all(root).unwrap();
         fs::remove_dir_all(other).unwrap();
+    }
+
+    #[test]
+    fn tags_do_not_overwrite_existing_sidecars_or_modify_originals() {
+        let root = temp_root();
+        let image = root.join("sample.jpg");
+        fs::write(&image, b"original").unwrap();
+        let sidecar = root.join("sample.jpg.xmp");
+        let root_arg = root.to_string_lossy().into_owned();
+        let paths = vec![image.to_string_lossy().into_owned()];
+        let first = bulk_create_tags(root_arg.clone(), paths.clone(), vec!["Family".into()]).unwrap();
+        assert_eq!(first.created, 1);
+        assert!(fs::read_to_string(&sidecar).unwrap().contains("Family"));
+        let second = bulk_create_tags(root_arg, paths, vec!["Other".into()]).unwrap();
+        assert_eq!(second.skipped, 1);
+        assert!(!fs::read_to_string(&sidecar).unwrap().contains("Other"));
+        assert_eq!(fs::read(&image).unwrap(), b"original");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
