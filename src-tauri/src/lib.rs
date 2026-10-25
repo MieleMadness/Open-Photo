@@ -1,4 +1,7 @@
 use serde::Serialize;
+use base64::Engine;
+use image::ImageReader;
+use std::io::Cursor;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -107,11 +110,37 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
     })
 }
 
+/// Decodes images locally and returns bounded image previews without exposing the filesystem.
+#[tauri::command]
+fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, String> {
+    let root = fs::canonicalize(root).map_err(|_| "Library folder not found".to_string())?;
+    let file = fs::canonicalize(path).map_err(|_| "Photo not found".to_string())?;
+    if !file.starts_with(&root) || !file.is_file() {
+        return Err("Photo is outside the selected library".into());
+    }
+    let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    if !SUPPORTED.contains(&ext.as_str()) {
+        return Err("Unsupported media type".into());
+    }
+    let size = fs::metadata(&file).map_err(|e| e.to_string())?.len();
+    if size > 75 * 1024 * 1024 {
+        return Err("Preview unavailable for files larger than 75 MB".into());
+    }
+    let edge = max_edge.clamp(64, 1920);
+    let reader = ImageReader::open(&file).map_err(|e| e.to_string())?
+        .with_guessed_format().map_err(|e| e.to_string())?;
+    let decoded = reader.decode().map_err(|_| "This format cannot be previewed yet".to_string())?;
+    let thumb = decoded.thumbnail(edge, edge);
+    let mut bytes = Cursor::new(Vec::new());
+    thumb.write_to(&mut bytes, image::ImageFormat::Png).map_err(|e| e.to_string())?;
+    Ok(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes.into_inner())))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![scan_library])
+        .invoke_handler(tauri::generate_handler![scan_library, preview_image])
         .run(tauri::generate_context!())
         .expect("error while running Open-Photo");
 }
