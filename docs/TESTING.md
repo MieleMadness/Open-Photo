@@ -28,3 +28,15 @@ Do not merge a failing PR. A green build verifies the checks that ran; it does *
 ## Reproducibility improvements still required
 
 Before release, commit `package-lock.json` and `Cargo.lock`, use `npm ci`, and document pinned toolchain/action versions. Avoid changing a workflow solely to suppress a failing test.
+
+## Photo viewer MVP regression coverage
+
+- Default is icon grid. Users can switch to list view.
+- Sort modes: newest, oldest, filename A-Z, largest, smallest.
+- Grid slider changes tile dimensions without modifying files.
+- Selecting an image opens a larger on-demand preview.
+- Backend refuses preview paths outside the canonical selected root.
+- Files unsupported by the local decoder show a clear preview-unavailable state.
+- Large file protection: files above 75 MB are not decoded in the current MVP.
+- Image previews are generated locally; no image bytes are uploaded or written to the originals.
+- Follow-up performance hardening: virtualized grid, thumbnail cache, decoded-pixel allocation limits, cancelable background decode.
