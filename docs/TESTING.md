@@ -49,3 +49,13 @@ Before release, commit `package-lock.json` and `Cargo.lock`, use `npm ci`, and d
 - Explicitly confirmed batch operation creates **missing** `.jpg.xmp`-style sidecars with standard `dc:subject` keywords; existing sidecars are skipped.
 - Regression coverage: repeat application does not overwrite the first sidecar and original image bytes are unchanged.
 - Future work: metadata-aware merge for existing sidecars, tag removal, undo, filesystem event refresh, UI interaction tests, thumbnail disk-cache migration and EXIF display. Until metadata merge is tested against Immich 3.3.5, **do not** overwrite existing XMP.
+
+## Incremental media-index milestone
+
+- `scan_indexed` persists a per-root snapshot in the user's local Open-Photo SQLite data directory.
+- Complete scans replace the previous index snapshot transactionally. Truncated scans are returned but not persisted as complete snapshots.
+- `find_exact_duplicates` groups candidates by file size, then streams SHA-256. No delete or rename operations are exposed.
+- The current duplicate UI compares files **within each folder root**; cross-root detection and persistent hash reuse remain planned.
+- The index is currently storage groundwork, not an incremental directory watcher: sync still traverses roots. Implement change-only updates before claiming incremental rescanning.
+- The initial exact-duplicate unit test verifies same-content/different-content fixtures. Expand coverage for media renames, root overlap, inaccessible files, and cross-root duplicates.
+- Immich 3.3.5 connectivity and semantic AI search are still future work.
