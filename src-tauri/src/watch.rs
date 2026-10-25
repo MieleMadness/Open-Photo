@@ -12,6 +12,11 @@ struct RenamedFile {
     to: String,
 }
 
+#[derive(Serialize, Clone)]
+struct ChangedFile {
+    paths: Vec<String>,
+}
+
 #[derive(Default)]
 pub struct WatchState {
     watchers: Vec<RecommendedWatcher>,
@@ -51,7 +56,9 @@ pub fn set_watched_folders(
                         };
                         let _ = emitter.emit("openphoto-file-renamed", rename);
                     }
-                    let _ = emitter.emit("openphoto-folder-changed", ());
+                    let _ = emitter.emit("openphoto-media-event", ChangedFile {
+                        paths: details.paths.iter().map(|path| path.to_string_lossy().into_owned()).collect(),
+                    });
                 }
             })
             .map_err(|error| error.to_string())?;
