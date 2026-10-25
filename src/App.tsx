@@ -201,7 +201,7 @@ export default function App() {
   const livePhotoPairs=useMemo(()=>{
     const names=new Map<string,Set<string>>();
     for(const photo of result?.photos||[]){
-      const normalized=photo.path.toLowerCase().replace(/\\\\/g,"/");
+      const normalized=photo.path.toLowerCase().replace(/\\/g,"/");
       const separator=normalized.lastIndexOf(".");
       if(separator<0)continue;
       const key=normalized.slice(0,separator);
