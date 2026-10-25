@@ -52,3 +52,6 @@
 .folder-item:hover{background:var(--surface-muted)}
 .folder-item svg:last-child{margin-left:auto;flex-shrink:0}
 @media(max-width:900px){.workspace-select{font-size:10px}.workspace-create{font-size:10px;padding:8px 3px}}
+
+.photo-location-map{height:min(64vh,640px);min-height:350px;width:100%;margin-top:20px;border:1px solid var(--line);border-radius:14px;overflow:hidden;z-index:0}
+.leaflet-container{font-family:inherit;background:var(--surface-muted)}
