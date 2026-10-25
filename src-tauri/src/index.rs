@@ -165,14 +165,23 @@ pub fn update_indexed_path(root: String, path: String) -> Result<IncrementalChan
         return Err("Changed file is outside the selected library".into());
     }
     let actual = std::fs::canonicalize(&candidate).ok();
-    if actual.as_ref().is_some_and(|resolved| !resolved.starts_with(&base)) {
+    if actual
+        .as_ref()
+        .is_some_and(|resolved| !resolved.starts_with(&base))
+    {
         return Err("Changed file resolves outside the library".into());
     }
-    let metadata = actual.as_ref().and_then(|resolved| std::fs::metadata(resolved).ok());
+    let metadata = actual
+        .as_ref()
+        .and_then(|resolved| std::fs::metadata(resolved).ok());
     if metadata.as_ref().is_some_and(|meta| meta.is_dir()) {
         return Err("Directory change requires full scan".into());
     }
-    let extension = candidate.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    let extension = candidate
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
     if !crate::SUPPORTED.contains(&extension.as_str()) {
         return Err("Unsupported media extension".into());
     }
@@ -184,7 +193,9 @@ pub fn update_indexed_path(root: String, path: String) -> Result<IncrementalChan
     };
     let db = database()?;
     if let Some(meta) = metadata.filter(|meta| meta.is_file()) {
-        let modified = meta.modified().ok()
+        let modified = meta
+            .modified()
+            .ok()
             .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
             .map_or(0, |duration| duration.as_secs());
         db.execute(
@@ -196,8 +207,11 @@ pub fn update_indexed_path(root: String, path: String) -> Result<IncrementalChan
         change.bytes = meta.len();
         change.modified_unix = modified;
     } else {
-        db.execute("DELETE FROM media WHERE root=?1 AND path=?2", params![root,path])
-            .map_err(|e| e.to_string())?;
+        db.execute(
+            "DELETE FROM media WHERE root=?1 AND path=?2",
+            params![root, path],
+        )
+        .map_err(|e| e.to_string())?;
     }
     Ok(change)
 }
