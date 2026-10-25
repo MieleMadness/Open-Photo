@@ -80,8 +80,8 @@ export default function App() {
     if(!result)return;
     setDuplicateBusy(true);setError("");
     try{
-      const groups=await Promise.all(roots.map(parent=>invoke<{paths:string[];bytes:number}[]>("find_exact_duplicates",{root:parent,paths:result.photos.filter(p=>(p.libraryRoot||root)===parent).map(p=>p.path)})));
-      setDuplicates(groups.flat());
+      const groups=await invoke<{paths:string[];bytes:number}[]>("find_workspace_duplicates",{roots,paths:result.photos.map(p=>p.path)});
+      setDuplicates(groups);
     }catch(e){setError(String(e))}finally{setDuplicateBusy(false)}
   };
   const workspace = workspaces.find(w=>w.id===activeWorkspace);
