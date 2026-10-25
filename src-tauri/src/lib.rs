@@ -132,7 +132,7 @@ fn bulk_create_tags(
 
 const SUPPORTED: &[&str] = &[
     "jpg", "jpeg", "png", "webp", "gif", "tif", "tiff", "bmp", "heic", "heif", "avif", "dng",
-    "cr2", "nef", "arw",
+    "cr2", "nef", "arw", "mov", "mp4", "m4v", "avi", "mkv", "webm",
 ];
 
 #[derive(Serialize)]
