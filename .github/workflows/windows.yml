@@ -13,6 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
@@ -23,6 +25,12 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Typecheck and build frontend
         run: npm run build
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+      - name: Rust lint
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+      - name: Rust regression tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
       - name: Build Windows desktop installer
         run: npm run tauri build
       - uses: actions/upload-artifact@v4
