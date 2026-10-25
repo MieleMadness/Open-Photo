@@ -62,3 +62,8 @@
 .sync-toolbar .secondary-button{padding:8px 11px;font-size:12px}
 .folder-chip{display:inline-flex;gap:8px;align-items:center;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:6px 9px;border:1px solid var(--line);border-radius:8px;color:var(--muted);font-size:11px}
 .folder-chip button{border:0;background:transparent;color:var(--muted);font-size:16px;cursor:pointer}
+
+.duplicate-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.duplicate-bar>span{font-size:12px;color:var(--muted)}
+.duplicate-group{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:5px}
+.duplicate-group small{color:var(--muted);overflow-wrap:anywhere}
