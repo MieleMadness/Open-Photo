@@ -43,6 +43,7 @@ export default function App() {
   const [syncChanges,setSyncChanges]=useState<{added:number;updated:number;removed:number;incomplete:boolean}|null>(null);
   const [duplicates, setDuplicates] = useState<{paths:string[];bytes:number}[]>([]);
   const [duplicateBusy, setDuplicateBusy] = useState(false);
+  const [similarGroups,setSimilarGroups]=useState<{paths:string[];max_distance:number}[]>([]);
   const [mediaType,setMediaType] = useState<"all"|"photo"|"video">("all");
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("openphoto.theme") as Theme) || "system");
   const [root, setRoot] = useState("");
@@ -87,6 +88,14 @@ export default function App() {
     try{
       const groups=await invoke<{paths:string[];bytes:number}[]>("find_workspace_duplicates",{roots,paths:result.photos.map(p=>p.path)});
       setDuplicates(groups);
+    }catch(e){setError(String(e))}finally{setDuplicateBusy(false)}
+  };
+  const inspectSimilar=async()=>{
+    if(!result)return;
+    setDuplicateBusy(true);setError("");
+    try{
+      const matches=await invoke<{paths:string[];max_distance:number}[]>("find_similar_photos",{roots,paths:result.photos.map(p=>p.path)});
+      setSimilarGroups(matches);
     }catch(e){setError(String(e))}finally{setDuplicateBusy(false)}
   };
   const workspace = workspaces.find(w=>w.id===activeWorkspace);
