@@ -9,7 +9,9 @@ pub struct GeoPoint {
     lon: f64,
 }
 fn coordinate(value: &Value) -> Option<f64> {
-    let Value::Rational(ref values) = *value else { return None; };
+    let Value::Rational(ref values) = *value else {
+        return None;
+    };
     if values.len() < 3 || values.iter().take(3).any(|v| v.denom == 0) {
         return None;
     }
@@ -18,13 +20,19 @@ fn coordinate(value: &Value) -> Option<f64> {
 }
 fn reference(value: &Value) -> Option<String> {
     match value {
-        Value::Ascii(values) => Some(String::from_utf8_lossy(values.first()?).trim_end_matches('\0').to_ascii_uppercase()),
+        Value::Ascii(values) => Some(
+            String::from_utf8_lossy(values.first()?)
+                .trim_end_matches('\0')
+                .to_ascii_uppercase(),
+        ),
         _ => None,
     }
 }
 fn read_point(path: &Path) -> Option<(f64, f64)> {
     let file = File::open(path).ok()?;
-    let metadata = Reader::new().read_from_container(&mut BufReader::new(file)).ok()?;
+    let metadata = Reader::new()
+        .read_from_container(&mut BufReader::new(file))
+        .ok()?;
     let latitude = coordinate(&metadata.get_field(Tag::GPSLatitude, In::PRIMARY)?.value)?;
     let longitude = coordinate(&metadata.get_field(Tag::GPSLongitude, In::PRIMARY)?.value)?;
     let lat_ref = reference(&metadata.get_field(Tag::GPSLatitudeRef, In::PRIMARY)?.value)?;
@@ -33,8 +41,13 @@ fn read_point(path: &Path) -> Option<(f64, f64)> {
         return None;
     }
     let lat = if lat_ref == "S" { -latitude } else { latitude };
-    let lon = if lon_ref == "W" { -longitude } else { longitude };
-    (lat.is_finite() && lon.is_finite() && lat.abs() <= 90.0 && lon.abs() <= 180.0).then_some((lat, lon))
+    let lon = if lon_ref == "W" {
+        -longitude
+    } else {
+        longitude
+    };
+    (lat.is_finite() && lon.is_finite() && lat.abs() <= 90.0 && lon.abs() <= 180.0)
+        .then_some((lat, lon))
 }
 #[tauri::command]
 pub fn gps_for_photos(root: String, paths: Vec<String>) -> Result<Vec<GeoPoint>, String> {
@@ -44,12 +57,26 @@ pub fn gps_for_photos(root: String, paths: Vec<String>) -> Result<Vec<GeoPoint>,
     let root = std::fs::canonicalize(root).map_err(|e| e.to_string())?;
     let mut points = Vec::new();
     for original in paths {
-        let Ok(path) = std::fs::canonicalize(&original) else { continue; };
-        if !path.starts_with(&root) || !path.is_file() { continue; }
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-        if !matches!(ext.as_str(), "jpg" | "jpeg" | "tif" | "tiff") { continue; }
+        let Ok(path) = std::fs::canonicalize(&original) else {
+            continue;
+        };
+        if !path.starts_with(&root) || !path.is_file() {
+            continue;
+        }
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        if !matches!(ext.as_str(), "jpg" | "jpeg" | "tif" | "tiff") {
+            continue;
+        }
         if let Some((lat, lon)) = read_point(&path) {
-            points.push(GeoPoint { path: original, lat, lon });
+            points.push(GeoPoint {
+                path: original,
+                lat,
+                lon,
+            });
         }
     }
     Ok(points)
