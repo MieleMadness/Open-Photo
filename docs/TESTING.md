@@ -40,3 +40,12 @@ Before release, commit `package-lock.json` and `Cargo.lock`, use `npm ci`, and d
 - Large file protection: files above 75 MB are not decoded in the current MVP.
 - Image previews are generated locally; no image bytes are uploaded or written to the originals.
 - Follow-up performance hardening: virtualized grid, thumbnail cache, decoded-pixel allocation limits, cancelable background decode.
+
+## MVP gallery follow-up implementation
+
+- Bounded, in-process cache keyed by canonical file path, size, modification time and requested resolution; no original file writes.
+- Virtualized grid renders a window of visible rows rather than all files. This first implementation needs performance testing on very large libraries and with resized windows.
+- Checkboxes support multi-selection across grid/list layouts; selection is reset when changing library folders.
+- Explicitly confirmed batch operation creates **missing** `.jpg.xmp`-style sidecars with standard `dc:subject` keywords; existing sidecars are skipped.
+- Regression coverage: repeat application does not overwrite the first sidecar and original image bytes are unchanged.
+- Future work: metadata-aware merge for existing sidecars, tag removal, undo, filesystem event refresh, UI interaction tests, thumbnail disk-cache migration and EXIF display. Until metadata merge is tested against Immich 3.3.5, **do not** overwrite existing XMP.
