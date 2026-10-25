@@ -187,6 +187,22 @@ mod tests {
     }
 
     #[test]
+    fn preview_rejects_files_outside_selected_library() {
+        let root = temp_root();
+        let other = temp_root();
+        let image = other.join("photo.jpg");
+        fs::write(&image, b"test").unwrap();
+        let result = preview_image(
+            root.to_string_lossy().into_owned(),
+            image.to_string_lossy().into_owned(),
+            400,
+        );
+        assert!(result.is_err());
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(other).unwrap();
+    }
+
+    #[test]
     fn empty_folder_returns_empty_result() {
         let root = temp_root();
         let result = scan_library(root.to_string_lossy().into_owned()).unwrap();
