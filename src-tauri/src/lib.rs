@@ -247,17 +247,13 @@ fn read_iphone_media(root: String, path: String) -> Result<String, String> {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_ascii_lowercase();
-    if !matches!(
-        extension.as_str(),
-        "heic" | "heif" | "mov" | "mp4" | "m4v"
-    ) {
+    if !matches!(extension.as_str(), "heic" | "heif" | "mov" | "mp4" | "m4v") {
         return Err("This format is not eligible for inline iPhone media preview".into());
     }
     let meta = fs::metadata(&file).map_err(|e| e.to_string())?;
     if meta.len() > 48 * 1024 * 1024 {
         return Err(
-            "Inline playback is limited to 48 MB; use the Windows player for larger videos"
-                .into(),
+            "Inline playback is limited to 48 MB; use the Windows player for larger videos".into(),
         );
     }
     let bytes = fs::read(file).map_err(|e| e.to_string())?;
