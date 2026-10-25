@@ -164,16 +164,23 @@ pub fn update_indexed_path(root: String, path: String) -> Result<IncrementalChan
     if !candidate.is_absolute() || !candidate.starts_with(&base) {
         return Err("Changed file is outside the selected library".into());
     }
-    let actual = std::fs::canonicalize(&candidate).ok();
+    // Missing files may be removed from the index, but an inaccessible file
+    // must never be mistaken for deletion (e.g. disconnected network drive).
+    let actual = match std::fs::canonicalize(&candidate) {
+        Ok(resolved) => Some(resolved),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(format!("Cannot inspect changed file: {error}")),
+    };
     if actual
         .as_ref()
         .is_some_and(|resolved| !resolved.starts_with(&base))
     {
         return Err("Changed file resolves outside the library".into());
     }
-    let metadata = actual
-        .as_ref()
-        .and_then(|resolved| std::fs::metadata(resolved).ok());
+    let metadata = match actual.as_ref() {
+        Some(resolved) => Some(std::fs::metadata(resolved).map_err(|e| e.to_string())?),
+        None => None,
+    };
     if metadata.as_ref().is_some_and(|meta| meta.is_dir()) {
         return Err("Directory change requires full scan".into());
     }
