@@ -8,6 +8,7 @@ import { Images, FolderOpen, Users, Tags, Settings2, Search, Moon, Sun, Monitor,
 
 type View = "library" | "folders" | "collections" | "timeline" | "map" | "people" | "tags" | "settings";
 type Collection = {id:string;workspaceId:string;name:string;paths:string[]};
+type SmartRule = {id:string;workspaceId:string;name:string;minRating:number;type:"all"|"photo"|"video";minMB:number};
 type Workspace = { id: string; name: string; root: string; roots?: string[] };
 type Theme = "light" | "dark" | "system";
 type PhotoView = "grid" | "list";
@@ -76,6 +77,14 @@ export default function App() {
   const [result, setResult] = useState<ScanResult | null>(null);
   const [query, setQuery] = useState("");
   const [smartFilter,setSmartFilter]=useState<""|"recent"|"thisDay"|"large"|"unrated"|"thisMonth">("");
+  const [selectedSmartRule,setSelectedSmartRule]=useState("");
+  const [smartRules,setSmartRules]=useState<SmartRule[]>(()=>{
+    try {
+      const saved=JSON.parse(localStorage.getItem("openphoto.smartRules")||"[]") as SmartRule[];
+      return Array.isArray(saved)?saved.filter(item=>typeof item.id==="string"&&typeof item.name==="string"&&["all","photo","video"].includes(item.type)&&Number.isInteger(item.minRating)&&item.minRating>=0&&item.minRating<=5&&Number.isFinite(item.minMB)&&item.minMB>=0):[];
+    }catch{return [];}
+  });
+  useEffect(()=>localStorage.setItem("openphoto.smartRules",JSON.stringify(smartRules)),[smartRules]);
   const [photoView, setPhotoView] = useState<PhotoView>("grid");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
   const [tileSize, setTileSize] = useState(180);
@@ -318,7 +327,9 @@ export default function App() {
         (smartFilter === "unrated" && !(photoRatings[p.path] > 0)) ||
         (smartFilter === "thisMonth" && modified.getMonth() === today.getMonth() && modified.getFullYear() < today.getFullYear());
       const video = ["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension);
-      return smartMatch &&
+      const rule=smartRules.find(item=>item.id===selectedSmartRule && item.workspaceId===activeWorkspace);
+      const ruleMatch=!rule || ((rule.type==="all" || (rule.type==="video" ? video : !video)) && (photoRatings[p.path]||0)>=rule.minRating && p.bytes>=rule.minMB*1024*1024);
+      return smartMatch && ruleMatch &&
         (mediaType === "video" || !hiddenLiveVideos.has(p.path)) &&
         p.name.toLowerCase().includes(query.toLowerCase()) &&
         (organizeFilter === "all" || (organizeFilter === "favorites" ? photoRatings[p.path] === 5 : (photoRatings[p.path] || 0) > 0)) &&
@@ -335,7 +346,7 @@ export default function App() {
         case "smallest": return a.bytes - b.bytes || a.path.localeCompare(b.path);
       }
     });
-  }, [result, query, sortBy, folderFilter, mediaType, smartFilter, organizeFilter, photoRatings, currentCollection, hiddenLiveVideos]);
+  }, [result, query, sortBy, folderFilter, mediaType, smartFilter, smartRules, selectedSmartRule, activeWorkspace, organizeFilter, photoRatings, currentCollection, hiddenLiveVideos]);
   useEffect(() => setScrollTop(0), [query, sortBy, photoView, tileSize, root, folderFilter, mediaType, organizeFilter, smartFilter]);
   const gridGap = 14;
   const columns = Math.max(1, Math.floor((gridWidth - 48 + gridGap) / (tileSize + gridGap)));
@@ -409,7 +420,7 @@ export default function App() {
             {error && <div role="alert" className="error">{error}</div>}
             {busy && <div className="empty"><div className="empty-symbol"><Images size={28}/></div><h3>Scanning your folder</h3><p>Reading file names and sizes. No photos are being changed.</p></div>}
             {!busy && !result && <div className="empty"><div className="empty-symbol"><ImageOff size={32}/></div><h3>Your library starts here</h3><p>Choose a folder on your computer to discover supported photo files. Images display as thumbnails where supported, with local-only processing.</p><button className="secondary-button" onClick={chooseFolder}><FolderOpen size={16}/> Select Photo Folder</button></div>}
-            {smartFilter && view==="library" && <div className="selection-toolbar"><strong>Smart collection: {smartFilter==="recent"?"Last 30 days":smartFilter==="thisDay"?"On this day":smartFilter==="thisMonth"?"This month in past years":smartFilter==="unrated"?"Unrated media":"Large media"}</strong><button className="secondary-button" onClick={()=>setSmartFilter("")}>Show all media</button></div>}
+            {(smartFilter || selectedSmartRule) && view==="library" && <div className="selection-toolbar"><strong>Smart collection: {selectedSmartRule ? smartRules.find(rule=>rule.id===selectedSmartRule)?.name : smartFilter==="recent"?"Last 30 days":smartFilter==="thisDay"?"On this day":smartFilter==="thisMonth"?"This month in past years":smartFilter==="unrated"?"Unrated media":"Large media"}</strong><button className="secondary-button" onClick={()=>{setSmartFilter("");setSelectedSmartRule("")}}>Show all media</button></div>}
             {result && <div className="selection-toolbar"><label className="sort-control">Organize <select aria-label="Organization filter" value={organizeFilter} onChange={e=>setOrganizeFilter(e.target.value as "all"|"favorites"|"rated")}><option value="all">All photos</option><option value="favorites">Favorites (5 stars)</option><option value="rated">Rated photos</option></select></label></div>}
             {!busy && result && <><div className="results-note">{visible.length} matching files · {result.scanned_files.toLocaleString()} filesystem entries scanned {result.truncated ? "· scan limit reached" : ""}</div><div className={photoView === "grid" ? "photo-grid virtual-photo-grid" : "file-list"} onScroll={e=>setScrollTop(e.currentTarget.scrollTop)} ref={el=>{if(el && Math.abs(el.clientWidth-gridWidth)>5)setGridWidth(el.clientWidth);}} style={photoView === "grid" ? { display:"block", padding:0 } : undefined}>
               {photoView === "grid" ? <div style={{height:rowCount*rowHeight,position:"relative"}}><div className="virtual-rows" style={{position:"absolute",top:windowStart*rowHeight,left:24,right:24,display:"grid",gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`,gridAutoRows:rowHeight,gap:0}}>
@@ -420,7 +431,24 @@ export default function App() {
         </>}
         {view === "folders" && <><span className="eyebrow">LIBRARY ORGANIZATION</span><h1>Folders</h1><p>Browse the folder structure from your selected workspace.</p><div className="folder-list">{folders.map(folder=><button key={folder} className="folder-item" onClick={()=>{setFolderFilter(folder==="(root)"?"":folder);setView("library")}}><FolderOpen size={20}/>{folder}<ChevronRight size={16}/></button>)}{folders.length===0&&<p>Open a workspace folder to browse its subfolders.</p>}</div></>}
         {view === "map" && <><span className="eyebrow">PHOTO LOCATIONS</span><h1>Map</h1><p>Zoom and explore GPS-tagged photos from your current workspace. Select a marker to preview its photo.</p>{geoBusy?<p>Reading embedded GPS locations…</p>:<p>{geoPoints.length} photo locations found. Currently supports GPS from JPEG and TIFF; HEIC/MOV location metadata is planned.</p>}{root&&result?<PhotoMap points={geoPoints} onChoose={path=>{const photo=result.photos.find(p=>p.path===path);if(photo)setSelected(photo)}}/>:<div className="placeholder-panel"><p>Open a workspace and scan a photo folder first.</p></div>}</>}
-        {view === "collections" && <><span className="eyebrow">AUTOMATIC COLLECTIONS</span><h2>Smart collections</h2><p>Dynamic, read-only views based on file modification dates and sizes. Nothing is moved or duplicated.</p><div className="folder-list">{([{id:"recent",name:"Modified in the last 30 days"},{id:"thisDay",name:"On this day in previous years"},{id:"large",name:"Large media (50 MB or more)"},{id:"unrated",name:"Photos not yet rated"},{id:"thisMonth",name:"This month in previous years"}] as const).map(item=><button className="folder-item" key={item.id} onClick={()=>{setSmartFilter(item.id);setCollectionFilter("");setQuery("");setView("library")}}><Images size={18}/>{item.name}<ChevronRight size={16}/></button>)}</div></>}
+        {view === "collections" && <><span className="eyebrow">AUTOMATIC COLLECTIONS</span><h2>Smart collections</h2><p>Dynamic, read-only views based on file modification dates and sizes. Nothing is moved or duplicated.</p><div className="folder-list">{([{id:"recent",name:"Modified in the last 30 days"},{id:"thisDay",name:"On this day in previous years"},{id:"large",name:"Large media (50 MB or more)"},{id:"unrated",name:"Photos not yet rated"},{id:"thisMonth",name:"This month in previous years"}] as const).map(item=><button className="folder-item" key={item.id} onClick={()=>{setSmartFilter(item.id);setSelectedSmartRule("");setCollectionFilter("");setQuery("");setView("library")}}><Images size={18}/>{item.name}<ChevronRight size={16}/></button>)}</div></>}
+        {view === "collections" && <><span className="eyebrow">CUSTOM SMART COLLECTIONS</span><h2>Your rules</h2><p>Create a reusable, read-only filter. Each rule belongs to this workspace.</p><button className="secondary-button" disabled={!activeWorkspace} onClick={()=>{
+          const name=window.prompt("Smart collection name");
+          if(!name?.trim())return;
+          const typeInput=window.prompt("Media type: all, photo, or video","all");
+          if(typeInput===null)return;
+          const type=typeInput.trim().toLowerCase();
+          if(type!=="all"&&type!=="photo"&&type!=="video"){window.alert("Choose all, photo, or video.");return;}
+          const ratingInput=window.prompt("Minimum star rating (0–5)","0");
+          if(ratingInput===null)return;
+          const minRating=Number(ratingInput);
+          if(!Number.isInteger(minRating)||minRating<0||minRating>5){window.alert("Rating must be a whole number from 0 to 5.");return;}
+          const sizeInput=window.prompt("Minimum file size in MB (0 or greater)","0");
+          if(sizeInput===null)return;
+          const minMB=Number(sizeInput);
+          if(!Number.isFinite(minMB)||minMB<0){window.alert("Size must be zero or greater.");return;}
+          setSmartRules(old=>[...old,{id:crypto.randomUUID(),workspaceId:activeWorkspace,name:name.trim(),type,minRating,minMB}]);
+        }}>Create smart collection</button><div className="folder-list">{smartRules.filter(rule=>rule.workspaceId===activeWorkspace).map(rule=><div key={rule.id} className="collection-row"><button className="folder-item" onClick={()=>{setSmartFilter("");setSelectedSmartRule(rule.id);setCollectionFilter("");setView("library")}}><Images size={18}/>{rule.name} · {rule.type} · {rule.minRating}+ stars · {rule.minMB}+ MB</button><button className="secondary-button" onClick={()=>{setSmartRules(old=>old.filter(item=>item.id!==rule.id));if(selectedSmartRule===rule.id)setSelectedSmartRule("")}}>Remove</button></div>)}</div></>}
         {view === "collections" && <><span className="eyebrow">VIRTUAL ORGANIZATION</span><h1>Collections</h1><p>Group media without moving original files.</p><button className="primary-button" onClick={()=>{const name=window.prompt("Collection name");if(name?.trim())setCollections(old=>[...old,{id:crypto.randomUUID(),workspaceId:activeWorkspace,name:name.trim(),paths:[...selection]}])}}>Create collection {selection.length? `with ${selection.length} selected` : ""}</button><div className="folder-list">{collections.filter(c=>c.workspaceId===activeWorkspace).map(c=><div key={c.id} className="collection-row"><button className="folder-item" onClick={()=>{setCollectionFilter(c.id);setView("library")}}><Images size={18}/>{c.name} · {c.paths.length} items</button><button className="secondary-button" onClick={()=>setCollections(old=>old.filter(x=>x.id!==c.id))}>Remove</button></div>)}</div></>}
         {view === "timeline" && <><span className="eyebrow">BY MODIFIED DATE</span><h1>Timeline</h1><p>Browse files by modification month. Capture-date sorting will follow when EXIF and QuickTime date extraction is complete.</p><div className="folder-list">{[...new Set((result?.photos||[]).map(p=>new Date(p.modified_unix*1000).toLocaleDateString(undefined,{year:"numeric",month:"long"})))].map(month=><button className="folder-item" key={month} onClick={()=>{setQuery("");setSortBy("newest");setView("library")}}>{month}</button>)}</div></>}
         {view === "people" && <Placeholder title="People" subtitle="Organize familiar faces without giving up control of your data." icon={Users} description="Coming in a later milestone: local, opt-in face detection, human-reviewed identities, and portable XMP regions."/>}
