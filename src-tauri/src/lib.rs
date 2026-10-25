@@ -1,3 +1,4 @@
+mod geo;
 use base64::Engine;
 use image::ImageReader;
 use serde::Serialize;
