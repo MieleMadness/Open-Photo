@@ -40,8 +40,10 @@ pub fn set_watched_folders(
         let mut watcher =
             notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
                 if let Ok(details) = event {
-                    if matches!(details.kind, EventKind::Modify(ModifyKind::Name(RenameMode::Both)))
-                        && details.paths.len() == 2
+                    if matches!(
+                        details.kind,
+                        EventKind::Modify(ModifyKind::Name(RenameMode::Both))
+                    ) && details.paths.len() == 2
                     {
                         let rename = RenamedFile {
                             from: details.paths[0].to_string_lossy().into_owned(),
