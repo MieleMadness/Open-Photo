@@ -15,8 +15,8 @@ fn database() -> Result<Connection, String> {
         .ok_or("Windows local data directory unavailable")?
         .join("Open-Photo");
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-    let connection = Connection::open(directory.join("media-index.sqlite"))
-        .map_err(|e| e.to_string())?;
+    let connection =
+        Connection::open(directory.join("media-index.sqlite")).map_err(|e| e.to_string())?;
     connection
         .execute_batch(
             "CREATE TABLE IF NOT EXISTS media (
@@ -138,10 +138,8 @@ mod tests {
 
     #[test]
     fn hashes_detect_identical_content() {
-        let directory = std::env::temp_dir().join(format!(
-            "openphoto-hash-test-{}",
-            std::process::id()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("openphoto-hash-test-{}", std::process::id()));
         std::fs::create_dir_all(&directory).unwrap();
         let a = directory.join("a.jpg");
         let b = directory.join("b.jpg");
@@ -154,7 +152,8 @@ mod tests {
             b.to_string_lossy().into_owned(),
             c.to_string_lossy().into_owned(),
         ];
-        let groups = find_exact_duplicates(directory.to_string_lossy().into_owned(), paths).unwrap();
+        let groups =
+            find_exact_duplicates(directory.to_string_lossy().into_owned(), paths).unwrap();
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].paths.len(), 2);
         std::fs::remove_dir_all(directory).unwrap();
