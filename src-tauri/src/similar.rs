@@ -103,6 +103,38 @@ pub fn find_similar_photos(
 #[cfg(test)]
 mod tests {
     #[test]
+    fn groups_matching_images_but_not_opposite_gradients() {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("openphoto-similar-{stamp}"));
+        std::fs::create_dir_all(&root).unwrap();
+        let first = root.join("one.png");
+        let second = root.join("two.png");
+        let opposite = root.join("opposite.png");
+        let light_to_dark = image::GrayImage::from_fn(9, 8, |x, _| {
+            image::Luma([(x * 20) as u8])
+        });
+        let dark_to_light = image::GrayImage::from_fn(9, 8, |x, _| {
+            image::Luma([((8 - x) * 20) as u8])
+        });
+        light_to_dark.save(&first).unwrap();
+        light_to_dark.save(&second).unwrap();
+        dark_to_light.save(&opposite).unwrap();
+        let paths = vec![
+            first.to_string_lossy().into_owned(),
+            second.to_string_lossy().into_owned(),
+            opposite.to_string_lossy().into_owned(),
+        ];
+        let results =
+            find_similar_photos(vec![root.to_string_lossy().into_owned()], paths).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].paths.len(), 2);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn differing_bit_positions_are_counted() {
         assert_eq!((0_u64 ^ 7_u64).count_ones(), 3);
     }
