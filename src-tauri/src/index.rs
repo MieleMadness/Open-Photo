@@ -170,7 +170,9 @@ pub fn update_indexed_path(root: String, path: String) -> Result<IncrementalChan
     // symlink escape, or removed directory is not proof of an individual deletion.
     // A full scan can reconcile directory changes separately.
     if !candidate.exists() {
-        let parent = candidate.parent().ok_or("Changed file has no parent folder")?;
+        let parent = candidate
+            .parent()
+            .ok_or("Changed file has no parent folder")?;
         let resolved_parent = std::fs::canonicalize(parent)
             .map_err(|e| format!("Cannot verify parent folder; full rescan required: {e}"))?;
         if !resolved_parent.starts_with(&base) || !resolved_parent.is_dir() {
@@ -331,27 +333,27 @@ fn sha256_file(path: &Path) -> std::io::Result<Vec<u8>> {
 mod tests {
     use super::*;
 
-
     #[test]
     fn missing_parent_is_not_assumed_to_be_a_deleted_photo() {
-        let directory = std::env::temp_dir().join(format!(
-            "openphoto-missing-parent-{}", std::process::id()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("openphoto-missing-parent-{}", std::process::id()));
         std::fs::create_dir_all(&directory).unwrap();
         let absent = directory.join("disconnected").join("photo.jpg");
         let result = update_indexed_path(
             directory.to_string_lossy().into_owned(),
             absent.to_string_lossy().into_owned(),
         );
-        assert!(result.is_err(), "Missing folders require full reconciliation");
+        assert!(
+            result.is_err(),
+            "Missing folders require full reconciliation"
+        );
         std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
     fn directory_event_does_not_remove_indexed_media() {
-        let directory = std::env::temp_dir().join(format!(
-            "openphoto-directory-event-{}", std::process::id()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("openphoto-directory-event-{}", std::process::id()));
         let child = directory.join("photos");
         std::fs::create_dir_all(&child).unwrap();
         let result = update_indexed_path(
