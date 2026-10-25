@@ -44,27 +44,43 @@ pub fn scan_indexed(root: String) -> Result<ScanResult, String> {
     }
     let mut db = database()?;
     let transaction = db.transaction().map_err(|e| e.to_string())?;
+    // Track the complete snapshot while preserving unchanged indexed rows.
+    // This avoids tearing down and rebuilding the index on every sync.
     transaction
-        .execute("DELETE FROM media WHERE root = ?1", [&root])
+        .execute_batch(
+            "CREATE TEMP TABLE IF NOT EXISTS seen_paths (path TEXT PRIMARY KEY);
+             DELETE FROM seen_paths;",
+        )
         .map_err(|e| e.to_string())?;
     {
-        let mut statement = transaction
+        let mut seen = transaction
+            .prepare("INSERT OR IGNORE INTO seen_paths(path) VALUES (?1)")
+            .map_err(|e| e.to_string())?;
+        let mut upsert = transaction
             .prepare(
-                "INSERT INTO media (root, path, bytes, modified_unix)
-                 VALUES (?1, ?2, ?3, ?4)",
+                "INSERT INTO media(root, path, bytes, modified_unix)
+                 VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT(root, path) DO UPDATE SET
+                     bytes = excluded.bytes,
+                     modified_unix = excluded.modified_unix
+                 WHERE media.bytes != excluded.bytes
+                    OR media.modified_unix != excluded.modified_unix",
             )
             .map_err(|e| e.to_string())?;
         for photo in &scan.photos {
-            statement
-                .execute(params![
-                    root,
-                    photo.path,
-                    photo.bytes as i64,
-                    photo.modified_unix as i64
-                ])
+            seen.execute([&photo.path]).map_err(|e| e.to_string())?;
+            upsert
+                .execute(params![root, photo.path, photo.bytes as i64, photo.modified_unix as i64])
                 .map_err(|e| e.to_string())?;
         }
     }
+    transaction
+        .execute(
+            "DELETE FROM media WHERE root = ?1
+             AND NOT EXISTS (SELECT 1 FROM seen_paths WHERE seen_paths.path = media.path)",
+            [&root],
+        )
+        .map_err(|e| e.to_string())?;
     transaction.commit().map_err(|e| e.to_string())?;
     Ok(scan)
 }
