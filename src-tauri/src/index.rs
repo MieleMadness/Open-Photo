@@ -446,7 +446,11 @@ mod tests {
             .as_secs() as i64;
         let health = classify_indexed_files(vec![
             (existing.to_string_lossy().into_owned(), 5, modified),
-            (directory.join("absent.jpg").to_string_lossy().into_owned(), 0, 0),
+            (
+                directory.join("absent.jpg").to_string_lossy().into_owned(),
+                0,
+                0,
+            ),
         ]);
         assert_eq!(health.indexed, 2);
         assert_eq!(health.available, 1);
