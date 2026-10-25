@@ -1,4 +1,5 @@
 mod ai_models;
+mod ai_preprocess;
 mod cache_disk;
 mod geo;
 mod index;
@@ -343,6 +344,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(std::sync::Mutex::new(watch::WatchState::default()))
         .invoke_handler(tauri::generate_handler![
+            ai_preprocess::ai_prepare_image,
             ai_models::ai_model_status,
             ai_models::ai_remove_model,
             ai_models::ai_import_model,
