@@ -242,13 +242,23 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
 #[tauri::command]
 fn read_iphone_media(root: String, path: String) -> Result<String, String> {
     let file = safe_media_path(&root, &path)?;
-    let extension = file.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-    if !matches!(extension.as_str(), "heic" | "heif" | "mov" | "mp4" | "m4v") {
+    let extension = file
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !matches!(
+        extension.as_str(),
+        "heic" | "heif" | "mov" | "mp4" | "m4v"
+    ) {
         return Err("This format is not eligible for inline iPhone media preview".into());
     }
     let meta = fs::metadata(&file).map_err(|e| e.to_string())?;
     if meta.len() > 48 * 1024 * 1024 {
-        return Err("Inline playback is limited to 48 MB; use the Windows player for larger videos".into());
+        return Err(
+            "Inline playback is limited to 48 MB; use the Windows player for larger videos"
+                .into(),
+        );
     }
     let bytes = fs::read(file).map_err(|e| e.to_string())?;
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
