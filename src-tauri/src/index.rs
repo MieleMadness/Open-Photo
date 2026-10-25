@@ -78,12 +78,25 @@ pub fn scan_indexed_with_changes(root: String) -> Result<IndexedScan, String> {
              DELETE FROM seen_paths;",
         )
         .map_err(|e| e.to_string())?;
+    // Fetch the prior snapshot once rather than executing one SELECT per media file.
+    // This reduces SQLite round-trips significantly for large libraries.
+    let previous_entries: HashMap<String, (i64, i64)> = {
+        let mut statement = transaction
+            .prepare("SELECT path, bytes, modified_unix FROM media WHERE root = ?1")
+            .map_err(|e| e.to_string())?;
+        let rows = statement
+            .query_map([&root], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    (row.get::<_, i64>(1)?, row.get::<_, i64>(2)?),
+                ))
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<_, _>>().map_err(|e| e.to_string())?
+    };
     {
         let mut seen = transaction
             .prepare("INSERT OR IGNORE INTO seen_paths(path) VALUES (?1)")
-            .map_err(|e| e.to_string())?;
-        let mut previous = transaction
-            .prepare("SELECT bytes, modified_unix FROM media WHERE root = ?1 AND path = ?2")
             .map_err(|e| e.to_string())?;
         let mut upsert = transaction
             .prepare(
@@ -97,17 +110,13 @@ pub fn scan_indexed_with_changes(root: String) -> Result<IndexedScan, String> {
             )
             .map_err(|e| e.to_string())?;
         for photo in &scan.photos {
-            let prior = previous.query_row(params![root, photo.path], |row| {
-                Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
-            });
-            match prior {
-                Ok((bytes, modified)) => {
-                    if bytes != photo.bytes as i64 || modified != photo.modified_unix as i64 {
+            match previous_entries.get(&photo.path) {
+                Some((bytes, modified)) => {
+                    if *bytes != photo.bytes as i64 || *modified != photo.modified_unix as i64 {
                         changes.updated += 1;
                     }
                 }
-                Err(rusqlite::Error::QueryReturnedNoRows) => changes.added += 1,
-                Err(error) => return Err(error.to_string()),
+                None => changes.added += 1,
             }
             seen.execute([&photo.path]).map_err(|e| e.to_string())?;
             upsert
