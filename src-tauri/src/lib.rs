@@ -326,6 +326,7 @@ pub fn run() {
             geo::gps_for_photos,
             index::scan_indexed,
             index::scan_indexed_with_changes,
+            index::update_indexed_path,
             index::find_exact_duplicates,
             index::find_workspace_duplicates,
             watch::set_watched_folders,
