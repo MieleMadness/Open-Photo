@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import PhotoMap, {type PhotoLocation} from "./PhotoMap";
+import { IPhonePicture, IPhoneMotion } from "./IPhoneMedia";
 import { Images, FolderOpen, Users, Tags, Settings2, Search, Moon, Sun, Monitor, ShieldCheck, ImageOff, HardDrive, ListFilter, ChevronRight, X, LayoutGrid, List, ZoomIn, ZoomOut, ArrowUpDown } from "lucide-react";
 
 type View = "library" | "folders" | "collections" | "timeline" | "map" | "people" | "tags" | "settings";
@@ -258,23 +259,31 @@ export default function App() {
     return ()=>{active=false};
   },[root,result,view]);
   const folders=useMemo(()=>[...new Set((result?.photos||[]).map(p=>p.path.slice(0,Math.max(p.path.lastIndexOf("\\"),p.path.lastIndexOf("/"))).replace(p.libraryRoot||root,"").replace(/^[\\/]/,"")||"(root)"))].sort(),[result,root]);
-  const livePhotoPairs=useMemo(()=>{
-    const names=new Map<string,Set<string>>();
+  // Group only unambiguous same-folder iPhone still/MOV pairs.
+  // Files remain separate on disk; this is a read-only presentation grouping.
+  const liveVideoByImage=useMemo(()=>{
+    const groups=new Map<string,{images:Photo[];videos:Photo[]}>();
     for(const photo of result?.photos||[]){
       const normalized=photo.path.toLowerCase().replace(/\\/g,"/");
-      const separator=normalized.lastIndexOf(".");
-      if(separator<0)continue;
-      const key=normalized.slice(0,separator);
-      const extension=normalized.slice(separator+1);
-      const types=names.get(key)||new Set<string>();
-      types.add(extension);
-      names.set(key,types);
+      const extension=photo.extension.toLowerCase();
+      if(!["mov","heic","heif","jpg","jpeg"].includes(extension))continue;
+      const stem=normalized.slice(0,normalized.lastIndexOf("."));
+      const group=groups.get(stem)||{images:[],videos:[]};
+      if(extension==="mov")group.videos.push(photo);
+      else group.images.push(photo);
+      groups.set(stem,group);
     }
-    return [...names.values()].filter(types=>types.has("mov")&&["heic","heif","jpg","jpeg"].some(type=>types.has(type))).length;
+    const matches=new Map<string,Photo>();
+    for(const group of groups.values()){
+      if(group.images.length===1&&group.videos.length===1)matches.set(group.images[0].path,group.videos[0]);
+    }
+    return matches;
   },[result]);
+  const hiddenLiveVideos=useMemo(()=>new Set([...liveVideoByImage.values()].map(video=>video.path)),[liveVideoByImage]);
+  const livePhotoPairs=liveVideoByImage.size;
   const currentCollection=collections.find(c=>c.id===collectionFilter&&c.workspaceId===activeWorkspace);
   const visible = useMemo(() => {
-    const photos = result?.photos.filter(p => p.name.toLowerCase().includes(query.toLowerCase()) && (!folderFilter || p.path.includes(folderFilter)) && (!currentCollection || currentCollection.paths.includes(p.path)) && (mediaType==="all" || (mediaType==="video" ? ["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension) : !["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension)))) || [];
+    const photos = result?.photos.filter(p => (mediaType==="video" || !hiddenLiveVideos.has(p.path)) && p.name.toLowerCase().includes(query.toLowerCase()) && (!folderFilter || p.path.includes(folderFilter)) && (!currentCollection || currentCollection.paths.includes(p.path)) && (mediaType==="all" || (mediaType==="video" ? ["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension) : !["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension)))) || [];
     return photos.sort((a,b) => {
       switch (sortBy) {
         case "name": return a.name.localeCompare(b.name) || a.path.localeCompare(b.path);
@@ -347,8 +356,8 @@ export default function App() {
             {!busy && !result && <div className="empty"><div className="empty-symbol"><ImageOff size={32}/></div><h3>Your library starts here</h3><p>Choose a folder on your computer to discover supported photo files. Images display as thumbnails where supported, with local-only processing.</p><button className="secondary-button" onClick={chooseFolder}><FolderOpen size={16}/> Select Photo Folder</button></div>}
             {!busy && result && <><div className="results-note">{visible.length} matching files · {result.scanned_files.toLocaleString()} filesystem entries scanned {result.truncated ? "· scan limit reached" : ""}</div><div className={photoView === "grid" ? "photo-grid virtual-photo-grid" : "file-list"} onScroll={e=>setScrollTop(e.currentTarget.scrollTop)} ref={el=>{if(el && Math.abs(el.clientWidth-gridWidth)>5)setGridWidth(el.clientWidth);}} style={photoView === "grid" ? { display:"block", padding:0 } : undefined}>
               {photoView === "grid" ? <div style={{height:rowCount*rowHeight,position:"relative"}}><div className="virtual-rows" style={{position:"absolute",top:windowStart*rowHeight,left:24,right:24,display:"grid",gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`,gridAutoRows:rowHeight,gap:0}}>
-                {windowPhotos.map(p=><div className="tile-cell" key={p.path}><button className={selection.includes(p.path) ? "photo-tile is-selected" : "photo-tile"} onClick={e=>e.ctrlKey||e.metaKey ? toggleSelection(p.path):setSelected(p)}><PhotoThumb root={p.libraryRoot||root} photo={p} maxEdge={Math.max(360,tileSize*2)} /><span className="tile-name" title={p.name}>{p.name}</span></button><input type="checkbox" aria-label={`Select ${p.name}`} checked={selection.includes(p.path)} onChange={()=>toggleSelection(p.path)}/></div>)}
-              </div></div> : visible.map(p=><div key={p.path} className="selectable-row"><input type="checkbox" aria-label={`Select ${p.name}`} checked={selection.includes(p.path)} onChange={()=>toggleSelection(p.path)}/><button className="file-row" onClick={()=>setSelected(p)}><div className="file-avatar"><PhotoThumb root={root} photo={p} maxEdge={96}/></div><div className="file-name"><strong>{p.name}</strong><small>{p.extension.toUpperCase()} · {formatBytes(p.bytes)}</small></div><ChevronRight size={16}/></button></div>)}
+                {windowPhotos.map(p=><div className="tile-cell" key={p.path}><button className={selection.includes(p.path) ? "photo-tile is-selected" : "photo-tile"} onClick={e=>e.ctrlKey||e.metaKey ? toggleSelection(p.path):setSelected(p)}><PhotoThumb root={p.libraryRoot||root} photo={p} maxEdge={Math.max(360,tileSize*2)} /><span className="tile-name" title={p.name}>{p.name}{liveVideoByImage.has(p.path)?" · LIVE":""}</span></button><input type="checkbox" aria-label={`Select ${p.name}`} checked={selection.includes(p.path)} onChange={()=>toggleSelection(p.path)}/></div>)}
+              </div></div> : visible.map(p=><div key={p.path} className="selectable-row"><input type="checkbox" aria-label={`Select ${p.name}`} checked={selection.includes(p.path)} onChange={()=>toggleSelection(p.path)}/><button className="file-row" onClick={()=>setSelected(p)}><div className="file-avatar"><PhotoThumb root={root} photo={p} maxEdge={96}/></div><div className="file-name"><strong>{p.name}</strong><small>{p.extension.toUpperCase()} · {formatBytes(p.bytes)}{liveVideoByImage.has(p.path)?" · LIVE":""}</small></div><ChevronRight size={16}/></button></div>)}
             </div>{visible.length === 0 && <div className="empty"><p>No supported photos matched this search.</p></div>}</>}
           </section>
         </>}
@@ -361,7 +370,7 @@ export default function App() {
         {view === "settings" && <div className="settings-view"><span className="eyebrow">PREFERENCES</span><h1>Settings</h1><p>Personalize the appearance of your workspace.</p><div className="settings-card"><div><h2>Appearance</h2><p>Choose your preferred color theme.</p></div><div className="theme-options">{([{id:"system",label:"System",Icon:Monitor},{id:"light",label:"Light",Icon:Sun},{id:"dark",label:"Dark",Icon:Moon}] as const).map(({id,label,Icon})=><button key={id} className={theme === id ? "theme-option selected" : "theme-option"} onClick={()=>setTheme(id)}><Icon size={17}/>{label}</button>)}</div></div><div className="settings-card"><div><h2>Workspace backup</h2><p>Export selected workspace settings, folder references and virtual collections to JSON. Photo and video files are not copied.</p></div><button className="secondary-button" disabled={!activeWorkspace} onClick={exportWorkspace}>Export Workspace JSON</button></div><div className="settings-card"><div><h2>File safety</h2><p>Open-Photo currently indexes paths, sizes, and modification times only. File writes and deletions are not implemented.</p></div><span className="safety-pill">Protected</span></div></div>}
       </main>
     </div>
-    {selected && <div className="modal-backdrop" role="presentation" onClick={()=>setSelected(null)}><section className="details" role="dialog" aria-modal="true" aria-label="Photo details" onClick={e=>e.stopPropagation()}><div className="details-header"><h2>File Details</h2><button className="icon-button" onClick={()=>setSelected(null)} aria-label="Close details"><X size={20}/></button></div><div className="detail-preview">{["mov","mp4","m4v","avi","mkv","webm"].includes(selected.extension)?<div className="photo-fallback"><Images size={42}/><span>Embedded playback is planned. Open this video using your default Windows player.</span></div>:<PhotoThumb root={selected.libraryRoot||root} photo={selected} maxEdge={1600}/>}</div>{["mov","mp4","m4v","avi","mkv","webm"].includes(selected.extension)&&<button className="primary-button" onClick={()=>invoke("open_video",{root:selected.libraryRoot||root,path:selected.path}).catch(e=>setError(String(e)))}>Open in Windows player</button>}<dl><dt>Name</dt><dd>{selected.name}</dd><dt>Location</dt><dd className="break-anywhere">{selected.path}</dd><dt>File size</dt><dd>{formatBytes(selected.bytes)}</dd><dt>File format</dt><dd>{selected.extension.toUpperCase()}</dd><dt>Modified</dt><dd>{selected.modified_unix ? new Date(selected.modified_unix*1000).toLocaleString() : "Unknown"}</dd></dl><div className="details-foot"><ShieldCheck size={16}/> File opened read-only</div></section></div>}
+    {selected && <div className="modal-backdrop" role="presentation" onClick={()=>setSelected(null)}><section className="details" role="dialog" aria-modal="true" aria-label="Photo details" onClick={e=>e.stopPropagation()}><div className="details-header"><h2>File Details</h2><button className="icon-button" onClick={()=>setSelected(null)} aria-label="Close details"><X size={20}/></button></div><div className="detail-preview">{["mov","mp4","m4v","avi","mkv","webm"].includes(selected.extension)?<IPhoneMotion root={selected.libraryRoot||root} path={selected.path} onOpenExternal={()=>void invoke("open_video",{root:selected.libraryRoot||root,path:selected.path}).catch(e=>setError(String(e)))}/>:<PhotoThumb root={selected.libraryRoot||root} photo={selected} maxEdge={1600}/>}</div>{liveVideoByImage.has(selected.path)&&<div className="live-photo-motion"><strong>Live Photo · motion clip</strong><IPhoneMotion root={selected.libraryRoot||root} path={liveVideoByImage.get(selected.path)!.path} onOpenExternal={()=>void invoke("open_video",{root:selected.libraryRoot||root,path:liveVideoByImage.get(selected.path)!.path}).catch(e=>setError(String(e)))}/></div>}{["mov","mp4","m4v","avi","mkv","webm"].includes(selected.extension)&&<button className="primary-button" onClick={()=>invoke("open_video",{root:selected.libraryRoot||root,path:selected.path}).catch(e=>setError(String(e)))}>Open in Windows player</button>}<dl><dt>Name</dt><dd>{selected.name}</dd><dt>Location</dt><dd className="break-anywhere">{selected.path}</dd><dt>File size</dt><dd>{formatBytes(selected.bytes)}</dd><dt>File format</dt><dd>{selected.extension.toUpperCase()}</dd><dt>Modified</dt><dd>{selected.modified_unix ? new Date(selected.modified_unix*1000).toLocaleString() : "Unknown"}</dd></dl><div className="details-foot"><ShieldCheck size={16}/> File opened read-only</div></section></div>}
   </div>;
 }
 
@@ -376,11 +385,12 @@ function PhotoThumb({root,photo,maxEdge}:{root:string;photo:Photo;maxEdge:number
   useEffect(() => {
     let active = true;
     setSrc(""); setFailed(false);
-    if (!isDesktop || !root) return;
+    if (!isDesktop || !root || ["heic","heif"].includes(photo.extension)) return;
     invoke<string>("preview_image",{root,path:photo.path,maxEdge})
       .then(data=>{if(active)setSrc(data);})
       .catch(()=>{if(active)setFailed(true);});
     return ()=>{active=false;};
   },[root,photo.path,maxEdge]);
+  if (["heic","heif"].includes(photo.extension)) return <IPhonePicture root={root} path={photo.path} name={photo.name}/>;
   return src ? <img className="photo-image" src={src} alt={photo.name} loading="lazy"/> : <div className="photo-fallback"><Images size={28}/><small>{failed ? "Preview unavailable" : "Loading preview…"}</small></div>;
 }
