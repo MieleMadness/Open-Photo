@@ -149,15 +149,21 @@ export default function App() {
     let unlistenRenames: (()=>void)|undefined;
     let debounce: number|undefined;
     let pendingPaths=new Set<string>();
+    let incrementalBusy=false;
+    let requireFullScan=false;
     const fileExtensions=new Set(["jpg","jpeg","png","webp","gif","tif","tiff","bmp","heic","heif","avif","dng","cr2","nef","arw","mov","mp4","m4v","avi","mkv","webm"]);
     const fullSync=()=>{if(syncRunning.current!==syncGeneration.current)void syncFolders(activeRoots)};
     const flush=async()=>{
+      if(incrementalBusy)return;
       const changed=[...pendingPaths];pendingPaths=new Set();
+      const fullFallback=requireFullScan;
+      requireFullScan=false;
       if(!changed.length)return;
       // A directory event or a large burst cannot be reconciled reliably one file at a time.
-      if(changed.length>64 || changed.some(path=>!fileExtensions.has(path.split(".").pop()?.toLowerCase()||"")) || syncRunning.current===syncGeneration.current){
+      if(fullFallback || changed.length>64 || changed.some(path=>!fileExtensions.has(path.split(".").pop()?.toLowerCase()||"")) || syncRunning.current===syncGeneration.current){
         fullSync();return;
       }
+      incrementalBusy=true;
       try{
         const changes=await Promise.all(changed.map(async path=>{
           const normalized=path.toLowerCase().replace(/\\/g,"/");
@@ -179,7 +185,12 @@ export default function App() {
           return {...previous,photos:[...updated.values()]};
         });
         setLastSync(new Date().toLocaleString());
-      }catch{fullSync()}
+      }catch{requireFullScan=true}finally{
+        incrementalBusy=false;
+        if(disposed)return;
+        if(requireFullScan){pendingPaths.clear();requireFullScan=false;fullSync()}
+        else if(pendingPaths.size){if(debounce!==undefined)window.clearTimeout(debounce);debounce=window.setTimeout(()=>{void flush()},1500)}
+      }
     };
     const activeRoots=autoSync?roots:[];
     const setup=async()=>{
@@ -188,7 +199,7 @@ export default function App() {
         if(disposed||!autoSync)return;
         unlisten=await listen<{paths:string[]}>("openphoto-media-event",(event)=>{
           for(const path of event.payload.paths)pendingPaths.add(path);
-          if(!event.payload.paths.length)pendingPaths.add("");
+          if(!event.payload.paths.length)requireFullScan=true;
           if(debounce!==undefined)window.clearTimeout(debounce);
           debounce=window.setTimeout(()=>{void flush()},1500);
         });
