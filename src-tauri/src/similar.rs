@@ -113,12 +113,9 @@ mod tests {
         let first = root.join("one.png");
         let second = root.join("two.png");
         let opposite = root.join("opposite.png");
-        let light_to_dark = image::GrayImage::from_fn(9, 8, |x, _| {
-            image::Luma([(x * 20) as u8])
-        });
-        let dark_to_light = image::GrayImage::from_fn(9, 8, |x, _| {
-            image::Luma([((8 - x) * 20) as u8])
-        });
+        let light_to_dark = image::GrayImage::from_fn(9, 8, |x, _| image::Luma([(x * 20) as u8]));
+        let dark_to_light =
+            image::GrayImage::from_fn(9, 8, |x, _| image::Luma([((8 - x) * 20) as u8]));
         light_to_dark.save(&first).unwrap();
         light_to_dark.save(&second).unwrap();
         dark_to_light.save(&opposite).unwrap();
