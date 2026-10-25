@@ -59,6 +59,14 @@ export default function App() {
     return () => media.removeEventListener("change", update);
   }, [theme]);
 
+  const inspectDuplicates=async()=>{
+    if(!result)return;
+    setDuplicateBusy(true);setError("");
+    try{
+      const groups=await Promise.all(roots.map(parent=>invoke<{paths:string[];bytes:number}[]>("find_exact_duplicates",{root:parent,paths:result.photos.filter(p=>(p.libraryRoot||root)===parent).map(p=>p.path)})));
+      setDuplicates(groups.flat());
+    }catch(e){setError(String(e))}finally{setDuplicateBusy(false)}
+  };
   const workspace = workspaces.find(w=>w.id===activeWorkspace);
   const roots = workspace ? (workspace.roots?.length ? workspace.roots : workspace.root ? [workspace.root] : []) : [];
   const syncFolders = async (paths: string[]) => {
@@ -66,7 +74,7 @@ export default function App() {
     setBusy(true); setError("");
     try {
       const scans = await Promise.allSettled(paths.map(async path=>{
-        const data=await invoke<ScanResult>("scan_library",{root:path});
+        const data=await invoke<ScanResult>("scan_indexed",{root:path});
         return {...data,photos:data.photos.map(photo=>({...photo,libraryRoot:path}))};
       }));
       const success=scans.filter(s=>s.status==="fulfilled");
@@ -76,7 +84,7 @@ export default function App() {
       for(const scan of success)for(const photo of scan.value.photos)merged.set(photo.path,photo);
       setResult({photos:[...merged.values()],scanned_files:success.reduce((n,s)=>n+s.value.scanned_files,0),truncated:success.some(s=>s.value.truncated)});
       if(failures.length)setError(failures.map(x=>String(x.reason)).join("; "));
-      setLastSync(new Date().toLocaleString());
+      setLastSync(new Date().toLocaleString());setDuplicates([]);
     } catch(e){setError(String(e))}finally{setBusy(false)}
   };
   const chooseFolder = async () => {
