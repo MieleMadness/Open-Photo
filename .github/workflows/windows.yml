@@ -27,6 +27,8 @@ jobs:
         run: npm run build
       - name: Check Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+      - name: Generate app icons from maintained SVG source
+        run: npm run tauri icon assets/app-icon.svg
       - name: Rust lint
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - name: Rust regression tests
