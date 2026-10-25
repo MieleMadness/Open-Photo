@@ -36,11 +36,32 @@ fn database() -> Result<Connection, String> {
 /// This never removes or edits source files.
 #[tauri::command]
 pub fn scan_indexed(root: String) -> Result<ScanResult, String> {
+    Ok(scan_indexed_with_changes(root)?.scan)
+}
+
+#[derive(Serialize)]
+pub struct ChangeCounts {
+    pub added: usize,
+    pub updated: usize,
+    pub removed: usize,
+    pub incomplete: bool,
+}
+
+#[derive(Serialize)]
+pub struct IndexedScan {
+    pub scan: ScanResult,
+    pub changes: ChangeCounts,
+}
+
+/// Report index changes while preserving all source files.
+#[tauri::command]
+pub fn scan_indexed_with_changes(root: String) -> Result<IndexedScan, String> {
     let scan = scan_library(root.clone())?;
+    let mut changes = ChangeCounts { added: 0, updated: 0, removed: 0, incomplete: scan.truncated };
     // A truncated scan is not a complete snapshot: do not evict previously
     // indexed media based on missing entries.
     if scan.truncated {
-        return Ok(scan);
+        return Ok(IndexedScan { scan, changes });
     }
     let mut db = database()?;
     let transaction = db.transaction().map_err(|e| e.to_string())?;
@@ -56,6 +77,9 @@ pub fn scan_indexed(root: String) -> Result<ScanResult, String> {
         let mut seen = transaction
             .prepare("INSERT OR IGNORE INTO seen_paths(path) VALUES (?1)")
             .map_err(|e| e.to_string())?;
+        let mut previous = transaction
+            .prepare("SELECT bytes, modified_unix FROM media WHERE root = ?1 AND path = ?2")
+            .map_err(|e| e.to_string())?;
         let mut upsert = transaction
             .prepare(
                 "INSERT INTO media(root, path, bytes, modified_unix)
@@ -68,6 +92,18 @@ pub fn scan_indexed(root: String) -> Result<ScanResult, String> {
             )
             .map_err(|e| e.to_string())?;
         for photo in &scan.photos {
+            let prior = previous.query_row(params![root, photo.path], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+            });
+            match prior {
+                Ok((bytes, modified)) => {
+                    if bytes != photo.bytes as i64 || modified != photo.modified_unix as i64 {
+                        changes.updated += 1;
+                    }
+                }
+                Err(rusqlite::Error::QueryReturnedNoRows) => changes.added += 1,
+                Err(error) => return Err(error.to_string()),
+            }
             seen.execute([&photo.path]).map_err(|e| e.to_string())?;
             upsert
                 .execute(params![
@@ -79,7 +115,7 @@ pub fn scan_indexed(root: String) -> Result<ScanResult, String> {
                 .map_err(|e| e.to_string())?;
         }
     }
-    transaction
+    changes.removed = transaction
         .execute(
             "DELETE FROM media WHERE root = ?1
              AND NOT EXISTS (SELECT 1 FROM seen_paths WHERE seen_paths.path = media.path)",
@@ -87,7 +123,7 @@ pub fn scan_indexed(root: String) -> Result<ScanResult, String> {
         )
         .map_err(|e| e.to_string())?;
     transaction.commit().map_err(|e| e.to_string())?;
-    Ok(scan)
+    Ok(IndexedScan { scan, changes })
 }
 
 #[derive(Serialize)]
