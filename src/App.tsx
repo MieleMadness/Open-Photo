@@ -302,11 +302,21 @@ export default function App() {
   const currentCollection=collections.find(c=>c.id===collectionFilter&&c.workspaceId===activeWorkspace);
   const visible = useMemo(() => {
     const photos = result?.photos.filter(p => {
-      const modified=new Date(p.modified_unix*1000);
-      const today=new Date();
-      const smartMatch=smartFilter==="" || (smartFilter==="recent" && p.modified_unix*1000>=today.getTime()-30*86400000) || (smartFilter==="thisDay" && modified.getMonth()===today.getMonth() && modified.getDate()===today.getDate() && modified.getFullYear()<today.getFullYear()) || (smartFilter==="large" && p.bytes>=50*1024*1024);
+      const modified = new Date(p.modified_unix * 1000);
+      const today = new Date();
+      const smartMatch = smartFilter === "" ||
+        (smartFilter === "recent" && p.modified_unix * 1000 >= today.getTime() - 30 * 86400000) ||
+        (smartFilter === "thisDay" && modified.getMonth() === today.getMonth() && modified.getDate() === today.getDate() && modified.getFullYear() < today.getFullYear()) ||
+        (smartFilter === "large" && p.bytes >= 50 * 1024 * 1024);
+      const video = ["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension);
       return smartMatch &&
-     (mediaType==="video" || !hiddenLiveVideos.has(p.path)) && p.name.toLowerCase().includes(query.toLowerCase()) && (organizeFilter==="all" || (organizeFilter==="favorites" ? photoRatings[p.path]===5 : (photoRatings[p.path]||0)>0)) && (!folderFilter || p.path.includes(folderFilter)) && (!currentCollection || currentCollection.paths.includes(p.path)) && (mediaType==="all" || (mediaType==="video" ? ["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension) : !["mov","mp4","m4v","avi","mkv","webm"].includes(p.extension))));}) || [];
+        (mediaType === "video" || !hiddenLiveVideos.has(p.path)) &&
+        p.name.toLowerCase().includes(query.toLowerCase()) &&
+        (organizeFilter === "all" || (organizeFilter === "favorites" ? photoRatings[p.path] === 5 : (photoRatings[p.path] || 0) > 0)) &&
+        (!folderFilter || p.path.includes(folderFilter)) &&
+        (!currentCollection || currentCollection.paths.includes(p.path)) &&
+        (mediaType === "all" || (mediaType === "video" ? video : !video));
+    }) || [];
     return photos.sort((a,b) => {
       switch (sortBy) {
         case "name": return a.name.localeCompare(b.name) || a.path.localeCompare(b.path);
