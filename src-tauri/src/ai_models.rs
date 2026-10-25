@@ -135,6 +135,18 @@ pub fn ai_import_model(
         sha256: Some(digest),
     })
 }
+/// Remove only a known model slot under the private application-data folder.
+/// Never touches user photos or arbitrary input paths.
+#[tauri::command]
+pub fn ai_remove_model(kind: String) -> Result<bool, String> {
+    let name = model_name(&kind)?;
+    let destination = model_directory()?.join(name);
+    match fs::remove_file(&destination) {
+        Ok(()) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error.to_string()),
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
