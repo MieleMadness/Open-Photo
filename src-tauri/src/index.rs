@@ -57,7 +57,12 @@ pub struct IndexedScan {
 #[tauri::command]
 pub fn scan_indexed_with_changes(root: String) -> Result<IndexedScan, String> {
     let scan = scan_library(root.clone())?;
-    let mut changes = ChangeCounts { added: 0, updated: 0, removed: 0, incomplete: scan.truncated };
+    let mut changes = ChangeCounts {
+        added: 0,
+        updated: 0,
+        removed: 0,
+        incomplete: scan.truncated,
+    };
     // A truncated scan is not a complete snapshot: do not evict previously
     // indexed media based on missing entries.
     if scan.truncated {
