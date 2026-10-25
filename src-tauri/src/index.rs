@@ -432,9 +432,8 @@ mod tests {
     }
     #[test]
     fn health_inspection_counts_missing_without_mutating_sources() {
-        let directory = std::env::temp_dir().join(format!(
-            "openphoto-health-{}", std::process::id()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("openphoto-health-{}", std::process::id()));
         std::fs::create_dir_all(&directory).unwrap();
         let existing = directory.join("existing.jpg");
         std::fs::write(&existing, b"photo").unwrap();
