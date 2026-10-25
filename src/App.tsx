@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import PhotoMap, {type PhotoLocation} from "./PhotoMap";
@@ -34,7 +34,10 @@ export default function App() {
   useEffect(()=>localStorage.setItem("openphoto.collections",JSON.stringify(collections)),[collections]);
   const [geoPoints,setGeoPoints]=useState<PhotoLocation[]>([]);
   const [geoBusy,setGeoBusy]=useState(false);
-  const [autoSync,setAutoSync]=useState(false);
+  const [autoSync,setAutoSync]=useState(()=>localStorage.getItem("openphoto.autosync")==="true");
+  const syncRunning=useRef(false);
+  const syncGeneration=useRef(0);
+  useEffect(()=>{localStorage.setItem("openphoto.autosync",String(autoSync))},[autoSync]);
   const [lastSync,setLastSync]=useState("");
   const [syncChanges,setSyncChanges]=useState<{added:number;updated:number;removed:number;incomplete:boolean}|null>(null);
   const [duplicates, setDuplicates] = useState<{paths:string[];bytes:number}[]>([]);
@@ -88,7 +91,9 @@ export default function App() {
   const workspace = workspaces.find(w=>w.id===activeWorkspace);
   const roots = workspace ? (workspace.roots?.length ? workspace.roots : workspace.root ? [workspace.root] : []) : [];
   const syncFolders = async (paths: string[]) => {
-    if (!isDesktop || !paths.length) return;
+    if (!isDesktop || !paths.length || syncRunning.current) return;
+    syncRunning.current=true;
+    const generation=syncGeneration.current;
     setBusy(true); setError("");
     try {
       const scans = await Promise.allSettled(paths.map(async path=>{
@@ -101,11 +106,12 @@ export default function App() {
       if (!success.length) throw Error(failures.map(x=>String(x.reason)).join("; "));
       const merged=new Map<string,Photo>();
       for(const scan of success)for(const photo of scan.value.photos)merged.set(photo.path,photo);
+      if(generation!==syncGeneration.current)return;
       setResult({photos:[...merged.values()],scanned_files:success.reduce((n,s)=>n+s.value.scanned_files,0),truncated:success.some(s=>s.value.truncated)});
       if(failures.length)setError(failures.map(x=>String(x.reason)).join("; "));
       setSyncChanges(success.reduce<{added:number;updated:number;removed:number;incomplete:boolean}>((summary,entry)=>({added:summary.added+entry.value.changes.added,updated:summary.updated+entry.value.changes.updated,removed:summary.removed+entry.value.changes.removed,incomplete:summary.incomplete||entry.value.changes.incomplete}),{added:0,updated:0,removed:0,incomplete:false}));
       setLastSync(new Date().toLocaleString());setDuplicates([]);
-    } catch(e){setError(String(e))}finally{setBusy(false)}
+    } catch(e){if(generation===syncGeneration.current)setError(String(e))}finally{syncRunning.current=false;if(generation===syncGeneration.current)setBusy(false)}
   };
   const chooseFolder = async () => {
     if (!isDesktop) { setError("Folders must be selected in the Windows app."); return; }
@@ -116,17 +122,19 @@ export default function App() {
       const current=workspaces.find(w=>w.id===id);
       const nextRoots=[...new Set([...(current?.roots?.length?current.roots:current?.root?[current.root]:[]),path])];
       setWorkspaces(old=>old.some(w=>w.id===id)?old.map(w=>w.id===id?{...w,root:nextRoots[0],roots:nextRoots}:w):[...old,{id,name:`Workspace ${old.length+1}`,root:path,roots:nextRoots}]);
+      syncGeneration.current+=1;
       setActiveWorkspace(id);setRoot(nextRoots[0]);setSelection([]);setSelected(null);setFolderFilter("");
       await syncFolders(nextRoots);
     }catch(e){setError(String(e))}
   };
   useEffect(()=>{
     if(!autoSync||!roots.length)return;
-    const timer=window.setInterval(()=>{if(!busy)void syncFolders(roots)},120000);
+    const timer=window.setInterval(()=>{if(!syncRunning.current)void syncFolders(roots)},120000);
     return ()=>window.clearInterval(timer);
-  },[autoSync,activeWorkspace,workspaces,busy]);
+  },[autoSync,activeWorkspace,workspaces]);
   const openWorkspace=async(id:string)=>{
     const item=workspaces.find(w=>w.id===id);if(!item)return;
+    syncGeneration.current+=1;
     setActiveWorkspace(id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter("");
     const folders=item.roots?.length?item.roots:item.root?[item.root]:[];
     if(folders.length)await syncFolders(folders);
