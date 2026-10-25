@@ -1,0 +1,18 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Open-Photo",
+  "version": "0.1.0",
+  "identifier": "com.openphoto.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [{"title": "Open-Photo", "width": 1220, "height": 780, "minWidth": 800, "minHeight": 580}],
+    "security": {"csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'"},
+    "capabilities": ["default"]
+  },
+  "bundle": { "active": true, "targets": ["nsis"] }
+}
