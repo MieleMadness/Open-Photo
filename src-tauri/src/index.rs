@@ -70,7 +70,12 @@ pub fn scan_indexed(root: String) -> Result<ScanResult, String> {
         for photo in &scan.photos {
             seen.execute([&photo.path]).map_err(|e| e.to_string())?;
             upsert
-                .execute(params![root, photo.path, photo.bytes as i64, photo.modified_unix as i64])
+                .execute(params![
+                    root,
+                    photo.path,
+                    photo.bytes as i64,
+                    photo.modified_unix as i64
+                ])
                 .map_err(|e| e.to_string())?;
         }
     }
@@ -127,7 +132,11 @@ pub fn find_workspace_duplicates(
         if !permitted.iter().any(|root| file.starts_with(root)) || !file.is_file() {
             continue;
         }
-        let extension = file.extension().and_then(|x| x.to_str()).unwrap_or("").to_ascii_lowercase();
+        let extension = file
+            .extension()
+            .and_then(|x| x.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
         if !crate::SUPPORTED.contains(&extension.as_str()) || !visited.insert(file.clone()) {
             continue;
         }
@@ -189,8 +198,15 @@ mod tests {
         let b = second.join("b.jpg");
         std::fs::write(&a, b"identical").unwrap();
         std::fs::write(&b, b"identical").unwrap();
-        let roots = vec![first.to_string_lossy().into_owned(), second.to_string_lossy().into_owned()];
-        let paths = vec![a.to_string_lossy().into_owned(), b.to_string_lossy().into_owned(), a.to_string_lossy().into_owned()];
+        let roots = vec![
+            first.to_string_lossy().into_owned(),
+            second.to_string_lossy().into_owned(),
+        ];
+        let paths = vec![
+            a.to_string_lossy().into_owned(),
+            b.to_string_lossy().into_owned(),
+            a.to_string_lossy().into_owned(),
+        ];
         let groups = find_workspace_duplicates(roots, paths).unwrap();
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].paths.len(), 2);
