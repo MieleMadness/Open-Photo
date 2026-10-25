@@ -17,7 +17,7 @@ export default function PhotoMap({points,onChoose}:{points:PhotoLocation[];onCho
         .bindTooltip(point.path.split(/[\\/]/).pop()||"Photo").on("click",()=>onChoose(point.path));
     }
     if(bounds.length) map.fitBounds(L.latLngBounds(bounds),{padding:[35,35],maxZoom:15});
-    return ()=>map.remove();
+    return ()=>{map.remove();};
   },[points,onChoose]);
   return <div ref={container} className="photo-location-map" aria-label="Photo locations map"/>;
 }
