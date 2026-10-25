@@ -140,10 +140,25 @@ export default function App() {
     if(folders.length)await syncFolders(folders);
   };
   useEffect(()=>{
-    if(view!=="map"||!root||!result){setGeoPoints([]);return;}
-    let active=true;setGeoBusy(true);
-    const paths=result.photos.filter(p=>["jpg","jpeg","tif","tiff"].includes(p.extension)).slice(0,5000).map(p=>p.path);
-    invoke<PhotoLocation[]>("gps_for_photos",{root,paths}).then(x=>{if(active)setGeoPoints(x)}).catch(e=>{if(active)setError(String(e))}).finally(()=>{if(active)setGeoBusy(false)});
+    if(view!=="map"||!result){setGeoPoints([]);return;}
+    let active=true;
+    setGeoBusy(true);
+    const grouped=new Map<string,string[]>();
+    for(const photo of result.photos) {
+      if(!["jpg","jpeg","tif","tiff"].includes(photo.extension))continue;
+      const parent=photo.libraryRoot||root;
+      if(!parent)continue;
+      const paths=grouped.get(parent)||[];
+      if(paths.length<5000)paths.push(photo.path);
+      grouped.set(parent,paths);
+    }
+    Promise.allSettled([...grouped].map(([parent,paths])=>invoke<PhotoLocation[]>("gps_for_photos",{root:parent,paths})))
+      .then(scans=>{
+        if(!active)return;
+        setGeoPoints(scans.flatMap(scan=>scan.status==="fulfilled"?scan.value:[]));
+        const errors=scans.filter((scan):scan is PromiseRejectedResult=>scan.status==="rejected");
+        if(errors.length)setError(errors.map(scan=>String(scan.reason)).join("; "));
+      }).finally(()=>{if(active)setGeoBusy(false)});
     return ()=>{active=false};
   },[root,result,view]);
   const folders=useMemo(()=>[...new Set((result?.photos||[]).map(p=>p.path.slice(0,Math.max(p.path.lastIndexOf("\\"),p.path.lastIndexOf("/"))).replace(p.libraryRoot||root,"").replace(/^[\\/]/,"")||"(root)"))].sort(),[result,root]);
