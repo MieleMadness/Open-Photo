@@ -35,7 +35,7 @@ export default function App() {
   const [geoPoints,setGeoPoints]=useState<PhotoLocation[]>([]);
   const [geoBusy,setGeoBusy]=useState(false);
   const [autoSync,setAutoSync]=useState(()=>localStorage.getItem("openphoto.autosync")==="true");
-  const syncRunning=useRef(false);
+  const syncRunning=useRef<number|null>(null);
   const syncGeneration=useRef(0);
   useEffect(()=>{localStorage.setItem("openphoto.autosync",String(autoSync))},[autoSync]);
   const [lastSync,setLastSync]=useState("");
@@ -91,9 +91,9 @@ export default function App() {
   const workspace = workspaces.find(w=>w.id===activeWorkspace);
   const roots = workspace ? (workspace.roots?.length ? workspace.roots : workspace.root ? [workspace.root] : []) : [];
   const syncFolders = async (paths: string[]) => {
-    if (!isDesktop || !paths.length || syncRunning.current) return;
-    syncRunning.current=true;
+    if (!isDesktop || !paths.length || syncRunning.current===syncGeneration.current) return;
     const generation=syncGeneration.current;
+    syncRunning.current=generation;
     setBusy(true); setError("");
     try {
       const scans = await Promise.allSettled(paths.map(async path=>{
@@ -111,7 +111,7 @@ export default function App() {
       if(failures.length)setError(failures.map(x=>String(x.reason)).join("; "));
       setSyncChanges(success.reduce<{added:number;updated:number;removed:number;incomplete:boolean}>((summary,entry)=>({added:summary.added+entry.value.changes.added,updated:summary.updated+entry.value.changes.updated,removed:summary.removed+entry.value.changes.removed,incomplete:summary.incomplete||entry.value.changes.incomplete}),{added:0,updated:0,removed:0,incomplete:false}));
       setLastSync(new Date().toLocaleString());setDuplicates([]);
-    } catch(e){if(generation===syncGeneration.current)setError(String(e))}finally{syncRunning.current=false;if(generation===syncGeneration.current)setBusy(false)}
+    } catch(e){if(generation===syncGeneration.current)setError(String(e))}finally{if(syncRunning.current===generation)syncRunning.current=null;if(generation===syncGeneration.current)setBusy(false)}
   };
   const chooseFolder = async () => {
     if (!isDesktop) { setError("Folders must be selected in the Windows app."); return; }
@@ -129,7 +129,7 @@ export default function App() {
   };
   useEffect(()=>{
     if(!autoSync||!roots.length)return;
-    const timer=window.setInterval(()=>{if(!syncRunning.current)void syncFolders(roots)},120000);
+    const timer=window.setInterval(()=>{if(syncRunning.current!==syncGeneration.current)void syncFolders(roots)},120000);
     return ()=>window.clearInterval(timer);
   },[autoSync,activeWorkspace,workspaces]);
   const openWorkspace=async(id:string)=>{
