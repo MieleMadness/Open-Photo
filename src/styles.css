@@ -38,3 +38,17 @@
 .selection-toolbar>span{font-size:12px;font-weight:700;white-space:nowrap}
 .selection-toolbar>.secondary-button,.selection-toolbar>.primary-button{padding:8px 11px;font-size:12px}
 .selection-toolbar>input{flex:1;min-width:180px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--text);padding:9px 12px;font-size:12px}
+
+/* Workspaces, accessible full-height navigation, and folder organization */
+.app-shell{height:100dvh;min-height:0;overflow:hidden}
+.sidebar{height:100dvh;min-height:0;overflow-y:auto;overflow-x:hidden}
+.main{height:100dvh;min-height:0;overflow-y:auto}
+.sidebar-spacer{min-height:14px}
+.workspace-select{width:100%;min-width:0;padding:9px 8px;margin-bottom:7px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text);font-size:12px}
+.workspace-create{width:100%;border:1px dashed var(--line);border-radius:9px;padding:9px;color:var(--primary);background:var(--surface);margin-bottom:18px;font-size:12px;font-weight:600}
+.workspace-create:hover{background:var(--primary-soft)}
+.folder-list{margin-top:24px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.folder-item{display:flex;gap:14px;align-items:center;border:0;border-bottom:1px solid var(--line);background:var(--surface);width:100%;text-align:left;color:var(--text);padding:15px 19px;overflow-wrap:anywhere}
+.folder-item:hover{background:var(--surface-muted)}
+.folder-item svg:last-child{margin-left:auto;flex-shrink:0}
+@media(max-width:900px){.workspace-select{font-size:10px}.workspace-create{font-size:10px;padding:8px 3px}}
