@@ -69,7 +69,7 @@ export default function App() {
         const data=await invoke<ScanResult>("scan_library",{root:path});
         return {...data,photos:data.photos.map(photo=>({...photo,libraryRoot:path}))};
       }));
-      const success=scans.filter((s):s is PromiseFulfilledResult<ScanResult>=>s.status==="fulfilled");
+      const success=scans.filter(s=>s.status==="fulfilled");
       const failures=scans.filter((s):s is PromiseRejectedResult=>s.status==="rejected");
       if (!success.length) throw Error(failures.map(x=>String(x.reason)).join("; "));
       const merged=new Map<string,Photo>();
