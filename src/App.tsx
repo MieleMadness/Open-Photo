@@ -293,7 +293,7 @@ export default function App() {
         case "smallest": return a.bytes - b.bytes || a.path.localeCompare(b.path);
       }
     });
-  }, [result, query, sortBy, folderFilter, mediaType, currentCollection]);
+  }, [result, query, sortBy, folderFilter, mediaType, currentCollection, hiddenLiveVideos]);
   useEffect(() => setScrollTop(0), [query, sortBy, photoView, tileSize, root, folderFilter, mediaType]);
   const gridGap = 14;
   const columns = Math.max(1, Math.floor((gridWidth - 48 + gridGap) / (tileSize + gridGap)));
