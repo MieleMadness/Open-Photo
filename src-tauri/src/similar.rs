@@ -136,6 +136,8 @@ mod tests {
 
     #[test]
     fn differing_bit_positions_are_counted() {
-        assert_eq!((0_u64 ^ 7_u64).count_ones(), 3);
+        let left = 9_u64;
+        let right = 14_u64;
+        assert_eq!((left ^ right).count_ones(), 3);
     }
 }
