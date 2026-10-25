@@ -1,3 +1,4 @@
+mod ai_models;
 mod cache_disk;
 mod geo;
 mod index;
@@ -342,6 +343,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(std::sync::Mutex::new(watch::WatchState::default()))
         .invoke_handler(tauri::generate_handler![
+            ai_models::ai_model_status,
+            ai_models::ai_import_model,
             scan_library,
             preview_image,
             read_iphone_media,
