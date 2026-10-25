@@ -18,3 +18,4 @@ tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff", "avif"] }
 base64 = "0.22"
+kamadak-exif = "0.6"
