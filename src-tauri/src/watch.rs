@@ -27,12 +27,13 @@ pub fn set_watched_folders(
             return Err("Watched root is not a folder".into());
         }
         let emitter = app.clone();
-        let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-            if event.is_ok() {
-                let _ = emitter.emit("openphoto-folder-changed", ());
-            }
-        })
-        .map_err(|error| error.to_string())?;
+        let mut watcher =
+            notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+                if event.is_ok() {
+                    let _ = emitter.emit("openphoto-folder-changed", ());
+                }
+            })
+            .map_err(|error| error.to_string())?;
         watcher
             .watch(&path, RecursiveMode::Recursive)
             .map_err(|error| error.to_string())?;
