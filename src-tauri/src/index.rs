@@ -43,6 +43,7 @@ pub fn scan_indexed(root: String) -> Result<ScanResult, String> {
 pub struct ChangeCounts {
     pub added: usize,
     pub updated: usize,
+    pub unchanged: usize,
     pub removed: usize,
     pub incomplete: bool,
 }
@@ -60,6 +61,7 @@ pub fn scan_indexed_with_changes(root: String) -> Result<IndexedScan, String> {
     let mut changes = ChangeCounts {
         added: 0,
         updated: 0,
+        unchanged: 0,
         removed: 0,
         incomplete: scan.truncated,
     };
@@ -114,6 +116,8 @@ pub fn scan_indexed_with_changes(root: String) -> Result<IndexedScan, String> {
                 Some((bytes, modified)) => {
                     if *bytes != photo.bytes as i64 || *modified != photo.modified_unix as i64 {
                         changes.updated += 1;
+                    } else {
+                        changes.unchanged += 1;
                     }
                 }
                 None => changes.added += 1,
