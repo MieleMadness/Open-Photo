@@ -1,6 +1,16 @@
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{
+    event::{ModifyKind, RenameMode},
+    EventKind, RecommendedWatcher, RecursiveMode, Watcher,
+};
+use serde::Serialize;
 use std::{path::PathBuf, sync::Mutex};
 use tauri::Emitter;
+
+#[derive(Serialize, Clone)]
+struct RenamedFile {
+    from: String,
+    to: String,
+}
 
 #[derive(Default)]
 pub struct WatchState {
@@ -29,7 +39,16 @@ pub fn set_watched_folders(
         let emitter = app.clone();
         let mut watcher =
             notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-                if event.is_ok() {
+                if let Ok(details) = event {
+                    if matches!(details.kind, EventKind::Modify(ModifyKind::Name(RenameMode::Both)))
+                        && details.paths.len() == 2
+                    {
+                        let rename = RenamedFile {
+                            from: details.paths[0].to_string_lossy().into_owned(),
+                            to: details.paths[1].to_string_lossy().into_owned(),
+                        };
+                        let _ = emitter.emit("openphoto-file-renamed", rename);
+                    }
                     let _ = emitter.emit("openphoto-folder-changed", ());
                 }
             })
