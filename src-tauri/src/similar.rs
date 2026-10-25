@@ -32,7 +32,10 @@ fn difference_hash(path: &Path) -> Result<u64, String> {
 }
 
 #[tauri::command]
-pub fn find_similar_photos(roots: Vec<String>, paths: Vec<String>) -> Result<Vec<SimilarGroup>, String> {
+pub fn find_similar_photos(
+    roots: Vec<String>,
+    paths: Vec<String>,
+) -> Result<Vec<SimilarGroup>, String> {
     if roots.is_empty() || roots.len() > 64 || paths.len() > 5000 {
         return Err("Select 1–64 folders and up to 5,000 images".into());
     }
@@ -44,15 +47,30 @@ pub fn find_similar_photos(roots: Vec<String>, paths: Vec<String>) -> Result<Vec
     let mut hashes = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for input in paths {
-        let Ok(path) = std::fs::canonicalize(input) else { continue };
-        if !path.is_file() || !allowed.iter().any(|root| path.starts_with(root)) || !seen.insert(path.clone()) {
+        let Ok(path) = std::fs::canonicalize(input) else {
+            continue;
+        };
+        if !path.is_file()
+            || !allowed.iter().any(|root| path.starts_with(root))
+            || !seen.insert(path.clone())
+        {
             continue;
         }
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-        if !matches!(ext.as_str(), "jpg" | "jpeg" | "png" | "webp" | "bmp" | "tiff" | "tif") {
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        if !matches!(
+            ext.as_str(),
+            "jpg" | "jpeg" | "png" | "webp" | "bmp" | "tiff" | "tif"
+        ) {
             continue;
         }
-        if path.metadata().is_ok_and(|metadata| metadata.len() > 75 * 1024 * 1024) {
+        if path
+            .metadata()
+            .is_ok_and(|metadata| metadata.len() > 75 * 1024 * 1024)
+        {
             continue;
         }
         if let Ok(hash) = difference_hash(&path) {
@@ -62,15 +80,24 @@ pub fn find_similar_photos(roots: Vec<String>, paths: Vec<String>) -> Result<Vec
     // Compare only against representatives to keep groups bounded.
     let mut groups: Vec<(u64, Vec<String>, u32)> = Vec::new();
     for (path, hash) in hashes {
-        if let Some((representative, paths, max_distance)) = groups.iter_mut().find(|(reference, _, _)| (hash ^ *reference).count_ones() <= 5) {
+        if let Some((representative, paths, max_distance)) = groups
+            .iter_mut()
+            .find(|(reference, _, _)| (hash ^ *reference).count_ones() <= 5)
+        {
             *max_distance = (*max_distance).max((hash ^ *representative).count_ones());
             paths.push(path);
         } else {
             groups.push((hash, vec![path], 0));
         }
     }
-    Ok(groups.into_iter().filter(|(_, paths, _)| paths.len() > 1)
-        .map(|(_, paths, max_distance)| SimilarGroup { paths, max_distance }).collect())
+    Ok(groups
+        .into_iter()
+        .filter(|(_, paths, _)| paths.len() > 1)
+        .map(|(_, paths, max_distance)| SimilarGroup {
+            paths,
+            max_distance,
+        })
+        .collect())
 }
 
 #[cfg(test)]
