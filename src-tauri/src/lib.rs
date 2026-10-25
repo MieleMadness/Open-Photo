@@ -283,6 +283,21 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
     Ok(result)
 }
 
+/// Open a selected video with the user's configured operating-system media player.
+#[tauri::command]
+fn open_video(root: String, path: String) -> Result<(), String> {
+    let file = safe_media_path(&root, &path)?;
+    let extension = file
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !matches!(extension.as_str(), "mov" | "mp4" | "m4v" | "avi" | "mkv" | "webm") {
+        return Err("Only video files can be opened from this action".into());
+    }
+    opener::open(&file).map_err(|e| format!("Unable to open video: {e}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
