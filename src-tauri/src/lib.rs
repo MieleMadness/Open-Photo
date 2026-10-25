@@ -75,3 +75,48 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running Open-Photo");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{env, fs, time::{SystemTime, UNIX_EPOCH}};
+
+    fn temp_root() -> PathBuf {
+        let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let dir = env::temp_dir().join(format!("openphoto-scan-{}-{}", std::process::id(), stamp));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn rejects_missing_directory() {
+        assert!(scan_library("this-path-should-not-exist-openphoto-TEST".into()).is_err());
+    }
+
+    #[test]
+    fn only_indexes_supported_images_and_never_modifies_files() {
+        let root = temp_root();
+        let nested = root.join("subfolder");
+        fs::create_dir_all(&nested).unwrap();
+        let original = b"test original bytes";
+        let image = nested.join("picture.JPG");
+        fs::write(&image, original).unwrap();
+        fs::write(root.join("notes.txt"), b"not a photo").unwrap();
+        let result = scan_library(root.to_string_lossy().into_owned()).unwrap();
+        assert_eq!(result.photos.len(), 1);
+        assert_eq!(result.photos[0].name, "picture.JPG");
+        assert_eq!(result.photos[0].extension, "jpg");
+        assert_eq!(fs::read(&image).unwrap(), original);
+        assert!(root.join("notes.txt").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn empty_folder_returns_empty_result() {
+        let root = temp_root();
+        let result = scan_library(root.to_string_lossy().into_owned()).unwrap();
+        assert!(result.photos.is_empty());
+        assert!(!result.truncated);
+        fs::remove_dir_all(root).unwrap();
+    }
+}
