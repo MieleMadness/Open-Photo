@@ -59,3 +59,14 @@ Before release, commit `package-lock.json` and `Cargo.lock`, use `npm ci`, and d
 - The index is currently storage groundwork, not an incremental directory watcher: sync still traverses roots. Implement change-only updates before claiming incremental rescanning.
 - The initial exact-duplicate unit test verifies same-content/different-content fixtures. Expand coverage for media renames, root overlap, inaccessible files, and cross-root duplicates.
 - Immich 3.3.5 connectivity and semantic AI search are still future work.
+
+## Native folder watching milestone
+
+- Auto-sync preference persists locally across application restarts.
+- Native Windows recursive filesystem notifications trigger a debounced indexed rescan after approximately 1.5 seconds.
+- A two-minute polling rescan remains as a fallback for missed changes, disconnected drives, and unsupported filesystems.
+- Folder changes never automatically move, rename, or delete original media.
+- Scan generation guards prevent the result from a previous workspace from replacing the current workspace's results.
+- Multiple indexed roots are included in the GPS map, not only the first root.
+- A native event currently triggers a full rescan of selected roots. True path-level incremental updates and preserving virtual collection membership across renames remain pending.
+- Validate on NTFS and external drives; test add, delete, modify, rename, drive removal, reattachment, and rapid workspace switching.
