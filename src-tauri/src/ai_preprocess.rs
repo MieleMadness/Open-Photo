@@ -23,7 +23,9 @@ pub fn ai_prepare_image(root: String, path: String) -> Result<ImageTensorPreview
         .map_err(|e| e.to_string())?
         .decode()
         .map_err(|e| format!("Cannot decode this photo for AI: {e}"))?;
-    let rgb = input.resize_exact(224, 224, image::imageops::FilterType::Triangle).to_rgb8();
+    let rgb = input
+        .resize_exact(224, 224, image::imageops::FilterType::Triangle)
+        .to_rgb8();
     let mut bytes = Vec::with_capacity(224 * 224 * 3 * 4);
     for channel in 0..3 {
         for pixel in rgb.pixels() {
@@ -54,6 +56,9 @@ mod tests {
         }
         assert_eq!(tensor.len(), 224 * 224 * 3 * 4);
         assert_eq!(&tensor[0..4], &1_f32.to_le_bytes());
-        assert_eq!(&tensor[(224 * 224 * 4)..(224 * 224 * 4 + 4)], &0_f32.to_le_bytes());
+        assert_eq!(
+            &tensor[(224 * 224 * 4)..(224 * 224 * 4 + 4)],
+            &0_f32.to_le_bytes()
+        );
     }
 }
