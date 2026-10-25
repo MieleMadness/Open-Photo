@@ -2,6 +2,7 @@ mod cache_disk;
 mod geo;
 mod index;
 mod watch;
+mod similar;
 use base64::Engine;
 use image::ImageReader;
 use serde::Serialize;
@@ -327,7 +328,8 @@ pub fn run() {
             index::scan_indexed_with_changes,
             index::find_exact_duplicates,
             index::find_workspace_duplicates,
-            watch::set_watched_folders
+            watch::set_watched_folders,
+            similar::find_similar_photos
         ])
         .run(tauri::generate_context!())
         .expect("error while running Open-Photo");
