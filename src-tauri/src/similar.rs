@@ -102,6 +102,7 @@ pub fn find_similar_photos(
 
 #[cfg(test)]
 mod tests {
+    use super::find_similar_photos;
     #[test]
     fn groups_matching_images_but_not_opposite_gradients() {
         let stamp = std::time::SystemTime::now()
