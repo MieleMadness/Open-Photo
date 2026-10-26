@@ -10,6 +10,12 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.28.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter output required by the Windows CI gate for the new People pipeline and face-model import guard.
+- No People functionality was removed or rolled back.
+
 ## 0.28.0 — 2026-10-26
 
 ### Added
