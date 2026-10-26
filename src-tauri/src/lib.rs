@@ -1,4 +1,5 @@
 mod ai_embeddings;
+mod ai_faces;
 mod ai_inference;
 mod ai_models;
 mod ai_preprocess;
@@ -353,6 +354,10 @@ pub fn run() {
             ai_embeddings::ai_index_semantic_batch,
             ai_embeddings::ai_index_semantic_image,
             ai_embeddings::ai_search_semantic_text,
+            ai_faces::ai_detect_faces,
+            ai_faces::ai_face_index_status,
+            ai_faces::ai_index_faces_batch,
+            ai_faces::ai_people_groups,
             ai_inference::ai_run_semantic_image,
             ai_preprocess::ai_prepare_image,
             ai_runtime::ai_runtime_status,
