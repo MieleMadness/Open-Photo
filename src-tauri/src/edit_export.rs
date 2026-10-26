@@ -7,7 +7,7 @@ use std::{fs, io::Cursor, path::PathBuf};
 
 const MAX_EDIT_SOURCE_BYTES: u64 = 250 * 1024 * 1024;
 
-#[derive(Deserialize)]
+#[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EditOptions {
     rotation: i32,
