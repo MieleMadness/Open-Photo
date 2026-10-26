@@ -3,14 +3,11 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct InferenceResult {
-    output_shape: Vec<i64>,
-    values: Vec<f32>,
+    pub(crate) output_shape: Vec<i64>,
+    pub(crate) values: Vec<f32>,
 }
 
-/// Run one installed semantic ONNX model against one library image.
-/// The model must accept a single float32 tensor shaped [1, 3, 224, 224].
-#[tauri::command]
-pub fn ai_run_semantic_image(root: String, path: String) -> Result<InferenceResult, String> {
+/// Run one installed semantic ONNX model against one library image.\n/// The model must accept a single float32 tensor shaped [1, 3, 224, 224].\npub(crate) fn run_semantic_image(root: String, path: String) -> Result<InferenceResult, String> {
     let model = crate::ai_models::installed_model_path("semantic")?;
     let values = crate::ai_preprocess::prepare_tensor(&root, &path)?;
     let environment = ort::init()
@@ -46,4 +43,9 @@ pub fn ai_run_semantic_image(root: String, path: String) -> Result<InferenceResu
         output_shape: shape.iter().copied().collect(),
         values: data.to_vec(),
     })
+}
+
+#[tauri::command]
+pub fn ai_run_semantic_image(root: String, path: String) -> Result<InferenceResult, String> {
+    run_semantic_image(root, path)
 }
