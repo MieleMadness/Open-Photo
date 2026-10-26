@@ -50,6 +50,21 @@ pub struct ModelInfo {
     installed: bool,
     bytes: u64,
     sha256: Option<String>,
+    expected_sha256: String,
+    compatible: bool,
+}
+
+pub(crate) fn supported_sha256(kind: &str) -> Result<&'static str, String> {
+    match kind {
+        "semantic" => Ok(SUPPORTED_CLIP_VISION_SHA256),
+        "semantic_text" => Ok(SUPPORTED_CLIP_TEXT_SHA256),
+        "semantic_tokenizer" => Ok(SUPPORTED_CLIP_TOKENIZER_SHA256),
+        "faces" => Ok(SUPPORTED_YUNET_SHA256),
+        "face_embedder" => Ok(SUPPORTED_SFACE_SHA256),
+        "ocr" => Ok(SUPPORTED_OCR_DETECTOR_SHA256),
+        "ocr_recognizer" => Ok(SUPPORTED_OCR_RECOGNIZER_SHA256),
+        _ => Err("Unknown model type".into()),
+    }
 }
 
 fn fingerprint(path: &Path) -> Result<(u64, String), String> {
@@ -163,14 +178,20 @@ pub fn ai_model_status() -> Result<Vec<ModelInfo>, String> {
                 installed: false,
                 bytes: 0,
                 sha256: None,
+                expected_sha256: supported_sha256(kind)?.into(),
+                compatible: false,
             });
         }
         let (bytes, sha) = fingerprint(&file)?;
+        let expected = supported_sha256(kind)?;
+        let compatible = sha.eq_ignore_ascii_case(expected);
         Ok(ModelInfo {
             kind: (*kind).into(),
             installed: true,
             bytes,
             sha256: Some(sha),
+            expected_sha256: expected.into(),
+            compatible,
         })
     })
     .collect()
@@ -202,17 +223,8 @@ pub fn ai_import_model(
         ));
     }
     let (size, sha) = fingerprint(&source)?;
-    let supported_sha = match kind.as_str() {
-        "semantic" => Some(SUPPORTED_CLIP_VISION_SHA256),
-        "semantic_text" => Some(SUPPORTED_CLIP_TEXT_SHA256),
-        "semantic_tokenizer" => Some(SUPPORTED_CLIP_TOKENIZER_SHA256),
-        "faces" => Some(SUPPORTED_YUNET_SHA256),
-        "face_embedder" => Some(SUPPORTED_SFACE_SHA256),
-        "ocr" => Some(SUPPORTED_OCR_DETECTOR_SHA256),
-        "ocr_recognizer" => Some(SUPPORTED_OCR_RECOGNIZER_SHA256),
-        _ => None,
-    };
-    if supported_sha.is_some_and(|required| sha != required) {
+    let supported_sha = supported_sha256(&kind)?;
+    if sha != supported_sha {
         return Err(match kind.as_str() {
             "faces" => "The People detector slot only accepts YuNet 2026may from OpenCV Zoo".into(),
             "face_embedder" => {
@@ -262,7 +274,9 @@ pub fn ai_import_model(
         kind,
         installed: true,
         bytes: written,
+        compatible: digest.eq_ignore_ascii_case(supported_sha),
         sha256: Some(digest),
+        expected_sha256: supported_sha.into(),
     })
 }
 /// Remove only a known model slot under the private application-data folder.
@@ -283,6 +297,24 @@ mod tests {
     #[test]
     fn invalid_model_type_is_rejected() {
         assert!(model_name("../escape").is_err());
+        assert!(supported_sha256("../escape").is_err());
+    }
+
+    #[test]
+    fn every_known_slot_has_a_pinned_sha256() {
+        for kind in [
+            "semantic",
+            "semantic_text",
+            "semantic_tokenizer",
+            "faces",
+            "face_embedder",
+            "ocr",
+            "ocr_recognizer",
+        ] {
+            let sha = supported_sha256(kind).unwrap();
+            assert_eq!(sha.len(), 64);
+            assert!(sha.bytes().all(|byte| byte.is_ascii_hexdigit()));
+        }
     }
     #[test]
     fn empty_model_is_rejected() {
