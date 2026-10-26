@@ -50,11 +50,12 @@ Decode keyframes with a supported media backend (FFmpeg licensing review and shi
 - Manual, checksum-verified local model storage.
 - Backend-derived compatibility metadata and Settings readiness states for Semantic Search, People and OCR.
 - Frontend gating so incomplete or incompatible model bundles cannot start AI jobs.
+- Phase 3 self-check command/UI for model bundle readiness, DirectML availability and explicit real-world validation status.
 - Pinned YuNet 2026may + SFace 2021dec People model contracts.
 - Local face detection, five-landmark ArcFace alignment, 128-value SFace embeddings, model-provenance persistence, incremental People indexing and suggested local grouping UI.
 - Pinned English PP-OCR detector + recognizer contracts, local OCR region extraction, persistent text indexing and local photo-text search.
 
-### Still required before Phase 3 is complete
+### Still required before Phase 3 is fully validated
 - Validate the pinned YuNet + SFace People pipeline on representative real libraries and refine grouping thresholds without silently merging identities.
 - Validate PP-OCR accuracy and region post-processing on screenshots, signs, receipts and document photos; expand languages only with separately pinned contracts.
 - Validate DirectML results against CPU within documented similarity tolerances on representative Windows hardware.
