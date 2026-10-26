@@ -10,6 +10,24 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.26.0 — 2026-10-26
+
+### Added
+- Added **Index library with AI** for the current workspace.
+- Added multi-root AI indexing orchestration in the Library UI.
+- Added multi-root natural-language semantic search that merges and ranks matches across workspace folders.
+- Added explicit batch failure counts separate from safe already-current skips.
+
+### Performance
+- Semantic batch indexing now reuses one ONNX vision session per batch instead of loading the model once per photo.
+- Heavy batch inference runs on Tauri's blocking worker pool rather than the main UI thread.
+- Existing embeddings are skipped when the source modification time, semantic pipeline key and 512-value dimension are already current.
+- Raised the backend batch limit to 5,000 photos; the UI chunks larger root groups.
+
+### Notes
+- Full cancellable queue/progress/pause/resume support is still planned.
+- Semantic search remains experimental until the verified OpenCLIP bundle is exercised end-to-end on representative photo libraries.
+
 ## 0.25.3 — 2026-10-26
 
 ### Fixed
