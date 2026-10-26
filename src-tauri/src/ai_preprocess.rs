@@ -1,7 +1,10 @@
-//! Read-only AI image preprocessing for future local ONNX inference.
-//! No image embeddings or classifications are produced by this module.
+//! Read-only OpenCLIP image preprocessing for local semantic inference.
 use base64::Engine;
+use image::GenericImageView;
 use serde::Serialize;
+
+const CLIP_MEAN: [f32; 3] = [0.48145466, 0.4578275, 0.40821073];
+const CLIP_STD: [f32; 3] = [0.26862954, 0.26130258, 0.27577711];
 
 #[derive(Serialize)]
 pub struct ImageTensorPreview {
@@ -12,6 +15,33 @@ pub struct ImageTensorPreview {
     values_base64: String,
 }
 
+fn clip_tensor(input: image::DynamicImage) -> Result<Vec<f32>, String> {
+    let (width, height) = input.dimensions();
+    if width == 0 || height == 0 {
+        return Err("Cannot preprocess an empty image".into());
+    }
+    let scale = 224.0_f32 / (width.min(height) as f32);
+    let resized_width = ((width as f32 * scale).round() as u32).max(224);
+    let resized_height = ((height as f32 * scale).round() as u32).max(224);
+    let resized = input.resize_exact(
+        resized_width,
+        resized_height,
+        image::imageops::FilterType::CatmullRom,
+    );
+    let left = (resized_width - 224) / 2;
+    let top = (resized_height - 224) / 2;
+    let rgb = resized.crop_imm(left, top, 224, 224).to_rgb8();
+
+    let mut values = Vec::with_capacity(224 * 224 * 3);
+    for channel in 0..3 {
+        for pixel in rgb.pixels() {
+            let value = f32::from(pixel[channel]) / 255.0;
+            values.push((value - CLIP_MEAN[channel]) / CLIP_STD[channel]);
+        }
+    }
+    Ok(values)
+}
+
 pub(crate) fn prepare_tensor(root: &str, path: &str) -> Result<Vec<f32>, String> {
     let source = crate::safe_media_path(root, path)?;
     let input = image::ImageReader::open(source)
@@ -20,20 +50,11 @@ pub(crate) fn prepare_tensor(root: &str, path: &str) -> Result<Vec<f32>, String>
         .map_err(|e| e.to_string())?
         .decode()
         .map_err(|e| format!("Cannot decode this photo for AI: {e}"))?;
-    let rgb = input
-        .resize_exact(224, 224, image::imageops::FilterType::Triangle)
-        .to_rgb8();
-    let mut values = Vec::with_capacity(224 * 224 * 3);
-    for channel in 0..3 {
-        for pixel in rgb.pixels() {
-            values.push(f32::from(pixel[channel]) / 255.0);
-        }
-    }
-    Ok(values)
+    clip_tensor(input)
 }
 
-/// Convert a supported local photo to a deterministic RGB 224x224 float32 CHW tensor.
-/// This command prepares input only. It does not invoke an inference model.
+/// Convert a supported local photo to the supported OpenCLIP RGB 224x224 float32 CHW tensor.
+/// This diagnostic command prepares input only and never modifies the original image.
 #[tauri::command]
 pub fn ai_prepare_image(root: String, path: String) -> Result<ImageTensorPreview, String> {
     let values = prepare_tensor(&root, &path)?;
@@ -45,27 +66,27 @@ pub fn ai_prepare_image(root: String, path: String) -> Result<ImageTensorPreview
         width: 224,
         height: 224,
         channels: 3,
-        layout: "CHW-f32-le-0-to-1",
+        layout: "OpenCLIP-CHW-f32-normalized-v1",
         values_base64: base64::engine::general_purpose::STANDARD.encode(bytes),
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use super::{clip_tensor, CLIP_MEAN, CLIP_STD};
+
     #[test]
-    fn channel_first_tensor_is_consistent() {
-        let image = image::RgbImage::from_pixel(224, 224, image::Rgb([255, 0, 128]));
-        let mut tensor = Vec::new();
-        for channel in 0..3 {
-            for pixel in image.pixels() {
-                tensor.extend_from_slice(&(f32::from(pixel[channel]) / 255.0).to_le_bytes());
-            }
-        }
-        assert_eq!(tensor.len(), 224 * 224 * 3 * 4);
-        assert_eq!(&tensor[0..4], &1_f32.to_le_bytes());
-        assert_eq!(
-            &tensor[(224 * 224 * 4)..(224 * 224 * 4 + 4)],
-            &0_f32.to_le_bytes()
-        );
+    fn clip_tensor_is_channel_first_and_normalized() {
+        let image = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+            224,
+            224,
+            image::Rgb([255, 0, 128]),
+        ));
+        let tensor = clip_tensor(image).unwrap();
+        assert_eq!(tensor.len(), 224 * 224 * 3);
+        let red = (1.0 - CLIP_MEAN[0]) / CLIP_STD[0];
+        let green = (0.0 - CLIP_MEAN[1]) / CLIP_STD[1];
+        assert!((tensor[0] - red).abs() < 0.0001);
+        assert!((tensor[224 * 224] - green).abs() < 0.0001);
     }
 }
