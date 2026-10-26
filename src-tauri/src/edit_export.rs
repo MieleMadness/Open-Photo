@@ -157,9 +157,7 @@ pub fn export_edited_copy(
         return Err(format!("Cannot finish edited export: {error}"));
     }
     drop(output);
-    let bytes = fs::metadata(&destination)
-        .map_err(|e| e.to_string())?
-        .len();
+    let bytes = fs::metadata(&destination).map_err(|e| e.to_string())?.len();
 
     Ok(EditedExportResult {
         path: destination.to_string_lossy().into_owned(),
