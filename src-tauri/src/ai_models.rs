@@ -9,6 +9,12 @@ use std::{
 };
 
 const MAX_MODEL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+pub(crate) const SUPPORTED_CLIP_VISION_SHA256: &str =
+    "7e14f76233d0c840c0621b1ef68f5877efe9357850782b1bbaf0c01693f73b43";
+pub(crate) const SUPPORTED_CLIP_TEXT_SHA256: &str =
+    "252b86e0ef1fc95b22cfd52fbf647142727fdbecc152556ffe0fba0b10a80370";
+pub(crate) const SUPPORTED_CLIP_TOKENIZER_SHA256: &str =
+    "b556ac8c99757ffb677208af34bc8c6721572114111a6e0aaf5fa69ff0b8d842";
 
 pub(crate) fn model_directory() -> Result<PathBuf, String> {
     let dir = dirs::data_local_dir()
@@ -21,6 +27,8 @@ pub(crate) fn model_directory() -> Result<PathBuf, String> {
 pub(crate) fn model_name(kind: &str) -> Result<&'static str, String> {
     match kind {
         "semantic" => Ok("semantic.onnx"),
+        "semantic_text" => Ok("semantic-text.onnx"),
+        "semantic_tokenizer" => Ok("semantic-tokenizer.json"),
         "faces" => Ok("faces.onnx"),
         "ocr" => Ok("ocr.onnx"),
         _ => Err("Unknown model type".into()),
@@ -68,10 +76,36 @@ pub(crate) fn installed_model_sha256(kind: &str) -> Result<String, String> {
     fingerprint(&path).map(|(_, sha)| sha)
 }
 
+pub(crate) fn validate_supported_clip_bundle() -> Result<String, String> {
+    let vision = installed_model_sha256("semantic")?;
+    let text = installed_model_sha256("semantic_text")?;
+    let tokenizer = installed_model_sha256("semantic_tokenizer")?;
+    if vision != SUPPORTED_CLIP_VISION_SHA256
+        || text != SUPPORTED_CLIP_TEXT_SHA256
+        || tokenizer != SUPPORTED_CLIP_TOKENIZER_SHA256
+    {
+        return Err(
+            "Semantic search requires the supported OpenCLIP ViT-B/32 vision model, text model, and tokenizer bundle"
+                .into(),
+        );
+    }
+    Ok(format!("openclip-vit-b32-v1:{vision}"))
+}
+
+pub(crate) fn validate_supported_clip_vision() -> Result<String, String> {
+    let vision = installed_model_sha256("semantic")?;
+    if vision != SUPPORTED_CLIP_VISION_SHA256 {
+        return Err(
+            "Semantic image indexing requires the supported OpenCLIP ViT-B/32 vision model".into(),
+        );
+    }
+    Ok(format!("openclip-vit-b32-v1:{vision}"))
+}
+
 #[tauri::command]
 pub fn ai_model_status() -> Result<Vec<ModelInfo>, String> {
     let dir = model_directory()?;
-    ["semantic", "faces", "ocr"]
+    ["semantic", "semantic_text", "semantic_tokenizer", "faces", "ocr"]
         .iter()
         .map(|kind| {
             let file = dir.join(model_name(kind)?);
@@ -104,13 +138,20 @@ pub fn ai_import_model(
         return Err("A 64-character SHA-256 checksum is required to verify a model".into());
     }
     let source = fs::canonicalize(&path).map_err(|e| e.to_string())?;
+    let expected_extension = if kind == "semantic_tokenizer" {
+        "json"
+    } else {
+        "onnx"
+    };
     if !source.is_file()
         || source
             .extension()
             .and_then(|v| v.to_str())
-            .is_none_or(|v| !v.eq_ignore_ascii_case("onnx"))
+            .is_none_or(|v| !v.eq_ignore_ascii_case(expected_extension))
     {
-        return Err("Choose a valid local ONNX model file".into());
+        return Err(format!(
+            "Choose a valid local .{expected_extension} file for this AI slot"
+        ));
     }
     let (size, sha) = fingerprint(&source)?;
     if !sha.eq_ignore_ascii_case(&expected_sha256) {
