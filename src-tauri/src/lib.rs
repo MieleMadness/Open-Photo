@@ -377,6 +377,7 @@ pub fn run() {
             read_iphone_media,
             bulk_create_tags,
             edit_export::export_edited_copy,
+            edit_export::preview_edited_photo,
             open_video,
             geo::gps_for_photos,
             index::scan_indexed,
