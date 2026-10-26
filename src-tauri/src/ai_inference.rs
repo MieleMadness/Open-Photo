@@ -8,7 +8,7 @@ pub struct InferenceResult {
     pub(crate) values: Vec<f32>,
 }
 
-pub(crate) fn semantic_image_session() -> Result<Session, String> {
+pub(crate) fn semantic_image_session(device: Option<&str>) -> Result<Session, String> {
     crate::ai_models::validate_supported_clip_vision()?;
     let model = crate::ai_models::installed_model_path("semantic")?;
     let environment = ort::init()
@@ -16,8 +16,9 @@ pub(crate) fn semantic_image_session() -> Result<Session, String> {
         .with_telemetry(false)
         .build()
         .map_err(|e| e.to_string())?;
-    let session = Session::builder(&environment)
-        .map_err(|e| e.to_string())?
+    let builder = Session::builder(&environment).map_err(|e| e.to_string())?;
+    let builder = crate::ai_runtime::configure_session(builder, device)?;
+    let session = builder
         .commit_from_file(&model)
         .map_err(|e| format!("Cannot load semantic ONNX model: {e}"))?;
     if session.inputs().len() != 1 {
@@ -61,12 +62,12 @@ pub(crate) fn run_semantic_image_with_session(
 }
 
 /// Run one installed semantic ONNX model against one library image.
-pub(crate) fn run_semantic_image(root: String, path: String) -> Result<InferenceResult, String> {
-    let mut session = semantic_image_session()?;
+pub(crate) fn run_semantic_image(root: String, path: String, device: Option<String>) -> Result<InferenceResult, String> {
+    let mut session = semantic_image_session(device.as_deref())?;
     run_semantic_image_with_session(&mut session, &root, &path)
 }
 
 #[tauri::command]
-pub fn ai_run_semantic_image(root: String, path: String) -> Result<InferenceResult, String> {
-    run_semantic_image(root, path)
+pub fn ai_run_semantic_image(root: String, path: String, device: Option<String>) -> Result<InferenceResult, String> {
+    run_semantic_image(root, path, device)
 }
