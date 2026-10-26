@@ -15,6 +15,7 @@ type PhotoView = "grid" | "list";
 type SortBy = "name" | "newest" | "oldest" | "largest" | "smallest";
 type Photo = { path: string; name: string; extension: string; bytes: number; modified_unix: number; libraryRoot?: string };
 type ScanResult = { photos: Photo[]; scanned_files: number; truncated: boolean };
+type AiBatchResult = {requested:number;indexed:number;skipped:number;failed:number;errors:string[]};
 const NAV: {id: View; title: string; icon: typeof Images}[] = [
   { id: "library", title: "Library", icon: Images },
   { id: "folders", title: "Folders", icon: FolderOpen },
@@ -34,6 +35,7 @@ export default function App() {
   const [aiModelMessage,setAiModelMessage]=useState("");
   const [aiModelBusy,setAiModelBusy]=useState(false);
   const [aiIndexMessage,setAiIndexMessage]=useState("");
+  const [aiIndexBusy,setAiIndexBusy]=useState(false);
   const [aiSimilar,setAiSimilar]=useState<{path:string;score:number}[]>([]);
   const [aiTextQuery,setAiTextQuery]=useState("");
   const [aiTextMatches,setAiTextMatches]=useState<{path:string;score:number}[]>([]);
@@ -158,6 +160,61 @@ export default function App() {
   };
   const workspace = workspaces.find(w=>w.id===activeWorkspace);
   const roots = workspace ? (workspace.roots?.length ? workspace.roots : workspace.root ? [workspace.root] : []) : [];
+  const indexAiPhotos=async(photos:Photo[],label:string)=>{
+    const supported=new Set(["jpg","jpeg","png","webp","gif","tif","tiff","bmp","avif"]);
+    const grouped=new Map<string,string[]>();
+    for(const photo of photos){
+      if(!supported.has(photo.extension.toLowerCase()))continue;
+      const parent=photo.libraryRoot||root;
+      if(!parent)continue;
+      const paths=grouped.get(parent)||[];
+      paths.push(photo.path);
+      grouped.set(parent,paths);
+    }
+    const requested=[...grouped.values()].reduce((total,paths)=>total+paths.length,0);
+    if(!requested){
+      setAiIndexMessage("No currently supported AI-decodable photos were found in this selection.");
+      return;
+    }
+    setAiIndexBusy(true);
+    setAiIndexMessage(`Checking ${requested} ${label} photos for local AI indexing…`);
+    try{
+      const total:AiBatchResult={requested:0,indexed:0,skipped:0,failed:0,errors:[]};
+      for(const [parent,paths] of grouped){
+        for(let offset=0;offset<paths.length;offset+=5000){
+          const batch=await invoke<AiBatchResult>("ai_index_semantic_batch",{root:parent,paths:paths.slice(offset,offset+5000)});
+          total.requested+=batch.requested;
+          total.indexed+=batch.indexed;
+          total.skipped+=batch.skipped;
+          total.failed+=batch.failed;
+          total.errors.push(...batch.errors);
+        }
+      }
+      setAiIndexMessage(`AI indexing checked ${total.requested} photos: ${total.indexed} indexed, ${total.skipped} already current${total.failed?`, ${total.failed} failed`:""}.`);
+    }catch(e){setAiIndexMessage(String(e))}
+    finally{setAiIndexBusy(false)}
+  };
+  const searchAiWorkspace=async()=>{
+    if(!result||!aiTextQuery.trim())return;
+    setAiIndexMessage("Searching indexed photos locally by meaning…");
+    setAiTextMatches([]);
+    const searchRoots=roots.length?roots:root?[root]:[];
+    try{
+      const searches=await Promise.allSettled(searchRoots.map(parent=>invoke<{path:string;score:number}[]>("ai_search_semantic_text",{root:parent,query:aiTextQuery,limit:20})));
+      const best=new Map<string,{path:string;score:number}>();
+      const errors:string[]=[];
+      for(const search of searches){
+        if(search.status==="rejected"){errors.push(String(search.reason));continue}
+        for(const match of search.value){
+          const previous=best.get(match.path);
+          if(!previous||match.score>previous.score)best.set(match.path,match);
+        }
+      }
+      const matches=[...best.values()].sort((a,b)=>b.score-a.score).slice(0,20);
+      setAiTextMatches(matches);
+      setAiIndexMessage(`Found ${matches.length} semantic matches across ${searchRoots.length} workspace folder${searchRoots.length===1?"":"s"}${errors.length?`; ${errors.length} folder search failed`:""}.`);
+    }catch(e){setAiIndexMessage(String(e))}
+  };
   const syncFolders = async (paths: string[]) => {
     if (!isDesktop || !paths.length || syncRunning.current===syncGeneration.current) return;
     const generation=syncGeneration.current;
@@ -439,7 +496,7 @@ export default function App() {
             {result && <div className="selection-toolbar">{collectionFilter&&<button className="secondary-button" onClick={()=>setCollectionFilter("")}>Show all (clear collection)</button>}<label className="sort-control">Media <select aria-label="Media type" value={mediaType} onChange={e=>setMediaType(e.target.value as "all"|"photo"|"video")}><option value="all">All media</option><option value="photo">Photos</option><option value="video">Videos</option></select></label><span>{selection.length} selected</span><button className="secondary-button" onClick={()=>setSelection(visible.map(p=>p.path))}>Select matching</button><button className="secondary-button" onClick={()=>setSelection([])}>Clear selection</button><input aria-label="New XMP tags (comma separated)" placeholder="Tags separated by commas" value={tagText} onChange={e=>setTagText(e.target.value)}/><button className="primary-button" disabled={!selection.length || !tagText.trim() || applying} onClick={applyTags}>{applying?"Writing…":"Add tags to new sidecars"}</button></div>}
             {result && livePhotoPairs>0 && <p className="results-note">{livePhotoPairs} potential iPhone Live Photo pairs found (same folder and filename stem). Original image and video files remain separate.</p>}
             {result && <div className="duplicate-bar"><button className="secondary-button" disabled={duplicateBusy} onClick={inspectDuplicates}>Find Exact Duplicates</button><button className="secondary-button" disabled={duplicateBusy} onClick={inspectSimilar}>Find Similar Photos</button>{duplicateBusy&&<span>Analyzing local files…</span>}{duplicates.length>0&&<span>{duplicates.length} identical-file groups</span>}{similarGroups.length>0&&<span>{similarGroups.length} visually similar groups</span>}{[...duplicates.map(group=>({paths:group.paths,label:"Identical files"})),...similarGroups.map(group=>({paths:group.paths,label:"Visually similar photos"}))].map((group,i)=><div className="duplicate-group" key={i}><strong>{group.label} · {group.paths.length} files</strong><p>Inspect each candidate and optionally mark one to keep. This review never deletes or moves a file.</p>{group.paths.map(path=><div key={path} className="collection-row"><small className="break-anywhere">{duplicateReview[group.paths.join("|")]===path?"✓ Preferred copy · ":""}{path}</small><button className="secondary-button" onClick={()=>{const candidate=result?.photos.find(photo=>photo.path===path);if(candidate)setSelected(candidate);else setError("This file is not in the current library view.")}}>Preview</button><button className="secondary-button" aria-pressed={duplicateReview[group.paths.join("|")]===path} onClick={()=>setDuplicateReview(previous=>({...previous,[group.paths.join("|")]:path}))}>Mark to keep</button></div>)}</div>)}</div>}
-            {aiOptIn&&result&&<div className="selection-toolbar"><strong>Semantic search</strong><input aria-label="Semantic photo search" placeholder="Try: dog at the beach" value={aiTextQuery} onChange={e=>setAiTextQuery(e.target.value)}/><button className="secondary-button" disabled={!aiTextQuery.trim()} onClick={()=>{setAiIndexMessage("Searching locally by meaning…");setAiTextMatches([]);void invoke<{path:string;score:number}[]>("ai_search_semantic_text",{root,query:aiTextQuery,limit:20}).then(matches=>{setAiTextMatches(matches);setAiIndexMessage(`Found ${matches.length} semantic matches.`)}).catch(e=>setAiIndexMessage(String(e)))}}>Search by meaning</button>{aiTextMatches.map(match=><button className="folder-item" key={match.path} onClick={()=>{const candidate=result.photos.find(photo=>photo.path===match.path);if(candidate)setSelected(candidate)}}>{Math.round(match.score*100)}% · {match.path}</button>)}</div>}{aiOptIn&&selection.length>0&&<div className="selection-toolbar"><strong>Local AI</strong><span>{selection.length} selected</span><button className="secondary-button" onClick={()=>{setAiIndexMessage(`Indexing ${selection.length} selected photos locally…`);void invoke<{requested:number;indexed:number;skipped:number;errors:string[]}>("ai_index_semantic_batch",{root,paths:selection}).then(result=>setAiIndexMessage(`AI indexed ${result.indexed}/${result.requested} selected files locally${result.skipped?`; ${result.skipped} skipped`:""}.`)).catch(e=>setAiIndexMessage(String(e)))}}>Index selected with AI</button>{aiIndexMessage&&<span>{aiIndexMessage}</span>}</div>}{tagMessage && <div className="results-note" role="status">{tagMessage}</div>}
+            {aiOptIn&&result&&<div className="selection-toolbar"><strong>Semantic search</strong><input aria-label="Semantic photo search" placeholder="Try: dog at the beach" value={aiTextQuery} onChange={e=>setAiTextQuery(e.target.value)}/><button className="secondary-button" disabled={!aiTextQuery.trim()} onClick={()=>void searchAiWorkspace()}>Search by meaning</button><button className="secondary-button" disabled={aiIndexBusy} onClick={()=>void indexAiPhotos(result.photos,"library")}>{aiIndexBusy?"Indexing…":"Index library with AI"}</button>{aiIndexMessage&&<span>{aiIndexMessage}</span>}{aiTextMatches.map(match=><button className="folder-item" key={match.path} onClick={()=>{const candidate=result.photos.find(photo=>photo.path===match.path);if(candidate)setSelected(candidate)}}>{Math.round(match.score*100)}% · {match.path}</button>)}</div>}{aiOptIn&&selection.length>0&&<div className="selection-toolbar"><strong>Local AI</strong><span>{selection.length} selected</span><button className="secondary-button" disabled={aiIndexBusy} onClick={()=>void indexAiPhotos(result.photos.filter(photo=>selection.includes(photo.path)),"selected")}>Index selected with AI</button></div>}{tagMessage && <div className="results-note" role="status">{tagMessage}</div>}
             {error && <div role="alert" className="error">{error}</div>}
             {busy && <div className="empty"><div className="empty-symbol"><Images size={28}/></div><h3>Scanning your folder</h3><p>Reading file names and sizes. No photos are being changed.</p></div>}
             {!busy && !result && <div className="empty"><div className="empty-symbol"><ImageOff size={32}/></div><h3>Your library starts here</h3><p>Choose a folder on your computer to discover supported photo files. Images display as thumbnails where supported, with local-only processing.</p><button className="secondary-button" onClick={chooseFolder}><FolderOpen size={16}/> Select Photo Folder</button></div>}
