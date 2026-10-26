@@ -10,6 +10,7 @@ pub struct InferenceResult {
 /// Run one installed semantic ONNX model against one library image.
 /// The model must accept a single float32 tensor shaped [1, 3, 224, 224].
 pub(crate) fn run_semantic_image(root: String, path: String) -> Result<InferenceResult, String> {
+    crate::ai_models::validate_supported_clip_vision()?;
     let model = crate::ai_models::installed_model_path("semantic")?;
     let values = crate::ai_preprocess::prepare_tensor(&root, &path)?;
     let environment = ort::init()
@@ -35,15 +36,20 @@ pub(crate) fn run_semantic_image(root: String, path: String) -> Result<Inference
     let (shape, data) = outputs[0]
         .try_extract_tensor::<f32>()
         .map_err(|e| format!("Semantic model output is not a float tensor: {e}"))?;
-    if data.is_empty() {
-        return Err("Semantic model returned an empty tensor".into());
+    if data.len() != 512 {
+        return Err("Supported OpenCLIP vision model must return a 512-value embedding".into());
     }
-    if data.len() > 8192 {
-        return Err("Semantic model output is larger than the current safety limit".into());
+    let mut values = data.to_vec();
+    let norm = values.iter().map(|value| value * value).sum::<f32>().sqrt();
+    if norm == 0.0 {
+        return Err("Semantic model returned a zero embedding".into());
+    }
+    for value in &mut values {
+        *value /= norm;
     }
     Ok(InferenceResult {
         output_shape: shape.iter().copied().collect(),
-        values: data.to_vec(),
+        values,
     })
 }
 
