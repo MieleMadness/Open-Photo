@@ -195,10 +195,8 @@ pub fn ai_import_model(
             "face_embedder" => {
                 "The People embedding slot only accepts SFace 2021dec from OpenCV Zoo".into()
             }
-            _ => {
-                "This semantic slot only accepts the supported OpenCLIP ViT-B/32 bundle asset"
-                    .into()
-            }
+            _ => "This semantic slot only accepts the supported OpenCLIP ViT-B/32 bundle asset"
+                .into(),
         });
     }
     if !sha.eq_ignore_ascii_case(&expected_sha256) {
