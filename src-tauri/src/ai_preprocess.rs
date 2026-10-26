@@ -44,7 +44,6 @@ pub fn ai_prepare_image(root: String, path: String) -> Result<ImageTensorPreview
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[test]
     fn channel_first_tensor_is_consistent() {
         let image = image::RgbImage::from_pixel(224, 224, image::Rgb([255, 0, 128]));
