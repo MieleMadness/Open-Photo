@@ -219,10 +219,12 @@ pub fn ai_import_model(
                 "The People embedding slot only accepts SFace 2021dec from OpenCV Zoo".into()
             }
             "ocr" => {
-                "The OCR detector slot only accepts the pinned PP-OCRv3 English mobile detector".into()
+                "The OCR detector slot only accepts the pinned PP-OCRv3 English mobile detector"
+                    .into()
             }
             "ocr_recognizer" => {
-                "The OCR recognizer slot only accepts the pinned PP-OCRv4 English mobile recognizer".into()
+                "The OCR recognizer slot only accepts the pinned PP-OCRv4 English mobile recognizer"
+                    .into()
             }
             _ => "This semantic slot only accepts the supported OpenCLIP ViT-B/32 bundle asset"
                 .into(),
