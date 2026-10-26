@@ -419,7 +419,9 @@ mod tests {
             sharpen_threshold: 0,
         };
         assert!(apply_edits(image, &options).is_err());
-    }    #[test]
+    }
+
+    #[test]
     fn adjustment_limits_are_enforced() {
         let image = DynamicImage::new_rgb8(8, 8);
         let base = EditOptions {
@@ -465,6 +467,4 @@ mod tests {
         )
         .is_err());
     }
-
-
 }
