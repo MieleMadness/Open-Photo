@@ -10,7 +10,7 @@ pub struct TextInferenceResult {
     values: Vec<f32>,
 }
 
-pub(crate) fn run_semantic_text(query: &str) -> Result<Vec<f32>, String> {
+pub(crate) fn run_semantic_text(query: &str, device: Option<&str>) -> Result<Vec<f32>, String> {
     let query = query.trim();
     if query.is_empty() {
         return Err("Enter a semantic search phrase".into());
@@ -41,8 +41,9 @@ pub(crate) fn run_semantic_text(query: &str) -> Result<Vec<f32>, String> {
         .build()
         .map_err(|e| e.to_string())?;
     let model = crate::ai_models::installed_model_path("semantic_text")?;
-    let mut session = ort::session::Session::builder(&environment)
-        .map_err(|e| e.to_string())?
+    let builder = ort::session::Session::builder(&environment).map_err(|e| e.to_string())?;
+    let builder = crate::ai_runtime::configure_session(builder, device)?;
+    let mut session = builder
         .commit_from_file(&model)
         .map_err(|e| format!("Cannot load semantic text ONNX model: {e}"))?;
     let has_input_ids = session
@@ -93,7 +94,7 @@ pub(crate) fn run_semantic_text(query: &str) -> Result<Vec<f32>, String> {
 }
 
 #[tauri::command]
-pub fn ai_run_semantic_text(query: String) -> Result<TextInferenceResult, String> {
+pub fn ai_run_semantic_text(query: String, device: Option<String>) -> Result<TextInferenceResult, String> {
     let token_count = tokenizers::Tokenizer::from_file(crate::ai_models::installed_model_path(
         "semantic_tokenizer",
     )?)
@@ -103,7 +104,7 @@ pub fn ai_run_semantic_text(query: String) -> Result<TextInferenceResult, String
     .get_ids()
     .len()
     .min(CLIP_SEQUENCE_LENGTH);
-    let values = run_semantic_text(&query)?;
+    let values = run_semantic_text(&query, device.as_deref())?;
     Ok(TextInferenceResult {
         tokens: token_count,
         values,
