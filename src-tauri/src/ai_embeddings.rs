@@ -114,6 +114,86 @@ pub fn ai_index_semantic_batch(
     Ok(result)
 }
 
+fn decode_f32(bytes: &[u8]) -> Result<Vec<f32>, String> {
+    if bytes.len() % 4 != 0 {
+        return Err("Stored embedding is corrupt".into());
+    }
+    Ok(bytes
+        .chunks_exact(4)
+        .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+        .collect())
+}
+
+fn cosine_similarity(left: &[f32], right: &[f32]) -> Result<f32, String> {
+    if left.len() != right.len() || left.is_empty() {
+        return Err("Embedding dimensions do not match".into());
+    }
+    let mut dot = 0.0_f32;
+    let mut left_norm = 0.0_f32;
+    let mut right_norm = 0.0_f32;
+    for (a, b) in left.iter().zip(right.iter()) {
+        dot += a * b;
+        left_norm += a * a;
+        right_norm += b * b;
+    }
+    if left_norm == 0.0 || right_norm == 0.0 {
+        return Err("Cannot compare zero-length embedding vectors".into());
+    }
+    Ok(dot / (left_norm.sqrt() * right_norm.sqrt()))
+}
+
+#[derive(Serialize)]
+pub struct SemanticMatch {
+    path: String,
+    score: f32,
+}
+
+#[tauri::command]
+pub fn ai_find_similar_by_photo(
+    root: String,
+    path: String,
+    limit: usize,
+) -> Result<Vec<SemanticMatch>, String> {
+    let limit = limit.clamp(1, 100);
+    let current_sha = crate::ai_models::installed_model_sha256("semantic")?;
+    let db = database()?;
+    let query_blob: Vec<u8> = db
+        .query_row(
+            "SELECT vector FROM semantic_embeddings
+             WHERE root=?1 AND path=?2 AND model_sha256=?3",
+            params![root, path, current_sha],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Index this photo with the current semantic model before searching".to_string())?;
+    let query = decode_f32(&query_blob)?;
+    let mut statement = db
+        .prepare(
+            "SELECT path, vector FROM semantic_embeddings
+             WHERE root=?1 AND model_sha256=?2 AND path<>?3",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map(params![root, current_sha, path], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
+    let mut matches = Vec::new();
+    for row in rows {
+        let (candidate_path, blob) = row.map_err(|e| e.to_string())?;
+        let candidate = decode_f32(&blob)?;
+        if candidate.len() != query.len() {
+            continue;
+        }
+        matches.push(SemanticMatch {
+            path: candidate_path,
+            score: cosine_similarity(&query, &candidate)?,
+        });
+    }
+    matches.sort_by(|a, b| b.score.total_cmp(&a.score));
+    matches.truncate(limit);
+    Ok(matches)
+}
+
 #[tauri::command]
 pub fn ai_embedding_status(root: String) -> Result<EmbeddingStatus, String> {
     let current_sha = crate::ai_models::installed_model_sha256("semantic")?;
@@ -141,7 +221,21 @@ pub fn ai_embedding_status(root: String) -> Result<EmbeddingStatus, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::encode_f32;
+    use super::{cosine_similarity, decode_f32, encode_f32};
+
+    #[test]
+    fn cosine_similarity_ranks_identical_vectors_highest() {
+        let identical = cosine_similarity(&[1.0, 0.0], &[1.0, 0.0]).unwrap();
+        let orthogonal = cosine_similarity(&[1.0, 0.0], &[0.0, 1.0]).unwrap();
+        assert!(identical > orthogonal);
+        assert!((identical - 1.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn round_trips_embedding_bytes() {
+        let source = [1.0, 0.5, -0.25];
+        assert_eq!(decode_f32(&encode_f32(&source)).unwrap(), source);
+    }
 
     #[test]
     fn encodes_embedding_values_as_little_endian_f32() {
