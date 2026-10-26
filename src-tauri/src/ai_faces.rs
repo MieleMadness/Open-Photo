@@ -462,9 +462,9 @@ fn bilinear_sample(image: &RgbImage, x: f64, y: f64) -> Rgb<u8> {
 
 fn aligned_crop(image: &RgbImage, detection: &FaceDetection) -> Result<RgbImage, String> {
     let mut source = [[0.0_f64; 2]; 5];
-    for index in 0..5 {
-        source[index][0] = f64::from(detection.landmarks[index * 2]);
-        source[index][1] = f64::from(detection.landmarks[index * 2 + 1]);
+    for (index, point) in source.iter_mut().enumerate() {
+        point[0] = f64::from(detection.landmarks[index * 2]);
+        point[1] = f64::from(detection.landmarks[index * 2 + 1]);
     }
     let inverse = invert_affine(similarity_transform(&source)?)?;
     let mut output = RgbImage::new(EMBED_SIZE as u32, EMBED_SIZE as u32);
@@ -843,7 +843,7 @@ pub fn ai_people_groups(roots: Vec<String>) -> Result<Vec<PersonGroup>, String> 
         }
     }
 
-    groups.sort_by(|a, b| b.members.len().cmp(&a.members.len()));
+    groups.sort_by_key(|group| std::cmp::Reverse(group.members.len()));
     Ok(groups
         .into_iter()
         .map(|group| PersonGroup {
