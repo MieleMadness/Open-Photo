@@ -1,7 +1,9 @@
 //! Phase 4 non-destructive photo edits.
 //! The source media is always read-only. Edits are written only to a new, explicitly chosen file.
 use base64::Engine;
-use image::{codecs::jpeg::JpegEncoder, imageops::FilterType, DynamicImage, GenericImageView, ImageFormat};
+use image::{
+    codecs::jpeg::JpegEncoder, imageops::FilterType, DynamicImage, GenericImageView, ImageFormat,
+};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Cursor, path::PathBuf};
 
