@@ -321,7 +321,9 @@ mod tests {
         };
         let edited = apply_edits(image, &options).unwrap();
         assert_eq!((edited.width(), edited.height()), (3, 4));
-    }    #[test]
+    }
+
+    #[test]
     fn crop_and_resize_are_bounded() {
         let image = DynamicImage::new_rgb8(100, 80);
         let options = EditOptions {
@@ -360,5 +362,4 @@ mod tests {
         };
         assert!(apply_edits(image, &options).is_err());
     }
-
 }
