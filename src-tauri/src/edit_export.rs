@@ -27,6 +27,16 @@ pub struct EditOptions {
     resize_width: Option<u32>,
     #[serde(default)]
     resize_height: Option<u32>,
+    #[serde(default)]
+    grayscale: bool,
+    #[serde(default)]
+    hue_rotate: i32,
+    #[serde(default)]
+    blur_sigma: f32,
+    #[serde(default)]
+    sharpen_sigma: f32,
+    #[serde(default)]
+    sharpen_threshold: i32,
 }
 
 #[derive(Serialize)]
@@ -134,6 +144,34 @@ fn apply_edits(mut image: DynamicImage, options: &EditOptions) -> Result<Dynamic
     }
     if options.contrast.abs() > f32::EPSILON {
         image = image.adjust_contrast(options.contrast);
+    }
+
+    if !(-180..=180).contains(&options.hue_rotate) {
+        return Err("Hue rotation must be between -180 and 180 degrees".into());
+    }
+    if options.hue_rotate != 0 {
+        image = image.huerotate(options.hue_rotate);
+    }
+
+    if !options.blur_sigma.is_finite() || !(0.0..=10.0).contains(&options.blur_sigma) {
+        return Err("Blur must be between 0 and 10".into());
+    }
+    if options.blur_sigma > f32::EPSILON {
+        image = image.blur(options.blur_sigma);
+    }
+
+    if !options.sharpen_sigma.is_finite() || !(0.0..=10.0).contains(&options.sharpen_sigma) {
+        return Err("Sharpen strength must be between 0 and 10".into());
+    }
+    if !(0..=100).contains(&options.sharpen_threshold) {
+        return Err("Sharpen threshold must be between 0 and 100".into());
+    }
+    if options.sharpen_sigma > f32::EPSILON {
+        image = image.unsharpen(options.sharpen_sigma, options.sharpen_threshold);
+    }
+
+    if options.grayscale {
+        image = image.grayscale();
     }
     Ok(image)
 }
@@ -293,6 +331,11 @@ mod tests {
             crop_bottom: 0.0,
             resize_width: None,
             resize_height: None,
+            grayscale: false,
+            hue_rotate: 0,
+            blur_sigma: 0.0,
+            sharpen_sigma: 0.0,
+            sharpen_threshold: 0,
         };
         let too_contrasty = EditOptions {
             brightness: 0,
@@ -318,6 +361,11 @@ mod tests {
             crop_bottom: 0.0,
             resize_width: None,
             resize_height: None,
+            grayscale: false,
+            hue_rotate: 0,
+            blur_sigma: 0.0,
+            sharpen_sigma: 0.0,
+            sharpen_threshold: 0,
         };
         let edited = apply_edits(image, &options).unwrap();
         assert_eq!((edited.width(), edited.height()), (3, 4));
@@ -338,6 +386,11 @@ mod tests {
             crop_bottom: 10.0,
             resize_width: Some(40),
             resize_height: None,
+            grayscale: false,
+            hue_rotate: 0,
+            blur_sigma: 0.0,
+            sharpen_sigma: 0.0,
+            sharpen_threshold: 0,
         };
         let edited = apply_edits(image, &options).unwrap();
         assert_eq!(edited.width(), 40);
@@ -359,7 +412,59 @@ mod tests {
             crop_bottom: 0.0,
             resize_width: None,
             resize_height: None,
+            grayscale: false,
+            hue_rotate: 0,
+            blur_sigma: 0.0,
+            sharpen_sigma: 0.0,
+            sharpen_threshold: 0,
         };
         assert!(apply_edits(image, &options).is_err());
+    }    #[test]
+    fn adjustment_limits_are_enforced() {
+        let image = DynamicImage::new_rgb8(8, 8);
+        let base = EditOptions {
+            rotation: 0,
+            flip_horizontal: false,
+            flip_vertical: false,
+            brightness: 0,
+            contrast: 0.0,
+            crop_left: 0.0,
+            crop_top: 0.0,
+            crop_right: 0.0,
+            crop_bottom: 0.0,
+            resize_width: None,
+            resize_height: None,
+            grayscale: false,
+            hue_rotate: 0,
+            blur_sigma: 0.0,
+            sharpen_sigma: 0.0,
+            sharpen_threshold: 0,
+        };
+        assert!(apply_edits(
+            image.clone(),
+            &EditOptions {
+                hue_rotate: 181,
+                ..base
+            }
+        )
+        .is_err());
+        assert!(apply_edits(
+            image.clone(),
+            &EditOptions {
+                blur_sigma: 10.1,
+                ..base
+            }
+        )
+        .is_err());
+        assert!(apply_edits(
+            image,
+            &EditOptions {
+                sharpen_threshold: 101,
+                ..base
+            }
+        )
+        .is_err());
     }
+
+
 }
