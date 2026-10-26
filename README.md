@@ -4,7 +4,7 @@
 
 It is designed to work directly with folders you already own, keep original media read-only, store rebuildable indexes locally, and make optional AI features run on the computer instead of sending photos to a cloud recognition service.
 
-> **Development status:** Open-Photo is actively developed as a 0.x project. Many library-management features are working today, while People/face recognition, OCR, GPU acceleration, full RAW support, and Immich synchronization are still unfinished. Do not use Open-Photo as the only copy of important photos or metadata.
+> **Development status:** Open-Photo is actively developed as a 0.x project. Many library-management features are working today, while People/face grouping, OCR, GPU validation, full RAW support, and Immich synchronization are still unfinished. Do not use Open-Photo as the only copy of important photos or metadata.
 
 ## What works today
 
@@ -36,7 +36,7 @@ It is designed to work directly with folders you already own, keep original medi
 | Incremental AI indexing | ✅ Working foundation | Selected or full-library indexing; already-current embeddings are skipped |
 | AI photo-to-photo similarity | ✅ Working | Cosine similarity over locally stored embeddings |
 | Natural-language semantic search | 🧪 Experimental | 0.25.x code path; requires the exact supported OpenCLIP bundle and further end-to-end runtime validation |
-| Face recognition / People | 🚧 Not implemented | UI placeholder only |
+| Face recognition / People | 🧪 Experimental | YuNet detection + SFace embeddings + local suggested groups; manual naming is local-only |
 | OCR | 🚧 Not implemented | Model slot exists, OCR pipeline does not |
 | GPU acceleration | 🧪 Windows foundation | Automatic mode prefers DirectML when available and safely falls back to CPU |
 | Full RAW preview pipeline | 🚧 Not implemented | RAW files can be indexed but may not preview |
@@ -216,8 +216,32 @@ Current AI architecture:
 - Imported assets are copied into Open-Photo's private local app-data model directory.
 - SHA-256 verification is required.
 - Semantic model slots reject assets that do not match the currently supported OpenCLIP bundle.
+- People model slots reject anything except the pinned YuNet 2026may detector and SFace 2021dec embedder.
 - Image embeddings are stored in a separate local SQLite database.
 - Original photos are never modified by AI indexing.
+
+### Supported People model bundle
+
+People indexing uses two pinned OpenCV Zoo models:
+
+| Open-Photo slot | Upstream file | Required SHA-256 | License |
+| --- | --- | --- | --- |
+| faces | face_detection_yunet_2026may.onnx | ebafce4e3c118d6554634be5c27ab333b4c047a9a8c3faf1d7cf93101c22f0f0 | MIT |
+| face_embedder | face_recognition_sface_2021dec.onnx | 0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79 | Apache-2.0 |
+
+Download the exact upstream files yourself, then import them in Settings. Open-Photo supplies the pinned checksum automatically for these known slots and refuses a mismatched model.
+
+The current pipeline:
+- resizes and pads photos locally for YuNet detection;
+- decodes bounding boxes and five facial landmarks locally;
+- aligns faces to the standard 112×112 ArcFace five-landmark template;
+- generates normalized 128-value SFace embeddings;
+- stores boxes, embeddings and model provenance in `ai-faces.sqlite` under local app data;
+- skips photos that are already current for the same source modification time and model pair;
+- creates local suggested People groups by embedding similarity;
+- lets the user apply local display names to suggested groups.
+
+Suggested groups are intentionally advisory. Open-Photo does not write face regions or names into original media or XMP yet, and it does not automatically merge identities permanently.
 
 ### Supported semantic model bundle
 
