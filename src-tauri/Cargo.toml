@@ -1,6 +1,6 @@
 [package]
 name = "open-photo"
-version = "0.35.0"
+version = "0.35.1"
 description = "Offline-first Windows photo organizer"
 authors = ["Open-Photo contributors"]
 edition = "2021"
