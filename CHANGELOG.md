@@ -10,6 +10,12 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.29.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the new OCR pipeline and OCR model guards.
+- No OCR functionality was removed or rolled back.
+
 ## 0.29.0 — 2026-10-26
 
 ### Added
