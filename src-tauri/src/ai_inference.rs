@@ -7,7 +7,9 @@ pub struct InferenceResult {
     pub(crate) values: Vec<f32>,
 }
 
-/// Run one installed semantic ONNX model against one library image.\n/// The model must accept a single float32 tensor shaped [1, 3, 224, 224].\npub(crate) fn run_semantic_image(root: String, path: String) -> Result<InferenceResult, String> {
+/// Run one installed semantic ONNX model against one library image.
+/// The model must accept a single float32 tensor shaped [1, 3, 224, 224].
+pub(crate) fn run_semantic_image(root: String, path: String) -> Result<InferenceResult, String> {
     let model = crate::ai_models::installed_model_path("semantic")?;
     let values = crate::ai_preprocess::prepare_tensor(&root, &path)?;
     let environment = ort::init()
