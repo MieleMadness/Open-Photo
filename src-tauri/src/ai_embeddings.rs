@@ -80,6 +80,37 @@ pub fn ai_index_semantic_image(root: String, path: String) -> Result<usize, Stri
     Ok(dimensions)
 }
 
+#[derive(Serialize)]
+pub struct BatchEmbeddingResult {
+    requested: usize,
+    indexed: usize,
+    skipped: usize,
+    errors: Vec<String>,
+}
+
+#[tauri::command]
+pub fn ai_index_semantic_batch(root: String, paths: Vec<String>) -> Result<BatchEmbeddingResult, String> {
+    if paths.is_empty() || paths.len() > 500 {
+        return Err("Select between 1 and 500 photos per AI indexing batch".into());
+    }
+    let mut result = BatchEmbeddingResult {
+        requested: paths.len(),
+        indexed: 0,
+        skipped: 0,
+        errors: Vec::new(),
+    };
+    for path in paths {
+        match ai_index_semantic_image(root.clone(), path.clone()) {
+            Ok(_) => result.indexed += 1,
+            Err(error) => {
+                result.skipped += 1;
+                result.errors.push(format!("{path}: {error}"));
+            }
+        }
+    }
+    Ok(result)
+}
+
 #[tauri::command]
 pub fn ai_embedding_status(root: String) -> Result<EmbeddingStatus, String> {
     let current_sha = crate::ai_models::installed_model_sha256("semantic")?;
