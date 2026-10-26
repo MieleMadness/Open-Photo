@@ -46,12 +46,12 @@ pub(crate) fn model_name(kind: &str) -> Result<&'static str, String> {
 }
 #[derive(Serialize)]
 pub struct ModelInfo {
-    kind: String,
-    installed: bool,
-    bytes: u64,
-    sha256: Option<String>,
-    expected_sha256: String,
-    compatible: bool,
+    pub(crate) kind: String,
+    pub(crate) installed: bool,
+    pub(crate) bytes: u64,
+    pub(crate) sha256: Option<String>,
+    pub(crate) expected_sha256: String,
+    pub(crate) compatible: bool,
 }
 
 pub(crate) fn supported_sha256(kind: &str) -> Result<&'static str, String> {
