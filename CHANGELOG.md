@@ -10,6 +10,11 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.26.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter output to the incremental semantic indexing path so the Phase 3 library-indexing milestone can reach compile, lint, regression-test and installer validation.
+
 ## 0.26.0 — 2026-10-26
 
 ### Added
