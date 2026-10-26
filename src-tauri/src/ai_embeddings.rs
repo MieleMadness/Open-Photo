@@ -2,7 +2,7 @@
 //! Embeddings are stored in application data and never written to original photos.
 use rusqlite::{params, Connection};
 use serde::Serialize;
-use std::time::UNIX_EPOCH;
+use std::{path::Path, time::UNIX_EPOCH};
 
 #[derive(Serialize)]
 pub struct EmbeddingStatus {
@@ -43,22 +43,47 @@ fn encode_f32(values: &[f32]) -> Vec<u8> {
     bytes
 }
 
-#[tauri::command]
-pub fn ai_index_semantic_image(root: String, path: String) -> Result<usize, String> {
-    let source = crate::safe_media_path(&root, &path)?;
-    let modified_unix = source
+fn modified_unix(source: &Path) -> Result<i64, String> {
+    source
         .metadata()
         .map_err(|e| e.to_string())?
         .modified()
         .map_err(|e| e.to_string())?
         .duration_since(UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
-        .as_secs() as i64;
-    let model_sha256 = crate::ai_models::validate_supported_clip_vision()?;
-    let result = crate::ai_inference::run_semantic_image(root.clone(), path.clone())?;
-    let dimensions = result.values.len();
-    let vector = encode_f32(&result.values);
-    let db = database()?;
+        .map_err(|e| e.to_string())
+        .map(|duration| duration.as_secs() as i64)
+}
+
+fn embedding_is_current(
+    db: &Connection,
+    root: &str,
+    path: &str,
+    modified_unix: i64,
+    model_key: &str,
+) -> Result<bool, String> {
+    db.query_row(
+        "SELECT EXISTS(
+            SELECT 1 FROM semantic_embeddings
+            WHERE root=?1 AND path=?2 AND modified_unix=?3
+              AND model_sha256=?4 AND dimensions=512
+        )",
+        params![root, path, modified_unix, model_key],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|exists| exists != 0)
+    .map_err(|e| e.to_string())
+}
+
+fn store_embedding(
+    db: &Connection,
+    root: &str,
+    path: &str,
+    modified_unix: i64,
+    model_key: &str,
+    values: &[f32],
+) -> Result<usize, String> {
+    let dimensions = values.len();
+    let vector = encode_f32(values);
     db.execute(
         "INSERT INTO semantic_embeddings(root,path,modified_unix,model_sha256,dimensions,vector)
          VALUES(?1,?2,?3,?4,?5,?6)
@@ -71,7 +96,7 @@ pub fn ai_index_semantic_image(root: String, path: String) -> Result<usize, Stri
             root,
             path,
             modified_unix,
-            model_sha256,
+            model_key,
             dimensions as i64,
             vector
         ],
@@ -80,38 +105,113 @@ pub fn ai_index_semantic_image(root: String, path: String) -> Result<usize, Stri
     Ok(dimensions)
 }
 
+#[tauri::command]
+pub fn ai_index_semantic_image(root: String, path: String) -> Result<usize, String> {
+    let source = crate::safe_media_path(&root, &path)?;
+    let modified_unix = modified_unix(&source)?;
+    let model_key = crate::ai_models::validate_supported_clip_vision()?;
+    let result = crate::ai_inference::run_semantic_image(root.clone(), path.clone())?;
+    let db = database()?;
+    store_embedding(
+        &db,
+        &root,
+        &path,
+        modified_unix,
+        &model_key,
+        &result.values,
+    )
+}
+
 #[derive(Serialize)]
 pub struct BatchEmbeddingResult {
     requested: usize,
     indexed: usize,
     skipped: usize,
+    failed: usize,
     errors: Vec<String>,
 }
 
-#[tauri::command]
-pub fn ai_index_semantic_batch(
+fn index_semantic_batch_blocking(
     root: String,
     paths: Vec<String>,
 ) -> Result<BatchEmbeddingResult, String> {
-    if paths.is_empty() || paths.len() > 500 {
-        return Err("Select between 1 and 500 photos per AI indexing batch".into());
-    }
+    let model_key = crate::ai_models::validate_supported_clip_vision()?;
+    let db = database()?;
+    let mut session = crate::ai_inference::semantic_image_session()?;
     let mut result = BatchEmbeddingResult {
         requested: paths.len(),
         indexed: 0,
         skipped: 0,
+        failed: 0,
         errors: Vec::new(),
     };
+
     for path in paths {
-        match ai_index_semantic_image(root.clone(), path.clone()) {
-            Ok(_) => result.indexed += 1,
+        let source = match crate::safe_media_path(&root, &path) {
+            Ok(source) => source,
             Err(error) => {
+                result.failed += 1;
+                result.errors.push(format!("{path}: {error}"));
+                continue;
+            }
+        };
+        let modified_unix = match modified_unix(&source) {
+            Ok(modified) => modified,
+            Err(error) => {
+                result.failed += 1;
+                result.errors.push(format!("{path}: {error}"));
+                continue;
+            }
+        };
+        match embedding_is_current(&db, &root, &path, modified_unix, &model_key) {
+            Ok(true) => {
                 result.skipped += 1;
+                continue;
+            }
+            Ok(false) => {}
+            Err(error) => {
+                result.failed += 1;
+                result.errors.push(format!("{path}: {error}"));
+                continue;
+            }
+        }
+
+        match crate::ai_inference::run_semantic_image_with_session(&mut session, &root, &path) {
+            Ok(inference) => {
+                if let Err(error) = store_embedding(
+                    &db,
+                    &root,
+                    &path,
+                    modified_unix,
+                    &model_key,
+                    &inference.values,
+                ) {
+                    result.failed += 1;
+                    result.errors.push(format!("{path}: {error}"));
+                } else {
+                    result.indexed += 1;
+                }
+            }
+            Err(error) => {
+                result.failed += 1;
                 result.errors.push(format!("{path}: {error}"));
             }
         }
     }
     Ok(result)
+}
+
+#[tauri::command]
+pub async fn ai_index_semantic_batch(
+    root: String,
+    paths: Vec<String>,
+) -> Result<BatchEmbeddingResult, String> {
+    if paths.is_empty() || paths.len() > 5000 {
+        return Err("Select between 1 and 5,000 photos per AI indexing batch".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || index_semantic_batch_blocking(root, paths))
+        .await
+        .map_err(|e| format!("AI indexing worker failed: {e}"))?
 }
 
 fn decode_f32(bytes: &[u8]) -> Result<Vec<f32>, String> {
