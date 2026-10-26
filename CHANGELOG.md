@@ -10,6 +10,29 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.28.0 — 2026-10-26
+
+### Added
+- Added the first working **People** pipeline using pinned OpenCV Zoo models.
+- Added exact YuNet 2026may face-detector enforcement (MIT weights, SHA-256 pinned).
+- Added exact SFace 2021dec face-embedder enforcement (Apache-2.0 weights, SHA-256 pinned).
+- Added local YuNet preprocessing, 12-head output decoding, confidence filtering and non-maximum suppression.
+- Added five-landmark ArcFace alignment to 112×112 crops before SFace inference.
+- Added normalized 128-value face embeddings and a separate local `ai-faces.sqlite` index.
+- Added per-photo model provenance and source-modification tracking so current People results can be skipped safely.
+- Added multi-photo People indexing with shared ONNX sessions per batch.
+- Replaced the People placeholder with local suggested groups, index status and manual local naming.
+- Added automatic use of Open-Photo's pinned checksums for known AI model imports.
+
+### Safety
+- People indexing never modifies original photos.
+- Suggested identity groups are advisory and are not permanently auto-merged.
+- Face embeddings remain local application data and are not exported by default.
+
+### Notes
+- People grouping is experimental and still needs representative real-library validation and threshold tuning.
+- OCR remains unfinished.
+
 ## 0.27.2 — 2026-10-26
 
 ### Fixed
