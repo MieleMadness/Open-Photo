@@ -10,6 +10,28 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.29.0 — 2026-10-26
+
+### Added
+- Added the first working **OCR** pipeline for local photo-text indexing and search.
+- Pinned the English PP-OCRv3 mobile detector by SHA-256.
+- Pinned the English PP-OCRv4 mobile recognizer by SHA-256.
+- Added local detector preprocessing, probability-map region extraction and conservative text-region bounding boxes.
+- Added local English CTC text recognition using the pinned PP-OCR character contract.
+- Added persistent OCR text and region metadata in `ai-ocr.sqlite`.
+- Added incremental OCR indexing that skips photos already current for the same source timestamp and model pair.
+- Added a Library toolbar for **Index library text** and **Search photo text**.
+- Reused the existing DirectML-first / CPU-fallback AI processing preference.
+
+### Safety
+- OCR never modifies original media.
+- Extracted text remains local application data unless the user later chooses an explicit export/write workflow.
+
+### Limitations
+- The first OCR release is English-first.
+- Text-region post-processing uses conservative rectangular connected components rather than full DB polygon reconstruction.
+- Rotated, curved, handwritten and dense document text still need validation and refinement.
+
 ## 0.28.2 — 2026-10-26
 
 ### Fixed
