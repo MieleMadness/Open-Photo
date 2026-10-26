@@ -106,11 +106,11 @@ fn store_embedding(
 }
 
 #[tauri::command]
-pub fn ai_index_semantic_image(root: String, path: String) -> Result<usize, String> {
+pub fn ai_index_semantic_image(root: String, path: String, device: Option<String>) -> Result<usize, String> {
     let source = crate::safe_media_path(&root, &path)?;
     let modified_unix = modified_unix(&source)?;
     let model_key = crate::ai_models::validate_supported_clip_vision()?;
-    let result = crate::ai_inference::run_semantic_image(root.clone(), path.clone())?;
+    let result = crate::ai_inference::run_semantic_image(root.clone(), path.clone(), device)?;
     let db = database()?;
     store_embedding(&db, &root, &path, modified_unix, &model_key, &result.values)
 }
@@ -127,10 +127,11 @@ pub struct BatchEmbeddingResult {
 fn index_semantic_batch_blocking(
     root: String,
     paths: Vec<String>,
+    device: Option<String>,
 ) -> Result<BatchEmbeddingResult, String> {
     let model_key = crate::ai_models::validate_supported_clip_vision()?;
     let db = database()?;
-    let mut session = crate::ai_inference::semantic_image_session()?;
+    let mut session = crate::ai_inference::semantic_image_session(device.as_deref())?;
     let mut result = BatchEmbeddingResult {
         requested: paths.len(),
         indexed: 0,
@@ -198,11 +199,12 @@ fn index_semantic_batch_blocking(
 pub async fn ai_index_semantic_batch(
     root: String,
     paths: Vec<String>,
+    device: Option<String>,
 ) -> Result<BatchEmbeddingResult, String> {
     if paths.is_empty() || paths.len() > 5000 {
         return Err("Select between 1 and 5,000 photos per AI indexing batch".into());
     }
-    tauri::async_runtime::spawn_blocking(move || index_semantic_batch_blocking(root, paths))
+    tauri::async_runtime::spawn_blocking(move || index_semantic_batch_blocking(root, paths, device))
         .await
         .map_err(|e| format!("AI indexing worker failed: {e}"))?
 }
@@ -296,9 +298,10 @@ pub fn ai_search_semantic_text(
     root: String,
     query: String,
     limit: usize,
+    device: Option<String>,
 ) -> Result<Vec<SemanticMatch>, String> {
     let current_key = crate::ai_models::validate_supported_clip_bundle()?;
-    let query_vector = crate::ai_text::run_semantic_text(&query)?;
+    let query_vector = crate::ai_text::run_semantic_text(&query, device.as_deref())?;
     let db = database()?;
     let mut statement = db
         .prepare(
