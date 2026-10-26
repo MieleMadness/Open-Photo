@@ -10,6 +10,22 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.35.0 — 2026-10-26
+
+### Added
+- Added **Show original / Show edits** comparison directly in the photo preview.
+- Added explicit JPEG export quality from 40–100 with a default of 92.
+- Added backend validation for JPEG quality.
+- Added regression coverage for JPEG quality bounds.
+
+### Fixed
+- Reset Edits now clears grayscale, hue, blur, sharpen and sharpen-threshold controls too.
+- Removed duplicated advanced-adjustment resets when switching photos.
+
+### Safety
+- Before/after comparison is read-only.
+- JPEG quality only changes newly rendered JPEG copies; originals remain untouched.
+
 ## 0.34.1 — 2026-10-26
 
 ### Fixed
