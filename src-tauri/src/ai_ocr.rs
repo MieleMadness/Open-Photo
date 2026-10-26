@@ -56,7 +56,8 @@ fn database() -> Result<Connection, String> {
         .ok_or("Windows local data directory unavailable")?
         .join("Open-Photo");
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-    let connection = Connection::open(directory.join("ai-ocr.sqlite")).map_err(|e| e.to_string())?;
+    let connection =
+        Connection::open(directory.join("ai-ocr.sqlite")).map_err(|e| e.to_string())?;
     connection
         .execute_batch(
             "CREATE TABLE IF NOT EXISTS ocr_index (
@@ -242,10 +243,10 @@ fn detect_regions(
             let padding_y = ((region.y2 - region.y1 + 1) as f32 * 0.18).max(2.0);
             let x1 = ((region.x1 as f32 - padding_x).max(0.0) * scale_x) as u32;
             let y1 = ((region.y1 as f32 - padding_y).max(0.0) * scale_y) as u32;
-            let x2 = (((region.x2 + 1) as f32 + padding_x).min(map_width as f32) * scale_x)
-                .ceil() as u32;
-            let y2 = (((region.y2 + 1) as f32 + padding_y).min(map_height as f32) * scale_y)
-                .ceil() as u32;
+            let x2 = (((region.x2 + 1) as f32 + padding_x).min(map_width as f32) * scale_x).ceil()
+                as u32;
+            let y2 = (((region.y2 + 1) as f32 + padding_y).min(map_height as f32) * scale_y).ceil()
+                as u32;
             (
                 x1.min(source_width.saturating_sub(1)),
                 y1.min(source_height.saturating_sub(1)),
@@ -438,8 +439,7 @@ fn index_batch_blocking(
     paths: Vec<String>,
     device: Option<String>,
 ) -> Result<OcrBatchResult, String> {
-    let (mut detector, mut recognizer, detector_key, recognizer_key) =
-        sessions(device.as_deref())?;
+    let (mut detector, mut recognizer, detector_key, recognizer_key) = sessions(device.as_deref())?;
     let db = database()?;
     let mut result = OcrBatchResult {
         requested: paths.len(),
@@ -466,14 +466,7 @@ fn index_batch_blocking(
                 continue;
             }
         };
-        match index_is_current(
-            &db,
-            &root,
-            &path,
-            modified,
-            &detector_key,
-            &recognizer_key,
-        ) {
+        match index_is_current(&db, &root, &path, modified, &detector_key, &recognizer_key) {
             Ok(true) => {
                 result.skipped += 1;
                 continue;
@@ -572,13 +565,16 @@ pub fn ai_search_ocr(
         .map_err(|e| e.to_string())?;
     let allowed: std::collections::HashSet<String> = roots.into_iter().collect();
     let rows = statement
-        .query_map(params![recognizer_key, pattern, limit.clamp(1, 100) as i64], |row| {
-            Ok(OcrSearchMatch {
-                root: row.get(0)?,
-                path: row.get(1)?,
-                text: row.get(2)?,
-            })
-        })
+        .query_map(
+            params![recognizer_key, pattern, limit.clamp(1, 100) as i64],
+            |row| {
+                Ok(OcrSearchMatch {
+                    root: row.get(0)?,
+                    path: row.get(1)?,
+                    text: row.get(2)?,
+                })
+            },
+        )
         .map_err(|e| e.to_string())?;
     let mut matches = Vec::new();
     for row in rows {
