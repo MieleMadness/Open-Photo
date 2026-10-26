@@ -1,11 +1,15 @@
 //! Phase 4 non-destructive photo edits.
 //! The source media is always read-only. Edits are written only to a new, explicitly chosen file.
 use base64::Engine;
-use image::{imageops::FilterType, DynamicImage, GenericImageView, ImageFormat};
+use image::{codecs::jpeg::JpegEncoder, imageops::FilterType, DynamicImage, GenericImageView, ImageFormat};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Cursor, path::PathBuf};
 
 const MAX_EDIT_SOURCE_BYTES: u64 = 250 * 1024 * 1024;
+
+fn default_jpeg_quality() -> u8 {
+    92
+}
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,6 +41,8 @@ pub struct EditOptions {
     sharpen_sigma: f32,
     #[serde(default)]
     sharpen_threshold: i32,
+    #[serde(default = "default_jpeg_quality")]
+    jpeg_quality: u8,
 }
 
 #[derive(Serialize)]
@@ -176,6 +182,13 @@ fn apply_edits(mut image: DynamicImage, options: &EditOptions) -> Result<Dynamic
     Ok(image)
 }
 
+fn validate_jpeg_quality(quality: u8) -> Result<u8, String> {
+    if !(40..=100).contains(&quality) {
+        return Err("JPEG quality must be between 40 and 100".into());
+    }
+    Ok(quality)
+}
+
 fn export_format(destination: &std::path::Path) -> Result<ImageFormat, String> {
     let extension = destination
         .extension()
@@ -284,7 +297,20 @@ pub fn export_edited_copy(
         .create_new(true)
         .open(&destination)
         .map_err(|e| format!("Cannot create edited export: {e}"))?;
-    if let Err(error) = edited.write_to(&mut output, format) {
+    let encode_result = if format == ImageFormat::Jpeg {
+        let quality = match validate_jpeg_quality(options.jpeg_quality) {
+            Ok(quality) => quality,
+            Err(error) => {
+                drop(output);
+                let _ = fs::remove_file(&destination);
+                return Err(error);
+            }
+        };
+        JpegEncoder::new_with_quality(&mut output, quality).encode_image(&edited)
+    } else {
+        edited.write_to(&mut output, format)
+    };
+    if let Err(error) = encode_result {
         drop(output);
         let _ = fs::remove_file(&destination);
         return Err(format!("Cannot encode edited export: {error}"));
@@ -336,6 +362,7 @@ mod tests {
             blur_sigma: 0.0,
             sharpen_sigma: 0.0,
             sharpen_threshold: 0,
+            jpeg_quality: 92,
         };
         let too_contrasty = EditOptions {
             brightness: 0,
@@ -366,6 +393,7 @@ mod tests {
             blur_sigma: 0.0,
             sharpen_sigma: 0.0,
             sharpen_threshold: 0,
+            jpeg_quality: 92,
         };
         let edited = apply_edits(image, &options).unwrap();
         assert_eq!((edited.width(), edited.height()), (3, 4));
@@ -391,6 +419,7 @@ mod tests {
             blur_sigma: 0.0,
             sharpen_sigma: 0.0,
             sharpen_threshold: 0,
+            jpeg_quality: 92,
         };
         let edited = apply_edits(image, &options).unwrap();
         assert_eq!(edited.width(), 40);
@@ -417,6 +446,7 @@ mod tests {
             blur_sigma: 0.0,
             sharpen_sigma: 0.0,
             sharpen_threshold: 0,
+            jpeg_quality: 92,
         };
         assert!(apply_edits(image, &options).is_err());
     }
@@ -441,6 +471,7 @@ mod tests {
             blur_sigma: 0.0,
             sharpen_sigma: 0.0,
             sharpen_threshold: 0,
+            jpeg_quality: 92,
         };
         assert!(apply_edits(
             image.clone(),
@@ -462,9 +493,17 @@ mod tests {
             image,
             &EditOptions {
                 sharpen_threshold: 101,
+            jpeg_quality: 92,
                 ..base
             }
         )
         .is_err());
+    }    #[test]
+    fn jpeg_quality_is_bounded() {
+        assert_eq!(validate_jpeg_quality(92).unwrap(), 92);
+        assert!(validate_jpeg_quality(39).is_err());
+        assert!(validate_jpeg_quality(101).is_err());
     }
+
+
 }
