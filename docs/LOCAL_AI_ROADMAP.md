@@ -39,4 +39,23 @@ Decode keyframes with a supported media backend (FFmpeg licensing review and shi
 - Multi-root workspace isolation, overlap handling, inaccessible folders, missing files and rescan resilience.
 
 ## Status
-Architecture and development roadmap only. AI inference, GPU model execution, persistent hash index, semantic search and near-duplicate review screens are **not yet implemented**.
+
+### Implemented
+- Exact SHA-256 duplicates and local visual near-duplicate review.
+- Supported OpenCLIP ViT-B/32 image + text inference.
+- Persistent semantic image embeddings and natural-language search.
+- Incremental/full-library AI indexing with stale-embedding skips.
+- Windows DirectML-first execution in Automatic mode with CPU fallback.
+- Bounded frontend AI batches with visible progress and safe cancellation between batches.
+- Manual, checksum-verified local model storage.
+
+### Still required before Phase 3 is complete
+- Define and pin a supported **face detection + face embedding** model contract, including exact input preprocessing, output parsing, checksums, licensing, persistence schema and human-reviewed identity merge behavior.
+- Define and pin a supported **OCR detection + recognition** model contract with the same integrity/version guarantees.
+- Add People indexing/UI only after the face-model contract is deterministic; do not accept arbitrary ONNX output shapes and guess.
+- Add OCR text persistence/search only after the OCR contract is deterministic.
+- Validate DirectML results against CPU within documented similarity tolerances on representative Windows hardware.
+- Add pause/resume and persistent resumable queues if long-running indexing moves beyond the current bounded cancel-between-batches design.
+- Exercise the exact supported OpenCLIP bundle end-to-end on representative libraries before calling semantic search production-ready.
+
+The old architecture-only status below has been superseded by the implemented milestones above.
