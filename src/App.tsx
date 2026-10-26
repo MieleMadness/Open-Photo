@@ -552,7 +552,7 @@ export default function App() {
       <nav aria-label="Main navigation">{NAV.map(({ id, title, icon: Icon }) => <button key={id} className={view === id ? "nav-button active" : "nav-button"} onClick={() => setView(id)} aria-current={view === id ? "page" : undefined}><Icon size={18}/>{title}{view === id && <ChevronRight size={15} className="nav-chevron"/>}</button>)}</nav>
       <div className="sidebar-spacer"/>
 
-      <div className="sidebar-footer">Open-Photo <span>v0.28.1 preview</span></div>
+      <div className="sidebar-footer">Open-Photo <span>v0.28.2 preview</span></div>
     </aside>
 
     <div className="main">
