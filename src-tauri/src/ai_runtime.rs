@@ -33,9 +33,13 @@ pub(crate) fn configure_session(
     }
 }
 
+pub(crate) fn directml_available() -> bool {
+    DirectML::is_available().unwrap_or(false)
+}
+
 #[tauri::command]
 pub fn ai_runtime_status() -> AiRuntimeStatus {
-    let directml_available = DirectML::is_available().unwrap_or(false);
+    let directml_available = directml_available();
     AiRuntimeStatus {
         directml_compiled: true,
         directml_available,
