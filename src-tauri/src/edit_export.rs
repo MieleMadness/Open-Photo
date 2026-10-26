@@ -493,17 +493,16 @@ mod tests {
             image,
             &EditOptions {
                 sharpen_threshold: 101,
-            jpeg_quality: 92,
                 ..base
             }
         )
         .is_err());
-    }    #[test]
+    }
+
+    #[test]
     fn jpeg_quality_is_bounded() {
         assert_eq!(validate_jpeg_quality(92).unwrap(), 92);
         assert!(validate_jpeg_quality(39).is_err());
         assert!(validate_jpeg_quality(101).is_err());
     }
-
-
 }
