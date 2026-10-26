@@ -147,6 +147,8 @@ Open a supported photo and use **Edit & Export** to preview and apply:
 - Blur from 0.0 to 10.0
 - Sharpen from 0.0 to 10.0 with threshold 0–100
 
+Use **Show original / Show edits** in the preview to compare the current edit against the source without changing the file.
+
 Choose **Save edited copy** and select a new destination filename.
 
 Safety behavior:
@@ -160,6 +162,8 @@ Safety behavior:
 - Resize dimensions are limited to 20,000 pixels per side. Supplying only one dimension preserves aspect ratio.
 - Hue rotation is limited to -180° through +180°.
 - Blur and sharpen strengths are limited to 0.0–10.0. Sharpen threshold is limited to 0–100.
+- JPEG exports support an explicit quality setting from 40–100; the default is 92.
+- JPEG quality is ignored for PNG, WebP, BMP and TIFF exports.
 - Export is currently limited to JPG/JPEG, PNG, WebP, BMP and TIFF.
 - This first editor pass supports locally decodable JPG/JPEG, PNG, WebP, GIF, TIFF, BMP and AVIF sources.
 - HEIC/HEIF, RAW and video editing are intentionally excluded until dedicated decode/export handling is validated.
