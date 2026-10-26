@@ -8,6 +8,7 @@ mod ai_runtime;
 mod ai_text;
 mod ai_validation;
 mod cache_disk;
+mod edit_export;
 mod geo;
 mod index;
 mod similar;
@@ -375,6 +376,7 @@ pub fn run() {
             preview_image,
             read_iphone_media,
             bulk_create_tags,
+            edit_export::export_edited_copy,
             open_video,
             geo::gps_for_photos,
             index::scan_indexed,
