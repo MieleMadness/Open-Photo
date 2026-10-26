@@ -237,6 +237,7 @@ pub fn ai_search_semantic_text(
 
 #[tauri::command]
 pub fn ai_embedding_status(root: String) -> Result<EmbeddingStatus, String> {
+    let current_key = crate::ai_models::validate_supported_clip_vision()?;
     let current_sha = crate::ai_models::installed_model_sha256("semantic")?;
     let db = database()?;
     let indexed: usize = db
@@ -249,7 +250,7 @@ pub fn ai_embedding_status(root: String) -> Result<EmbeddingStatus, String> {
     let stale: usize = db
         .query_row(
             "SELECT COUNT(*) FROM semantic_embeddings WHERE root=?1 AND model_sha256<>?2",
-            params![root, current_sha],
+            params![root, current_key],
             |row| row.get::<_, i64>(0),
         )
         .map_err(|e| e.to_string())? as usize;
