@@ -54,7 +54,7 @@ pub fn ai_index_semantic_image(root: String, path: String) -> Result<usize, Stri
         .duration_since(UNIX_EPOCH)
         .map_err(|e| e.to_string())?
         .as_secs() as i64;
-    let model_sha256 = crate::ai_models::installed_model_sha256("semantic")?;
+    let model_sha256 = crate::ai_models::validate_supported_clip_vision()?;
     let result = crate::ai_inference::run_semantic_image(root.clone(), path.clone())?;
     let dimensions = result.values.len();
     let vector = encode_f32(&result.values);
@@ -157,7 +157,7 @@ pub fn ai_find_similar_by_photo(
     limit: usize,
 ) -> Result<Vec<SemanticMatch>, String> {
     let limit = limit.clamp(1, 100);
-    let current_sha = crate::ai_models::installed_model_sha256("semantic")?;
+    let current_sha = crate::ai_models::validate_supported_clip_vision()?;
     let db = database()?;
     let query_blob: Vec<u8> = db
         .query_row(
@@ -195,6 +195,43 @@ pub fn ai_find_similar_by_photo(
     }
     matches.sort_by(|a, b| b.score.total_cmp(&a.score));
     matches.truncate(limit);
+    Ok(matches)
+}
+
+#[tauri::command]
+pub fn ai_search_semantic_text(
+    root: String,
+    query: String,
+    limit: usize,
+) -> Result<Vec<SemanticMatch>, String> {
+    let current_key = crate::ai_models::validate_supported_clip_bundle()?;
+    let query_vector = crate::ai_text::run_semantic_text(&query)?;
+    let db = database()?;
+    let mut statement = db
+        .prepare(
+            "SELECT path, vector FROM semantic_embeddings
+             WHERE root=?1 AND model_sha256=?2",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map(params![root, current_key], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
+    let mut matches = Vec::new();
+    for row in rows {
+        let (candidate_path, blob) = row.map_err(|e| e.to_string())?;
+        let candidate = decode_f32(&blob)?;
+        if candidate.len() != query_vector.len() {
+            continue;
+        }
+        matches.push(SemanticMatch {
+            path: candidate_path,
+            score: cosine_similarity(&query_vector, &candidate)?,
+        });
+    }
+    matches.sort_by(|a, b| b.score.total_cmp(&a.score));
+    matches.truncate(limit.clamp(1, 100));
     Ok(matches)
 }
 
