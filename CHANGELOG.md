@@ -10,6 +10,12 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.27.2 — 2026-10-26
+
+### Fixed
+- Kept the DirectML-aware ONNX session builders mutable through model commit for both semantic image and semantic text inference.
+- This resolves the Rust Clippy/compile error introduced by the 0.27.0 GPU-provider integration.
+
 ## 0.27.1 — 2026-10-26
 
 ### Fixed
