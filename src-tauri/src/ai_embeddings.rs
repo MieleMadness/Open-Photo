@@ -112,14 +112,7 @@ pub fn ai_index_semantic_image(root: String, path: String) -> Result<usize, Stri
     let model_key = crate::ai_models::validate_supported_clip_vision()?;
     let result = crate::ai_inference::run_semantic_image(root.clone(), path.clone())?;
     let db = database()?;
-    store_embedding(
-        &db,
-        &root,
-        &path,
-        modified_unix,
-        &model_key,
-        &result.values,
-    )
+    store_embedding(&db, &root, &path, modified_unix, &model_key, &result.values)
 }
 
 #[derive(Serialize)]
