@@ -62,12 +62,20 @@ pub(crate) fn run_semantic_image_with_session(
 }
 
 /// Run one installed semantic ONNX model against one library image.
-pub(crate) fn run_semantic_image(root: String, path: String, device: Option<String>) -> Result<InferenceResult, String> {
+pub(crate) fn run_semantic_image(
+    root: String,
+    path: String,
+    device: Option<String>,
+) -> Result<InferenceResult, String> {
     let mut session = semantic_image_session(device.as_deref())?;
     run_semantic_image_with_session(&mut session, &root, &path)
 }
 
 #[tauri::command]
-pub fn ai_run_semantic_image(root: String, path: String, device: Option<String>) -> Result<InferenceResult, String> {
+pub fn ai_run_semantic_image(
+    root: String,
+    path: String,
+    device: Option<String>,
+) -> Result<InferenceResult, String> {
     run_semantic_image(root, path, device)
 }
