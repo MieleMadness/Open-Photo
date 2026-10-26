@@ -241,6 +241,57 @@ export default function App() {
       setAiIndexMessage(`Found ${matches.length} semantic matches across ${searchRoots.length} workspace folder${searchRoots.length===1?"":"s"}${errors.length?`; ${errors.length} folder search failed`:""}.`);
     }catch(e){setAiIndexMessage(String(e))}
   };
+  const refreshPeople=async()=>{
+    if(!roots.length){setPeopleGroups([]);setPeopleStatus(null);return;}
+    setPeopleMessage("");
+    try{
+      const [groups,status]=await Promise.all([
+        invoke<PersonGroup[]>("ai_people_groups",{roots}),
+        invoke<FaceIndexStatus>("ai_face_index_status",{roots})
+      ]);
+      setPeopleGroups(groups);
+      setPeopleStatus(status);
+    }catch(e){setPeopleMessage(String(e))}
+  };
+  const indexPeopleWorkspace=async()=>{
+    if(!result||!roots.length)return;
+    const supported=new Set(["jpg","jpeg","png","webp","gif","tif","tiff","bmp","avif"]);
+    const grouped=new Map<string,string[]>();
+    for(const photo of result.photos){
+      if(!supported.has(photo.extension.toLowerCase()))continue;
+      const parent=photo.libraryRoot||root;
+      if(!parent)continue;
+      const paths=grouped.get(parent)||[];
+      paths.push(photo.path);
+      grouped.set(parent,paths);
+    }
+    const requested=[...grouped.values()].reduce((total,paths)=>total+paths.length,0);
+    if(!requested){setPeopleMessage("No currently supported photos are available for People indexing.");return;}
+    setPeopleBusy(true);
+    setPeopleMessage(`Starting local face indexing for ${requested} photos…`);
+    try{
+      const total:FaceIndexBatch={requested:0,indexed_images:0,skipped_images:0,failed_images:0,faces:0,errors:[]};
+      let completed=0;
+      for(const [parent,paths] of grouped){
+        for(let offset=0;offset<paths.length;offset+=32){
+          const slice=paths.slice(offset,offset+32);
+          const batch=await invoke<FaceIndexBatch>("ai_index_faces_batch",{root:parent,paths:slice,device:aiDevice});
+          total.requested+=batch.requested;
+          total.indexed_images+=batch.indexed_images;
+          total.skipped_images+=batch.skipped_images;
+          total.failed_images+=batch.failed_images;
+          total.faces+=batch.faces;
+          total.errors.push(...batch.errors);
+          completed+=slice.length;
+          setPeopleMessage(`People indexing ${completed}/${requested}: ${total.faces} faces found, ${total.skipped_images} photos already current${total.failed_images?`, ${total.failed_images} failed`:""}.`);
+        }
+      }
+      await refreshPeople();
+      setPeopleMessage(`People indexing complete: ${total.indexed_images} photos processed, ${total.skipped_images} already current, ${total.faces} faces added${total.failed_images?`, ${total.failed_images} failed`:""}.`);
+    }catch(e){setPeopleMessage(String(e))}
+    finally{setPeopleBusy(false)}
+  };
+  useEffect(()=>{if(view==="people"&&aiOptIn&&roots.length)void refreshPeople()},[view,activeWorkspace,aiOptIn]);
   const syncFolders = async (paths: string[]) => {
     if (!isDesktop || !paths.length || syncRunning.current===syncGeneration.current) return;
     const generation=syncGeneration.current;
