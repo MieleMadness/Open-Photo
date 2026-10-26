@@ -164,6 +164,8 @@ Safety behavior:
 - Blur and sharpen strengths are limited to 0.0–10.0. Sharpen threshold is limited to 0–100.
 - JPEG exports support an explicit quality setting from 40–100; the default is 92.
 - JPEG quality is ignored for PNG, WebP, BMP and TIFF exports.
+- Edited copies preserve the source file's modified timestamp by default. Turn **Preserve source modified date** off to use the export time instead.
+- Timestamp preservation applies only to the new copy and never changes the source file.
 - Export is currently limited to JPG/JPEG, PNG, WebP, BMP and TIFF.
 - This first editor pass supports locally decodable JPG/JPEG, PNG, WebP, GIF, TIFF, BMP and AVIF sources.
 - HEIC/HEIF, RAW and video editing are intentionally excluded until dedicated decode/export handling is validated.
