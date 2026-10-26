@@ -537,10 +537,10 @@ mod tests {
         assert_eq!(validate_jpeg_quality(92).unwrap(), 92);
         assert!(validate_jpeg_quality(39).is_err());
         assert!(validate_jpeg_quality(101).is_err());
-    }    #[test]
+    }
+
+    #[test]
     fn preserve_modified_time_defaults_on() {
         assert!(default_preserve_modified_time());
     }
-
-
 }
