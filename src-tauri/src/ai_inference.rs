@@ -21,11 +21,8 @@ pub fn ai_run_semantic_image(root: String, path: String) -> Result<InferenceResu
     if session.inputs().len() != 1 {
         return Err("Semantic model must expose exactly one image input".into());
     }
-    let tensor = ort::value::Tensor::from_array((
-        [1usize, 3, 224, 224],
-        values.into_boxed_slice(),
-    ))
-    .map_err(|e| e.to_string())?;
+    let tensor = ort::value::Tensor::from_array(([1usize, 3, 224, 224], values.into_boxed_slice()))
+        .map_err(|e| e.to_string())?;
     let outputs = session
         .run(ort::inputs![tensor])
         .map_err(|e| format!("Semantic inference failed: {e}"))?;
