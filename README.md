@@ -37,7 +37,7 @@ It is designed to work directly with folders you already own, keep original medi
 | AI photo-to-photo similarity | ✅ Working | Cosine similarity over locally stored embeddings |
 | Natural-language semantic search | 🧪 Experimental | 0.25.x code path; requires the exact supported OpenCLIP bundle and further end-to-end runtime validation |
 | Face recognition / People | 🧪 Experimental | YuNet detection + SFace embeddings + local suggested groups; manual naming is local-only |
-| OCR | 🚧 Not implemented | Model slot exists, OCR pipeline does not |
+| OCR | 🧪 Experimental | English-first PP-OCR detector + recognizer, local text index and photo-text search |
 | GPU acceleration | 🧪 Windows foundation | Automatic mode prefers DirectML when available and safely falls back to CPU |
 | Full RAW preview pipeline | 🚧 Not implemented | RAW files can be indexed but may not preview |
 | Immich synchronization | 🚧 Not implemented | Architecture planning only; no API bridge is active |
@@ -219,6 +219,29 @@ Current AI architecture:
 - People model slots reject anything except the pinned YuNet 2026may detector and SFace 2021dec embedder.
 - Image embeddings are stored in a separate local SQLite database.
 - Original photos are never modified by AI indexing.
+
+### Supported OCR model bundle
+
+The first OCR milestone is intentionally **English-first** and uses RapidOCR/PaddleOCR-compatible mobile ONNX models:
+
+| Open-Photo slot | Upstream model | Required SHA-256 |
+| --- | --- | --- |
+| ocr | en_PP-OCRv3_det_mobile.onnx | ea07c15d38ac40cd69da3c493444ec75b44ff23840553ff8ba102c1219ed39c2 |
+| ocr_recognizer | en_PP-OCRv4_rec_mobile.onnx | e8770c967605983d1570cdf5352041dfb68fa0c21664f49f47b155abd3e0e318 |
+
+Open-Photo validates both assets before inference and supplies their pinned hashes automatically during import.
+
+Current OCR behavior:
+- Runs locally on CPU or DirectML using the existing AI processing preference.
+- Detects text regions from a PP-OCR probability map.
+- Uses conservative rectangular connected components for the first implementation rather than permanently storing unverified polygons.
+- Recognizes text with a fixed 48×320 English PP-OCR input pipeline and CTC decoding.
+- Stores extracted text and region metadata in `ai-ocr.sqlite` under local app data.
+- Skips already-current photos when the source timestamp and model pair are unchanged.
+- Lets Library users index the current workspace for OCR and search indexed photo text locally.
+- Never writes OCR text into original photos or XMP automatically.
+
+This first OCR pass is experimental. Curved text, rotated text, dense documents, handwriting and non-English languages need later model/post-processing work.
 
 ### Supported People model bundle
 
