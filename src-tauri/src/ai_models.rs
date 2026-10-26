@@ -15,6 +15,10 @@ pub(crate) const SUPPORTED_CLIP_TEXT_SHA256: &str =
     "252b86e0ef1fc95b22cfd52fbf647142727fdbecc152556ffe0fba0b10a80370";
 pub(crate) const SUPPORTED_CLIP_TOKENIZER_SHA256: &str =
     "b556ac8c99757ffb677208af34bc8c6721572114111a6e0aaf5fa69ff0b8d842";
+pub(crate) const SUPPORTED_YUNET_SHA256: &str =
+    "ebafce4e3c118d6554634be5c27ab333b4c047a9a8c3faf1d7cf93101c22f0f0";
+pub(crate) const SUPPORTED_SFACE_SHA256: &str =
+    "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79";
 
 pub(crate) fn model_directory() -> Result<PathBuf, String> {
     let dir = dirs::data_local_dir()
@@ -29,7 +33,8 @@ pub(crate) fn model_name(kind: &str) -> Result<&'static str, String> {
         "semantic" => Ok("semantic.onnx"),
         "semantic_text" => Ok("semantic-text.onnx"),
         "semantic_tokenizer" => Ok("semantic-tokenizer.json"),
-        "faces" => Ok("faces.onnx"),
+        "faces" => Ok("faces-yunet.onnx"),
+        "face_embedder" => Ok("faces-sface.onnx"),
         "ocr" => Ok("ocr.onnx"),
         _ => Err("Unknown model type".into()),
     }
@@ -102,6 +107,21 @@ pub(crate) fn validate_supported_clip_vision() -> Result<String, String> {
     Ok(format!("openclip-vit-b32-v1:{vision}"))
 }
 
+pub(crate) fn validate_supported_face_bundle() -> Result<(String, String), String> {
+    let detector = installed_model_sha256("faces")?;
+    let embedder = installed_model_sha256("face_embedder")?;
+    if detector != SUPPORTED_YUNET_SHA256 || embedder != SUPPORTED_SFACE_SHA256 {
+        return Err(
+            "People indexing requires the supported YuNet 2026may detector and SFace 2021dec embedding model"
+                .into(),
+        );
+    }
+    Ok((
+        format!("yunet-2026may:{detector}"),
+        format!("sface-2021dec:{embedder}"),
+    ))
+}
+
 #[tauri::command]
 pub fn ai_model_status() -> Result<Vec<ModelInfo>, String> {
     let dir = model_directory()?;
@@ -110,6 +130,7 @@ pub fn ai_model_status() -> Result<Vec<ModelInfo>, String> {
         "semantic_text",
         "semantic_tokenizer",
         "faces",
+        "face_embedder",
         "ocr",
     ]
     .iter()
@@ -164,12 +185,21 @@ pub fn ai_import_model(
         "semantic" => Some(SUPPORTED_CLIP_VISION_SHA256),
         "semantic_text" => Some(SUPPORTED_CLIP_TEXT_SHA256),
         "semantic_tokenizer" => Some(SUPPORTED_CLIP_TOKENIZER_SHA256),
+        "faces" => Some(SUPPORTED_YUNET_SHA256),
+        "face_embedder" => Some(SUPPORTED_SFACE_SHA256),
         _ => None,
     };
     if supported_sha.is_some_and(|required| sha != required) {
-        return Err(
-            "This semantic slot only accepts the supported OpenCLIP ViT-B/32 bundle asset".into(),
-        );
+        return Err(match kind.as_str() {
+            "faces" => "The People detector slot only accepts YuNet 2026may from OpenCV Zoo".into(),
+            "face_embedder" => {
+                "The People embedding slot only accepts SFace 2021dec from OpenCV Zoo".into()
+            }
+            _ => {
+                "This semantic slot only accepts the supported OpenCLIP ViT-B/32 bundle asset"
+                    .into()
+            }
+        });
     }
     if !sha.eq_ignore_ascii_case(&expected_sha256) {
         return Err("Model checksum mismatch: nothing was installed".into());
