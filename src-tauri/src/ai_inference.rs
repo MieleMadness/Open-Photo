@@ -13,8 +13,12 @@ pub struct InferenceResult {
 pub fn ai_run_semantic_image(root: String, path: String) -> Result<InferenceResult, String> {
     let model = crate::ai_models::installed_model_path("semantic")?;
     let values = crate::ai_preprocess::prepare_tensor(&root, &path)?;
-    let environment = ort::environment::get_environment().map_err(|e| e.to_string())?;
-    let mut session = ort::session::Session::builder(environment.as_ref())
+    let environment = ort::init()
+        .with_name("Open-Photo")
+        .with_telemetry(false)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let mut session = ort::session::Session::builder(&environment)
         .map_err(|e| e.to_string())?
         .commit_from_file(&model)
         .map_err(|e| format!("Cannot load semantic ONNX model: {e}"))?;
@@ -26,7 +30,7 @@ pub fn ai_run_semantic_image(root: String, path: String) -> Result<InferenceResu
     let outputs = session
         .run(ort::inputs![tensor])
         .map_err(|e| format!("Semantic inference failed: {e}"))?;
-    if outputs.is_empty() {
+    if outputs.len() == 0 {
         return Err("Semantic model returned no outputs".into());
     }
     let (shape, data) = outputs[0]
