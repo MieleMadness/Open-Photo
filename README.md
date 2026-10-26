@@ -33,7 +33,7 @@ It is designed to work directly with folders you already own, keep original medi
 | Local ONNX inference | ✅ Working foundation | CPU-first ONNX Runtime integration |
 | AI model import/removal | ✅ Working | Manual, local, checksum-verified and confined to app data |
 | Persistent semantic image embeddings | ✅ Working | Stored locally in SQLite and model/pipeline-versioned |
-| Batch AI indexing | ✅ Working | Up to 500 selected files per batch |
+| Incremental AI indexing | ✅ Working foundation | Selected or full-library indexing; already-current embeddings are skipped |
 | AI photo-to-photo similarity | ✅ Working | Cosine similarity over locally stored embeddings |
 | Natural-language semantic search | 🧪 Experimental | 0.25.x code path; requires the exact supported OpenCLIP bundle and further end-to-end runtime validation |
 | Face recognition / People | 🚧 Not implemented | UI placeholder only |
@@ -259,11 +259,20 @@ For multiple photos:
 
 1. Select files in the Library.
 2. Choose **Index selected with AI**.
-3. The current batch limit is 500 files.
+
+For the current workspace:
+
+1. Choose **Index library with AI**.
+2. Open-Photo groups photos by workspace root and indexes each root locally.
+3. Files whose modification time, model/preprocessing key and 512-value embedding are already current are skipped instead of recomputed.
+
+The backend accepts up to 5,000 photos per batch, and the Library UI chunks larger root groups automatically. One ONNX vision session is reused for each batch rather than reloading the model for every image. The heavy batch command runs off the main UI thread.
 
 The image model creates a normalized 512-value embedding for each supported image. Embeddings are stored locally and are tied to the supported model/preprocessing pipeline so incompatible or older embeddings can be detected as stale.
 
-**Current limitation:** AI commands are still root-scoped. Multi-folder workspace behavior for AI indexing/search needs more end-to-end testing than the regular library scanner.
+Current AI-decodable library indexing is limited to JPG/JPEG, PNG, WebP, GIF, TIFF, BMP and AVIF. HEIC/HEIF, RAW formats and video can still exist in the library, but the semantic image pipeline does not currently index them.
+
+Multi-folder workspace semantic text search now queries each workspace root and merges the best local matches. This still needs representative end-to-end runtime testing with the verified model bundle.
 
 ### Find AI-similar photos
 
@@ -278,7 +287,7 @@ This is different from the non-AI dHash similar-photo tool.
 
 ### Natural-language semantic search
 
-The 0.25.x development line adds the code path for text queries such as:
+The 0.25.x development line introduced the text-query path, with 0.26.x adding incremental library-scale indexing and multi-root search orchestration. Example queries include:
 
 - dog at the beach
 - sunset over water
