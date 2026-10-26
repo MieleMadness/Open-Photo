@@ -48,6 +48,8 @@ Decode keyframes with a supported media backend (FFmpeg licensing review and shi
 - Windows DirectML-first execution in Automatic mode with CPU fallback.
 - Bounded frontend AI batches with visible progress and safe cancellation between batches.
 - Manual, checksum-verified local model storage.
+- Backend-derived compatibility metadata and Settings readiness states for Semantic Search, People and OCR.
+- Frontend gating so incomplete or incompatible model bundles cannot start AI jobs.
 - Pinned YuNet 2026may + SFace 2021dec People model contracts.
 - Local face detection, five-landmark ArcFace alignment, 128-value SFace embeddings, model-provenance persistence, incremental People indexing and suggested local grouping UI.
 - Pinned English PP-OCR detector + recognizer contracts, local OCR region extraction, persistent text indexing and local photo-text search.
