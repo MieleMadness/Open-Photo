@@ -214,6 +214,7 @@ Current AI architecture:
 - CPU remains the compatibility fallback. On Windows, Automatic mode now attempts the ONNX Runtime DirectML execution provider first and falls back to CPU if DirectML cannot be registered.
 - Models are manually imported; Open-Photo does not silently download them.
 - Settings exposes backend-derived compatibility status for every pinned AI slot and shows whether Semantic Search, People and OCR are ready.
+- **Run AI self-check** reports bundle readiness, DirectML availability, CPU fallback and whether real-world validation is still outstanding.
 - Imported assets are copied into Open-Photo's private local app-data model directory.
 - SHA-256 verification is required.
 - Semantic model slots reject assets that do not match the currently supported OpenCLIP bundle.
