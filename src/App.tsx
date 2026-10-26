@@ -16,6 +16,10 @@ type SortBy = "name" | "newest" | "oldest" | "largest" | "smallest";
 type Photo = { path: string; name: string; extension: string; bytes: number; modified_unix: number; libraryRoot?: string };
 type ScanResult = { photos: Photo[]; scanned_files: number; truncated: boolean };
 type AiBatchResult = {requested:number;indexed:number;skipped:number;failed:number;errors:string[]};
+type FaceIndexBatch = {requested:number;indexed_images:number;skipped_images:number;failed_images:number;faces:number;errors:string[]};
+type PersonFace = {root:string;path:string;face_index:number;x:number;y:number;width:number;height:number;score:number};
+type PersonGroup = {id:string;members:PersonFace[]};
+type FaceIndexStatus = {indexed_images:number;faces:number};
 const NAV: {id: View; title: string; icon: typeof Images}[] = [
   { id: "library", title: "Library", icon: Images },
   { id: "folders", title: "Folders", icon: FolderOpen },
@@ -41,6 +45,12 @@ export default function App() {
   const [aiSimilar,setAiSimilar]=useState<{path:string;score:number}[]>([]);
   const [aiTextQuery,setAiTextQuery]=useState("");
   const [aiTextMatches,setAiTextMatches]=useState<{path:string;score:number}[]>([]);
+  const [peopleGroups,setPeopleGroups]=useState<PersonGroup[]>([]);
+  const [peopleStatus,setPeopleStatus]=useState<FaceIndexStatus|null>(null);
+  const [peopleBusy,setPeopleBusy]=useState(false);
+  const [peopleMessage,setPeopleMessage]=useState("");
+  const [peopleNames,setPeopleNames]=useState<Record<string,string>>(()=>{try{return JSON.parse(localStorage.getItem("openphoto.peopleNames")||"{}") as Record<string,string>}catch{return {}}});
+  useEffect(()=>localStorage.setItem("openphoto.peopleNames",JSON.stringify(peopleNames)),[peopleNames]);
   const [aiRuntime,setAiRuntime]=useState<{directml_compiled:boolean;directml_available:boolean;automatic_policy:string;cpu_fallback:boolean}|null>(null);
   const refreshModels=()=>invoke<{kind:string;installed:boolean;bytes:number;sha256:string|null}[]>("ai_model_status").then(setAiModels).catch(e=>setAiModelMessage(String(e)));
   const refreshAiRuntime=()=>invoke<{directml_compiled:boolean;directml_available:boolean;automatic_policy:string;cpu_fallback:boolean}>("ai_runtime_status").then(setAiRuntime).catch(e=>setAiModelMessage(String(e)));
