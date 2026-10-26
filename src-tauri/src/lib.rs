@@ -1,3 +1,4 @@
+mod ai_inference;
 mod ai_models;
 mod ai_preprocess;
 mod cache_disk;
@@ -344,6 +345,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(std::sync::Mutex::new(watch::WatchState::default()))
         .invoke_handler(tauri::generate_handler![
+            ai_inference::ai_run_semantic_image,
             ai_preprocess::ai_prepare_image,
             ai_models::ai_model_status,
             ai_models::ai_remove_model,
