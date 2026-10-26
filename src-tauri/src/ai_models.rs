@@ -63,6 +63,11 @@ pub(crate) fn installed_model_path(kind: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+pub(crate) fn installed_model_sha256(kind: &str) -> Result<String, String> {
+    let path = installed_model_path(kind)?;
+    fingerprint(&path).map(|(_, sha)| sha)
+}
+
 #[tauri::command]
 pub fn ai_model_status() -> Result<Vec<ModelInfo>, String> {
     let dir = model_directory()?;
