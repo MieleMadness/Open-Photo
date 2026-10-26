@@ -10,6 +10,13 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.32.2 — 2026-10-26
+
+### Fixed
+- Replaced the eight-argument edited-export command with a typed `EditOptions` request object to satisfy strict Clippy without suppressing lint rules.
+- Updated the frontend export call to use the typed edit-options payload.
+- No Phase 4 editing functionality was removed.
+
 ## 0.32.1 — 2026-10-26
 
 ### Fixed
