@@ -10,6 +10,12 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.27.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter layout required by the Windows CI fail-fast gate for the new DirectML-aware semantic image/text commands.
+- No Phase 3 functionality was removed or rolled back.
+
 ## 0.27.0 — 2026-10-26
 
 ### Added
