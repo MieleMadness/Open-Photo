@@ -10,7 +10,7 @@ use std::{
 
 const MAX_MODEL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
-fn model_directory() -> Result<PathBuf, String> {
+pub(crate) fn model_directory() -> Result<PathBuf, String> {
     let dir = dirs::data_local_dir()
         .ok_or("Local application data folder unavailable")?
         .join("Open-Photo")
@@ -18,7 +18,7 @@ fn model_directory() -> Result<PathBuf, String> {
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }
-fn model_name(kind: &str) -> Result<&'static str, String> {
+pub(crate) fn model_name(kind: &str) -> Result<&'static str, String> {
     match kind {
         "semantic" => Ok("semantic.onnx"),
         "faces" => Ok("faces.onnx"),
@@ -55,6 +55,14 @@ fn fingerprint(path: &Path) -> Result<(u64, String), String> {
     }
     Ok((bytes, format!("{:x}", hash.finalize())))
 }
+pub(crate) fn installed_model_path(kind: &str) -> Result<PathBuf, String> {
+    let path = model_directory()?.join(model_name(kind)?);
+    if !path.is_file() {
+        return Err(format!("{kind} model is not installed"));
+    }
+    Ok(path)
+}
+
 #[tauri::command]
 pub fn ai_model_status() -> Result<Vec<ModelInfo>, String> {
     let dir = model_directory()?;
