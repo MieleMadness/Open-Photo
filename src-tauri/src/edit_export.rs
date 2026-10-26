@@ -5,12 +5,16 @@ use image::{
     codecs::jpeg::JpegEncoder, imageops::FilterType, DynamicImage, GenericImageView, ImageFormat,
 };
 use serde::{Deserialize, Serialize};
-use std::{fs, io::Cursor, path::PathBuf};
+use std::{fs, fs::FileTimes, io::Cursor, path::PathBuf};
 
 const MAX_EDIT_SOURCE_BYTES: u64 = 250 * 1024 * 1024;
 
 fn default_jpeg_quality() -> u8 {
     92
+}
+
+fn default_preserve_modified_time() -> bool {
+    true
 }
 
 #[derive(Clone, Copy, Deserialize)]
@@ -45,6 +49,8 @@ pub struct EditOptions {
     sharpen_threshold: i32,
     #[serde(default = "default_jpeg_quality")]
     jpeg_quality: u8,
+    #[serde(default = "default_preserve_modified_time")]
+    preserve_modified_time: bool,
 }
 
 #[derive(Serialize)]
@@ -53,6 +59,7 @@ pub struct EditedExportResult {
     width: u32,
     height: u32,
     bytes: u64,
+    preserved_modified_time: bool,
 }
 
 fn validate_rotation(rotation: i32) -> Result<i32, String> {
@@ -259,10 +266,20 @@ pub fn export_edited_copy(
     ) {
         return Err("This media type is not supported by the Phase 4 image editor".into());
     }
-    let source_bytes = fs::metadata(&source).map_err(|e| e.to_string())?.len();
+    let source_metadata = fs::metadata(&source).map_err(|e| e.to_string())?;
+    let source_bytes = source_metadata.len();
     if source_bytes > MAX_EDIT_SOURCE_BYTES {
         return Err("Editing is limited to source images up to 250 MB".into());
     }
+    let source_modified = if options.preserve_modified_time {
+        Some(
+            source_metadata
+                .modified()
+                .map_err(|e| format!("Cannot read source modified time: {e}"))?,
+        )
+    } else {
+        None
+    };
 
     let destination = PathBuf::from(destination);
     if destination.as_os_str().is_empty() {
@@ -322,6 +339,13 @@ pub fn export_edited_copy(
         let _ = fs::remove_file(&destination);
         return Err(format!("Cannot finish edited export: {error}"));
     }
+    if let Some(modified) = source_modified {
+        if let Err(error) = output.set_times(FileTimes::new().set_modified(modified)) {
+            drop(output);
+            let _ = fs::remove_file(&destination);
+            return Err(format!("Cannot preserve source modified time: {error}"));
+        }
+    }
     drop(output);
     let bytes = fs::metadata(&destination).map_err(|e| e.to_string())?.len();
 
@@ -330,6 +354,7 @@ pub fn export_edited_copy(
         width,
         height,
         bytes,
+        preserved_modified_time: source_modified.is_some(),
     })
 }
 
@@ -365,6 +390,7 @@ mod tests {
             sharpen_sigma: 0.0,
             sharpen_threshold: 0,
             jpeg_quality: 92,
+            preserve_modified_time: true,
         };
         let too_contrasty = EditOptions {
             brightness: 0,
@@ -396,6 +422,7 @@ mod tests {
             sharpen_sigma: 0.0,
             sharpen_threshold: 0,
             jpeg_quality: 92,
+            preserve_modified_time: true,
         };
         let edited = apply_edits(image, &options).unwrap();
         assert_eq!((edited.width(), edited.height()), (3, 4));
@@ -422,6 +449,7 @@ mod tests {
             sharpen_sigma: 0.0,
             sharpen_threshold: 0,
             jpeg_quality: 92,
+            preserve_modified_time: true,
         };
         let edited = apply_edits(image, &options).unwrap();
         assert_eq!(edited.width(), 40);
@@ -449,6 +477,7 @@ mod tests {
             sharpen_sigma: 0.0,
             sharpen_threshold: 0,
             jpeg_quality: 92,
+            preserve_modified_time: true,
         };
         assert!(apply_edits(image, &options).is_err());
     }
@@ -474,6 +503,7 @@ mod tests {
             sharpen_sigma: 0.0,
             sharpen_threshold: 0,
             jpeg_quality: 92,
+            preserve_modified_time: true,
         };
         assert!(apply_edits(
             image.clone(),
@@ -506,5 +536,10 @@ mod tests {
         assert_eq!(validate_jpeg_quality(92).unwrap(), 92);
         assert!(validate_jpeg_quality(39).is_err());
         assert!(validate_jpeg_quality(101).is_err());
+    }    #[test]
+    fn preserve_modified_time_defaults_on() {
+        assert!(default_preserve_modified_time());
     }
+
+
 }
