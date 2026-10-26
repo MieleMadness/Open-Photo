@@ -10,6 +10,24 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.31.0 — 2026-10-26
+
+### Added
+- Added a backend **Phase 3 AI self-check** report.
+- Added Settings UI to run the self-check and report Semantic Search, People and OCR bundle readiness.
+- Added DirectML availability and CPU-fallback status to the self-check.
+- Added tests that distinguish missing from incompatible model slots.
+
+### Changed
+- Photo-details semantic AI actions are now disabled until the verified OpenCLIP bundle is ready.
+- Documentation now distinguishes **Phase 3 core implementation complete** from **real-world validation still required**.
+
+### Phase 3 validation still required
+- Representative real-library testing for semantic search, People and OCR.
+- CPU-vs-DirectML comparison on real Windows hardware.
+- People grouping threshold tuning and OCR post-processing refinement.
+- Stronger pause/resume behavior if very long AI indexing jobs require persistent queues.
+
 ## 0.30.0 — 2026-10-26
 
 ### Added
