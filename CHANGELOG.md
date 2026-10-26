@@ -10,6 +10,13 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.28.2 — 2026-10-26
+
+### Fixed
+- Reworked ArcFace landmark packing to satisfy the strict Clippy iterator rule.
+- Switched People-group ordering to `sort_by_key(Reverse(...))` as required by the Windows lint gate.
+- No People recognition functionality was removed or rolled back.
+
 ## 0.28.1 — 2026-10-26
 
 ### Fixed
