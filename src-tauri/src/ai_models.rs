@@ -19,6 +19,10 @@ pub(crate) const SUPPORTED_YUNET_SHA256: &str =
     "ebafce4e3c118d6554634be5c27ab333b4c047a9a8c3faf1d7cf93101c22f0f0";
 pub(crate) const SUPPORTED_SFACE_SHA256: &str =
     "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79";
+pub(crate) const SUPPORTED_OCR_DETECTOR_SHA256: &str =
+    "ea07c15d38ac40cd69da3c493444ec75b44ff23840553ff8ba102c1219ed39c2";
+pub(crate) const SUPPORTED_OCR_RECOGNIZER_SHA256: &str =
+    "e8770c967605983d1570cdf5352041dfb68fa0c21664f49f47b155abd3e0e318";
 
 pub(crate) fn model_directory() -> Result<PathBuf, String> {
     let dir = dirs::data_local_dir()
@@ -35,7 +39,8 @@ pub(crate) fn model_name(kind: &str) -> Result<&'static str, String> {
         "semantic_tokenizer" => Ok("semantic-tokenizer.json"),
         "faces" => Ok("faces-yunet.onnx"),
         "face_embedder" => Ok("faces-sface.onnx"),
-        "ocr" => Ok("ocr.onnx"),
+        "ocr" => Ok("ocr-detector.onnx"),
+        "ocr_recognizer" => Ok("ocr-recognizer.onnx"),
         _ => Err("Unknown model type".into()),
     }
 }
@@ -107,6 +112,21 @@ pub(crate) fn validate_supported_clip_vision() -> Result<String, String> {
     Ok(format!("openclip-vit-b32-v1:{vision}"))
 }
 
+pub(crate) fn validate_supported_ocr_bundle() -> Result<(String, String), String> {
+    let detector = installed_model_sha256("ocr")?;
+    let recognizer = installed_model_sha256("ocr_recognizer")?;
+    if detector != SUPPORTED_OCR_DETECTOR_SHA256 || recognizer != SUPPORTED_OCR_RECOGNIZER_SHA256 {
+        return Err(
+            "OCR indexing requires the supported PP-OCRv3 English detector and PP-OCRv4 English recognizer"
+                .into(),
+        );
+    }
+    Ok((
+        format!("ppocrv3-en-det-mobile:{detector}"),
+        format!("ppocrv4-en-rec-mobile:{recognizer}"),
+    ))
+}
+
 pub(crate) fn validate_supported_face_bundle() -> Result<(String, String), String> {
     let detector = installed_model_sha256("faces")?;
     let embedder = installed_model_sha256("face_embedder")?;
@@ -132,6 +152,7 @@ pub fn ai_model_status() -> Result<Vec<ModelInfo>, String> {
         "faces",
         "face_embedder",
         "ocr",
+        "ocr_recognizer",
     ]
     .iter()
     .map(|kind| {
@@ -187,6 +208,8 @@ pub fn ai_import_model(
         "semantic_tokenizer" => Some(SUPPORTED_CLIP_TOKENIZER_SHA256),
         "faces" => Some(SUPPORTED_YUNET_SHA256),
         "face_embedder" => Some(SUPPORTED_SFACE_SHA256),
+        "ocr" => Some(SUPPORTED_OCR_DETECTOR_SHA256),
+        "ocr_recognizer" => Some(SUPPORTED_OCR_RECOGNIZER_SHA256),
         _ => None,
     };
     if supported_sha.is_some_and(|required| sha != required) {
@@ -194,6 +217,12 @@ pub fn ai_import_model(
             "faces" => "The People detector slot only accepts YuNet 2026may from OpenCV Zoo".into(),
             "face_embedder" => {
                 "The People embedding slot only accepts SFace 2021dec from OpenCV Zoo".into()
+            }
+            "ocr" => {
+                "The OCR detector slot only accepts the pinned PP-OCRv3 English mobile detector".into()
+            }
+            "ocr_recognizer" => {
+                "The OCR recognizer slot only accepts the pinned PP-OCRv4 English mobile recognizer".into()
             }
             _ => "This semantic slot only accepts the supported OpenCLIP ViT-B/32 bundle asset"
                 .into(),
