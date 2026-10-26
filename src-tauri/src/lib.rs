@@ -2,6 +2,7 @@ mod ai_embeddings;
 mod ai_faces;
 mod ai_inference;
 mod ai_models;
+mod ai_ocr;
 mod ai_preprocess;
 mod ai_runtime;
 mod ai_text;
@@ -364,6 +365,9 @@ pub fn run() {
             ai_text::ai_run_semantic_text,
             ai_models::ai_model_status,
             ai_models::ai_remove_model,
+            ai_ocr::ai_index_ocr_batch,
+            ai_ocr::ai_ocr_photo,
+            ai_ocr::ai_search_ocr,
             ai_models::ai_import_model,
             scan_library,
             preview_image,
