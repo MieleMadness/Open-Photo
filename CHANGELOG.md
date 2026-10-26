@@ -10,6 +10,12 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.25.3 — 2026-10-26
+
+### Fixed
+- Disabled the optional `tokenizers` `esaxx_fast` C++ acceleration feature on Windows builds to avoid duplicate MSVC C++ runtime symbols when the tokenizer and ONNX Runtime are linked into the same Rust regression-test binary.
+- Kept the tokenizer's Oniguruma regex backend enabled, so CLIP tokenization functionality remains available without the conflicting C++ helper path.
+
 ## 0.25.2 — 2026-10-26
 
 ### Fixed
