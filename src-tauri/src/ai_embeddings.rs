@@ -89,7 +89,10 @@ pub struct BatchEmbeddingResult {
 }
 
 #[tauri::command]
-pub fn ai_index_semantic_batch(root: String, paths: Vec<String>) -> Result<BatchEmbeddingResult, String> {
+pub fn ai_index_semantic_batch(
+    root: String,
+    paths: Vec<String>,
+) -> Result<BatchEmbeddingResult, String> {
     if paths.is_empty() || paths.len() > 500 {
         return Err("Select between 1 and 500 photos per AI indexing batch".into());
     }
