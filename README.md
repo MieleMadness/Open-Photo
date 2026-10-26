@@ -213,9 +213,11 @@ Current AI architecture:
 - ONNX Runtime executes models locally.
 - CPU remains the compatibility fallback. On Windows, Automatic mode now attempts the ONNX Runtime DirectML execution provider first and falls back to CPU if DirectML cannot be registered.
 - Models are manually imported; Open-Photo does not silently download them.
+- Settings exposes backend-derived compatibility status for every pinned AI slot and shows whether Semantic Search, People and OCR are ready.
 - Imported assets are copied into Open-Photo's private local app-data model directory.
 - SHA-256 verification is required.
 - Semantic model slots reject assets that do not match the currently supported OpenCLIP bundle.
+- AI actions are disabled until their complete pinned model bundle is installed and verified.
 - People model slots reject anything except the pinned YuNet 2026may detector and SFace 2021dec embedder.
 - Image embeddings are stored in a separate local SQLite database.
 - Original photos are never modified by AI indexing.
