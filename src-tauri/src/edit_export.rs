@@ -5,7 +5,8 @@ use image::{
     codecs::jpeg::JpegEncoder, imageops::FilterType, DynamicImage, GenericImageView, ImageFormat,
 };
 use serde::{Deserialize, Serialize};
-use std::{fs, fs::FileTimes, io::Cursor, path::PathBuf};
+use std::fs::{self, FileTimes};
+use std::{io::Cursor, path::PathBuf};
 
 const MAX_EDIT_SOURCE_BYTES: u64 = 250 * 1024 * 1024;
 
