@@ -1,10 +1,20 @@
 //! Phase 4 non-destructive photo edits.
 //! The source media is always read-only. Edits are written only to a new, explicitly chosen file.
 use image::{DynamicImage, ImageFormat};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
 const MAX_EDIT_SOURCE_BYTES: u64 = 250 * 1024 * 1024;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditOptions {
+    rotation: i32,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    brightness: i32,
+    contrast: f32,
+}
 
 #[derive(Serialize)]
 pub struct EditedExportResult {
@@ -81,11 +91,7 @@ pub fn export_edited_copy(
     root: String,
     path: String,
     destination: String,
-    rotation: i32,
-    flip_horizontal: bool,
-    flip_vertical: bool,
-    brightness: i32,
-    contrast: f32,
+    options: EditOptions,
 ) -> Result<EditedExportResult, String> {
     let source = crate::safe_media_path(&root, &path)?;
     let source_extension = source
@@ -132,11 +138,11 @@ pub fn export_edited_copy(
         .map_err(|e| format!("Cannot decode this image for editing: {e}"))?;
     let edited = apply_edits(
         image,
-        rotation,
-        flip_horizontal,
-        flip_vertical,
-        brightness,
-        contrast,
+        options.rotation,
+        options.flip_horizontal,
+        options.flip_vertical,
+        options.brightness,
+        options.contrast,
     )?;
     let width = edited.width();
     let height = edited.height();
