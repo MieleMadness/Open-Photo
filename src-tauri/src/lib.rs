@@ -347,6 +347,7 @@ pub fn run() {
         .manage(std::sync::Mutex::new(watch::WatchState::default()))
         .invoke_handler(tauri::generate_handler![
             ai_embeddings::ai_embedding_status,
+            ai_embeddings::ai_index_semantic_batch,
             ai_embeddings::ai_index_semantic_image,
             ai_inference::ai_run_semantic_image,
             ai_preprocess::ai_prepare_image,
