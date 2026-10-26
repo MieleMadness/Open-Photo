@@ -38,7 +38,7 @@ It is designed to work directly with folders you already own, keep original medi
 | Natural-language semantic search | 🧪 Experimental | 0.25.x code path; requires the exact supported OpenCLIP bundle and further end-to-end runtime validation |
 | Face recognition / People | 🚧 Not implemented | UI placeholder only |
 | OCR | 🚧 Not implemented | Model slot exists, OCR pipeline does not |
-| GPU acceleration | 🚧 Not implemented | CPU path is the current execution path |
+| GPU acceleration | 🧪 Windows foundation | Automatic mode prefers DirectML when available and safely falls back to CPU |
 | Full RAW preview pipeline | 🚧 Not implemented | RAW files can be indexed but may not preview |
 | Immich synchronization | 🚧 Not implemented | Architecture planning only; no API bridge is active |
 | Photo editing or deletion | 🚫 Not implemented | Open-Photo does not currently edit or delete original media |
@@ -211,7 +211,7 @@ Open **Settings → Local AI** and enable **Allow local AI features when availab
 Current AI architecture:
 
 - ONNX Runtime executes models locally.
-- CPU is the verified execution target. The Automatic option is reserved for future GPU execution-provider support.
+- CPU remains the compatibility fallback. On Windows, Automatic mode now attempts the ONNX Runtime DirectML execution provider first and falls back to CPU if DirectML cannot be registered.
 - Models are manually imported; Open-Photo does not silently download them.
 - Imported assets are copied into Open-Photo's private local app-data model directory.
 - SHA-256 verification is required.
