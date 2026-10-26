@@ -10,6 +10,23 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.27.0 — 2026-10-26
+
+### Added
+- Added Windows **DirectML-first** ONNX execution for Automatic AI processing mode with safe CPU fallback.
+- Added local AI runtime status reporting so Settings can show whether DirectML is available.
+- Added visible semantic indexing progress in bounded 64-photo batches.
+- Added safe cancellation between AI indexing batches; embeddings completed before cancellation remain stored and reusable.
+
+### Changed
+- Routed semantic image indexing and natural-language text inference through the selected AI processing preference.
+- Updated the Settings copy so GPU behavior is explicit instead of being labeled as future support.
+- Updated the in-app version display to 0.27.0.
+
+### Phase 3 guardrails
+- Face recognition and OCR model slots remain intentionally non-executable until Open-Photo pins supported model contracts (preprocessing, output shape, checksums, licensing and regression fixtures). Arbitrary ONNX files are not treated as compatible merely because they import successfully.
+- DirectML still requires real-hardware validation against the CPU path before semantic search is considered production-ready.
+
 ## 0.26.2 — 2026-10-26
 
 ### Fixed
