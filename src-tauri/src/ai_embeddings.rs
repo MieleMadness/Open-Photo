@@ -164,7 +164,9 @@ pub fn ai_find_similar_by_photo(
             params![root, path, current_sha],
             |row| row.get(0),
         )
-        .map_err(|_| "Index this photo with the current semantic model before searching".to_string())?;
+        .map_err(|_| {
+            "Index this photo with the current semantic model before searching".to_string()
+        })?;
     let query = decode_f32(&query_blob)?;
     let mut statement = db
         .prepare(
