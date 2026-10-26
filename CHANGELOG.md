@@ -10,6 +10,22 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.36.0 — 2026-10-26
+
+### Added
+- Added **Preserve source modified date** for edited exports, enabled by default.
+- Added an opt-out so users can use the export time instead.
+- Export confirmation now reports when the source date was preserved.
+
+### Fixed
+- Removed duplicated editor reset state when switching photos.
+- Reset Edits now restores all current editor/export controls to their defaults.
+
+### Safety
+- Timestamp preservation changes only the new edited copy.
+- If the requested source timestamp cannot be applied, the new export is removed and the operation reports an error.
+- Original media remains read-only.
+
 ## 0.35.1 — 2026-10-26
 
 ### Fixed
