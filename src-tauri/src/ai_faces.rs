@@ -241,22 +241,6 @@ fn clamp(value: f32, min: f32, max: f32) -> f32 {
     value.max(min).min(max)
 }
 
-fn output_data(
-    session: &Session,
-    outputs: &ort::session::SessionOutputs<'_>,
-    name: &str,
-) -> Result<Vec<f32>, String> {
-    let index = session
-        .outputs()
-        .iter()
-        .position(|output| output.name() == name)
-        .ok_or_else(|| format!("YuNet output {name} is missing"))?;
-    let (_, data) = outputs[index]
-        .try_extract_tensor::<f32>()
-        .map_err(|e| format!("YuNet output {name} is not float32: {e}"))?;
-    Ok(data.to_vec())
-}
-
 fn iou(left: &FaceDetection, right: &FaceDetection) -> f32 {
     let left_x2 = left.x + left.width;
     let left_y2 = left.y + left.height;
@@ -301,16 +285,31 @@ fn detect_faces(
         values.into_boxed_slice(),
     ))
     .map_err(|e| e.to_string())?;
+    let output_names: Vec<String> = session
+        .outputs()
+        .iter()
+        .map(|output| output.name().to_string())
+        .collect();
     let outputs = session
         .run(ort::inputs![tensor])
         .map_err(|e| format!("YuNet face detection failed: {e}"))?;
+    let read_output = |name: &str| -> Result<Vec<f32>, String> {
+        let index = output_names
+            .iter()
+            .position(|candidate| candidate == name)
+            .ok_or_else(|| format!("YuNet output {name} is missing"))?;
+        let (_, data) = outputs[index]
+            .try_extract_tensor::<f32>()
+            .map_err(|e| format!("YuNet output {name} is not float32: {e}"))?;
+        Ok(data.to_vec())
+    };
 
     let mut detections = Vec::new();
     for stride in [8usize, 16, 32] {
-        let cls = output_data(session, &outputs, &format!("cls_{stride}"))?;
-        let obj = output_data(session, &outputs, &format!("obj_{stride}"))?;
-        let bbox = output_data(session, &outputs, &format!("bbox_{stride}"))?;
-        let kps = output_data(session, &outputs, &format!("kps_{stride}"))?;
+        let cls = read_output(&format!("cls_{stride}"))?;
+        let obj = read_output(&format!("obj_{stride}"))?;
+        let bbox = read_output(&format!("bbox_{stride}"))?;
+        let kps = read_output(&format!("kps_{stride}"))?;
         let feature_width = DETECTOR_SIZE / stride;
         let feature_height = DETECTOR_SIZE / stride;
         let cells = feature_width * feature_height;
@@ -749,7 +748,6 @@ pub fn ai_detect_faces(
 #[derive(Clone)]
 struct GroupCandidate {
     face: PersonFace,
-    vector: Vec<f32>,
 }
 
 struct WorkingGroup {
@@ -841,13 +839,10 @@ pub fn ai_people_groups(roots: Vec<String>) -> Result<Vec<PersonGroup>, String> 
                 *centroid = (*centroid * count + *value) / (count + 1.0);
             }
             normalize(&mut group.centroid)?;
-            group.members.push(GroupCandidate { face, vector });
+            group.members.push(GroupCandidate { face });
         } else {
             groups.push(WorkingGroup {
-                members: vec![GroupCandidate {
-                    face,
-                    vector: vector.clone(),
-                }],
+                members: vec![GroupCandidate { face }],
                 centroid: vector,
             });
         }
