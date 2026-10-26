@@ -184,7 +184,7 @@ export default function App() {
     if(typeof destination!=="string")return;
     setEditExportBusy(true);setEditExportMessage("");
     try{
-      const result=await invoke<{path:string;width:number;height:number;bytes:number}>("export_edited_copy",{root:selected.libraryRoot||root,path:selected.path,destination,rotation:editRotation,flipHorizontal:editFlipH,flipVertical:editFlipV,brightness:editBrightness,contrast:editContrast});
+      const result=await invoke<{path:string;width:number;height:number;bytes:number}>("export_edited_copy",{root:selected.libraryRoot||root,path:selected.path,destination,options:{rotation:editRotation,flipHorizontal:editFlipH,flipVertical:editFlipV,brightness:editBrightness,contrast:editContrast}});
       setEditExportMessage(`Saved new edited copy: ${result.width}×${result.height} · ${Math.round(result.bytes/1024)} KB · ${result.path}`);
     }catch(e){setEditExportMessage(String(e))}
     finally{setEditExportBusy(false)}
