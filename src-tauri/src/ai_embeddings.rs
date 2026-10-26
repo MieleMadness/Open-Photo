@@ -67,7 +67,14 @@ pub fn ai_index_semantic_image(root: String, path: String) -> Result<usize, Stri
            model_sha256=excluded.model_sha256,
            dimensions=excluded.dimensions,
            vector=excluded.vector",
-        params![root, path, modified_unix, model_sha256, dimensions as i64, vector],
+        params![
+            root,
+            path,
+            modified_unix,
+            model_sha256,
+            dimensions as i64,
+            vector
+        ],
     )
     .map_err(|e| e.to_string())?;
     Ok(dimensions)
