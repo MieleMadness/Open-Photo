@@ -105,27 +105,33 @@ pub(crate) fn validate_supported_clip_vision() -> Result<String, String> {
 #[tauri::command]
 pub fn ai_model_status() -> Result<Vec<ModelInfo>, String> {
     let dir = model_directory()?;
-    ["semantic", "semantic_text", "semantic_tokenizer", "faces", "ocr"]
-        .iter()
-        .map(|kind| {
-            let file = dir.join(model_name(kind)?);
-            if !file.exists() {
-                return Ok(ModelInfo {
-                    kind: (*kind).into(),
-                    installed: false,
-                    bytes: 0,
-                    sha256: None,
-                });
-            }
-            let (bytes, sha) = fingerprint(&file)?;
-            Ok(ModelInfo {
+    [
+        "semantic",
+        "semantic_text",
+        "semantic_tokenizer",
+        "faces",
+        "ocr",
+    ]
+    .iter()
+    .map(|kind| {
+        let file = dir.join(model_name(kind)?);
+        if !file.exists() {
+            return Ok(ModelInfo {
                 kind: (*kind).into(),
-                installed: true,
-                bytes,
-                sha256: Some(sha),
-            })
+                installed: false,
+                bytes: 0,
+                sha256: None,
+            });
+        }
+        let (bytes, sha) = fingerprint(&file)?;
+        Ok(ModelInfo {
+            kind: (*kind).into(),
+            installed: true,
+            bytes,
+            sha256: Some(sha),
         })
-        .collect()
+    })
+    .collect()
 }
 #[tauri::command]
 pub fn ai_import_model(
@@ -161,7 +167,9 @@ pub fn ai_import_model(
         _ => None,
     };
     if supported_sha.is_some_and(|required| sha != required) {
-        return Err("This semantic slot only accepts the supported OpenCLIP ViT-B/32 bundle asset".into());
+        return Err(
+            "This semantic slot only accepts the supported OpenCLIP ViT-B/32 bundle asset".into(),
+        );
     }
     if !sha.eq_ignore_ascii_case(&expected_sha256) {
         return Err("Model checksum mismatch: nothing was installed".into());
