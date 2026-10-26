@@ -50,11 +50,11 @@ Decode keyframes with a supported media backend (FFmpeg licensing review and shi
 - Manual, checksum-verified local model storage.
 - Pinned YuNet 2026may + SFace 2021dec People model contracts.
 - Local face detection, five-landmark ArcFace alignment, 128-value SFace embeddings, model-provenance persistence, incremental People indexing and suggested local grouping UI.
+- Pinned English PP-OCR detector + recognizer contracts, local OCR region extraction, persistent text indexing and local photo-text search.
 
 ### Still required before Phase 3 is complete
 - Validate the pinned YuNet + SFace People pipeline on representative real libraries and refine grouping thresholds without silently merging identities.
-- Define and pin a supported **OCR detection + recognition** model contract with the same integrity/version guarantees.
-- Add OCR text persistence/search only after the OCR contract is deterministic.
+- Validate PP-OCR accuracy and region post-processing on screenshots, signs, receipts and document photos; expand languages only with separately pinned contracts.
 - Validate DirectML results against CPU within documented similarity tolerances on representative Windows hardware.
 - Add pause/resume and persistent resumable queues if long-running indexing moves beyond the current bounded cancel-between-batches design.
 - Exercise the exact supported OpenCLIP bundle end-to-end on representative libraries before calling semantic search production-ready.
