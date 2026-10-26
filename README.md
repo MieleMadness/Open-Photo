@@ -41,7 +41,8 @@ It is designed to work directly with folders you already own, keep original medi
 | GPU acceleration | 🧪 Windows foundation | Automatic mode prefers DirectML when available and safely falls back to CPU |
 | Full RAW preview pipeline | 🚧 Not implemented | RAW files can be indexed but may not preview |
 | Immich synchronization | 🚧 Not implemented | Architecture planning only; no API bridge is active |
-| Photo editing or deletion | 🚫 Not implemented | Open-Photo does not currently edit or delete original media |
+| Non-destructive photo editing/export | 🧪 Experimental | Rotate, flip, brightness and contrast; always saves a new copy and never overwrites originals |
+| Original photo deletion | 🚫 Not implemented | Open-Photo does not delete original media |
 
 See [CHANGELOG.md](CHANGELOG.md) for the version history.
 
@@ -127,6 +128,31 @@ Open-Photo includes dynamic filters such as:
 You can also create workspace-scoped smart rules based on rating, media type and minimum file size.
 
 Current date-based smart filters use filesystem modification timestamps. Full capture-date indexing from EXIF and QuickTime metadata is still planned.
+
+## Edit & Export
+
+The first Phase 4 editor is intentionally non-destructive.
+
+Open a supported photo and use **Edit & Export** to apply:
+
+- 90° rotation
+- Horizontal flip
+- Vertical flip
+- Brightness from -100 to +100
+- Contrast from -100 to +100
+
+Choose **Save edited copy** and select a new destination filename.
+
+Safety behavior:
+
+- The source photo is opened read-only.
+- The export command rejects a destination that resolves to the original source.
+- Existing destination files are never overwritten; choose a new filename instead.
+- If encoding or final disk sync fails, the partial output is removed.
+- Export is currently limited to JPG/JPEG, PNG, WebP, BMP and TIFF.
+- This first editor pass supports locally decodable JPG/JPEG, PNG, WebP, GIF, TIFF, BMP and AVIF sources.
+- HEIC/HEIF, RAW and video editing are intentionally excluded until dedicated decode/export handling is validated.
+- Metadata preservation is not yet guaranteed for edited exports; treat an edited copy as a newly rendered image.
 
 ## XMP keyword sidecars
 
