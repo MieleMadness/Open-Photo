@@ -45,7 +45,10 @@ pub(crate) fn run_semantic_text(query: &str) -> Result<Vec<f32>, String> {
         .map_err(|e| e.to_string())?
         .commit_from_file(&model)
         .map_err(|e| format!("Cannot load semantic text ONNX model: {e}"))?;
-    let has_input_ids = session.inputs().iter().any(|input| input.name() == "input_ids");
+    let has_input_ids = session
+        .inputs()
+        .iter()
+        .any(|input| input.name() == "input_ids");
     let has_attention_mask = session
         .inputs()
         .iter()
@@ -91,9 +94,9 @@ pub(crate) fn run_semantic_text(query: &str) -> Result<Vec<f32>, String> {
 
 #[tauri::command]
 pub fn ai_run_semantic_text(query: String) -> Result<TextInferenceResult, String> {
-    let token_count = tokenizers::Tokenizer::from_file(
-        crate::ai_models::installed_model_path("semantic_tokenizer")?,
-    )
+    let token_count = tokenizers::Tokenizer::from_file(crate::ai_models::installed_model_path(
+        "semantic_tokenizer",
+    )?)
     .map_err(|e| e.to_string())?
     .encode(query.trim(), true)
     .map_err(|e| e.to_string())?
