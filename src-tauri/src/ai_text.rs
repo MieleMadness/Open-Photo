@@ -31,7 +31,6 @@ pub(crate) fn run_semantic_text(query: &str) -> Result<Vec<f32>, String> {
         ids.truncate(CLIP_SEQUENCE_LENGTH);
         ids[CLIP_SEQUENCE_LENGTH - 1] = CLIP_PAD_EOS_ID;
     }
-    let token_count = ids.len();
     let mut attention_mask = vec![1_i64; ids.len()];
     ids.resize(CLIP_SEQUENCE_LENGTH, CLIP_PAD_EOS_ID);
     attention_mask.resize(CLIP_SEQUENCE_LENGTH, 0);
@@ -46,8 +45,12 @@ pub(crate) fn run_semantic_text(query: &str) -> Result<Vec<f32>, String> {
         .map_err(|e| e.to_string())?
         .commit_from_file(&model)
         .map_err(|e| format!("Cannot load semantic text ONNX model: {e}"))?;
-    let input_names: Vec<&str> = session.inputs().iter().map(|input| input.name()).collect();
-    if !input_names.contains(&"input_ids") || !input_names.contains(&"attention_mask") {
+    let has_input_ids = session.inputs().iter().any(|input| input.name() == "input_ids");
+    let has_attention_mask = session
+        .inputs()
+        .iter()
+        .any(|input| input.name() == "attention_mask");
+    if !has_input_ids || !has_attention_mask {
         return Err("Supported semantic text model inputs are missing".into());
     }
 
@@ -83,7 +86,6 @@ pub(crate) fn run_semantic_text(query: &str) -> Result<Vec<f32>, String> {
     for value in &mut values {
         *value /= norm;
     }
-    let _ = token_count;
     Ok(values)
 }
 
