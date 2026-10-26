@@ -10,6 +10,19 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.34.0 — 2026-10-26
+
+### Added
+- Added grayscale editing with live preview.
+- Added hue rotation from -180° to +180°.
+- Added blur from 0.0 to 10.0.
+- Added sharpening from 0.0 to 10.0 with a 0–100 threshold.
+- Added backend validation and regression tests for the new adjustment limits.
+
+### Safety
+- All new adjustments use the existing shared preview/export pipeline.
+- Original media remains read-only and export remains create-new only.
+
 ## 0.33.1 — 2026-10-26
 
 ### Fixed
