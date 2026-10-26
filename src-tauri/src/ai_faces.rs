@@ -161,10 +161,7 @@ fn cosine_similarity(left: &[f32], right: &[f32]) -> f32 {
     if left.len() != right.len() || left.is_empty() {
         return -1.0;
     }
-    left.iter()
-        .zip(right)
-        .map(|(a, b)| a * b)
-        .sum::<f32>()
+    left.iter().zip(right).map(|(a, b)| a * b).sum::<f32>()
 }
 
 fn face_sessions(device: Option<&str>) -> Result<(Session, Session, String, String), String> {
@@ -186,11 +183,15 @@ fn face_sessions(device: Option<&str>) -> Result<(Session, Session, String, Stri
         return Err("Supported YuNet detector must expose one input and 12 output heads".into());
     }
     let required = [
-        "cls_8", "cls_16", "cls_32", "obj_8", "obj_16", "obj_32", "bbox_8", "bbox_16",
-        "bbox_32", "kps_8", "kps_16", "kps_32",
+        "cls_8", "cls_16", "cls_32", "obj_8", "obj_16", "obj_32", "bbox_8", "bbox_16", "bbox_32",
+        "kps_8", "kps_16", "kps_32",
     ];
     for name in required {
-        if !detector.outputs().iter().any(|output| output.name() == name) {
+        if !detector
+            .outputs()
+            .iter()
+            .any(|output| output.name() == name)
+        {
             return Err(format!("Supported YuNet output {name} is missing"));
         }
     }
@@ -214,8 +215,7 @@ fn detector_tensor(image: &image::DynamicImage) -> Result<(Vec<f32>, f32), Strin
         return Err("Cannot detect faces in an empty image".into());
     }
 
-    let scale = (DETECTOR_SIZE as f32 / width as f32)
-        .min(DETECTOR_SIZE as f32 / height as f32);
+    let scale = (DETECTOR_SIZE as f32 / width as f32).min(DETECTOR_SIZE as f32 / height as f32);
     let new_width = ((width as f32 * scale).round() as u32).clamp(1, DETECTOR_SIZE as u32);
     let new_height = ((height as f32 * scale).round() as u32).clamp(1, DETECTOR_SIZE as u32);
     let resized = image
@@ -263,7 +263,10 @@ fn non_max_suppression(mut faces: Vec<FaceDetection>) -> Vec<FaceDetection> {
     faces.sort_by(|a, b| b.score.total_cmp(&a.score));
     let mut kept: Vec<FaceDetection> = Vec::with_capacity(faces.len().min(100));
     for face in faces {
-        if kept.iter().any(|existing| iou(existing, &face) >= NMS_THRESHOLD) {
+        if kept
+            .iter()
+            .any(|existing| iou(existing, &face) >= NMS_THRESHOLD)
+        {
             continue;
         }
         kept.push(face);
@@ -346,8 +349,7 @@ fn detect_faces(
 
             let mut landmarks = [0.0_f32; 10];
             for point in 0..5 {
-                landmarks[point * 2] =
-                    (kps[index * 10 + point * 2] + col) * stride_f / scale;
+                landmarks[point * 2] = (kps[index * 10 + point * 2] + col) * stride_f / scale;
                 landmarks[point * 2 + 1] =
                     (kps[index * 10 + point * 2 + 1] + row) * stride_f / scale;
             }
@@ -664,14 +666,7 @@ fn index_batch_blocking(
                 continue;
             }
         };
-        match index_state_is_current(
-            &db,
-            &root,
-            &path,
-            modified,
-            &detector_key,
-            &embedder_key,
-        ) {
+        match index_state_is_current(&db, &root, &path, modified, &detector_key, &embedder_key) {
             Ok(true) => {
                 result.skipped_images += 1;
                 continue;
@@ -853,7 +848,11 @@ pub fn ai_people_groups(roots: Vec<String>) -> Result<Vec<PersonGroup>, String> 
         .into_iter()
         .map(|group| PersonGroup {
             id: stable_group_id(&group),
-            members: group.members.into_iter().map(|member| member.face).collect(),
+            members: group
+                .members
+                .into_iter()
+                .map(|member| member.face)
+                .collect(),
         })
         .collect())
 }
@@ -901,8 +900,10 @@ mod tests {
 
     #[test]
     fn cosine_similarity_prefers_identical_face_vectors() {
-        assert!(cosine_similarity(&[1.0, 0.0], &[1.0, 0.0])
-            > cosine_similarity(&[1.0, 0.0], &[0.0, 1.0]));
+        assert!(
+            cosine_similarity(&[1.0, 0.0], &[1.0, 0.0])
+                > cosine_similarity(&[1.0, 0.0], &[0.0, 1.0])
+        );
     }
 
     #[test]
