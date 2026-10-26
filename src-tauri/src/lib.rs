@@ -2,6 +2,7 @@ mod ai_embeddings;
 mod ai_inference;
 mod ai_models;
 mod ai_preprocess;
+mod ai_text;
 mod cache_disk;
 mod geo;
 mod index;
@@ -350,8 +351,10 @@ pub fn run() {
             ai_embeddings::ai_find_similar_by_photo,
             ai_embeddings::ai_index_semantic_batch,
             ai_embeddings::ai_index_semantic_image,
+            ai_embeddings::ai_search_semantic_text,
             ai_inference::ai_run_semantic_image,
             ai_preprocess::ai_prepare_image,
+            ai_text::ai_run_semantic_text,
             ai_models::ai_model_status,
             ai_models::ai_remove_model,
             ai_models::ai_import_model,
