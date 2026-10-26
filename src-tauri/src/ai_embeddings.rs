@@ -106,7 +106,11 @@ fn store_embedding(
 }
 
 #[tauri::command]
-pub fn ai_index_semantic_image(root: String, path: String, device: Option<String>) -> Result<usize, String> {
+pub fn ai_index_semantic_image(
+    root: String,
+    path: String,
+    device: Option<String>,
+) -> Result<usize, String> {
     let source = crate::safe_media_path(&root, &path)?;
     let modified_unix = modified_unix(&source)?;
     let model_key = crate::ai_models::validate_supported_clip_vision()?;
