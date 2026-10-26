@@ -94,7 +94,10 @@ pub(crate) fn run_semantic_text(query: &str, device: Option<&str>) -> Result<Vec
 }
 
 #[tauri::command]
-pub fn ai_run_semantic_text(query: String, device: Option<String>) -> Result<TextInferenceResult, String> {
+pub fn ai_run_semantic_text(
+    query: String,
+    device: Option<String>,
+) -> Result<TextInferenceResult, String> {
     let token_count = tokenizers::Tokenizer::from_file(crate::ai_models::installed_model_path(
         "semantic_tokenizer",
     )?)
