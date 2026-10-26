@@ -10,6 +10,23 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.30.0 — 2026-10-26
+
+### Added
+- Added backend-provided compatibility metadata for every supported AI model slot.
+- Added Settings readiness states for **Semantic Search**, **People**, and **OCR**.
+- Added model-level **verified / missing / incompatible** status in the Local AI inventory.
+- Added a regression test that every known AI slot has a valid pinned SHA-256 contract.
+
+### Changed
+- Removed the duplicated checksum table from the React frontend; Rust is now the single source of truth for supported AI assets.
+- Model imports now use the backend-provided expected checksum.
+- Semantic Search, People, and OCR actions are disabled until their complete verified model bundles are ready.
+
+### Phase 3 status
+- Core implementation now exists for semantic search, DirectML-first execution with CPU fallback, People/face grouping, and English-first OCR.
+- These AI features remain experimental until representative real-library and real-hardware validation is complete.
+
 ## 0.29.2 — 2026-10-26
 
 ### Fixed
