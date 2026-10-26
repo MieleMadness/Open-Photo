@@ -6,6 +6,7 @@ mod ai_ocr;
 mod ai_preprocess;
 mod ai_runtime;
 mod ai_text;
+mod ai_validation;
 mod cache_disk;
 mod geo;
 mod index;
@@ -363,6 +364,7 @@ pub fn run() {
             ai_preprocess::ai_prepare_image,
             ai_runtime::ai_runtime_status,
             ai_text::ai_run_semantic_text,
+            ai_validation::ai_validation_report,
             ai_models::ai_model_status,
             ai_models::ai_remove_model,
             ai_ocr::ai_index_ocr_batch,
