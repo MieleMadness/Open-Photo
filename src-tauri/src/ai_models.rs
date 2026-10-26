@@ -1,5 +1,5 @@
 //! Offline AI model storage. This module never sends data to a network service.
-//! An installed model is not an active inference engine; execution is a separate milestone.
+//! Semantic model slots are validated against one supported OpenCLIP bundle before execution.
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
@@ -154,6 +154,15 @@ pub fn ai_import_model(
         ));
     }
     let (size, sha) = fingerprint(&source)?;
+    let supported_sha = match kind.as_str() {
+        "semantic" => Some(SUPPORTED_CLIP_VISION_SHA256),
+        "semantic_text" => Some(SUPPORTED_CLIP_TEXT_SHA256),
+        "semantic_tokenizer" => Some(SUPPORTED_CLIP_TOKENIZER_SHA256),
+        _ => None,
+    };
+    if supported_sha.is_some_and(|required| sha != required) {
+        return Err("This semantic slot only accepts the supported OpenCLIP ViT-B/32 bundle asset".into());
+    }
     if !sha.eq_ignore_ascii_case(&expected_sha256) {
         return Err("Model checksum mismatch: nothing was installed".into());
     }
