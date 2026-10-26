@@ -10,6 +10,12 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.29.2 — 2026-10-26
+
+### Fixed
+- Added the missing `serde_json` dependency required to persist OCR region metadata in local application data.
+- No OCR functionality was removed or rolled back.
+
 ## 0.29.1 — 2026-10-26
 
 ### Fixed
