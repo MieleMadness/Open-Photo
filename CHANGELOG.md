@@ -10,6 +10,26 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.32.0 — 2026-10-26
+
+### Added
+- Started **Phase 4** with a non-destructive **Edit & Export** workflow.
+- Added 90° rotation, horizontal/vertical flip, brightness and contrast adjustments.
+- Added an explicit save dialog for exporting a new edited copy.
+- Added backend export validation that prevents overwriting the original source or any existing destination.
+- Added cleanup of partial exports if encoding or disk sync fails.
+- Added regression tests for edit limits and quarter-turn dimensions.
+
+### Safety
+- Original media remains read-only.
+- Edited output is always a new file chosen by the user.
+- Existing files are never silently overwritten.
+
+### Limitations
+- First-pass editing supports common locally decodable still-image formats; HEIC/HEIF, RAW and video editing remain excluded.
+- Export supports JPG/JPEG, PNG, WebP, BMP and TIFF.
+- Metadata preservation is not yet guaranteed for rendered edited copies.
+
 ## 0.31.0 — 2026-10-26
 
 ### Added
