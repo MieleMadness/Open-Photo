@@ -42,7 +42,7 @@ pub(crate) fn run_semantic_text(query: &str, device: Option<&str>) -> Result<Vec
         .map_err(|e| e.to_string())?;
     let model = crate::ai_models::installed_model_path("semantic_text")?;
     let builder = ort::session::Session::builder(&environment).map_err(|e| e.to_string())?;
-    let builder = crate::ai_runtime::configure_session(builder, device)?;
+    let mut builder = crate::ai_runtime::configure_session(builder, device)?;
     let mut session = builder
         .commit_from_file(&model)
         .map_err(|e| format!("Cannot load semantic text ONNX model: {e}"))?;
