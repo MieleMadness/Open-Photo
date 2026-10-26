@@ -12,11 +12,8 @@ pub struct ImageTensorPreview {
     values_base64: String,
 }
 
-/// Convert a supported local photo to a deterministic RGB 224x224 float32 CHW tensor.
-/// This command prepares input only. It does not invoke an inference model.
-#[tauri::command]
-pub fn ai_prepare_image(root: String, path: String) -> Result<ImageTensorPreview, String> {
-    let source = crate::safe_media_path(&root, &path)?;
+pub(crate) fn prepare_tensor(root: &str, path: &str) -> Result<Vec<f32>, String> {
+    let source = crate::safe_media_path(root, path)?;
     let input = image::ImageReader::open(source)
         .map_err(|e| e.to_string())?
         .with_guessed_format()
@@ -26,12 +23,23 @@ pub fn ai_prepare_image(root: String, path: String) -> Result<ImageTensorPreview
     let rgb = input
         .resize_exact(224, 224, image::imageops::FilterType::Triangle)
         .to_rgb8();
-    let mut bytes = Vec::with_capacity(224 * 224 * 3 * 4);
+    let mut values = Vec::with_capacity(224 * 224 * 3);
     for channel in 0..3 {
         for pixel in rgb.pixels() {
-            let value = f32::from(pixel[channel]) / 255.0;
-            bytes.extend_from_slice(&value.to_le_bytes());
+            values.push(f32::from(pixel[channel]) / 255.0);
         }
+    }
+    Ok(values)
+}
+
+/// Convert a supported local photo to a deterministic RGB 224x224 float32 CHW tensor.
+/// This command prepares input only. It does not invoke an inference model.
+#[tauri::command]
+pub fn ai_prepare_image(root: String, path: String) -> Result<ImageTensorPreview, String> {
+    let values = prepare_tensor(&root, &path)?;
+    let mut bytes = Vec::with_capacity(values.len() * 4);
+    for value in values {
+        bytes.extend_from_slice(&value.to_le_bytes());
     }
     Ok(ImageTensorPreview {
         width: 224,
