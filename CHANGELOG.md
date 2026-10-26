@@ -10,6 +10,12 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.36.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the export-date preservation regression test.
+- No timestamp-preservation, preview, or export behavior was changed.
+
 ## 0.36.0 — 2026-10-26
 
 ### Added
