@@ -17,7 +17,7 @@ pub(crate) fn semantic_image_session(device: Option<&str>) -> Result<Session, St
         .build()
         .map_err(|e| e.to_string())?;
     let builder = Session::builder(&environment).map_err(|e| e.to_string())?;
-    let builder = crate::ai_runtime::configure_session(builder, device)?;
+    let mut builder = crate::ai_runtime::configure_session(builder, device)?;
     let session = builder
         .commit_from_file(&model)
         .map_err(|e| format!("Cannot load semantic ONNX model: {e}"))?;
