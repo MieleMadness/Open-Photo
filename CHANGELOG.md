@@ -10,6 +10,13 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.41.2 — 2026-10-27
+
+### Fixed
+- Replaced manual EXIF timestamp splitting with the kamadak-exif `DateTime::from_ascii` parser already used by the project.
+- Capture timestamps are now validated by the EXIF library before being stored.
+- No source files are modified.
+
 ## 0.41.1 — 2026-10-27
 
 ### Fixed
