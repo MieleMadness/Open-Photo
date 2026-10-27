@@ -16,6 +16,7 @@ mod watch;
 use base64::Engine;
 use exif::{DateTime as ExifDateTime, In, Reader as ExifReader, Tag, Value};
 use image::ImageReader;
+use nom_exif::{read_exif as read_nom_exif, ExifTag as NomExifTag};
 use serde::Serialize;
 use std::{
     collections::{HashMap, VecDeque},
@@ -148,7 +149,7 @@ fn bulk_create_tags(
 
 const SUPPORTED: &[&str] = &[
     "jpg", "jpeg", "png", "webp", "gif", "tif", "tiff", "bmp", "heic", "heif", "avif", "dng",
-    "cr2", "nef", "arw", "mov", "mp4", "m4v", "avi", "mkv", "webm",
+    "cr2", "cr3", "nef", "arw", "raf", "iiq", "mov", "mp4", "m4v", "avi", "mkv", "webm",
 ];
 
 #[derive(Serialize)]
@@ -295,6 +296,68 @@ fn quicktime_creation_seconds(path: &Path) -> Option<u64> {
     None
 }
 
+fn normalize_metadata_datetime(raw: &str) -> Option<String> {
+    let value = raw.trim().trim_matches('"');
+    if value.len() < 19 {
+        return None;
+    }
+    let bytes = value.as_bytes();
+    let valid_digits = [0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18]
+        .into_iter()
+        .all(|index| bytes.get(index).is_some_and(u8::is_ascii_digit));
+    if !valid_digits {
+        return None;
+    }
+
+    let exif_shape = bytes.get(4) == Some(&b':')
+        && bytes.get(7) == Some(&b':')
+        && bytes.get(10) == Some(&b' ')
+        && bytes.get(13) == Some(&b':')
+        && bytes.get(16) == Some(&b':');
+    let iso_shape = bytes.get(4) == Some(&b'-')
+        && bytes.get(7) == Some(&b'-')
+        && matches!(bytes.get(10), Some(b'T') | Some(b' '))
+        && bytes.get(13) == Some(&b':')
+        && bytes.get(16) == Some(&b':');
+    if !exif_shape && !iso_shape {
+        return None;
+    }
+
+    let year: u16 = value[0..4].parse().ok()?;
+    let month: u8 = value[5..7].parse().ok()?;
+    let day: u8 = value[8..10].parse().ok()?;
+    let hour: u8 = value[11..13].parse().ok()?;
+    let minute: u8 = value[14..16].parse().ok()?;
+    let second: u8 = value[17..19].parse().ok()?;
+    if year < 1601
+        || !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || hour > 23
+        || minute > 59
+        || second > 60
+    {
+        return None;
+    }
+
+    if exif_shape {
+        return Some(format!(
+            "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}"
+        ));
+    }
+
+    let suffix = value.get(19..).unwrap_or("");
+    Some(format!(
+        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}{suffix}"
+    ))
+}
+
+fn read_extended_image_capture(path: &Path) -> Option<String> {
+    let exif = read_nom_exif(path).ok()?;
+    [NomExifTag::DateTimeOriginal, NomExifTag::CreateDate, NomExifTag::ModifyDate]
+        .into_iter()
+        .find_map(|tag| exif.get(tag).and_then(|value| normalize_metadata_datetime(&value.to_string())))
+}
+
 fn read_capture_local(path: &Path, extension: &str) -> Option<String> {
     if matches!(extension, "mov" | "mp4" | "m4v") {
         const QUICKTIME_TO_UNIX_SECONDS: i64 = 2_082_844_800;
@@ -302,6 +365,11 @@ fn read_capture_local(path: &Path, extension: &str) -> Option<String> {
         let quicktime_seconds = i64::try_from(quicktime_seconds).ok()?;
         return utc_iso_from_unix(quicktime_seconds - QUICKTIME_TO_UNIX_SECONDS);
     }
+
+    if matches!(extension, "heic" | "heif" | "avif" | "cr3" | "raf" | "iiq") {
+        return read_extended_image_capture(path);
+    }
+
     if !matches!(
         extension,
         "jpg" | "jpeg" | "tif" | "tiff" | "dng" | "cr2" | "nef" | "arw"
@@ -646,6 +714,23 @@ mod tests {
     fn rejects_invalid_exif_capture_datetime() {
         let value = Value::Ascii(vec![b"2024:13:40 25:99:99".to_vec()]);
         assert!(parse_exif_capture_value(&value).is_none());
+    }
+
+    #[test]
+    fn normalizes_extended_metadata_datetimes_without_inventing_timezone() {
+        assert_eq!(
+            normalize_metadata_datetime("2024:07:04 18:23:59").as_deref(),
+            Some("2024-07-04T18:23:59")
+        );
+        assert_eq!(
+            normalize_metadata_datetime("2024-07-04 18:23:59").as_deref(),
+            Some("2024-07-04T18:23:59")
+        );
+        assert_eq!(
+            normalize_metadata_datetime("2024-07-04T18:23:59+00:00").as_deref(),
+            Some("2024-07-04T18:23:59+00:00")
+        );
+        assert!(normalize_metadata_datetime("2024:13:40 25:99:99").is_none());
     }
 
     #[test]
