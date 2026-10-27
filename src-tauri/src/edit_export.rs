@@ -60,6 +60,8 @@ pub struct EditedPreviewResult {
     data_uri: String,
     width: u32,
     height: u32,
+    source_width: u32,
+    source_height: u32,
 }
 
 #[derive(Serialize)]
@@ -317,7 +319,9 @@ pub fn preview_edited_photo(
         .map_err(|e| e.to_string())?
         .decode()
         .map_err(|e| format!("Cannot decode this image for editing: {e}"))?;
-    let (width, height) = edited_output_dimensions(image.width(), image.height(), &options)?;
+    let source_width = image.width();
+    let source_height = image.height();
+    let (width, height) = edited_output_dimensions(source_width, source_height, &options)?;
     let (preview_width, preview_height) = preview_resize_dimensions(width, height, max_edge);
     let mut preview_options = options;
     preview_options.resize_width = Some(preview_width);
@@ -334,6 +338,8 @@ pub fn preview_edited_photo(
         ),
         width,
         height,
+        source_width,
+        source_height,
     })
 }
 
