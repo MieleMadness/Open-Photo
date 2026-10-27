@@ -120,6 +120,8 @@ Timeline month entries now open the Library filtered to that exact capture month
 
 Memories is a dedicated **On This Day** view in the main navigation. It groups matching photos and videos by past year, shows how many years ago each group was captured, and lets you open individual items directly. Use **Open all On This Day** to review every matching item in the Library, or **This month in past years** for a broader date-based view.
 
+Each year group also includes **Browse all media from YEAR**. That opens the Library filtered to the selected capture year. The Library shows a visible **Memory year** chip with a **Show all years** control, and the year filter is cleared when Timeline, smart collections, or virtual collections take over so hidden filters do not stack.
+
 Memories uses the same capture-date rules as Timeline: EXIF for supported still images, QuickTime metadata for MOV/MP4/M4V, and filesystem modified time only as a fallback.
 
 ### 4. Ratings and favorites
