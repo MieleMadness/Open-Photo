@@ -14,8 +14,8 @@ mod index;
 mod similar;
 mod watch;
 use base64::Engine;
-use image::ImageReader;
 use exif::{In, Reader as ExifReader, Tag, Value};
+use image::ImageReader;
 use serde::Serialize;
 use std::{
     collections::{HashMap, VecDeque},
@@ -173,8 +173,14 @@ fn parse_exif_capture_value(value: &Value) -> Option<String> {
         return None;
     };
     let bytes = values.first()?;
-    let raw = std::str::from_utf8(bytes).ok()?.trim_matches(char::from(0)).trim();
-    let parts: Vec<&str> = raw.split([':', ' ', '-']).filter(|part| !part.is_empty()).collect();
+    let raw = std::str::from_utf8(bytes)
+        .ok()?
+        .trim_matches(char::from(0))
+        .trim();
+    let parts: Vec<&str> = raw
+        .split([':', ' ', '-'])
+        .filter(|part| !part.is_empty())
+        .collect();
     if parts.len() < 6 {
         return None;
     }
@@ -528,7 +534,9 @@ mod tests {
         assert!(result.photos.is_empty());
         assert!(!result.truncated);
         fs::remove_dir_all(root).unwrap();
-    }    #[test]
+    }
+
+    #[test]
     fn parses_exif_capture_datetime_without_inventing_timezone() {
         let value = Value::Ascii(vec![b"2024:07:04 18:23:59".to_vec()]);
         assert_eq!(
@@ -542,6 +550,4 @@ mod tests {
         let value = Value::Ascii(vec![b"2024:13:40 25:99:99".to_vec()]);
         assert!(parse_exif_capture_value(&value).is_none());
     }
-
-
 }
