@@ -95,4 +95,3 @@ Acceptance: mixed portrait/landscape, silent/audio, and variable/constant-frame-
 7. Video poster frames, waveforms, and reusable export presets.
 8. Basic titles and a single music track after Phase 7 hard cuts are stable.
 9. Immich integration as a separately scoped milestone with an actual tested server version and explicit mapping review.
-
