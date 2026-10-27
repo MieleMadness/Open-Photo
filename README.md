@@ -88,6 +88,14 @@ You can also enable **Auto-sync every 2 minutes**. Open-Photo additionally liste
 
 The sync summary reports added, updated, unchanged and removed index entries. Removing an item from the index is not the same as deleting a source file.
 
+### Capture dates
+
+Open-Photo reads EXIF capture time during library scans for supported JPEG/TIFF-family still images. It checks DateTimeOriginal first, then DateTimeDigitized, then DateTime.
+
+Most EXIF camera timestamps do not include a reliable timezone, so Open-Photo stores the value as a local camera date/time rather than inventing an offset. Timeline, newest/oldest sorting, Last 30 Days, On This Day, and This Month prefer this capture date and fall back to file modified time.
+
+QuickTime/MOV/MP4 capture-time extraction is not implemented yet.
+
 ### 3. Browse and filter
 
 The Library view supports:
@@ -127,7 +135,7 @@ Open-Photo includes dynamic filters such as:
 
 You can also create workspace-scoped smart rules based on rating, media type and minimum file size.
 
-Current date-based smart filters use filesystem modification timestamps. Full capture-date indexing from EXIF and QuickTime metadata is still planned.
+Date-based smart filters now prefer embedded EXIF capture dates for supported still-image formats and fall back to filesystem modification time when capture metadata is unavailable. QuickTime/iPhone video capture-date extraction is still planned.
 
 ## Edit & Export
 
