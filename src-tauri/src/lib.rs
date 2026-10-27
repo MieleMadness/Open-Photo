@@ -216,8 +216,6 @@ fn utc_iso_from_unix(unix_seconds: i64) -> Option<String> {
 }
 
 fn quicktime_creation_seconds(path: &Path) -> Option<u64> {
-    const QUICKTIME_TO_UNIX_SECONDS: i64 = 2_082_844_800;
-
     fn read_box_header(file: &mut fs::File, position: u64, end: u64) -> Option<(u64, [u8; 4], u64)> {
         if position.checked_add(8)? > end {
             return None;
@@ -288,7 +286,6 @@ fn quicktime_creation_seconds(path: &Path) -> Option<u64> {
         }
         position = box_end;
     }
-    let _ = QUICKTIME_TO_UNIX_SECONDS;
     None
 }
 
@@ -651,7 +648,7 @@ mod tests {
         );
         assert_eq!(
             utc_iso_from_unix(1_720_116_239).as_deref(),
-            Some("2024-07-04T22:03:59Z")
+            Some("2024-07-04T18:03:59Z")
         );
     }
 
