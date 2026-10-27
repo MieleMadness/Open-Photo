@@ -14,7 +14,7 @@ mod index;
 mod similar;
 mod watch;
 use base64::Engine;
-use exif::{In, Reader as ExifReader, Tag, Value};
+use exif::{DateTime as ExifDateTime, In, Reader as ExifReader, Tag, Value};
 use image::ImageReader;
 use serde::Serialize;
 use std::{
@@ -172,35 +172,13 @@ fn parse_exif_capture_value(value: &Value) -> Option<String> {
     let Value::Ascii(values) = value else {
         return None;
     };
-    let bytes = values.first()?;
-    let raw = std::str::from_utf8(bytes)
-        .ok()?
-        .trim_matches(char::from(0))
-        .trim();
-    let parts: Vec<&str> = raw
-        .split([':', ' ', '-'])
-        .filter(|part| !part.is_empty())
-        .collect();
-    if parts.len() < 6 {
-        return None;
-    }
-    let year = parts[0].parse::<u32>().ok()?;
-    let month = parts[1].parse::<u32>().ok()?;
-    let day = parts[2].parse::<u32>().ok()?;
-    let hour = parts[3].parse::<u32>().ok()?;
-    let minute = parts[4].parse::<u32>().ok()?;
-    let second = parts[5].parse::<u32>().ok()?;
-    if !(1..=12).contains(&month)
-        || !(1..=31).contains(&day)
-        || hour > 23
-        || minute > 59
-        || second > 60
-        || year < 1601
-    {
+    let parsed = ExifDateTime::from_ascii(values.first()?).ok()?;
+    if parsed.year < 1601 {
         return None;
     }
     Some(format!(
-        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}"
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
+        parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, parsed.second
     ))
 }
 
