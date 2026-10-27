@@ -10,6 +10,21 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.40.0 — 2026-10-27
+
+### Added
+- Added centered crop presets for **Original / Free**, **1:1**, **4:3** and **16:9**.
+- Crop presets use the decoded source dimensions returned by the existing preview request.
+- Preset calculations account for the current 90° rotation before determining the centered crop.
+
+### Changed
+- Crop sliders now use 0.1% precision so preset-generated crop values can be adjusted without being rounded to whole percentages.
+
+### Safety
+- Crop presets still use the existing 0–45% per-edge bounds and preserve the existing minimum-image-area validation.
+- No additional source-file read or write is performed for crop preset calculation.
+- Original media remains read-only.
+
 ## 0.39.0 — 2026-10-27
 
 ### Changed
