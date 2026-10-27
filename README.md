@@ -40,7 +40,7 @@ It is designed to work directly with folders you already own, keep original medi
 | Face recognition / People | 🧪 Experimental | YuNet detection + SFace embeddings + local suggested groups; manual naming is local-only |
 | OCR | 🧪 Experimental | English-first PP-OCR detector + recognizer, local text index and photo-text search |
 | GPU acceleration | 🧪 Windows foundation | Automatic mode prefers DirectML when available and safely falls back to CPU |
-| RAW support | 🧪 Partial | DNG/CR2/NEF/ARW plus CR3/RAF/IIQ can be indexed for metadata; full RAW pixel previews are not implemented |
+| RAW support | 🧪 Partial | NEF/ARW embedded JPEG previews work; DNG/CR2/NEF/ARW plus CR3/RAF/IIQ can be indexed for metadata; full sensor-data development is not implemented |
 | Immich synchronization | 🚧 Not implemented | Architecture planning only; no API bridge is active |
 | Non-destructive photo editing/export | 🧪 Experimental | Live preview, crop, resize, rotate, flip, brightness and contrast; always saves a new copy |
 | Original photo deletion | 🚫 Not implemented | Open-Photo does not delete original media |
@@ -198,7 +198,7 @@ Safety behavior:
 - Timestamp preservation applies only to the new copy and never changes the source file.
 - Export is currently limited to JPG/JPEG, PNG, WebP, BMP and TIFF.
 - The editor currently supports JPG/JPEG, PNG, WebP, TIFF, BMP and AVIF sources. Animated GIF editing is intentionally disabled so Open-Photo does not silently flatten an animation to a single frame.
-- HEIC/HEIF, RAW and video editing are intentionally excluded until dedicated decode/export handling is validated.
+- HEIC/HEIF, RAW and video editing are intentionally excluded until dedicated decode/export handling is validated. NEF/ARW can now show their camera-embedded JPEG preview in the viewer, but editing still does not operate on RAW sensor data.
 - Metadata preservation is not yet guaranteed for edited exports; treat an edited copy as a newly rendered image.
 
 ## XMP keyword sidecars
