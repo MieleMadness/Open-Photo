@@ -10,6 +10,13 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.41.4 — 2026-10-27
+
+### Fixed
+- Added explicit calendar/time range checks after EXIF parsing so impossible values such as month 13 or hour 25 are rejected.
+- This fixes the capture-date regression test while keeping the EXIF library parser for structural parsing.
+- No source media is modified.
+
 ## 0.41.3 — 2026-10-27
 
 ### CI
