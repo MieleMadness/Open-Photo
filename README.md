@@ -21,7 +21,7 @@ It is designed to work directly with folders you already own, keep original medi
 | Ratings and favorites | ✅ Working | 1–5 stars stored as local Open-Photo state; 5 stars acts as Favorite |
 | Virtual collections | ✅ Working | Workspace-scoped collections without moving files |
 | Smart collections | ✅ Working | Rating, size, media type, recent media, memories, unrated and similar presets |
-| Timeline | ✅ Working with limitation | Uses filesystem modified date, not full EXIF/QuickTime capture date yet |
+| Timeline | ✅ Working with limitation | Prefers EXIF still-image and QuickTime MOV/MP4/M4V capture dates, then falls back to filesystem modified time |
 | GPS map | ✅ Working with privacy note | Reads EXIF GPS locally; map tiles are loaded from OpenStreetMap |
 | Full-screen viewer | ✅ Working | Keyboard navigation and larger local preview |
 | XMP keyword sidecars | ✅ Working, intentionally limited | Creates new sidecars only; never overwrites an existing sidecar |
@@ -94,7 +94,7 @@ Open-Photo reads EXIF capture time during library scans for supported JPEG/TIFF-
 
 Most EXIF camera timestamps do not include a reliable timezone, so Open-Photo stores the value as a local camera date/time rather than inventing an offset. Timeline, newest/oldest sorting, Last 30 Days, On This Day, and This Month prefer this capture date and fall back to file modified time.
 
-QuickTime/MOV/MP4 capture-time extraction is not implemented yet.
+QuickTime MOV/MP4/M4V files now read the movie-header creation timestamp from the local file. QuickTime timestamps use the UTC-based 1904 epoch, so Open-Photo stores them with a UTC `Z` suffix while EXIF camera dates remain timezone-less local camera time.
 
 ### 3. Browse and filter
 
@@ -135,7 +135,7 @@ Open-Photo includes dynamic filters such as:
 
 You can also create workspace-scoped smart rules based on rating, media type and minimum file size.
 
-Date-based smart filters now prefer embedded EXIF capture dates for supported still-image formats and fall back to filesystem modification time when capture metadata is unavailable. QuickTime/iPhone video capture-date extraction is still planned.
+Date-based smart filters now prefer embedded EXIF capture dates for supported still images and QuickTime movie-header capture dates for MOV/MP4/M4V, then fall back to filesystem modification time when capture metadata is unavailable.
 
 ## Edit & Export
 
@@ -250,6 +250,8 @@ This is a filename-based heuristic, not full Apple asset-identifier matching.
 ### Motion video
 
 MOV/MP4/M4V motion can be previewed inline when the Windows/WebView2 codec stack supports it. A fallback action opens the video in the default Windows media player.
+
+For Timeline and date sorting, Open-Photo now reads the QuickTime movie-header creation timestamp without decoding the video or loading the entire file into memory. Corrupt or unsupported containers safely fall back to filesystem modified time.
 
 Special limitations:
 
