@@ -667,13 +667,13 @@ mod tests {
             edited_output_dimensions(4_000, 3_000, &options).unwrap(),
             (1_000, 1_667)
         );
-    }    #[test]
+    }
+
+    #[test]
     fn editor_source_formats_exclude_animated_gif() {
         assert!(editable_source_extension("jpg"));
         assert!(editable_source_extension("AVIF"));
         assert!(!editable_source_extension("gif"));
         assert!(!editable_source_extension("heic"));
     }
-
-
 }
