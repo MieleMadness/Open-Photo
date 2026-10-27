@@ -21,7 +21,7 @@ It is designed to work directly with folders you already own, keep original medi
 | Ratings and favorites | ✅ Working | 1–5 stars stored as local Open-Photo state; 5 stars acts as Favorite |
 | Virtual collections | ✅ Working | Workspace-scoped collections without moving files |
 | Smart collections | ✅ Working | Rating, size, media type, recent media, memories, unrated and similar presets |
-| Timeline | ✅ Working with limitation | Prefers EXIF still-image and QuickTime MOV/MP4/M4V capture dates, then falls back to filesystem modified time |
+| Timeline | ✅ Working | Prefers EXIF still-image and QuickTime MOV/MP4/M4V capture dates, falls back to filesystem modified time, and month entries filter the Library |
 | GPS map | ✅ Working with privacy note | Reads EXIF GPS locally; map tiles are loaded from OpenStreetMap |
 | Full-screen viewer | ✅ Working | Keyboard navigation and larger local preview |
 | XMP keyword sidecars | ✅ Working, intentionally limited | Creates new sidecars only; never overwrites an existing sidecar |
@@ -112,6 +112,8 @@ The Library view supports:
 Select a photo to open the details viewer. Use the full-screen control for a larger preview.
 
 The details panel shows the date Open-Photo is actually using and labels its source as **EXIF metadata**, **QuickTime metadata**, or **File modified fallback**. When embedded capture metadata exists, both the embedded capture value and the filesystem modified value are shown so the fallback behavior is visible rather than hidden.
+
+Timeline month entries now open the Library filtered to that exact capture month. The active month is shown above the Library with a **Show all months** control. Timeline month filtering is intentionally cleared when a smart collection, custom smart rule, or virtual collection takes over, so hidden filters do not stack unexpectedly.
 
 ### 4. Ratings and favorites
 
