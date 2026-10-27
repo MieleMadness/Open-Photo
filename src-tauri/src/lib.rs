@@ -195,11 +195,9 @@ fn utc_iso_from_unix(unix_seconds: i64) -> Option<String> {
     let era = if z >= 0 { z } else { z - 146_096 }.div_euclid(146_097);
     let day_of_era = z - era * 146_097;
     let year_of_era =
-        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096)
-            / 365;
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
     let mut year = year_of_era + era * 400;
-    let day_of_year =
-        day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
     let month_prime = (5 * day_of_year + 2) / 153;
     let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
     let month = month_prime + if month_prime < 10 { 3 } else { -9 };
@@ -216,7 +214,11 @@ fn utc_iso_from_unix(unix_seconds: i64) -> Option<String> {
 }
 
 fn quicktime_creation_seconds(path: &Path) -> Option<u64> {
-    fn read_box_header(file: &mut fs::File, position: u64, end: u64) -> Option<(u64, [u8; 4], u64)> {
+    fn read_box_header(
+        file: &mut fs::File,
+        position: u64,
+        end: u64,
+    ) -> Option<(u64, [u8; 4], u64)> {
         if position.checked_add(8)? > end {
             return None;
         }
@@ -240,7 +242,11 @@ fn quicktime_creation_seconds(path: &Path) -> Option<u64> {
         Some((size, kind, header_size))
     }
 
-    fn read_mvhd_creation(file: &mut fs::File, payload_start: u64, payload_end: u64) -> Option<u64> {
+    fn read_mvhd_creation(
+        file: &mut fs::File,
+        payload_start: u64,
+        payload_end: u64,
+    ) -> Option<u64> {
         if payload_start.checked_add(8)? > payload_end {
             return None;
         }
@@ -640,7 +646,9 @@ mod tests {
     fn rejects_invalid_exif_capture_datetime() {
         let value = Value::Ascii(vec![b"2024:13:40 25:99:99".to_vec()]);
         assert!(parse_exif_capture_value(&value).is_none());
-    }    #[test]
+    }
+
+    #[test]
     fn converts_quicktime_epoch_to_utc_iso() {
         assert_eq!(
             utc_iso_from_unix(0).as_deref(),
@@ -672,6 +680,4 @@ mod tests {
         );
         fs::remove_dir_all(root).unwrap();
     }
-
-
 }
