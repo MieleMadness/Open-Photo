@@ -19,7 +19,7 @@ use image::ImageReader;
 use serde::Serialize;
 use std::{
     collections::{HashMap, VecDeque},
-    io::{BufReader, Cursor, Write},
+    io::{BufReader, Cursor, Read, Seek, SeekFrom, Write},
     sync::{Mutex, OnceLock},
 };
 use std::{
@@ -188,7 +188,117 @@ fn parse_exif_capture_value(value: &Value) -> Option<String> {
     ))
 }
 
+fn utc_iso_from_unix(unix_seconds: i64) -> Option<String> {
+    let days = unix_seconds.div_euclid(86_400);
+    let seconds_of_day = unix_seconds.rem_euclid(86_400);
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 }.div_euclid(146_097);
+    let day_of_era = z - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096)
+            / 365;
+    let mut year = year_of_era + era * 400;
+    let day_of_year =
+        day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_prime = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
+    let month = month_prime + if month_prime < 10 { 3 } else { -9 };
+    year += if month <= 2 { 1 } else { 0 };
+    if !(1601..=9999).contains(&year) {
+        return None;
+    }
+    let hour = seconds_of_day / 3_600;
+    let minute = (seconds_of_day % 3_600) / 60;
+    let second = seconds_of_day % 60;
+    Some(format!(
+        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z"
+    ))
+}
+
+fn quicktime_creation_seconds(path: &Path) -> Option<u64> {
+    const QUICKTIME_TO_UNIX_SECONDS: i64 = 2_082_844_800;
+
+    fn read_box_header(file: &mut fs::File, position: u64, end: u64) -> Option<(u64, [u8; 4], u64)> {
+        if position.checked_add(8)? > end {
+            return None;
+        }
+        file.seek(SeekFrom::Start(position)).ok()?;
+        let mut header = [0_u8; 8];
+        file.read_exact(&mut header).ok()?;
+        let size32 = u32::from_be_bytes(header[..4].try_into().ok()?);
+        let kind: [u8; 4] = header[4..8].try_into().ok()?;
+        let (size, header_size) = match size32 {
+            0 => (end.checked_sub(position)?, 8),
+            1 => {
+                let mut extended = [0_u8; 8];
+                file.read_exact(&mut extended).ok()?;
+                (u64::from_be_bytes(extended), 16)
+            }
+            value => (u64::from(value), 8),
+        };
+        if size < header_size || position.checked_add(size)? > end {
+            return None;
+        }
+        Some((size, kind, header_size))
+    }
+
+    fn read_mvhd_creation(file: &mut fs::File, payload_start: u64, payload_end: u64) -> Option<u64> {
+        if payload_start.checked_add(8)? > payload_end {
+            return None;
+        }
+        file.seek(SeekFrom::Start(payload_start)).ok()?;
+        let mut prefix = [0_u8; 12];
+        file.read_exact(&mut prefix[..8]).ok()?;
+        match prefix[0] {
+            0 => Some(u64::from(u32::from_be_bytes(prefix[4..8].try_into().ok()?))),
+            1 => {
+                if payload_start.checked_add(12)? > payload_end {
+                    return None;
+                }
+                file.read_exact(&mut prefix[8..12]).ok()?;
+                Some(u64::from_be_bytes(prefix[4..12].try_into().ok()?))
+            }
+            _ => None,
+        }
+    }
+
+    fn find_mvhd(file: &mut fs::File, start: u64, end: u64) -> Option<u64> {
+        let mut position = start;
+        while position.checked_add(8)? <= end {
+            let (size, kind, header_size) = read_box_header(file, position, end)?;
+            let payload_start = position.checked_add(header_size)?;
+            let box_end = position.checked_add(size)?;
+            if &kind == b"mvhd" {
+                return read_mvhd_creation(file, payload_start, box_end);
+            }
+            position = box_end;
+        }
+        None
+    }
+
+    let mut file = fs::File::open(path).ok()?;
+    let end = file.metadata().ok()?.len();
+    let mut position = 0_u64;
+    while position.checked_add(8)? <= end {
+        let (size, kind, header_size) = read_box_header(&mut file, position, end)?;
+        let payload_start = position.checked_add(header_size)?;
+        let box_end = position.checked_add(size)?;
+        if &kind == b"moov" {
+            return find_mvhd(&mut file, payload_start, box_end);
+        }
+        position = box_end;
+    }
+    let _ = QUICKTIME_TO_UNIX_SECONDS;
+    None
+}
+
 fn read_capture_local(path: &Path, extension: &str) -> Option<String> {
+    if matches!(extension, "mov" | "mp4" | "m4v") {
+        const QUICKTIME_TO_UNIX_SECONDS: i64 = 2_082_844_800;
+        let quicktime_seconds = quicktime_creation_seconds(path)?;
+        let quicktime_seconds = i64::try_from(quicktime_seconds).ok()?;
+        return utc_iso_from_unix(quicktime_seconds - QUICKTIME_TO_UNIX_SECONDS);
+    }
     if !matches!(
         extension,
         "jpg" | "jpeg" | "tif" | "tiff" | "dng" | "cr2" | "nef" | "arw"
@@ -533,5 +643,38 @@ mod tests {
     fn rejects_invalid_exif_capture_datetime() {
         let value = Value::Ascii(vec![b"2024:13:40 25:99:99".to_vec()]);
         assert!(parse_exif_capture_value(&value).is_none());
+    }    #[test]
+    fn converts_quicktime_epoch_to_utc_iso() {
+        assert_eq!(
+            utc_iso_from_unix(0).as_deref(),
+            Some("1970-01-01T00:00:00Z")
+        );
+        assert_eq!(
+            utc_iso_from_unix(1_720_116_239).as_deref(),
+            Some("2024-07-04T22:03:59Z")
+        );
     }
+
+    #[test]
+    fn parses_quicktime_mvhd_creation_time() {
+        let root = temp_root();
+        let video = root.join("sample.mov");
+        let quicktime_seconds = 2_082_844_800_u32 + 3_600;
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&28_u32.to_be_bytes());
+        bytes.extend_from_slice(b"moov");
+        bytes.extend_from_slice(&20_u32.to_be_bytes());
+        bytes.extend_from_slice(b"mvhd");
+        bytes.extend_from_slice(&[0, 0, 0, 0]);
+        bytes.extend_from_slice(&quicktime_seconds.to_be_bytes());
+        bytes.extend_from_slice(&0_u32.to_be_bytes());
+        fs::write(&video, bytes).unwrap();
+        assert_eq!(
+            read_capture_local(&video, "mov").as_deref(),
+            Some("1970-01-01T01:00:00Z")
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+
 }
