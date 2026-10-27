@@ -173,7 +173,13 @@ fn parse_exif_capture_value(value: &Value) -> Option<String> {
         return None;
     };
     let parsed = ExifDateTime::from_ascii(values.first()?).ok()?;
-    if parsed.year < 1601 {
+    if parsed.year < 1601
+        || !(1..=12).contains(&parsed.month)
+        || !(1..=31).contains(&parsed.day)
+        || parsed.hour > 23
+        || parsed.minute > 59
+        || parsed.second > 60
+    {
         return None;
     }
     Some(format!(
