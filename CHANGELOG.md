@@ -10,6 +10,12 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.41.1 — 2026-10-27
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the capture-date foundation.
+- No EXIF parsing, SQLite indexing, timeline, sorting, or smart-filter behavior was changed.
+
 ## 0.41.0 — 2026-10-27
 
 ### Added
