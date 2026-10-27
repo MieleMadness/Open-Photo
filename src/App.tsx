@@ -13,7 +13,7 @@ type Workspace = { id: string; name: string; root: string; roots?: string[] };
 type Theme = "light" | "dark" | "system";
 type PhotoView = "grid" | "list";
 type SortBy = "name" | "newest" | "oldest" | "largest" | "smallest";
-type Photo = { path: string; name: string; extension: string; bytes: number; modified_unix: number; capture_local?: string | null; libraryRoot?: string };
+type Photo = { path: string; name: string; extension: string; bytes: number; modified_unix: number; capture_local?: string | null; live_asset_id?: string | null; libraryRoot?: string };
 type ScanResult = { photos: Photo[]; scanned_files: number; truncated: boolean };
 type AiBatchResult = {requested:number;indexed:number;skipped:number;failed:number;errors:string[]};
 type FaceIndexBatch = {requested:number;indexed_images:number;skipped_images:number;failed_images:number;faces:number;errors:string[]};
@@ -631,26 +631,57 @@ export default function App() {
     return ()=>{active=false};
   },[root,result,view]);
   const folders=useMemo(()=>[...new Set((result?.photos||[]).map(p=>p.path.slice(0,Math.max(p.path.lastIndexOf("\\"),p.path.lastIndexOf("/"))).replace(p.libraryRoot||root,"").replace(/^[\\/]/,"")||"(root)"))].sort(),[result,root]);
-  // Group only unambiguous same-folder iPhone still/MOV pairs.
-  // Files remain separate on disk; this is a read-only presentation grouping.
-  const liveVideoByImage=useMemo(()=>{
-    const groups=new Map<string,{images:Photo[];videos:Photo[]}>();
-    for(const photo of result?.photos||[]){
-      const normalized=photo.path.toLowerCase().replace(/\\/g,"/");
+  // Prefer Apple's shared Live Photo content identifier when available.
+  // Exporters sometimes strip it, so unmatched files retain the conservative
+  // same-folder + same-stem fallback. Source files remain separate and read-only.
+  const livePhotoPairing=useMemo(()=>{
+    const photos=result?.photos||[];
+    const matches=new Map<string,Photo>();
+    const usedVideos=new Set<string>();
+    const byAssetId=new Map<string,{images:Photo[];videos:Photo[]}>();
+
+    for(const photo of photos){
+      const extension=photo.extension.toLowerCase();
+      if(!["mov","mp4","m4v","heic","heif","jpg","jpeg"].includes(extension))continue;
+      const assetId=photo.live_asset_id?.trim();
+      if(!assetId)continue;
+      const group=byAssetId.get(assetId)||{images:[],videos:[]};
+      if(["mov","mp4","m4v"].includes(extension))group.videos.push(photo);
+      else group.images.push(photo);
+      byAssetId.set(assetId,group);
+    }
+
+    let metadataPairs=0;
+    for(const group of byAssetId.values()){
+      if(group.images.length!==1||group.videos.length!==1)continue;
+      matches.set(group.images[0].path,group.videos[0]);
+      usedVideos.add(group.videos[0].path);
+      metadataPairs+=1;
+    }
+
+    const byStem=new Map<string,{images:Photo[];videos:Photo[]}>();
+    for(const photo of photos){
+      if(matches.has(photo.path)||usedVideos.has(photo.path))continue;
       const extension=photo.extension.toLowerCase();
       if(!["mov","heic","heif","jpg","jpeg"].includes(extension))continue;
+      const normalized=photo.path.toLowerCase().replace(/\\/g,"/");
       const stem=normalized.slice(0,normalized.lastIndexOf("."));
-      const group=groups.get(stem)||{images:[],videos:[]};
+      const group=byStem.get(stem)||{images:[],videos:[]};
       if(extension==="mov")group.videos.push(photo);
       else group.images.push(photo);
-      groups.set(stem,group);
+      byStem.set(stem,group);
     }
-    const matches=new Map<string,Photo>();
-    for(const group of groups.values()){
-      if(group.images.length===1&&group.videos.length===1)matches.set(group.images[0].path,group.videos[0]);
+
+    let fallbackPairs=0;
+    for(const group of byStem.values()){
+      if(group.images.length!==1||group.videos.length!==1)continue;
+      matches.set(group.images[0].path,group.videos[0]);
+      usedVideos.add(group.videos[0].path);
+      fallbackPairs+=1;
     }
-    return matches;
+    return {matches,metadataPairs,fallbackPairs};
   },[result]);
+  const liveVideoByImage=livePhotoPairing.matches;
   const hiddenLiveVideos=useMemo(()=>new Set([...liveVideoByImage.values()].map(video=>video.path)),[liveVideoByImage]);
   const livePhotoPairs=liveVideoByImage.size;
   const onThisDayMemories=useMemo(()=>{
@@ -766,7 +797,7 @@ export default function App() {
       <nav aria-label="Main navigation">{NAV.map(({ id, title, icon: Icon }) => <button key={id} className={view === id ? "nav-button active" : "nav-button"} onClick={() => setView(id)} aria-current={view === id ? "page" : undefined}><Icon size={18}/>{title}{view === id && <ChevronRight size={15} className="nav-chevron"/>}</button>)}</nav>
       <div className="sidebar-spacer"/>
 
-      <div className="sidebar-footer">Open-Photo <span>v0.49.0 preview</span></div>
+      <div className="sidebar-footer">Open-Photo <span>v0.50.0 preview</span></div>
     </aside>
 
     <div className="main">
@@ -786,7 +817,7 @@ export default function App() {
               {photoView === "grid" && <div className="zoom-control"><ZoomOut size={17}/><input aria-label="Thumbnail size" type="range" min="110" max="300" step="10" value={tileSize} onChange={e=>setTileSize(Number(e.target.value))}/><ZoomIn size={17}/><span>{tileSize}px</span></div>}
             </div>
             {result && <div className="selection-toolbar">{collectionFilter&&<button className="secondary-button" onClick={()=>setCollectionFilter("")}>Show all (clear collection)</button>}<label className="sort-control">Media <select aria-label="Media type" value={mediaType} onChange={e=>setMediaType(e.target.value as "all"|"photo"|"video")}><option value="all">All media</option><option value="photo">Photos</option><option value="video">Videos</option></select></label><span>{selection.length} selected</span><button className="secondary-button" onClick={()=>setSelection(visible.map(p=>p.path))}>Select matching</button><button className="secondary-button" onClick={()=>setSelection([])}>Clear selection</button><input aria-label="New XMP tags (comma separated)" placeholder="Tags separated by commas" value={tagText} onChange={e=>setTagText(e.target.value)}/><button className="primary-button" disabled={!selection.length || !tagText.trim() || applying} onClick={applyTags}>{applying?"Writing…":"Add tags to new sidecars"}</button></div>}
-            {result && livePhotoPairs>0 && <p className="results-note">{livePhotoPairs} potential iPhone Live Photo pairs found (same folder and filename stem). Original image and video files remain separate.</p>}
+            {result && livePhotoPairs>0 && <p className="results-note">{livePhotoPairs} iPhone Live Photo pair{livePhotoPairs===1?"":"s"} found · {livePhotoPairing.metadataPairs} matched by Apple asset ID · {livePhotoPairing.fallbackPairs} matched by filename fallback. Original image and video files remain separate.</p>}
             {result && <div className="duplicate-bar"><button className="secondary-button" disabled={duplicateBusy} onClick={inspectDuplicates}>Find Exact Duplicates</button><button className="secondary-button" disabled={duplicateBusy} onClick={inspectSimilar}>Find Similar Photos</button>{duplicateBusy&&<span>Analyzing local files…</span>}{duplicates.length>0&&<span>{duplicates.length} identical-file groups</span>}{similarGroups.length>0&&<span>{similarGroups.length} visually similar groups</span>}{[...duplicates.map(group=>({paths:group.paths,label:"Identical files"})),...similarGroups.map(group=>({paths:group.paths,label:"Visually similar photos"}))].map((group,i)=><div className="duplicate-group" key={i}><strong>{group.label} · {group.paths.length} files</strong><p>Inspect each candidate and optionally mark one to keep. This review never deletes or moves a file.</p>{group.paths.map(path=><div key={path} className="collection-row"><small className="break-anywhere">{duplicateReview[group.paths.join("|")]===path?"✓ Preferred copy · ":""}{path}</small><button className="secondary-button" onClick={()=>{const candidate=result?.photos.find(photo=>photo.path===path);if(candidate)setSelected(candidate);else setError("This file is not in the current library view.")}}>Preview</button><button className="secondary-button" aria-pressed={duplicateReview[group.paths.join("|")]===path} onClick={()=>setDuplicateReview(previous=>({...previous,[group.paths.join("|")]:path}))}>Mark to keep</button></div>)}</div>)}</div>}
             {aiOptIn&&result&&<div className="selection-toolbar"><strong>Semantic search</strong><input aria-label="Semantic photo search" placeholder="Try: dog at the beach" value={aiTextQuery} onChange={e=>setAiTextQuery(e.target.value)}/><button className="secondary-button" disabled={!semanticReady||!aiTextQuery.trim()} onClick={()=>void searchAiWorkspace()}>Search by meaning</button><button className="secondary-button" disabled={!semanticReady||aiIndexBusy} onClick={()=>void indexAiPhotos(result?.photos||[],"library")}>{aiIndexBusy?"Indexing…":"Index library with AI"}</button>{aiIndexBusy&&<button className="secondary-button" onClick={()=>{aiCancelRequested.current=true;setAiIndexMessage(`Cancelling after the current small batch… ${aiIndexProgress.done}/${aiIndexProgress.total}`)}}>Cancel AI indexing</button>}{aiIndexMessage&&<span>{aiIndexMessage}</span>}{aiTextMatches.map(match=><button className="folder-item" key={match.path} onClick={()=>{const candidate=result?.photos.find(photo=>photo.path===match.path);if(candidate)setSelected(candidate)}}>{Math.round(match.score*100)}% · {match.path}</button>)}</div>}{aiOptIn&&result&&<div className="selection-toolbar"><strong>Text in photos</strong><input aria-label="OCR photo search" placeholder="Try: EXIT, invoice, menu item…" value={ocrQuery} onChange={e=>setOcrQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void searchOcrWorkspace()}}/><button className="secondary-button" disabled={!ocrReady||ocrBusy||!ocrQuery.trim()} onClick={()=>void searchOcrWorkspace()}>Search photo text</button><button className="secondary-button" disabled={!ocrReady||ocrBusy} onClick={()=>void indexOcrWorkspace()}>{ocrBusy?"Working…":"Index library text"}</button>{ocrMessage&&<span>{ocrMessage}</span>}{ocrMatches.map(match=><button className="folder-item" key={match.root+"|"+match.path} onClick={()=>{const candidate=result?.photos.find(photo=>photo.path===match.path);if(candidate)setSelected(candidate)}}>{match.path} · {match.text.slice(0,120)}</button>)}</div>}{aiOptIn&&selection.length>0&&<div className="selection-toolbar"><strong>Local AI</strong><span>{selection.length} selected</span><button className="secondary-button" disabled={!semanticReady||aiIndexBusy} onClick={()=>void indexAiPhotos((result?.photos||[]).filter(photo=>selection.includes(photo.path)),"selected")}>Index selected with AI</button></div>}{tagMessage && <div className="results-note" role="status">{tagMessage}</div>}
             {error && <div role="alert" className="error">{error}</div>}
