@@ -89,21 +89,11 @@ fn validate_output_dimensions(width: u32, height: u32) -> Result<(u32, u32), Str
     Ok((width, height))
 }
 
-fn apply_edits(mut image: DynamicImage, options: &EditOptions) -> Result<DynamicImage, String> {
-    let rotation = validate_rotation(options.rotation)?;
-    image = match rotation {
-        90 => image.rotate90(),
-        180 => image.rotate180(),
-        270 => image.rotate270(),
-        _ => image,
-    };
-    if options.flip_horizontal {
-        image = image.fliph();
-    }
-    if options.flip_vertical {
-        image = image.flipv();
-    }
-
+fn crop_rect(
+    width: u32,
+    height: u32,
+    options: &EditOptions,
+) -> Result<(u32, u32, u32, u32), String> {
     let crops = [
         options.crop_left,
         options.crop_top,
@@ -121,48 +111,104 @@ fn apply_edits(mut image: DynamicImage, options: &EditOptions) -> Result<Dynamic
     {
         return Err("Crop settings must leave at least 10 percent of the image".into());
     }
-    if crops.iter().any(|value| *value > 0.0) {
-        let (width, height) = image.dimensions();
-        let left = ((width as f32 * options.crop_left / 100.0).round() as u32)
-            .min(width.saturating_sub(1));
-        let top = ((height as f32 * options.crop_top / 100.0).round() as u32)
-            .min(height.saturating_sub(1));
-        let right = ((width as f32 * options.crop_right / 100.0).round() as u32)
-            .min(width.saturating_sub(left + 1));
-        let bottom = ((height as f32 * options.crop_bottom / 100.0).round() as u32)
-            .min(height.saturating_sub(top + 1));
-        let crop_width = width.saturating_sub(left + right).max(1);
-        let crop_height = height.saturating_sub(top + bottom).max(1);
-        image = image.crop_imm(left, top, crop_width, crop_height);
-    }
 
-    if let Some(width) = options.resize_width {
-        if width == 0 || width > 20_000 {
+    let left =
+        ((width as f32 * options.crop_left / 100.0).round() as u32).min(width.saturating_sub(1));
+    let top =
+        ((height as f32 * options.crop_top / 100.0).round() as u32).min(height.saturating_sub(1));
+    let right = ((width as f32 * options.crop_right / 100.0).round() as u32)
+        .min(width.saturating_sub(left + 1));
+    let bottom = ((height as f32 * options.crop_bottom / 100.0).round() as u32)
+        .min(height.saturating_sub(top + 1));
+    let crop_width = width.saturating_sub(left + right).max(1);
+    let crop_height = height.saturating_sub(top + bottom).max(1);
+    Ok((left, top, crop_width, crop_height))
+}
+
+fn target_dimensions(
+    width: u32,
+    height: u32,
+    options: &EditOptions,
+) -> Result<(u32, u32), String> {
+    if let Some(resize_width) = options.resize_width {
+        if resize_width == 0 || resize_width > 20_000 {
             return Err("Resize width must be between 1 and 20,000 pixels".into());
         }
     }
-    if let Some(height) = options.resize_height {
-        if height == 0 || height > 20_000 {
+    if let Some(resize_height) = options.resize_height {
+        if resize_height == 0 || resize_height > 20_000 {
             return Err("Resize height must be between 1 and 20,000 pixels".into());
         }
     }
-    let (target_width, target_height) = match (options.resize_width, options.resize_height) {
-        (Some(width), Some(height)) => (width, height),
-        (Some(width), None) => {
-            let height = ((image.height() as f64 * width as f64 / image.width() as f64).round()
-                as u32)
-                .max(1);
-            (width, height)
+
+    let dimensions = match (options.resize_width, options.resize_height) {
+        (Some(resize_width), Some(resize_height)) => (resize_width, resize_height),
+        (Some(resize_width), None) => {
+            let resize_height =
+                ((height as f64 * resize_width as f64 / width as f64).round() as u32).max(1);
+            (resize_width, resize_height)
         }
-        (None, Some(height)) => {
-            let width = ((image.width() as f64 * height as f64 / image.height() as f64).round()
-                as u32)
-                .max(1);
-            (width, height)
+        (None, Some(resize_height)) => {
+            let resize_width =
+                ((width as f64 * resize_height as f64 / height as f64).round() as u32).max(1);
+            (resize_width, resize_height)
         }
-        (None, None) => image.dimensions(),
+        (None, None) => (width, height),
     };
-    validate_output_dimensions(target_width, target_height)?;
+    validate_output_dimensions(dimensions.0, dimensions.1)
+}
+
+fn edited_output_dimensions(
+    source_width: u32,
+    source_height: u32,
+    options: &EditOptions,
+) -> Result<(u32, u32), String> {
+    let rotation = validate_rotation(options.rotation)?;
+    let (rotated_width, rotated_height) = match rotation {
+        90 | 270 => (source_height, source_width),
+        _ => (source_width, source_height),
+    };
+    let (_, _, crop_width, crop_height) = crop_rect(rotated_width, rotated_height, options)?;
+    target_dimensions(crop_width, crop_height, options)
+}
+
+fn preview_resize_dimensions(width: u32, height: u32, max_edge: u32) -> (u32, u32) {
+    if width <= max_edge && height <= max_edge {
+        return (width, height);
+    }
+    if width >= height {
+        let preview_height =
+            ((height as f64 * max_edge as f64 / width as f64).round() as u32).max(1);
+        (max_edge, preview_height)
+    } else {
+        let preview_width =
+            ((width as f64 * max_edge as f64 / height as f64).round() as u32).max(1);
+        (preview_width, max_edge)
+    }
+}
+
+fn apply_edits(mut image: DynamicImage, options: &EditOptions) -> Result<DynamicImage, String> {
+    let rotation = validate_rotation(options.rotation)?;
+    image = match rotation {
+        90 => image.rotate90(),
+        180 => image.rotate180(),
+        270 => image.rotate270(),
+        _ => image,
+    };
+    if options.flip_horizontal {
+        image = image.fliph();
+    }
+    if options.flip_vertical {
+        image = image.flipv();
+    }
+
+    let (left, top, crop_width, crop_height) =
+        crop_rect(image.width(), image.height(), options)?;
+    if (crop_width, crop_height) != image.dimensions() {
+        image = image.crop_imm(left, top, crop_width, crop_height);
+    }
+
+    let (target_width, target_height) = target_dimensions(image.width(), image.height(), options)?;
     if (target_width, target_height) != image.dimensions() {
         image = image.resize_exact(target_width, target_height, FilterType::Lanczos3);
     }
@@ -254,10 +300,12 @@ pub fn preview_edited_photo(
         .map_err(|e| e.to_string())?
         .decode()
         .map_err(|e| format!("Cannot decode this image for editing: {e}"))?;
-    let edited = apply_edits(image, &options)?;
-    let width = edited.width();
-    let height = edited.height();
-    let preview = edited.thumbnail(max_edge, max_edge);
+    let (width, height) = edited_output_dimensions(image.width(), image.height(), &options)?;
+    let (preview_width, preview_height) = preview_resize_dimensions(width, height, max_edge);
+    let mut preview_options = options;
+    preview_options.resize_width = Some(preview_width);
+    preview_options.resize_height = Some(preview_height);
+    let preview = apply_edits(image, &preview_options)?;
     let mut buffer = Cursor::new(Vec::new());
     preview
         .write_to(&mut buffer, ImageFormat::Png)
@@ -575,5 +623,39 @@ mod tests {
             (10_000, 10_000)
         );
         assert!(validate_output_dimensions(20_000, 20_000).is_err());
+    }    #[test]
+    fn preview_resize_is_bounded_by_max_edge() {
+        assert_eq!(preview_resize_dimensions(20_000, 10_000, 1_400), (1_400, 700));
+        assert_eq!(preview_resize_dimensions(800, 600, 1_400), (800, 600));
     }
+
+    #[test]
+    fn output_dimensions_follow_rotation_crop_and_resize() {
+        let options = EditOptions {
+            rotation: 90,
+            flip_horizontal: false,
+            flip_vertical: false,
+            brightness: 0,
+            contrast: 0.0,
+            crop_left: 10.0,
+            crop_top: 0.0,
+            crop_right: 10.0,
+            crop_bottom: 0.0,
+            resize_width: Some(1_000),
+            resize_height: None,
+            grayscale: false,
+            hue_rotate: 0,
+            blur_sigma: 0.0,
+            sharpen_sigma: 0.0,
+            sharpen_threshold: 0,
+            jpeg_quality: 92,
+            preserve_modified_time: true,
+        };
+        assert_eq!(
+            edited_output_dimensions(4_000, 3_000, &options).unwrap(),
+            (1_000, 1_666)
+        );
+    }
+
+
 }
