@@ -10,6 +10,12 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.42.1 — 2026-10-27
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the QuickTime capture-date parser and tests.
+- No QuickTime parsing, timestamp conversion, timeline, sorting, or smart-filter behavior was changed.
+
 ## 0.42.0 — 2026-10-27
 
 ### Added
