@@ -1078,20 +1078,25 @@ mod tests {
     }
 
     #[test]
-    fn tags_do_not_overwrite_existing_sidecars_or_modify_originals() {
+    fn foreign_sidecars_are_never_overwritten_or_originals_modified() {
         let root = temp_root();
         let image = root.join("sample.jpg");
         fs::write(&image, b"original").unwrap();
         let sidecar = root.join("sample.jpg.xmp");
-        let root_arg = root.to_string_lossy().into_owned();
-        let paths = vec![image.to_string_lossy().into_owned()];
-        let first =
-            bulk_create_tags(root_arg.clone(), paths.clone(), vec!["Family".into()]).unwrap();
-        assert_eq!(first.created, 1);
-        assert!(fs::read_to_string(&sidecar).unwrap().contains("Family"));
-        let second = bulk_create_tags(root_arg, paths, vec!["Other".into()]).unwrap();
-        assert_eq!(second.skipped, 1);
-        assert!(!fs::read_to_string(&sidecar).unwrap().contains("Other"));
+        fs::write(&sidecar, b"<x:xmpmeta>foreign metadata</x:xmpmeta>").unwrap();
+        let result = bulk_create_tags(
+            root.to_string_lossy().into_owned(),
+            vec![image.to_string_lossy().into_owned()],
+            vec!["Family".into()],
+        )
+        .unwrap();
+        assert_eq!(result.created, 0);
+        assert_eq!(result.updated, 0);
+        assert_eq!(result.skipped, 1);
+        assert_eq!(
+            fs::read_to_string(&sidecar).unwrap(),
+            "<x:xmpmeta>foreign metadata</x:xmpmeta>"
+        );
         assert_eq!(fs::read(&image).unwrap(), b"original");
         fs::remove_dir_all(root).unwrap();
     }
