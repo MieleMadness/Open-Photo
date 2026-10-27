@@ -10,6 +10,18 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.39.0 — 2026-10-27
+
+### Changed
+- Centralized the frontend editor source-format list so preview visibility and export availability use the same contract.
+- Added strict whole-number resize parsing before preview and export requests.
+- Animated GIF is no longer offered to the Phase 4 editor because the current image pipeline would otherwise render only a decoded still frame.
+
+### Safety
+- Invalid, fractional, zero, negative and over-20,000 resize values are rejected before they reach the Rust edit pipeline.
+- Backend preview and export now both validate the same supported source extensions.
+- Original media remains read-only.
+
 ## 0.38.1 — 2026-10-27
 
 ### Fixed
