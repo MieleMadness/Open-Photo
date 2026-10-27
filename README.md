@@ -162,6 +162,7 @@ Safety behavior:
 - Resize dimensions are limited to 20,000 pixels per side. Supplying only one dimension preserves aspect ratio.
 - Edited output is capped at **100 megapixels** before resize allocation to reduce accidental memory exhaustion.
 - The editor shows the calculated final width, height and megapixel count before export.
+- Live preview uses the same crop/rotation/resize geometry and adjustment order at a bounded preview resolution, so large export targets do not require equally large preview allocations.
 - Hue rotation is limited to -180° through +180°.
 - Blur and sharpen strengths are limited to 0.0–10.0. Sharpen threshold is limited to 0–100.
 - JPEG exports support an explicit quality setting from 40–100; the default is 92.
