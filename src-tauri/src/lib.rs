@@ -1166,7 +1166,11 @@ mod tests {
             render_openphoto_xmp(&["People/Family/Marc".into(), "Florida".into()]),
         )
         .unwrap();
-        fs::write(root.join("foreign.jpg.xmp"), "<x:xmpmeta>foreign</x:xmpmeta>").unwrap();
+        fs::write(
+            root.join("foreign.jpg.xmp"),
+            "<x:xmpmeta>foreign</x:xmpmeta>",
+        )
+        .unwrap();
 
         let entries = read_managed_tags(
             root.to_string_lossy().into_owned(),
