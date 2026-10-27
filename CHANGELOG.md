@@ -10,6 +10,12 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.53.1 — 2026-10-27
+
+### Fixed
+- Applied the exact Rust formatter change required by CI for the managed tag read regression test.
+- No hierarchical tag behavior, filtering, XMP ownership rules, or safety behavior changed.
+
 ## 0.53.0 — 2026-10-27
 
 ### Added
