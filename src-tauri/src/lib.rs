@@ -16,7 +16,7 @@ mod watch;
 use base64::Engine;
 use exif::{DateTime as ExifDateTime, In, Reader as ExifReader, Tag, Value};
 use image::ImageReader;
-use nom_exif::{read_exif as read_nom_exif, ExifTag as NomExifTag};
+use nom_exif::{read_exif as read_nom_exif, EntryValue as NomEntryValue, ExifTag as NomExifTag};
 use serde::Serialize;
 use std::{
     collections::{HashMap, VecDeque},
@@ -160,6 +160,7 @@ struct Photo {
     bytes: u64,
     modified_unix: u64,
     capture_local: Option<String>,
+    live_asset_id: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -365,6 +366,212 @@ fn read_extended_image_capture(path: &Path) -> Option<String> {
     })
 }
 
+fn clean_live_asset_id(bytes: &[u8]) -> Option<String> {
+    let text = String::from_utf8_lossy(bytes);
+    let trimmed = text.trim_end_matches('\0').trim();
+    if trimmed.is_empty() || trimmed.len() > 128 {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
+fn apple_makernote_content_id(blob: &[u8]) -> Option<String> {
+    const CONTENT_IDENTIFIER_TAG: u16 = 0x0011;
+    if blob.len() < 16 || !blob.starts_with(b"Apple iOS\0") {
+        return None;
+    }
+
+    let big_endian = match blob.get(12..14)? {
+        b"MM" => true,
+        b"II" => false,
+        _ => return None,
+    };
+    let read_u16 = |offset: usize| -> Option<u16> {
+        let bytes: [u8; 2] = blob.get(offset..offset.checked_add(2)?)?.try_into().ok()?;
+        Some(if big_endian {
+            u16::from_be_bytes(bytes)
+        } else {
+            u16::from_le_bytes(bytes)
+        })
+    };
+    let read_u32 = |offset: usize| -> Option<u32> {
+        let bytes: [u8; 4] = blob.get(offset..offset.checked_add(4)?)?.try_into().ok()?;
+        Some(if big_endian {
+            u32::from_be_bytes(bytes)
+        } else {
+            u32::from_le_bytes(bytes)
+        })
+    };
+
+    let entries = usize::from(read_u16(14)?);
+    for index in 0..entries {
+        let entry = 16usize.checked_add(index.checked_mul(12)?)?;
+        if read_u16(entry)? != CONTENT_IDENTIFIER_TAG {
+            continue;
+        }
+        if read_u16(entry.checked_add(2)?)? != 2 {
+            return None;
+        }
+        let length = usize::try_from(read_u32(entry.checked_add(4)?)?).ok()?;
+        let bytes = if length <= 4 {
+            blob.get(entry.checked_add(8)?..entry.checked_add(8 + length)?)?
+        } else {
+            let offset = usize::try_from(read_u32(entry.checked_add(8)?)?).ok()?;
+            blob.get(offset..offset.checked_add(length)?)?
+        };
+        return clean_live_asset_id(bytes);
+    }
+    None
+}
+
+fn still_live_asset_id(path: &Path) -> Option<String> {
+    let exif = read_nom_exif(path).ok()?;
+    let NomEntryValue::Undefined(bytes) = exif.get(NomExifTag::MakerNote)? else {
+        return None;
+    };
+    apple_makernote_content_id(bytes)
+}
+
+fn quicktime_live_asset_id(path: &Path) -> Option<String> {
+    const MAX_MOOV_BYTES: u64 = 16 * 1024 * 1024;
+    const CONTENT_IDENTIFIER_KEY: &[u8] = b"com.apple.quicktime.content.identifier";
+
+    fn atom_payload<'a>(data: &'a [u8], wanted: &[u8; 4]) -> Option<&'a [u8]> {
+        let mut cursor = 0usize;
+        while cursor.checked_add(8)? <= data.len() {
+            let size32 = u32::from_be_bytes(data.get(cursor..cursor + 4)?.try_into().ok()?);
+            let kind: [u8; 4] = data.get(cursor + 4..cursor + 8)?.try_into().ok()?;
+            let (size, header) = match size32 {
+                0 => (data.len().checked_sub(cursor)?, 8usize),
+                1 => {
+                    let size = usize::try_from(u64::from_be_bytes(
+                        data.get(cursor + 8..cursor + 16)?.try_into().ok()?,
+                    ))
+                    .ok()?;
+                    (size, 16)
+                }
+                value => (usize::try_from(value).ok()?, 8),
+            };
+            if size < header || cursor.checked_add(size)? > data.len() {
+                return None;
+            }
+            if &kind == wanted {
+                return data.get(cursor + header..cursor + size);
+            }
+            cursor = cursor.checked_add(size)?;
+        }
+        None
+    }
+
+    fn find_top_level_moov(file: &mut fs::File, end: u64) -> Option<(u64, u64)> {
+        let mut position = 0u64;
+        while position.checked_add(8)? <= end {
+            file.seek(SeekFrom::Start(position)).ok()?;
+            let mut header = [0u8; 8];
+            file.read_exact(&mut header).ok()?;
+            let size32 = u32::from_be_bytes(header[..4].try_into().ok()?);
+            let kind: [u8; 4] = header[4..8].try_into().ok()?;
+            let (size, header_size) = match size32 {
+                0 => (end.checked_sub(position)?, 8u64),
+                1 => {
+                    let mut extended = [0u8; 8];
+                    file.read_exact(&mut extended).ok()?;
+                    (u64::from_be_bytes(extended), 16)
+                }
+                value => (u64::from(value), 8),
+            };
+            if size < header_size || position.checked_add(size)? > end {
+                return None;
+            }
+            if &kind == b"moov" {
+                return Some((position.checked_add(header_size)?, size - header_size));
+            }
+            position = position.checked_add(size)?;
+        }
+        None
+    }
+
+    fn content_key_index(keys: &[u8]) -> Option<u32> {
+        if keys.len() < 8 {
+            return None;
+        }
+        let count = u32::from_be_bytes(keys.get(4..8)?.try_into().ok()?);
+        let mut cursor = 8usize;
+        for index in 1..=count {
+            let size = usize::try_from(u32::from_be_bytes(
+                keys.get(cursor..cursor + 4)?.try_into().ok()?,
+            ))
+            .ok()?;
+            if size < 8 || cursor.checked_add(size)? > keys.len() {
+                return None;
+            }
+            if keys.get(cursor + 8..cursor + size)? == CONTENT_IDENTIFIER_KEY {
+                return Some(index);
+            }
+            cursor = cursor.checked_add(size)?;
+        }
+        None
+    }
+
+    fn value_for_index(ilst: &[u8], index: u32) -> Option<String> {
+        let wanted = index.to_be_bytes();
+        let mut cursor = 0usize;
+        while cursor.checked_add(8)? <= ilst.len() {
+            let size = usize::try_from(u32::from_be_bytes(
+                ilst.get(cursor..cursor + 4)?.try_into().ok()?,
+            ))
+            .ok()?;
+            if size < 8 || cursor.checked_add(size)? > ilst.len() {
+                return None;
+            }
+            if ilst.get(cursor + 4..cursor + 8)? == wanted {
+                let item = ilst.get(cursor + 8..cursor + size)?;
+                let data = atom_payload(item, b"data")?;
+                if data.len() < 8 {
+                    return None;
+                }
+                return clean_live_asset_id(&data[8..]);
+            }
+            cursor = cursor.checked_add(size)?;
+        }
+        None
+    }
+
+    let mut file = fs::File::open(path).ok()?;
+    let length = file.metadata().ok()?.len();
+    let (moov_start, moov_len) = find_top_level_moov(&mut file, length)?;
+    if moov_len > MAX_MOOV_BYTES {
+        return None;
+    }
+    file.seek(SeekFrom::Start(moov_start)).ok()?;
+    let mut moov = vec![0u8; usize::try_from(moov_len).ok()?];
+    file.read_exact(&mut moov).ok()?;
+
+    let meta = atom_payload(&moov, b"meta").or_else(|| {
+        let udta = atom_payload(&moov, b"udta")?;
+        atom_payload(udta, b"meta")
+    })?;
+    let meta_body = if atom_payload(meta, b"keys").is_some() {
+        meta
+    } else {
+        meta.get(4..)?
+    };
+    let keys = atom_payload(meta_body, b"keys")?;
+    let index = content_key_index(keys)?;
+    let ilst = atom_payload(meta_body, b"ilst")?;
+    value_for_index(ilst, index)
+}
+
+fn read_live_asset_id(path: &Path, extension: &str) -> Option<String> {
+    if matches!(extension, "mov" | "mp4" | "m4v") {
+        return quicktime_live_asset_id(path);
+    }
+    if matches!(extension, "heic" | "heif" | "jpg" | "jpeg") {
+        return still_live_asset_id(path);
+    }
+    None
+}
+
 fn read_capture_local(path: &Path, extension: &str) -> Option<String> {
     if matches!(extension, "mov" | "mp4" | "m4v") {
         const QUICKTIME_TO_UNIX_SECONDS: i64 = 2_082_844_800;
@@ -453,6 +660,7 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
             let capture_local = read_capture_local(&path, &ext);
+            let live_asset_id = read_live_asset_id(&path, &ext);
             photos.push(Photo {
                 path: path.to_string_lossy().into_owned(),
                 name: entry.file_name().to_string_lossy().into_owned(),
@@ -460,6 +668,7 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
                 bytes: metadata.len(),
                 modified_unix,
                 capture_local,
+                live_asset_id,
             });
         }
     }
@@ -738,6 +947,36 @@ mod tests {
             Some("2024-07-04T18:23:59+00:00")
         );
         assert!(normalize_metadata_datetime("2024:13:40 25:99:99").is_none());
+    }
+
+    #[test]
+    fn parses_apple_live_photo_makernote_identifier() {
+        let identifier = "F0652AEA-5229-4BF7-A366-B4C79E90CA1C";
+        let mut blob = Vec::new();
+        blob.extend_from_slice(b"Apple iOS\0");
+        blob.extend_from_slice(&[0, 1]);
+        blob.extend_from_slice(b"MM");
+        blob.extend_from_slice(&1u16.to_be_bytes());
+        let value_offset = 16 + 12 + 4;
+        blob.extend_from_slice(&0x0011u16.to_be_bytes());
+        blob.extend_from_slice(&2u16.to_be_bytes());
+        blob.extend_from_slice(&((identifier.len() + 1) as u32).to_be_bytes());
+        blob.extend_from_slice(&(value_offset as u32).to_be_bytes());
+        blob.extend_from_slice(&0u32.to_be_bytes());
+        blob.extend_from_slice(identifier.as_bytes());
+        blob.push(0);
+        assert_eq!(
+            apple_makernote_content_id(&blob).as_deref(),
+            Some(identifier)
+        );
+    }
+
+    #[test]
+    fn rejects_non_apple_or_truncated_live_photo_makernotes() {
+        assert!(apple_makernote_content_id(b"Nikon\0metadata").is_none());
+        let mut apple = b"Apple iOS\0".to_vec();
+        apple.extend_from_slice(&[0, 1, b'M', b'M']);
+        assert!(apple_makernote_content_id(&apple).is_none());
     }
 
     #[test]
