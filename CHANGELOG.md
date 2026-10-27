@@ -10,6 +10,20 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.43.0 — 2026-10-27
+
+### Added
+- Added explicit date provenance to the media details panel.
+- The active date source is labeled as **EXIF metadata**, **QuickTime metadata**, or **File modified fallback**.
+- When embedded capture metadata exists, the details panel also shows both the embedded capture value and the filesystem modified value.
+
+### Changed
+- Timeline help text now reflects the verified EXIF + QuickTime capture-date behavior instead of describing QuickTime dates as planned.
+
+### Safety
+- Provenance is derived from already-indexed metadata and does not trigger additional file reads.
+- No source media or metadata is modified.
+
 ## 0.42.1 — 2026-10-27
 
 ### Fixed
