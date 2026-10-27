@@ -122,6 +122,8 @@ Memories is a dedicated **On This Day** view in the main navigation. It groups m
 
 Each year group also includes **Browse all media from YEAR**. That opens the Library filtered to the selected capture year. The Library shows a visible **Memory year** chip with a **Show all years** control, and the year filter is cleared when Timeline, smart collections, or virtual collections take over so hidden filters do not stack.
 
+Memories also includes an **All years** browser built from the current workspace index. Every capture year is listed with its media count, so you can jump into any year even when there is no On This Day match.
+
 Memories uses the same capture-date rules as Timeline: EXIF for supported still images, QuickTime metadata for MOV/MP4/M4V, and filesystem modified time only as a fallback.
 
 ### 4. Ratings and favorites
