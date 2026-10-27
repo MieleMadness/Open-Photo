@@ -10,6 +10,24 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.52.0 — 2026-10-27
+
+### Added
+- Added safe keyword merging for XMP sidecars created and owned by Open-Photo.
+- New Open-Photo sidecars are marked with `xmp:CreatorTool="Open-Photo"`.
+- Existing Open-Photo keywords are preserved while new tags are merged case-insensitively.
+- The tagging UI now reports created, updated and skipped sidecars separately.
+- Added regression coverage proving foreign XMP files remain untouched and managed sidecars merge tags without modifying source media.
+
+### Changed
+- Foreign or unknown XMP sidecars are still skipped rather than overwritten.
+- Managed sidecar replacement now uses a temporary file plus rollback backup instead of truncating an existing XMP file in place.
+
+### Safety
+- Original photos and videos are never edited by the tagging workflow.
+- XMP sidecars larger than 256 KB or not carrying the Open-Photo ownership marker are skipped.
+- Managed sidecars are limited to 200 keywords.
+
 ## 0.51.0 — 2026-10-27
 
 ### Added
