@@ -10,6 +10,25 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.53.0 — 2026-10-27
+
+### Added
+- Added read-back of keywords from Open-Photo-managed XMP sidecars.
+- Replaced the Tags placeholder with a real hierarchical Tags browser.
+- Tags use `/` as the hierarchy separator, such as `People/Family/Marc`.
+- Parent branches are generated automatically and show unique tagged-media counts.
+- Selecting a branch opens the Library filtered to that branch and all descendant tags.
+- Added a visible active-tag filter chip and a Refresh tags action.
+- Added regression coverage proving tag reads ignore foreign/unknown XMP sidecars.
+
+### Changed
+- Major date/smart/collection filters clear an active tag filter so organization filters do not stack invisibly.
+
+### Safety
+- Tag indexing is read-only and only parses XMP sidecars carrying the Open-Photo ownership marker.
+- Foreign/unknown sidecars remain ignored and untouched.
+- Managed sidecar reads are capped at 256 KB and 5,000 media paths per request.
+
 ## 0.52.1 — 2026-10-27
 
 ### Fixed
