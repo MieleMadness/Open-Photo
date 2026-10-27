@@ -65,10 +65,107 @@ fn xml_escape(value: &str) -> String {
 #[derive(Serialize)]
 struct BulkTagResult {
     created: usize,
+    updated: usize,
     skipped: usize,
     errors: Vec<String>,
 }
-/// Only create missing XMP sidecars. Never overwrite existing sidecars or original files.
+
+const OPENPHOTO_XMP_MARKER: &str = "xmp:CreatorTool=\"Open-Photo\"";
+const MAX_XMP_SIDECAR_BYTES: u64 = 256 * 1024;
+
+fn render_openphoto_xmp(tags: &[String]) -> String {
+    let list = tags
+        .iter()
+        .map(|tag| format!("<rdf:li>{}</rdf:li>", xml_escape(tag)))
+        .collect::<String>();
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmp:CreatorTool="Open-Photo">
+<dc:subject><rdf:Bag>{list}</rdf:Bag></dc:subject>
+</rdf:Description></rdf:RDF></x:xmpmeta>
+"#
+    )
+}
+
+fn decode_xml_entities(value: &str) -> String {
+    value
+        .replace("&apos;", "'")
+        .replace("&quot;", "\"")
+        .replace("&gt;", ">")
+        .replace("&lt;", "<")
+        .replace("&amp;", "&")
+}
+
+fn openphoto_xmp_tags(xml: &str) -> Option<Vec<String>> {
+    if !xml.contains(OPENPHOTO_XMP_MARKER) {
+        return None;
+    }
+    let bag_start = xml.find("<dc:subject><rdf:Bag>")? + "<dc:subject><rdf:Bag>".len();
+    let bag_end = xml[bag_start..].find("</rdf:Bag></dc:subject>")? + bag_start;
+    let bag = &xml[bag_start..bag_end];
+    let mut tags = Vec::new();
+    let mut cursor = 0usize;
+    while let Some(start_rel) = bag[cursor..].find("<rdf:li>") {
+        let value_start = cursor + start_rel + "<rdf:li>".len();
+        let value_end = bag[value_start..].find("</rdf:li>")? + value_start;
+        let tag = decode_xml_entities(&bag[value_start..value_end]);
+        if tag.is_empty() || tag.len() > 128 {
+            return None;
+        }
+        tags.push(tag);
+        cursor = value_end + "</rdf:li>".len();
+    }
+    Some(tags)
+}
+
+fn replace_managed_sidecar(sidecar: &Path, contents: &str) -> Result<(), String> {
+    let file_name = sidecar
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("Invalid XMP sidecar filename")?;
+    let temp = sidecar.with_file_name(format!("{file_name}.openphoto.tmp"));
+    let backup = sidecar.with_file_name(format!("{file_name}.openphoto.bak"));
+    if temp.exists() || backup.exists() {
+        return Err("Previous Open-Photo XMP recovery file exists; inspect it before retrying".into());
+    }
+
+    {
+        let mut handle = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp)
+            .map_err(|e| e.to_string())?;
+        if let Err(error) = handle
+            .write_all(contents.as_bytes())
+            .and_then(|_| handle.sync_all())
+        {
+            drop(handle);
+            let _ = fs::remove_file(&temp);
+            return Err(error.to_string());
+        }
+    }
+
+    fs::rename(sidecar, &backup).map_err(|e| {
+        let _ = fs::remove_file(&temp);
+        e.to_string()
+    })?;
+    if let Err(error) = fs::rename(&temp, sidecar) {
+        let _ = fs::rename(&backup, sidecar);
+        let _ = fs::remove_file(&temp);
+        return Err(format!("Unable to replace managed XMP sidecar: {error}"));
+    }
+    if let Err(error) = fs::remove_file(&backup) {
+        return Err(format!(
+            "XMP updated, but the temporary recovery backup could not be removed: {error}"
+        ));
+    }
+    Ok(())
+}
+
+/// Create new Open-Photo XMP sidecars or merge keywords into sidecars that
+/// Open-Photo owns. Unknown/foreign XMP files are never overwritten.
 #[tauri::command]
 fn bulk_create_tags(
     root: String,
@@ -88,11 +185,18 @@ fn bulk_create_tags(
     {
         return Err("Invalid tags; use 1–50 tags of up to 128 characters".into());
     }
+
+    let normalized_tags = tags
+        .into_iter()
+        .map(|tag| tag.trim().to_string())
+        .collect::<Vec<_>>();
     let mut output = BulkTagResult {
         created: 0,
+        updated: 0,
         skipped: 0,
         errors: Vec::new(),
     };
+
     for path in paths {
         let file = match safe_media_path(&root, &path) {
             Ok(file) => file,
@@ -102,16 +206,43 @@ fn bulk_create_tags(
             }
         };
         let sidecar = PathBuf::from(format!("{}.xmp", file.display()));
-        let mut handle = match fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&sidecar)
-        {
-            Ok(file) => file,
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                output.skipped += 1;
-                continue;
+
+        if !sidecar.exists() {
+            let xml = render_openphoto_xmp(&normalized_tags);
+            let mut handle = match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&sidecar)
+            {
+                Ok(file) => file,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                    output.skipped += 1;
+                    continue;
+                }
+                Err(error) => {
+                    output
+                        .errors
+                        .push(format!("{}: {error}", sidecar.display()));
+                    continue;
+                }
+            };
+            if let Err(error) = handle
+                .write_all(xml.as_bytes())
+                .and_then(|_| handle.sync_all())
+            {
+                output
+                    .errors
+                    .push(format!("{}: {error}", sidecar.display()));
+                drop(handle);
+                let _ = fs::remove_file(&sidecar);
+            } else {
+                output.created += 1;
             }
+            continue;
+        }
+
+        let metadata = match fs::metadata(&sidecar) {
+            Ok(metadata) => metadata,
             Err(error) => {
                 output
                     .errors
@@ -119,30 +250,46 @@ fn bulk_create_tags(
                 continue;
             }
         };
-        let list = tags
-            .iter()
-            .map(|tag| format!("<rdf:li>{}</rdf:li>", xml_escape(tag)))
-            .collect::<String>();
-        let xml = format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<x:xmpmeta xmlns:x="adobe:ns:meta/">
-<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
-<dc:subject><rdf:Bag>{list}</rdf:Bag></dc:subject>
-</rdf:Description></rdf:RDF></x:xmpmeta>
-"#
-        );
-        if let Err(error) = handle
-            .write_all(xml.as_bytes())
-            .and_then(|_| handle.sync_all())
-        {
+        if !metadata.is_file() || metadata.len() > MAX_XMP_SIDECAR_BYTES {
+            output.skipped += 1;
+            continue;
+        }
+        let xml = match fs::read_to_string(&sidecar) {
+            Ok(xml) => xml,
+            Err(_) => {
+                output.skipped += 1;
+                continue;
+            }
+        };
+        let Some(existing) = openphoto_xmp_tags(&xml) else {
+            output.skipped += 1;
+            continue;
+        };
+
+        let mut merged = existing;
+        let mut changed = false;
+        for tag in &normalized_tags {
+            if !merged.iter().any(|existing| existing.eq_ignore_ascii_case(tag)) {
+                merged.push(tag.clone());
+                changed = true;
+            }
+        }
+        if !changed {
+            output.skipped += 1;
+            continue;
+        }
+        if merged.len() > 200 {
             output
                 .errors
-                .push(format!("{}: {error}", sidecar.display()));
-            drop(handle);
-            let _ = fs::remove_file(&sidecar);
-        } else {
-            output.created += 1;
+                .push(format!("{}: managed sidecar would exceed 200 keywords", sidecar.display()));
+            continue;
+        }
+        let replacement = render_openphoto_xmp(&merged);
+        match replace_managed_sidecar(&sidecar, &replacement) {
+            Ok(()) => output.updated += 1,
+            Err(error) => output
+                .errors
+                .push(format!("{}: {error}", sidecar.display())),
         }
     }
     Ok(output)
@@ -945,6 +1092,41 @@ mod tests {
         let second = bulk_create_tags(root_arg, paths, vec!["Other".into()]).unwrap();
         assert_eq!(second.skipped, 1);
         assert!(!fs::read_to_string(&sidecar).unwrap().contains("Other"));
+        assert_eq!(fs::read(&image).unwrap(), b"original");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn parses_only_openphoto_managed_xmp_keywords() {
+        let xml = render_openphoto_xmp(&["Family".into(), "Trips/Florida".into()]);
+        assert_eq!(
+            openphoto_xmp_tags(&xml),
+            Some(vec!["Family".into(), "Trips/Florida".into()])
+        );
+        let foreign = xml.replace(OPENPHOTO_XMP_MARKER, "xmp:CreatorTool=\"Other App\"");
+        assert!(openphoto_xmp_tags(&foreign).is_none());
+    }
+
+    #[test]
+    fn managed_xmp_update_preserves_source_media_and_merges_tags() {
+        let root = temp_root();
+        let image = root.join("sample.jpg");
+        fs::write(&image, b"original").unwrap();
+        let root_arg = root.to_string_lossy().into_owned();
+        let paths = vec![image.to_string_lossy().into_owned()];
+        let first =
+            bulk_create_tags(root_arg.clone(), paths.clone(), vec!["Family".into()]).unwrap();
+        assert_eq!(first.created, 1);
+        let second = bulk_create_tags(
+            root_arg,
+            paths,
+            vec!["family".into(), "Trips/Florida".into()],
+        )
+        .unwrap();
+        assert_eq!(second.updated, 1);
+        let xml = fs::read_to_string(root.join("sample.jpg.xmp")).unwrap();
+        let tags = openphoto_xmp_tags(&xml).unwrap();
+        assert_eq!(tags, vec!["Family", "Trips/Florida"]);
         assert_eq!(fs::read(&image).unwrap(), b"original");
         fs::remove_dir_all(root).unwrap();
     }
