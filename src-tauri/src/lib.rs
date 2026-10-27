@@ -243,11 +243,9 @@ fn bulk_create_tags(
     }
     if tags.is_empty()
         || tags.len() > 50
-        || tags.iter().any(|t| {
-            t.trim().is_empty()
-                || t.len() > 128
-                || t.chars().any(|c| c == '\0' || c == '\n' || c == '\r')
-        })
+        || tags
+            .iter()
+            .any(|t| t.trim().is_empty() || t.len() > 128 || t.chars().any(char::is_control))
     {
         return Err("Invalid tags; use 1–50 tags of up to 128 characters".into());
     }
@@ -277,34 +275,20 @@ fn bulk_create_tags(
 
         if !sidecar.exists() {
             let xml = render_openphoto_xmp(&normalized_tags);
-            let mut handle = match fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&sidecar)
-            {
-                Ok(file) => file,
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                    output.skipped += 1;
-                    continue;
-                }
-                Err(error) => {
-                    output
-                        .errors
-                        .push(format!("{}: {error}", sidecar.display()));
-                    continue;
-                }
-            };
-            if let Err(error) = handle
-                .write_all(xml.as_bytes())
-                .and_then(|_| handle.sync_all())
-            {
-                output
+            let result = (|| -> Result<(), String> {
+                let mut staged = crate::safe_output::StagedOutput::new(&sidecar)?;
+                staged
+                    .file()
+                    .write_all(xml.as_bytes())
+                    .map_err(|error| error.to_string())?;
+                staged.commit()?;
+                Ok(())
+            })();
+            match result {
+                Ok(()) => output.created += 1,
+                Err(error) => output
                     .errors
-                    .push(format!("{}: {error}", sidecar.display()));
-                drop(handle);
-                let _ = fs::remove_file(&sidecar);
-            } else {
-                output.created += 1;
+                    .push(format!("{}: {error}", sidecar.display())),
             }
             continue;
         }
