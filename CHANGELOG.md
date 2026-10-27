@@ -10,6 +10,20 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.46.0 — 2026-10-27
+
+### Added
+- Added **Browse all media from YEAR** to each Memories year group.
+- Added a dedicated Memory year filter to the Library with a visible **Show all years** control.
+- Year filtering uses the same capture-date preference as Memories and Timeline.
+
+### Changed
+- Memory year, Timeline month, smart collection, custom smart rule, and virtual collection filters are kept mutually exclusive to avoid hidden filter stacking.
+
+### Safety
+- Year browsing is a presentation-only filter over the existing local index.
+- No source media or metadata is moved, copied, renamed, or modified.
+
 ## 0.45.0 — 2026-10-27
 
 ### Added
