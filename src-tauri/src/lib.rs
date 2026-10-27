@@ -128,7 +128,9 @@ fn replace_managed_sidecar(sidecar: &Path, contents: &str) -> Result<(), String>
     let temp = sidecar.with_file_name(format!("{file_name}.openphoto.tmp"));
     let backup = sidecar.with_file_name(format!("{file_name}.openphoto.bak"));
     if temp.exists() || backup.exists() {
-        return Err("Previous Open-Photo XMP recovery file exists; inspect it before retrying".into());
+        return Err(
+            "Previous Open-Photo XMP recovery file exists; inspect it before retrying".into(),
+        );
     }
 
     {
@@ -269,7 +271,10 @@ fn bulk_create_tags(
         let mut merged = existing;
         let mut changed = false;
         for tag in &normalized_tags {
-            if !merged.iter().any(|existing| existing.eq_ignore_ascii_case(tag)) {
+            if !merged
+                .iter()
+                .any(|existing| existing.eq_ignore_ascii_case(tag))
+            {
                 merged.push(tag.clone());
                 changed = true;
             }
@@ -279,9 +284,10 @@ fn bulk_create_tags(
             continue;
         }
         if merged.len() > 200 {
-            output
-                .errors
-                .push(format!("{}: managed sidecar would exceed 200 keywords", sidecar.display()));
+            output.errors.push(format!(
+                "{}: managed sidecar would exceed 200 keywords",
+                sidecar.display()
+            ));
             continue;
         }
         let replacement = render_openphoto_xmp(&merged);
