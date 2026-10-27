@@ -25,7 +25,7 @@ It is designed to work directly with folders you already own, keep original medi
 | Memories | ✅ Working | Dedicated On This Day view groups past-year matches by year and links into date-based Library filters |
 | GPS map | ✅ Working with privacy note | Reads EXIF GPS locally; map tiles are loaded from OpenStreetMap |
 | Full-screen viewer | ✅ Working | Keyboard navigation and larger local preview |
-| XMP keyword sidecars | ✅ Working, guarded | Creates new Open-Photo sidecars and safely merges tags into Open-Photo-managed sidecars; foreign XMP remains untouched |
+| XMP keyword sidecars | ✅ Working, guarded | Creates/merges Open-Photo-managed keywords, reads them back into a hierarchical Tags browser, and leaves foreign XMP untouched |
 | Exact duplicate detection | ✅ Working | SHA-256 based review across workspace roots |
 | Visual near-duplicate review | ✅ Working | Local CPU dHash grouping; review only, no automatic deletion |
 | Preferred duplicate copy | ✅ Working | User choice is stored locally and does not move/delete files |
@@ -221,7 +221,10 @@ Important behavior:
 - Foreign or unknown XMP sidecars are skipped and never overwritten.
 - Managed sidecar replacement uses a temporary file and rollback backup rather than truncating the existing file in place.
 - The original photo/video is never edited.
-- Hierarchical tag UI, captions, ratings, face regions and full sidecar undo/history are still incomplete.
+- Hierarchical tag browsing is supported using `/` as the level separator, for example `People/Family/Marc` or `Places/Florida/Tampa`.
+- The Tags view reads only Open-Photo-managed sidecars and builds branch counts from actual tagged media.
+- Selecting a tag branch filters the Library to that branch and all descendants.
+- Captions, ratings, face regions and full sidecar undo/history are still incomplete.
 
 ## Duplicate tools
 
