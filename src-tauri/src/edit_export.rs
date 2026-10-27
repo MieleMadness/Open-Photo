@@ -312,7 +312,7 @@ fn preview_edited_photo_blocking(
     if source_bytes > MAX_EDIT_SOURCE_BYTES {
         return Err("Editing is limited to source images up to 250 MB".into());
     }
-    let image = crate::image_decode::decode(&source)?;
+    let image = crate::image_decode::editor_source(&source)?;
     let source_width = image.width();
     let source_height = image.height();
     let (width, height) = edited_output_dimensions(source_width, source_height, &options)?;
@@ -380,47 +380,26 @@ fn export_edited_copy_blocking(
     }
     let format = export_format(&destination)?;
 
-    let image = crate::image_decode::decode(&source)?;
+    let image = crate::image_decode::editor_source(&source)?;
     let edited = apply_edits(image, &options)?;
     let width = edited.width();
     let height = edited.height();
 
-    let mut output = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&destination)
-        .map_err(|e| format!("Cannot create edited export: {e}"))?;
-    let encode_result = if format == ImageFormat::Jpeg {
-        let quality = match validate_jpeg_quality(options.jpeg_quality) {
-            Ok(quality) => quality,
-            Err(error) => {
-                drop(output);
-                let _ = fs::remove_file(&destination);
-                return Err(error);
-            }
-        };
-        JpegEncoder::new_with_quality(&mut output, quality).encode_image(&edited)
+    let mut staged = crate::safe_output::StagedOutput::new(&destination)?;
+    let output = staged.file();
+    if format == ImageFormat::Jpeg {
+        let quality = validate_jpeg_quality(options.jpeg_quality)?;
+        JpegEncoder::new_with_quality(&mut *output, quality).encode_image(&edited)
     } else {
-        edited.write_to(&mut output, format)
-    };
-    if let Err(error) = encode_result {
-        drop(output);
-        let _ = fs::remove_file(&destination);
-        return Err(format!("Cannot encode edited export: {error}"));
+        edited.write_to(&mut *output, format)
     }
-    if let Err(error) = output.sync_all() {
-        drop(output);
-        let _ = fs::remove_file(&destination);
-        return Err(format!("Cannot finish edited export: {error}"));
-    }
+    .map_err(|error| format!("Cannot encode edited export: {error}"))?;
     if let Some(modified) = source_modified {
-        if let Err(error) = output.set_times(FileTimes::new().set_modified(modified)) {
-            drop(output);
-            let _ = fs::remove_file(&destination);
-            return Err(format!("Cannot preserve source modified time: {error}"));
-        }
+        output
+            .set_times(FileTimes::new().set_modified(modified))
+            .map_err(|error| format!("Cannot preserve source modified time: {error}"))?;
     }
-    drop(output);
+    staged.commit()?;
     let bytes = fs::metadata(&destination).map_err(|e| e.to_string())?.len();
 
     Ok(EditedExportResult {

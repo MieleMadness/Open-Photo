@@ -73,6 +73,18 @@ pub fn save_user_data(key: String, value: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn export_user_data(destination: String) -> Result<(), String> {
+    use std::io::Write;
+    let values = migrate(&mut database()?, BTreeMap::new())?;
+    let bytes = serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"values":values}))
+        .map_err(|e| e.to_string())?;
+    let mut output = crate::safe_output::StagedOutput::new(std::path::Path::new(&destination))?;
+    output.file().write_all(&bytes).map_err(|e| e.to_string())?;
+    output.commit()?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

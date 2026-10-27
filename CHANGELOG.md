@@ -4,9 +4,9 @@
 - XMP keyword merges preserve existing XML properties and use namespace-aware parsing. Conflicting external edits are detected before replacement; Windows replacement is atomic with a recovery copy.
 - Incomplete scans retain previous index snapshots, with visible read errors.
 - Shared image decode normalizes EXIF orientation and applies explicit allocation/pixel limits. Editor jobs run off the UI thread, serialize allocations, and drop superseded queued previews.
-- Editor previews use export-scale blur/sharpen semantics.
+- Editor previews use export-scale blur/sharpen semantics and a bounded normalized-source cache. Completed exports publish atomically without overwriting another file.
 - Inline video uses scoped range-aware local streaming rather than whole-file base64; decoder-dependent fallback remains available.
-- Organizational data migrates into local SQLite with previous-value history; startup load failures do not replace saved data.
+- Organizational data migrates into local SQLite with previous-value history; startup load failures do not replace saved data. Settings can export a separate JSON metadata backup.
 - People IDs and names persist independently of filenames; named identities are never automatically merged with new suggestions. Existing compatible legacy names migrate when their original group is available.
 - Fixed save-dialog permissions and incremental Live Photo metadata loss.
 - Added dependency lockfiles, pinned toolchains, frontend regression tests, independent frontend/Rust checks, and gated installer packaging.

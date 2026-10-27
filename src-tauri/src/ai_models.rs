@@ -1,7 +1,6 @@
 //! Offline AI model storage. This module never sends data to a network service.
 //! Semantic model slots are validated against one supported OpenCLIP bundle before execution.
 use crate::image_decode::POLICY;
-use crate::image_decode::POLICY;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{

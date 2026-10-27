@@ -47,6 +47,7 @@ jobs:
         with:
           workspaces: src-tauri -> target
           shared-key: windows-validation
+          cache-on-failure: true
       - uses: actions/setup-node@v4
         with:
           node-version: '22.23.0'

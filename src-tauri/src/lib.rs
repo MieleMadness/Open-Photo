@@ -14,6 +14,7 @@ mod image_decode;
 mod index;
 mod media_jobs;
 mod media_stream;
+mod safe_output;
 mod similar;
 mod user_data;
 mod watch;
@@ -1095,6 +1096,7 @@ pub fn run() {
             media_stream::video_source,
             user_data::load_user_data,
             user_data::save_user_data,
+            user_data::export_user_data,
             ai_faces::ai_name_person,
             bulk_create_tags,
             read_managed_tags,
@@ -1131,6 +1133,36 @@ mod tests {
         let dir = env::temp_dir().join(format!("openphoto-scan-{}-{}", std::process::id(), stamp));
         fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn managed_merge_preserves_extra_properties_and_rejects_stale_replacement() {
+        let root = temp_root();
+        let image = root.join("sample.jpg");
+        fs::write(&image, b"original").unwrap();
+        let sidecar = root.join("sample.jpg.xmp");
+        let xml = render_openphoto_xmp(&["Family".into()]).replace(
+            "</rdf:Description>",
+            "<dc:description>Keep this caption</dc:description></rdf:Description>",
+        );
+        fs::write(&sidecar, &xml).unwrap();
+        let result = bulk_create_tags(
+            root.to_string_lossy().into_owned(),
+            vec![image.to_string_lossy().into_owned()],
+            vec!["Trips".into()],
+        )
+        .unwrap();
+        assert_eq!(result.updated, 1);
+        let updated = fs::read_to_string(&sidecar).unwrap();
+        assert!(updated.contains("<dc:description>Keep this caption</dc:description>"));
+        assert_eq!(
+            openphoto_xmp_tags(&updated).unwrap(),
+            vec!["Family", "Trips"]
+        );
+        assert!(replace_managed_sidecar(&sidecar, &xml, "wrong replacement").is_err());
+        assert_eq!(fs::read_to_string(&sidecar).unwrap(), updated);
+        assert_eq!(fs::read(&image).unwrap(), b"original");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

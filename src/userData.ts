@@ -2,6 +2,7 @@ import {invoke} from "@tauri-apps/api/core";
 
 const desktop=typeof window!=="undefined"&&"__TAURI_INTERNALS__" in window;
 let pending:Promise<unknown>=Promise.resolve();
+const failures=new Map<string,string>();
 
 export async function hydrateSettings(){
   if(!desktop)return;
@@ -18,8 +19,8 @@ export function saveSetting(key:string,value:string){
   try{localStorage.setItem(key,value)}catch(error){report(error)}
   if(!desktop)return;
   // Preserve write order so a slow older write cannot replace newer metadata.
-  pending=pending.catch(()=>{}).then(()=>invoke("save_user_data",{key,value}));
-  void pending.catch(report);
+  pending=pending.catch(()=>{}).then(()=>invoke("save_user_data",{key,value})).then(()=>{failures.delete(key)});
+  void pending.catch(error=>{failures.set(key,String(error));report(error)});
 }
 
 function report(error:unknown){
@@ -32,4 +33,5 @@ export async function retrySettings(){
     if(key?.startsWith("openphoto."))saveSetting(key,localStorage.getItem(key)!);
   }
   await pending;
+  if(failures.size)throw Error([...failures.values()].join("; "));
 }

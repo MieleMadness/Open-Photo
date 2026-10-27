@@ -5,7 +5,11 @@ use ort::session::Session;
 use rusqlite::{params, Connection};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::{collections::HashMap, path::Path, time::UNIX_EPOCH};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+    time::UNIX_EPOCH,
+};
 
 const DETECTOR_SIZE: usize = 320;
 const EMBED_SIZE: usize = 112;
