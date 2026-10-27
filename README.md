@@ -124,6 +124,8 @@ Each year group also includes **Browse all media from YEAR**. That opens the Lib
 
 Memories also includes an **All years** browser built from the current workspace index. Every capture year is listed with its media count, so you can jump into any year even when there is no On This Day match.
 
+Each year also shows capture-date coverage: how many items use **EXIF metadata**, **QuickTime metadata**, or the **file modified fallback**. This makes it easier to spot years where organization depends heavily on filesystem dates rather than embedded capture metadata.
+
 Memories uses the same capture-date rules as Timeline: EXIF for supported still images, QuickTime metadata for MOV/MP4/M4V, and filesystem modified time only as a fallback.
 
 ### 4. Ratings and favorites
