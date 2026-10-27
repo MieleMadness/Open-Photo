@@ -10,6 +10,12 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.41.3 — 2026-10-27
+
+### CI
+- Pinned the Windows CI job to the supported `windows-2022` hosted runner pool after repeated `windows-latest` jobs failed before step execution and produced no logs.
+- Application and capture-date behavior are unchanged.
+
 ## 0.41.2 — 2026-10-27
 
 ### Fixed
