@@ -10,6 +10,20 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.47.0 — 2026-10-27
+
+### Added
+- Added an **All years** browser to Memories.
+- Every capture year in the current workspace is listed with its indexed media count.
+- Any year can be opened directly in the Library using the existing Memory year filter, even when there is no On This Day match.
+
+### Changed
+- Memories now remains useful on dates with zero On This Day results by providing full year-based navigation from the same view.
+
+### Safety
+- Year counts are derived from the already-loaded local index and do not trigger additional source-file reads.
+- No source media or metadata is moved, copied, renamed, or modified.
+
 ## 0.46.0 — 2026-10-27
 
 ### Added
