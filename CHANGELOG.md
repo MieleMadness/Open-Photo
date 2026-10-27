@@ -10,6 +10,12 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.52.1 — 2026-10-27
+
+### Fixed
+- Applied the exact Rust formatter changes required by CI for the managed XMP merge implementation.
+- No XMP behavior, ownership rules, limits, or source-media safety behavior changed.
+
 ## 0.52.0 — 2026-10-27
 
 ### Added
