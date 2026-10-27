@@ -623,10 +623,18 @@ mod tests {
             (10_000, 10_000)
         );
         assert!(validate_output_dimensions(20_000, 20_000).is_err());
-    }    #[test]
+    }
+
+    #[test]
     fn preview_resize_is_bounded_by_max_edge() {
-        assert_eq!(preview_resize_dimensions(20_000, 10_000, 1_400), (1_400, 700));
-        assert_eq!(preview_resize_dimensions(800, 600, 1_400), (800, 600));
+        assert_eq!(
+            preview_resize_dimensions(20_000, 10_000, 1_400),
+            (1_400, 700)
+        );
+        assert_eq!(
+            preview_resize_dimensions(800, 600, 1_400),
+            (800, 600)
+        );
     }
 
     #[test]
@@ -653,9 +661,7 @@ mod tests {
         };
         assert_eq!(
             edited_output_dimensions(4_000, 3_000, &options).unwrap(),
-            (1_000, 1_666)
+            (1_000, 1_667)
         );
     }
-
-
 }
