@@ -10,6 +10,18 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.38.0 — 2026-10-27
+
+### Changed
+- Refactored editor geometry so rotation, crop and resize dimensions are calculated through shared backend helpers.
+- Live preview now uses a bounded preview-size resize instead of allocating the full requested export dimensions first.
+- Final export width and height are still calculated from the exact requested edit geometry and reported unchanged.
+
+### Safety
+- Large but valid export targets no longer require equally large live-preview resize buffers.
+- The 100-megapixel final-output limit remains enforced before preview or export work proceeds.
+- Original media remains read-only.
+
 ## 0.37.1 — 2026-10-27
 
 ### Fixed
