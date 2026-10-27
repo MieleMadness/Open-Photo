@@ -17,6 +17,7 @@ use base64::Engine;
 use exif::{DateTime as ExifDateTime, In, Reader as ExifReader, Tag, Value};
 use image::ImageReader;
 use nom_exif::{read_exif as read_nom_exif, EntryValue as NomEntryValue, ExifTag as NomExifTag};
+use raw_files::{Orientation as RawOrientation, RawFile};
 use serde::Serialize;
 use std::{
     collections::{HashMap, VecDeque},
@@ -685,6 +686,29 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
     })
 }
 
+fn decode_raw_embedded_preview(path: &Path) -> Result<image::DynamicImage, String> {
+    let mut raw = RawFile::open(path).map_err(|e| format!("RAW preview unavailable: {e}"))?;
+    let preview = raw
+        .largest_preview()
+        .ok_or("RAW file does not contain a usable embedded preview")?;
+    let orientation = preview.orientation();
+    let bytes = raw
+        .read_preview(&preview)
+        .map_err(|e| format!("Unable to read embedded RAW preview: {e}"))?;
+    let image = image::load_from_memory(&bytes)
+        .map_err(|_| "Embedded RAW preview is not a supported image encoding".to_string())?;
+    Ok(match orientation {
+        RawOrientation::NoTransforms => image,
+        RawOrientation::FlipHorizontal => image.fliph(),
+        RawOrientation::Rotate180 => image.rotate180(),
+        RawOrientation::FlipVertical => image.flipv(),
+        RawOrientation::Rotate90FlipH => image.rotate90().fliph(),
+        RawOrientation::Rotate90 => image.rotate90(),
+        RawOrientation::Rotate270FlipH => image.rotate270().fliph(),
+        RawOrientation::Rotate270 => image.rotate270(),
+    })
+}
+
 /// Decodes images locally and returns bounded image previews without exposing the filesystem.
 /// Read a bounded local iPhone media file for on-device preview or playback.
 /// The media stays on the user's machine; originals are never rewritten.
@@ -712,9 +736,22 @@ fn read_iphone_media(root: String, path: String) -> Result<String, String> {
 #[tauri::command]
 fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, String> {
     let file = safe_media_path(&root, &path)?;
+    let extension = file
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
     let size = fs::metadata(&file).map_err(|e| e.to_string())?.len();
-    if size > 75 * 1024 * 1024 {
-        return Err("Preview unavailable for files larger than 75 MB".into());
+    let max_source_bytes = if matches!(extension.as_str(), "nef" | "arw") {
+        250 * 1024 * 1024
+    } else {
+        75 * 1024 * 1024
+    };
+    if size > max_source_bytes {
+        return Err(format!(
+            "Preview unavailable for this file larger than {} MB",
+            max_source_bytes / (1024 * 1024)
+        ));
     }
     let modified = fs::metadata(&file)
         .ok()
@@ -735,13 +772,17 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
         ));
     }
     let edge = max_edge.clamp(64, 1920);
-    let reader = ImageReader::open(&file)
-        .map_err(|e| e.to_string())?
-        .with_guessed_format()
-        .map_err(|e| e.to_string())?;
-    let decoded = reader
-        .decode()
-        .map_err(|_| "This format cannot be previewed yet".to_string())?;
+    let decoded = if matches!(extension.as_str(), "nef" | "arw") {
+        decode_raw_embedded_preview(&file)?
+    } else {
+        let reader = ImageReader::open(&file)
+            .map_err(|e| e.to_string())?
+            .with_guessed_format()
+            .map_err(|e| e.to_string())?;
+        reader
+            .decode()
+            .map_err(|_| "This format cannot be previewed yet".to_string())?
+    };
     let thumb = decoded.thumbnail(edge, edge);
     let mut bytes = Cursor::new(Vec::new());
     thumb
