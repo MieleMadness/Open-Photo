@@ -25,7 +25,7 @@ It is designed to work directly with folders you already own, keep original medi
 | Memories | ✅ Working | Dedicated On This Day view groups past-year matches by year and links into date-based Library filters |
 | GPS map | ✅ Working with privacy note | Reads EXIF GPS locally; map tiles are loaded from OpenStreetMap |
 | Full-screen viewer | ✅ Working | Keyboard navigation and larger local preview |
-| XMP keyword sidecars | ✅ Working, intentionally limited | Creates new sidecars only; never overwrites an existing sidecar |
+| XMP keyword sidecars | ✅ Working, guarded | Creates new Open-Photo sidecars and safely merges tags into Open-Photo-managed sidecars; foreign XMP remains untouched |
 | Exact duplicate detection | ✅ Working | SHA-256 based review across workspace roots |
 | Visual near-duplicate review | ✅ Working | Local CPU dHash grouping; review only, no automatic deletion |
 | Preferred duplicate copy | ✅ Working | User choice is stored locally and does not move/delete files |
@@ -212,12 +212,16 @@ Open-Photo can create keyword sidecars for selected media.
 Important behavior:
 
 - Maximum batch: 1,000 selected files.
-- Maximum tags: 50.
+- Maximum tags per operation: 50.
 - Maximum tag length: 128 characters.
-- The sidecar is created next to the source using the source filename plus .xmp.
-- Existing sidecars are skipped rather than overwritten.
-- The original photo/video is not edited.
-- This is currently a create-only keyword workflow. Hierarchical tag merging, captions, ratings, face regions, sidecar editing and undo are not complete.
+- The sidecar is stored next to the source using the source filename plus .xmp.
+- New sidecars created by Open-Photo are marked with `xmp:CreatorTool="Open-Photo"`.
+- Open-Photo can merge additional keywords into sidecars carrying that ownership marker.
+- Existing keywords are preserved and duplicate keywords are matched case-insensitively.
+- Foreign or unknown XMP sidecars are skipped and never overwritten.
+- Managed sidecar replacement uses a temporary file and rollback backup rather than truncating the existing file in place.
+- The original photo/video is never edited.
+- Hierarchical tag UI, captions, ratings, face regions and full sidecar undo/history are still incomplete.
 
 ## Duplicate tools
 
