@@ -25,6 +25,7 @@ fn database() -> Result<Connection, String> {
                 bytes INTEGER NOT NULL,
                 modified_unix INTEGER NOT NULL,
                 capture_local TEXT,
+                live_asset_id TEXT,
                 PRIMARY KEY(root, path)
             );
             CREATE INDEX IF NOT EXISTS idx_media_size ON media(bytes);",
@@ -43,6 +44,21 @@ fn database() -> Result<Connection, String> {
     if !has_capture_local {
         connection
             .execute("ALTER TABLE media ADD COLUMN capture_local TEXT", [])
+            .map_err(|e| e.to_string())?;
+    }
+    let has_live_asset_id = connection
+        .prepare("PRAGMA table_info(media)")
+        .and_then(|mut statement| {
+            statement
+                .query_map([], |row| row.get::<_, String>(1))?
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .map_err(|e| e.to_string())?
+        .iter()
+        .any(|column| column == "live_asset_id");
+    if !has_live_asset_id {
+        connection
+            .execute("ALTER TABLE media ADD COLUMN live_asset_id TEXT", [])
             .map_err(|e| e.to_string())?;
     }
     Ok(connection)
@@ -98,9 +114,9 @@ pub fn scan_indexed_with_changes(root: String) -> Result<IndexedScan, String> {
         .map_err(|e| e.to_string())?;
     // Fetch the prior snapshot once rather than executing one SELECT per media file.
     // This reduces SQLite round-trips significantly for large libraries.
-    let previous_entries: HashMap<String, (i64, i64, Option<String>)> = {
+    let previous_entries: HashMap<String, (i64, i64, Option<String>, Option<String>)> = {
         let mut statement = transaction
-            .prepare("SELECT path, bytes, modified_unix, capture_local FROM media WHERE root = ?1")
+            .prepare("SELECT path, bytes, modified_unix, capture_local, live_asset_id FROM media WHERE root = ?1")
             .map_err(|e| e.to_string())?;
         let rows = statement
             .query_map([&root], |row| {
@@ -110,6 +126,7 @@ pub fn scan_indexed_with_changes(root: String) -> Result<IndexedScan, String> {
                         row.get::<_, i64>(1)?,
                         row.get::<_, i64>(2)?,
                         row.get::<_, Option<String>>(3)?,
+                        row.get::<_, Option<String>>(4)?,
                     ),
                 ))
             })
@@ -122,23 +139,26 @@ pub fn scan_indexed_with_changes(root: String) -> Result<IndexedScan, String> {
             .map_err(|e| e.to_string())?;
         let mut upsert = transaction
             .prepare(
-                "INSERT INTO media(root, path, bytes, modified_unix, capture_local)
-                 VALUES (?1, ?2, ?3, ?4, ?5)
+                "INSERT INTO media(root, path, bytes, modified_unix, capture_local, live_asset_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
                  ON CONFLICT(root, path) DO UPDATE SET
                      bytes = excluded.bytes,
                      modified_unix = excluded.modified_unix,
-                     capture_local = excluded.capture_local
+                     capture_local = excluded.capture_local,
+                     live_asset_id = excluded.live_asset_id
                  WHERE media.bytes != excluded.bytes
                     OR media.modified_unix != excluded.modified_unix
-                    OR media.capture_local IS NOT excluded.capture_local",
+                    OR media.capture_local IS NOT excluded.capture_local
+                    OR media.live_asset_id IS NOT excluded.live_asset_id",
             )
             .map_err(|e| e.to_string())?;
         for photo in &scan.photos {
             match previous_entries.get(&photo.path) {
-                Some((bytes, modified, capture_local)) => {
+                Some((bytes, modified, capture_local, live_asset_id)) => {
                     if *bytes != photo.bytes as i64
                         || *modified != photo.modified_unix as i64
                         || capture_local != &photo.capture_local
+                        || live_asset_id != &photo.live_asset_id
                     {
                         changes.updated += 1;
                     } else {
@@ -154,7 +174,8 @@ pub fn scan_indexed_with_changes(root: String) -> Result<IndexedScan, String> {
                     photo.path,
                     photo.bytes as i64,
                     photo.modified_unix as i64,
-                    photo.capture_local
+                    photo.capture_local,
+                    photo.live_asset_id
                 ])
                 .map_err(|e| e.to_string())?;
         }
@@ -179,6 +200,7 @@ pub struct IncrementalChange {
     pub bytes: u64,
     pub modified_unix: u64,
     pub capture_local: Option<String>,
+    pub live_asset_id: Option<String>,
 }
 
 #[tauri::command]
@@ -238,6 +260,7 @@ pub fn update_indexed_path(root: String, path: String) -> Result<IncrementalChan
         bytes: 0,
         modified_unix: 0,
         capture_local: None,
+        live_asset_id: None,
     };
     let db = database()?;
     if let Some(meta) = metadata.filter(|meta| meta.is_file()) {
@@ -249,18 +272,23 @@ pub fn update_indexed_path(root: String, path: String) -> Result<IncrementalChan
         let capture_local = actual
             .as_ref()
             .and_then(|resolved| crate::read_capture_local(resolved, &extension));
+        let live_asset_id = actual
+            .as_ref()
+            .and_then(|resolved| crate::read_live_asset_id(resolved, &extension));
         db.execute(
-            "INSERT INTO media(root,path,bytes,modified_unix,capture_local) VALUES (?1,?2,?3,?4,?5)
+            "INSERT INTO media(root,path,bytes,modified_unix,capture_local,live_asset_id) VALUES (?1,?2,?3,?4,?5,?6)
              ON CONFLICT(root,path) DO UPDATE SET
                 bytes=excluded.bytes,
                 modified_unix=excluded.modified_unix,
-                capture_local=excluded.capture_local",
+                capture_local=excluded.capture_local,
+                live_asset_id=excluded.live_asset_id",
             params![
                 root,
                 path,
                 meta.len() as i64,
                 modified as i64,
-                capture_local
+                capture_local,
+                live_asset_id
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -268,6 +296,7 @@ pub fn update_indexed_path(root: String, path: String) -> Result<IncrementalChan
         change.bytes = meta.len();
         change.modified_unix = modified;
         change.capture_local = capture_local;
+        change.live_asset_id = live_asset_id;
     } else {
         db.execute(
             "DELETE FROM media WHERE root=?1 AND path=?2",
