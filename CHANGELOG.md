@@ -10,6 +10,22 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.51.0 — 2026-10-27
+
+### Added
+- Added local embedded-preview support for Nikon NEF and Sony ARW RAW files.
+- The Library grid, list thumbnails and full viewer can now use the largest embedded JPEG preview available in supported NEF/ARW files.
+- RAW preview orientation is applied from the camera metadata before the image is shown.
+
+### Changed
+- RAW files can use a larger bounded source-file limit for preview extraction because the preview reader seeks to embedded JPEG data instead of decoding the RAW sensor payload.
+- Full RAW sensor-data development/editing remains intentionally out of scope for this milestone.
+
+### Safety
+- RAW preview extraction is read-only.
+- The preview library applies bounded directory/preview limits and does not decode raw sensor data.
+- Open-Photo caps supported RAW source files at 250 MB for this preview path.
+
 ## 0.50.0 — 2026-10-27
 
 ### Added
