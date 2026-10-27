@@ -1,14 +1,15 @@
 {
   "name": "open-photo",
   "private": true,
-  "version": "0.54.0",
+  "version": "0.54.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepare:video": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-video-engine.ps1"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

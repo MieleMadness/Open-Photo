@@ -1,3 +1,13 @@
+# 0.54.1 — Phase 6.1: Local video inspection
+
+- Bundle a fixed, checksum-verified LGPL FFmpeg/ffprobe engine and its shared libraries/licenses in the Windows installer.
+- Show video duration, dimensions, codec, exact frame rate, rotation, HDR/color information, audio tracks, and inspection warnings alongside existing playback.
+- Inspect canonical local media paths in bounded background jobs, with timeout, superseded-job cancellation, bounded diagnostics, and network/playlist input rejection.
+- Expose bundled decoder/encoder inventories for subsequent editing milestones.
+- Add real-engine MP4/MOV, Unicode-path, audio/silent, rotation, HDR, variable-timing, corrupt-input, and process-lifecycle tests.
+- Add a reproducible local check script and persist the user's development instructions in AGENTS.md.
+- Video editing controls, proxies, project persistence, and export remain incomplete Phase 6 work.
+
 # 0.54.0 — Library integrity and editing foundations
 
 - Fixed the Tags initialization crash, complete metadata batching, active-filter invalidation, and partial tag-write reporting.

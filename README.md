@@ -1,4 +1,4 @@
-> Development update: **0.54.0** adds library integrity fixes and video playback foundations. See [current milestones](docs/MILESTONES.md), [validation status](docs/TESTING.md), and the [Phase 6/7 video roadmap](docs/VIDEO_ROADMAP.md). Historical milestone notes below describe earlier versions and may be superseded by these documents.
+> Development update: **0.54.1** starts Phase 6 with bundled local video inspection. Video details now include timing, dimensions, rotation, HDR flags, and audio streams. See [video engine setup and behavior](docs/VIDEO_ENGINE.md) and the [Phase 6/7 roadmap](docs/VIDEO_ROADMAP.md). Editing/export controls are not yet implemented.
 
 # Open-Photo
 

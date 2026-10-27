@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Open-Photo",
-  "version": "0.54.0",
+  "version": "0.54.1",
   "identifier": "com.openphoto.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run prepare:video && npm run build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -32,6 +32,10 @@
     "targets": [
       "nsis"
     ],
-    "icon": []
+    "icon": [],
+    "resources": {
+      "resources/video-engine/": "video-engine/"
+    },
+    "useLocalToolsDir": true
   }
 }

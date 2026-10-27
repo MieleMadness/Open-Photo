@@ -1,6 +1,6 @@
 # Video editing roadmap
 
-Status: planned. The 0.54.0 integrity work supplies scoped streaming and background image-job foundations; FFmpeg/proxies and video editing are not yet implemented.
+Status: Phase 6 is in progress. Version 0.54.1 supplies the pinned bundled engine, cancellable video inspection, metadata/capability results, and video-details UI. Proxies and editing/export controls remain unimplemented. See [VIDEO_ENGINE.md](VIDEO_ENGINE.md) for current behavior and checks.
 
 ## Phase 6 — Single-source video editing
 

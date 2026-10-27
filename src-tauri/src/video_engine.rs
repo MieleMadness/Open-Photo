@@ -1,0 +1,222 @@
+//! Pinned, bundled tools only: never execute a tool discovered on PATH.
+use serde::Serialize;
+use std::{
+    io::Read,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread,
+    time::{Duration, Instant},
+};
+use tauri::Manager;
+
+pub(crate) const VERSION: &str = "n8.1.3-24-g92611900bb";
+pub(crate) const ARCHIVE_SHA256: &str =
+    "6c6167da57decb941a0466b60d95f7f51e4edd6b2d79c24dc4860c1c15701292";
+
+pub(crate) fn directory(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    if cfg!(debug_assertions) {
+        Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/video-engine"))
+    } else {
+        Ok(app
+            .path()
+            .resource_dir()
+            .map_err(|e| e.to_string())?
+            .join("video-engine"))
+    }
+}
+
+pub(crate) fn tool(directory: &Path, name: &str) -> Result<PathBuf, String> {
+    if !matches!(name, "ffprobe" | "ffmpeg") {
+        return Err("Unknown video tool".into());
+    }
+    let manifest:serde_json::Value=serde_json::from_slice(&std::fs::read(directory.join("engine.json")).map_err(|_|"Bundled video engine is missing; reinstall Open-Photo or prepare the development engine".to_string())?).map_err(|e|e.to_string())?;
+    if manifest["version"] != VERSION || manifest["archive_sha256"] != ARCHIVE_SHA256 {
+        return Err("Video engine does not match this Open-Photo build".into());
+    }
+    let executable = directory.join(format!("{name}.exe"));
+    if !executable.is_file() {
+        return Err("Bundled video executable is missing".into());
+    }
+    Ok(executable)
+}
+
+fn collect(
+    mut reader: impl Read,
+    limit: usize,
+    overflow: Arc<AtomicBool>,
+) -> Result<Vec<u8>, String> {
+    let mut result = Vec::new();
+    let mut chunk = [0_u8; 8192];
+    loop {
+        let count = reader.read(&mut chunk).map_err(|e| e.to_string())?;
+        if count == 0 {
+            break;
+        }
+        let remaining = limit.saturating_sub(result.len());
+        result.extend_from_slice(&chunk[..count.min(remaining)]);
+        if count > remaining {
+            overflow.store(true, Ordering::Release);
+        }
+    }
+    Ok(result)
+}
+
+/// Drain both pipes concurrently, cap allocations, and reap the child on all failure paths.
+pub(crate) fn run(
+    executable: &Path,
+    args: &[&std::ffi::OsStr],
+    timeout: Duration,
+) -> Result<Vec<u8>, String> {
+    run_until(executable, args, timeout, || false)
+}
+
+pub(crate) fn run_until(
+    executable: &Path,
+    args: &[&std::ffi::OsStr],
+    timeout: Duration,
+    cancel: impl Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    let mut command = Command::new(executable);
+    command
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    let mut child = command
+        .spawn()
+        .map_err(|e| format!("Cannot start the bundled video tool: {e}"))?;
+    let overflow = Arc::new(AtomicBool::new(false));
+    let out = child.stdout.take().ok_or("Video tool stdout unavailable")?;
+    let err = child.stderr.take().ok_or("Video tool stderr unavailable")?;
+    let flag = overflow.clone();
+    let stdout = thread::spawn(move || collect(out, 4 * 1024 * 1024, flag));
+    let flag = overflow.clone();
+    let stderr = thread::spawn(move || collect(err, 64 * 1024, flag));
+    let started = Instant::now();
+    let mut failure = None;
+    let status = loop {
+        if cancel() || overflow.load(Ordering::Acquire) || started.elapsed() > timeout {
+            failure = Some(
+                if cancel() {
+                    "Video inspection superseded"
+                } else if overflow.load(Ordering::Acquire) {
+                    "Video tool output exceeded its safety limit"
+                } else {
+                    "Video inspection timed out"
+                }
+                .to_string(),
+            );
+            let _ = child.kill();
+            break child.wait();
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => break Ok(status),
+            Ok(None) => thread::sleep(Duration::from_millis(20)),
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break Err(error);
+            }
+        }
+    };
+    let output = stdout.join().map_err(|_| "Video output reader failed")??;
+    let diagnostics = stderr
+        .join()
+        .map_err(|_| "Video diagnostic reader failed")??;
+    if let Some(failure) = failure {
+        return Err(failure);
+    }
+    if overflow.load(Ordering::Acquire) {
+        return Err("Video tool output exceeded its safety limit".into());
+    }
+    if !status.map_err(|e| e.to_string())?.success() {
+        return Err(format!(
+            "Cannot inspect this video: {}",
+            String::from_utf8_lossy(&diagnostics).trim()
+        ));
+    }
+    Ok(output)
+}
+
+#[derive(Serialize)]
+pub struct EngineStatus {
+    version: &'static str,
+    available: bool,
+    message: String,
+    video_decoders: Vec<String>,
+    video_encoders: Vec<String>,
+}
+
+fn video_codecs(output: &[u8]) -> Vec<String> {
+    String::from_utf8_lossy(output)
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split_whitespace();
+            let flags = parts.next()?;
+            if flags.len() == 6 && flags.starts_with('V') {
+                parts.next().filter(|name| *name != "=").map(str::to_owned)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub async fn video_engine_status(app: tauri::AppHandle) -> Result<EngineStatus, String> {
+    let directory = directory(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let result = tool(&directory, "ffprobe")
+            .and_then(|path| run(&path, &["-version".as_ref()], Duration::from_secs(10)));
+        let ffmpeg = tool(&directory, "ffmpeg")?;
+        let decoders = run(
+            &ffmpeg,
+            &["-hide_banner".as_ref(), "-decoders".as_ref()],
+            Duration::from_secs(10),
+        )?;
+        let encoders = run(
+            &ffmpeg,
+            &["-hide_banner".as_ref(), "-encoders".as_ref()],
+            Duration::from_secs(10),
+        )?;
+        Ok(EngineStatus {
+            version: VERSION,
+            available: result.is_ok(),
+            message: result
+                .err()
+                .unwrap_or_else(|| "Local video inspection available".into()),
+            video_decoders: video_codecs(&decoders),
+            video_encoders: video_codecs(&encoders),
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn codec_inventory_excludes_the_flags_legend() {
+        assert_eq!(
+            video_codecs(b" V..... = Video\n VFS..D h264 H.264 decoder\n A....D aac AAC decoder\n"),
+            vec!["h264"]
+        );
+    }
+    #[test]
+    fn reader_stays_bounded_and_reports_overflow() {
+        let flag = Arc::new(AtomicBool::new(false));
+        let result = collect(&b"0123456789"[..], 4, flag.clone()).unwrap();
+        assert_eq!(result, b"0123");
+        assert!(flag.load(Ordering::Acquire));
+    }
+}

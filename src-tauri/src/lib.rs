@@ -17,6 +17,10 @@ mod media_stream;
 mod safe_output;
 mod similar;
 mod user_data;
+mod video_engine;
+#[cfg(test)]
+mod video_integration_tests;
+mod video_probe;
 mod watch;
 mod xmp;
 use base64::Engine;
@@ -1053,6 +1057,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(std::sync::Mutex::new(watch::WatchState::default()))
         .manage(media_jobs::ImageJobs::default())
+        .manage(video_probe::InspectionJobs::default())
         .invoke_handler(tauri::generate_handler![
             ai_embeddings::ai_embedding_status,
             ai_embeddings::ai_find_similar_by_photo,
@@ -1078,6 +1083,8 @@ pub fn run() {
             preview_image,
             read_iphone_media,
             media_stream::video_source,
+            video_probe::inspect_video,
+            video_engine::video_engine_status,
             user_data::load_user_data,
             user_data::save_user_data,
             user_data::export_user_data,

@@ -1,3 +1,4 @@
+import {VideoDetails} from "./VideoDetails";
 import { useEffect, useState } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 
@@ -65,6 +66,7 @@ export function IPhoneMotion({ root, path, onOpenExternal }: {
     return()=>{active=false};
   },[root,path,requested]);
   return <div className="iphone-motion">
+    <VideoDetails root={root} path={path}/>
     {src ? <video controls autoPlay playsInline onError={() => setError("Windows WebView2 cannot decode this MOV/HEVC clip. Use the Windows player.")} src={src} style={{maxWidth:"100%",maxHeight:420}} /> :
       <button className="secondary-button" onClick={() => setRequested(true)} disabled={loading}>{loading ? "Loading motion…" : "Play Live Photo / video"}</button>}
     {error && <p>{error}</p>}

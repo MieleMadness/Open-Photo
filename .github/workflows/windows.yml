@@ -1,4 +1,4 @@
-name: Windows Desktop Build
+name: Open-Photo 0.54.1 · Windows Desktop Build
 run-name: ${{ github.event.pull_request.title || format('Open-Photo {0}', github.ref_name) }} · CI #${{ github.run_number }}
 on:
   push:
@@ -53,6 +53,7 @@ jobs:
           node-version: '22.23.0'
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: npm run prepare:video
       - run: npm run tauri icon assets/app-icon.svg
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
@@ -76,6 +77,7 @@ jobs:
           node-version: '22.23.0'
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: npm run prepare:video
       - run: npm run tauri icon assets/app-icon.svg
       - name: Build Windows desktop installer
         run: npm run tauri build -- -- --locked

@@ -116,3 +116,5 @@
 .edit-crop-presets>strong{font-size:12px}
 
 .storage-error { position:fixed; top:0; left:0; right:0; z-index:10000; padding:12px; background:#8b1e22; color:white; }
+
+.video-details{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:9px;text-align:left}.video-details h3{font-size:14px;margin:0 0 10px}.video-details dl{display:grid;grid-template-columns:minmax(100px,1fr) minmax(0,2fr);gap:8px;font-size:12px}.video-details dt{color:var(--muted)}.video-details dd{margin:0;overflow-wrap:anywhere}

@@ -1,4 +1,10 @@
-# Current validation policy (0.54.0)
+# Phase 6.1 checks (0.54.1)
+
+Run `npm ci`, then `scripts/check.ps1 -Package` to prepare the pinned video engine and icons, run formatting/frontend/Rust checks, and package the installer. GitHub Actions prepares the identical engine before Rust tests and packaging. Generated executables, icons, and schemas are not committed.
+
+Video tests use generated synthetic media only. They verify real ffprobe/FFmpeg integration and source-byte preservation, in addition to parsed metadata and UI lifecycle tests. Installed WebView2 playback and actual user libraries still require acceptance testing. Phase 6 editing/export is not implemented yet.
+
+# Historical validation policy (0.54.0)
 
 - Use Node 22.23.0 and Rust 1.99.1; dependency lockfiles are committed.
 - Run `npm ci`, `npm test`, and `npm run build`.
