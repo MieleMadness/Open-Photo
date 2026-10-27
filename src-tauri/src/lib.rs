@@ -120,6 +120,41 @@ fn openphoto_xmp_tags(xml: &str) -> Option<Vec<String>> {
     Some(tags)
 }
 
+#[derive(Serialize)]
+struct ManagedTagEntry {
+    path: String,
+    tags: Vec<String>,
+}
+
+#[tauri::command]
+fn read_managed_tags(root: String, paths: Vec<String>) -> Result<Vec<ManagedTagEntry>, String> {
+    if paths.len() > 5000 {
+        return Err("Read up to 5,000 managed XMP sidecars per request".into());
+    }
+    let mut entries = Vec::new();
+    for path in paths {
+        let file = match safe_media_path(&root, &path) {
+            Ok(file) => file,
+            Err(_) => continue,
+        };
+        let sidecar = PathBuf::from(format!("{}.xmp", file.display()));
+        let Ok(metadata) = fs::metadata(&sidecar) else {
+            continue;
+        };
+        if !metadata.is_file() || metadata.len() > MAX_XMP_SIDECAR_BYTES {
+            continue;
+        }
+        let Ok(xml) = fs::read_to_string(&sidecar) else {
+            continue;
+        };
+        let Some(tags) = openphoto_xmp_tags(&xml) else {
+            continue;
+        };
+        entries.push(ManagedTagEntry { path, tags });
+    }
+    Ok(entries)
+}
+
 fn replace_managed_sidecar(sidecar: &Path, contents: &str) -> Result<(), String> {
     let file_name = sidecar
         .file_name()
@@ -1009,6 +1044,7 @@ pub fn run() {
             preview_image,
             read_iphone_media,
             bulk_create_tags,
+            read_managed_tags,
             edit_export::export_edited_copy,
             edit_export::preview_edited_photo,
             open_video,
@@ -1116,6 +1152,34 @@ mod tests {
         );
         let foreign = xml.replace(OPENPHOTO_XMP_MARKER, "xmp:CreatorTool=\"Other App\"");
         assert!(openphoto_xmp_tags(&foreign).is_none());
+    }
+
+    #[test]
+    fn reads_only_managed_xmp_tags_for_requested_media() {
+        let root = temp_root();
+        let managed = root.join("managed.jpg");
+        let foreign = root.join("foreign.jpg");
+        fs::write(&managed, b"managed").unwrap();
+        fs::write(&foreign, b"foreign").unwrap();
+        fs::write(
+            root.join("managed.jpg.xmp"),
+            render_openphoto_xmp(&["People/Family/Marc".into(), "Florida".into()]),
+        )
+        .unwrap();
+        fs::write(root.join("foreign.jpg.xmp"), "<x:xmpmeta>foreign</x:xmpmeta>").unwrap();
+
+        let entries = read_managed_tags(
+            root.to_string_lossy().into_owned(),
+            vec![
+                managed.to_string_lossy().into_owned(),
+                foreign.to_string_lossy().into_owned(),
+            ],
+        )
+        .unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].path, managed.to_string_lossy());
+        assert_eq!(entries[0].tags, vec!["People/Family/Marc", "Florida"]);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
