@@ -1,3 +1,20 @@
+# Current validation policy (0.54.0)
+
+- Use Node 22.23.0 and Rust 1.99.1; dependency lockfiles are committed.
+- Run `npm ci`, `npm test`, and `npm run build`.
+- Run `cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check`, `cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings`, and `cargo test --manifest-path src-tauri/Cargo.toml --locked`.
+- Generate app icons using `npm run tauri icon assets/app-icon.svg`, then build the installer with `npm run tauri build -- -- --locked`.
+- CI runs frontend and Rust checks independently. Installer packaging depends on both passing. Never weaken checks to make a failure disappear.
+- New regression coverage includes first render, metadata batching beyond 5,000, cancellation/partial results, tag invalidation/workspace switching, namespace-aware XMP preservation, all orientation transforms, incomplete-index reconciliation, settings migration, and filename-independent People identity.
+- The shared decoder rejects sources over 250 MB, 50 megapixels, or 20,000 pixels on either edge, and configures a 256 MB decoder allocation limit. These guards supplement image format-specific limits; measure process memory separately.
+- Packaged-app checks remain required for range playback and codec fallback, model inference/hardware, EXIF fixture integration, external-drive behavior, settings recovery, and large-image performance.
+- Photo exports currently re-encode pixels and do not promise to preserve EXIF, GPS, or ICC metadata. Modified-time preservation is a separate option.
+- XMP writes serialize within the app, compare the original document before replacement, and preserve recovery copies on replacement failure. Concurrent external editors can still race at the filesystem boundary: use copied test libraries and verify recovery.
+- Local data is stored under the user's local Open-Photo application-data folder. `user-data.sqlite` includes up to 20 previous values per setting. Existing LocalStorage values migrate only when a durable value is absent. Do not delete the old cache during migration.
+- AI indices created before the orientation policy change require reindexing; model verification checksums remain unchanged.
+
+The sections below are historical milestone notes. Where they conflict, the policy above and current milestones take precedence.
+
 # Compatibility and regression policy
 
 ## Immich target

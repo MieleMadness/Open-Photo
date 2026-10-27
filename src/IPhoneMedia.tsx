@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 
 function decodeBase64(encoded: string): Uint8Array {
   const raw = atob(encoded);
@@ -48,29 +48,25 @@ export function IPhoneMotion({ root, path, onOpenExternal }: {
   path: string;
   onOpenExternal: () => void;
 }) {
-  const [src, setSrc] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  useEffect(() => {
-    setSrc("");
-    setError("");
-    setLoading(false);
-  }, [root, path]);
-  const load = async () => {
+  const [src,setSrc]=useState("");
+  const [error,setError]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [requested,setRequested]=useState(false);
+  useEffect(()=>{setRequested(false)},[root,path]);
+  useEffect(()=>{
+    let active=true;
+    setSrc("");setError("");setLoading(false);
+    if(!requested)return()=>{active=false};
     setLoading(true);
-    setError("");
-    try {
-      const encoded = await invoke<string>("read_iphone_media", { root, path });
-      setSrc("data:video/mp4;base64," + encoded);
-    } catch (cause) {
-      setError(String(cause));
-    } finally {
-      setLoading(false);
-    }
-  };
+    void invoke<string>("video_source",{root,path})
+      .then(source=>{if(active)setSrc(convertFileSrc(source))})
+      .catch(cause=>{if(active)setError(String(cause))})
+      .finally(()=>{if(active)setLoading(false)});
+    return()=>{active=false};
+  },[root,path,requested]);
   return <div className="iphone-motion">
     {src ? <video controls autoPlay playsInline onError={() => setError("Windows WebView2 cannot decode this MOV/HEVC clip. Use the Windows player.")} src={src} style={{maxWidth:"100%",maxHeight:420}} /> :
-      <button className="secondary-button" onClick={() => void load()} disabled={loading}>{loading ? "Loading motion…" : "Play Live Photo / video"}</button>}
+      <button className="secondary-button" onClick={() => setRequested(true)} disabled={loading}>{loading ? "Loading motion…" : "Play Live Photo / video"}</button>}
     {error && <p>{error}</p>}
     {(error || src) && <button className="secondary-button" onClick={onOpenExternal}>Open in Windows player</button>}
   </div>;

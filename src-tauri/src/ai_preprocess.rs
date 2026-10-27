@@ -44,12 +44,7 @@ fn clip_tensor(input: image::DynamicImage) -> Result<Vec<f32>, String> {
 
 pub(crate) fn prepare_tensor(root: &str, path: &str) -> Result<Vec<f32>, String> {
     let source = crate::safe_media_path(root, path)?;
-    let input = image::ImageReader::open(source)
-        .map_err(|e| e.to_string())?
-        .with_guessed_format()
-        .map_err(|e| e.to_string())?
-        .decode()
-        .map_err(|e| format!("Cannot decode this photo for AI: {e}"))?;
+    let input = crate::image_decode::decode(&source)?;
     clip_tensor(input)
 }
 

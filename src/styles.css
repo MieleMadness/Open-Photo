@@ -114,3 +114,5 @@
 /* Phase 4: crop presets */
 .edit-crop-presets{display:grid;gap:8px;margin:14px 0}
 .edit-crop-presets>strong{font-size:12px}
+
+.storage-error { position:fixed; top:0; left:0; right:0; z-index:10000; padding:12px; background:#8b1e22; color:white; }

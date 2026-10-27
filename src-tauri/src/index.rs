@@ -90,19 +90,26 @@ pub struct IndexedScan {
 #[tauri::command]
 pub fn scan_indexed_with_changes(root: String) -> Result<IndexedScan, String> {
     let scan = scan_library(root.clone())?;
+    reconcile_scan(&mut database()?, root, scan)
+}
+
+fn reconcile_scan(
+    db: &mut Connection,
+    root: String,
+    scan: ScanResult,
+) -> Result<IndexedScan, String> {
     let mut changes = ChangeCounts {
         added: 0,
         updated: 0,
         unchanged: 0,
         removed: 0,
-        incomplete: scan.truncated,
+        incomplete: scan.incomplete,
     };
     // A truncated scan is not a complete snapshot: do not evict previously
     // indexed media based on missing entries.
-    if scan.truncated {
+    if scan.incomplete {
         return Ok(IndexedScan { scan, changes });
     }
-    let mut db = database()?;
     let transaction = db.transaction().map_err(|e| e.to_string())?;
     // Track the complete snapshot while preserving unchanged indexed rows.
     // This avoids tearing down and rebuilding the index on every sync.
@@ -470,6 +477,42 @@ fn sha256_file(path: &Path) -> std::io::Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn incomplete_snapshot_keeps_previous_index_but_complete_snapshot_reconciles() {
+        let mut db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE media(root TEXT,path TEXT,bytes INTEGER,modified_unix INTEGER,capture_local TEXT,live_asset_id TEXT,PRIMARY KEY(root,path));
+            INSERT INTO media VALUES('library','photo.jpg',10,1,NULL,NULL);").unwrap();
+        let incomplete = ScanResult {
+            photos: vec![],
+            scanned_files: 1,
+            truncated: false,
+            incomplete: true,
+            errors: vec!["metadata unavailable".into()],
+        };
+        let result = reconcile_scan(&mut db, "library".into(), incomplete).unwrap();
+        assert!(result.changes.incomplete);
+        assert_eq!(result.changes.removed, 0);
+        assert_eq!(
+            db.query_row("SELECT COUNT(*) FROM media", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        let complete = ScanResult {
+            photos: vec![],
+            scanned_files: 0,
+            truncated: false,
+            incomplete: false,
+            errors: vec![],
+        };
+        assert_eq!(
+            reconcile_scan(&mut db, "library".into(), complete)
+                .unwrap()
+                .changes
+                .removed,
+            1
+        );
+    }
 
     #[test]
     fn missing_parent_is_not_assumed_to_be_a_deleted_photo() {

@@ -5,7 +5,7 @@ use ort::session::Session;
 use rusqlite::{params, Connection};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::{collections::HashSet, path::Path, time::UNIX_EPOCH};
+use std::{collections::HashMap, path::Path, time::UNIX_EPOCH};
 
 const DETECTOR_SIZE: usize = 320;
 const EMBED_SIZE: usize = 112;
@@ -58,6 +58,8 @@ pub struct PersonFace {
 #[derive(Serialize)]
 pub struct PersonGroup {
     id: String,
+    name: String,
+    legacy_id: String,
     members: Vec<PersonFace>,
 }
 
@@ -111,6 +113,17 @@ fn database() -> Result<Connection, String> {
               ON face_embeddings(embedder_key);
             CREATE INDEX IF NOT EXISTS idx_face_state_models
               ON face_index_state(detector_key, embedder_key);",
+        )
+        .map_err(|e| e.to_string())?;
+    connection
+        .busy_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| e.to_string())?;
+    connection
+        .execute_batch(
+            "CREATE TABLE IF NOT EXISTS people (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '');
+        CREATE TABLE IF NOT EXISTS person_faces (
+        face_key TEXT PRIMARY KEY, person_id TEXT NOT NULL REFERENCES people(id));",
         )
         .map_err(|e| e.to_string())?;
     Ok(connection)
@@ -527,12 +540,7 @@ fn process_image(
 ) -> Result<(i64, Vec<FaceRecord>), String> {
     let source = crate::safe_media_path(root, path)?;
     let modified = modified_unix(&source)?;
-    let image = image::ImageReader::open(&source)
-        .map_err(|e| e.to_string())?
-        .with_guessed_format()
-        .map_err(|e| e.to_string())?
-        .decode()
-        .map_err(|e| format!("Cannot decode this photo for People indexing: {e}"))?;
+    let image = crate::image_decode::decode(&source)?;
     let rgb = image.to_rgb8();
     let detections = detect_faces(detector, &image)?;
     let mut faces = Vec::with_capacity(detections.len());
@@ -731,12 +739,7 @@ pub fn ai_detect_faces(
 ) -> Result<Vec<FaceDetection>, String> {
     let (mut detector, _, _, _) = face_sessions(device.as_deref())?;
     let source = crate::safe_media_path(&root, &path)?;
-    let image = image::ImageReader::open(source)
-        .map_err(|e| e.to_string())?
-        .with_guessed_format()
-        .map_err(|e| e.to_string())?
-        .decode()
-        .map_err(|e| format!("Cannot decode this photo for face detection: {e}"))?;
+    let image = crate::image_decode::decode(&source)?;
     detect_faces(&mut detector, &image)
 }
 
@@ -746,6 +749,8 @@ struct GroupCandidate {
 }
 
 struct WorkingGroup {
+    id: String,
+    name: String,
     members: Vec<GroupCandidate>,
     centroid: Vec<f32>,
 }
@@ -762,92 +767,174 @@ fn stable_group_id(group: &WorkingGroup) -> String {
     format!("person-{}", &digest[..12])
 }
 
+fn face_key(model: &str, vector: &[u8]) -> String {
+    let mut hash = Sha256::new();
+    hash.update(model.as_bytes());
+    hash.update([0]);
+    hash.update(vector);
+    format!("{:x}", hash.finalize())
+}
+
+fn person_for_face(db: &Connection, key: &str) -> Result<Option<(String, String)>, String> {
+    use rusqlite::OptionalExtension;
+    db.query_row("SELECT p.id,p.name FROM people p JOIN person_faces f ON p.id=f.person_id WHERE f.face_key=?1",[key],|row| Ok((row.get(0)?,row.get(1)?)))
+        .optional().map_err(|e|e.to_string())
+}
+
 #[tauri::command]
-pub fn ai_people_groups(roots: Vec<String>) -> Result<Vec<PersonGroup>, String> {
+pub fn ai_name_person(id: String, name: String) -> Result<(), String> {
+    if name.len() > 200 || name.chars().any(char::is_control) {
+        return Err("Use a person name of up to 200 characters".into());
+    }
+    let db = database()?;
+    if db
+        .execute(
+            "UPDATE people SET name=?2 WHERE id=?1",
+            params![id, name.trim()],
+        )
+        .map_err(|e| e.to_string())?
+        != 1
+    {
+        return Err("Person no longer available; refresh People".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn ai_people_groups(
+    roots: Vec<String>,
+    legacy_names: Option<HashMap<String, String>>,
+) -> Result<Vec<PersonGroup>, String> {
     if roots.is_empty() {
         return Ok(Vec::new());
     }
     let (_, embedder_key) = crate::ai_models::validate_supported_face_bundle()?;
-    let allowed: HashSet<String> = roots.into_iter().collect();
-    let db = database()?;
-    let mut statement = db
-        .prepare(
-            "SELECT root,path,face_index,x,y,width,height,score,vector
-             FROM face_embeddings
-             WHERE embedder_key=?1
-             ORDER BY root,path,face_index
-             LIMIT ?2",
-        )
-        .map_err(|e| e.to_string())?;
-    let rows = statement
-        .query_map(params![embedder_key, MAX_GROUP_FACES as i64], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, i64>(2)?,
-                row.get::<_, f32>(3)?,
-                row.get::<_, f32>(4)?,
-                row.get::<_, f32>(5)?,
-                row.get::<_, f32>(6)?,
-                row.get::<_, f32>(7)?,
-                row.get::<_, Vec<u8>>(8)?,
-            ))
-        })
-        .map_err(|e| e.to_string())?;
-
+    let mut db = database()?;
+    // Filter roots before applying the cap, so other workspaces cannot crowd this one out.
+    let candidates = {
+        let mut statement = db
+            .prepare(
+                "SELECT root,path,face_index,x,y,width,height,score,vector FROM face_embeddings
+            WHERE embedder_key=?1 AND root IN (SELECT value FROM json_each(?2))
+            ORDER BY root,path,face_index LIMIT ?3",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = statement
+            .query_map(
+                params![
+                    embedder_key,
+                    serde_json::to_string(&roots).map_err(|e| e.to_string())?,
+                    MAX_GROUP_FACES as i64 + 1
+                ],
+                |row| {
+                    Ok((
+                        PersonFace {
+                            root: row.get(0)?,
+                            path: row.get(1)?,
+                            face_index: row.get::<_, i64>(2)? as usize,
+                            x: row.get(3)?,
+                            y: row.get(4)?,
+                            width: row.get(5)?,
+                            height: row.get(6)?,
+                            score: row.get(7)?,
+                        },
+                        row.get::<_, Vec<u8>>(8)?,
+                    ))
+                },
+            )
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
+    };
+    if candidates.len() > MAX_GROUP_FACES {
+        return Err("People grouping currently supports up to 10,000 faces per workspace; choose fewer folders".into());
+    }
+    let tx = db.transaction().map_err(|e| e.to_string())?;
     let mut groups: Vec<WorkingGroup> = Vec::new();
-    for row in rows {
-        let (root, path, face_index, x, y, width, height, score, blob) =
-            row.map_err(|e| e.to_string())?;
-        if !allowed.contains(&root) {
+    for (face, blob) in candidates {
+        if crate::safe_media_path(&face.root, &face.path).is_err() {
             continue;
         }
         let vector = decode_f32(&blob)?;
         if vector.len() != 128 {
             continue;
         }
-        let face = PersonFace {
-            root,
-            path,
-            face_index: face_index as usize,
-            x,
-            y,
-            width,
-            height,
-            score,
-        };
-
-        let mut best_index = None;
-        let mut best_score = PEOPLE_COSINE_THRESHOLD;
-        for (index, group) in groups.iter().enumerate() {
-            let similarity = cosine_similarity(&vector, &group.centroid);
-            if similarity >= best_score {
-                best_score = similarity;
-                best_index = Some(index);
-            }
-        }
-
-        if let Some(index) = best_index {
-            let group = &mut groups[index];
-            let count = group.members.len() as f32;
-            for (centroid, value) in group.centroid.iter_mut().zip(&vector) {
-                *centroid = (*centroid * count + *value) / (count + 1.0);
-            }
-            normalize(&mut group.centroid)?;
-            group.members.push(GroupCandidate { face });
+        let key = face_key(&embedder_key, &blob);
+        let prior = person_for_face(&tx, &key)?;
+        let target = if let Some((id, _)) = &prior {
+            groups.iter().position(|group| &group.id == id)
         } else {
+            groups
+                .iter()
+                .enumerate()
+                .filter(|(_, group)| group.name.is_empty())
+                .map(|(index, group)| (index, cosine_similarity(&vector, &group.centroid)))
+                .filter(|(_, score)| *score >= PEOPLE_COSINE_THRESHOLD)
+                .max_by(|a, b| a.1.total_cmp(&b.1))
+                .map(|(index, _)| index)
+        };
+        let index = if let Some(index) = target {
+            index
+        } else {
+            let (id, name) = if let Some(prior) = prior {
+                prior
+            } else {
+                let id: String = tx
+                    .query_row(
+                        "SELECT 'person-' || lower(hex(randomblob(16)))",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .map_err(|e| e.to_string())?;
+                tx.execute("INSERT INTO people(id) VALUES(?1)", [&id])
+                    .map_err(|e| e.to_string())?;
+                (id, String::new())
+            };
             groups.push(WorkingGroup {
-                members: vec![GroupCandidate { face }],
-                centroid: vector,
+                id,
+                name,
+                members: Vec::new(),
+                centroid: vector.clone(),
             });
+            groups.len() - 1
+        };
+        let group = &mut groups[index];
+        tx.execute(
+            "INSERT OR IGNORE INTO person_faces(face_key,person_id) VALUES(?1,?2)",
+            params![key, group.id],
+        )
+        .map_err(|e| e.to_string())?;
+        let count = group.members.len() as f32;
+        for (centroid, value) in group.centroid.iter_mut().zip(&vector) {
+            *centroid = (*centroid * count + *value) / (count + 1.0);
+        }
+        normalize(&mut group.centroid)?;
+        group.members.push(GroupCandidate { face });
+    }
+    let legacy = legacy_names.unwrap_or_default();
+    for group in &mut groups {
+        if group.name.is_empty() {
+            if let Some(name) = legacy
+                .get(&stable_group_id(group))
+                .filter(|name| name.len() <= 200)
+            {
+                group.name = name.clone();
+                tx.execute(
+                    "UPDATE people SET name=?2 WHERE id=?1",
+                    params![group.id, group.name],
+                )
+                .map_err(|e| e.to_string())?;
+            }
         }
     }
-
+    tx.commit().map_err(|e| e.to_string())?;
     groups.sort_by_key(|group| std::cmp::Reverse(group.members.len()));
     Ok(groups
         .into_iter()
         .map(|group| PersonGroup {
-            id: stable_group_id(&group),
+            legacy_id: stable_group_id(&group),
+            id: group.id,
+            name: group.name,
             members: group
                 .members
                 .into_iter()
@@ -897,6 +984,28 @@ pub fn ai_face_index_status(roots: Vec<String>) -> Result<FaceIndexStatus, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reviewed_person_identity_is_independent_of_filename_or_first_member() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE people(id TEXT PRIMARY KEY,name TEXT);
+          CREATE TABLE person_faces(face_key TEXT PRIMARY KEY,person_id TEXT);
+          INSERT INTO people VALUES('immutable-id','Alex');",
+        )
+        .unwrap();
+        let key = face_key("model", &[1, 2, 3]);
+        db.execute("INSERT INTO person_faces VALUES(?1,'immutable-id')", [&key])
+            .unwrap();
+        // File/root names and group order are deliberately absent from the identity key.
+        assert_eq!(
+            person_for_face(&db, &face_key("model", &[1, 2, 3])).unwrap(),
+            Some(("immutable-id".into(), "Alex".into()))
+        );
+        assert!(person_for_face(&db, &face_key("other-model", &[1, 2, 3]))
+            .unwrap()
+            .is_none());
+    }
 
     #[test]
     fn cosine_similarity_prefers_identical_face_vectors() {

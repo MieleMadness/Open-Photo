@@ -1,5 +1,7 @@
 //! Offline AI model storage. This module never sends data to a network service.
 //! Semantic model slots are validated against one supported OpenCLIP bundle before execution.
+use crate::image_decode::POLICY;
+use crate::image_decode::POLICY;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
@@ -114,7 +116,7 @@ pub(crate) fn validate_supported_clip_bundle() -> Result<String, String> {
                 .into(),
         );
     }
-    Ok(format!("openclip-vit-b32-v1:{vision}"))
+    Ok(format!("openclip-vit-b32-oriented-v2:{vision}"))
 }
 
 pub(crate) fn validate_supported_clip_vision() -> Result<String, String> {
@@ -124,7 +126,7 @@ pub(crate) fn validate_supported_clip_vision() -> Result<String, String> {
             "Semantic image indexing requires the supported OpenCLIP ViT-B/32 vision model".into(),
         );
     }
-    Ok(format!("openclip-vit-b32-v1:{vision}"))
+    Ok(format!("openclip-vit-b32-oriented-v2:{vision}"))
 }
 
 pub(crate) fn validate_supported_ocr_bundle() -> Result<(String, String), String> {
@@ -137,8 +139,8 @@ pub(crate) fn validate_supported_ocr_bundle() -> Result<(String, String), String
         );
     }
     Ok((
-        format!("ppocrv3-en-det-mobile:{detector}"),
-        format!("ppocrv4-en-rec-mobile:{recognizer}"),
+        format!("ppocrv3-en-det-mobile:{POLICY}:{detector}"),
+        format!("ppocrv4-en-rec-mobile:{POLICY}:{recognizer}"),
     ))
 }
 
@@ -152,8 +154,8 @@ pub(crate) fn validate_supported_face_bundle() -> Result<(String, String), Strin
         );
     }
     Ok((
-        format!("yunet-2026may:{detector}"),
-        format!("sface-2021dec:{embedder}"),
+        format!("yunet-2026may:{POLICY}:{detector}"),
+        format!("sface-2021dec:{POLICY}:{embedder}"),
     ))
 }
 

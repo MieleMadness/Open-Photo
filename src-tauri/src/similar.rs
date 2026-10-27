@@ -1,4 +1,3 @@
-use image::ImageReader;
 use serde::Serialize;
 use std::path::Path;
 
@@ -11,12 +10,7 @@ pub struct SimilarGroup {
 /// Difference hash: a fast CPU-only visual similarity estimate.
 /// Similarity is advisory; it never modifies or deletes original media.
 fn difference_hash(path: &Path) -> Result<u64, String> {
-    let reader = ImageReader::open(path).map_err(|e| e.to_string())?;
-    let image = reader
-        .with_guessed_format()
-        .map_err(|e| e.to_string())?
-        .decode()
-        .map_err(|e| e.to_string())?
+    let image = crate::image_decode::decode(path)?
         .resize_exact(9, 8, image::imageops::FilterType::Triangle)
         .to_luma8();
     let mut hash = 0_u64;

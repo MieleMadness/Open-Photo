@@ -1,3 +1,5 @@
+> Development update: **0.54.0** adds library integrity fixes and video playback foundations. See [current milestones](docs/MILESTONES.md), [validation status](docs/TESTING.md), and the [Phase 6/7 video roadmap](docs/VIDEO_ROADMAP.md). Historical milestone notes below describe earlier versions and may be superseded by these documents.
+
 # Open-Photo
 
 **Open-Photo is a privacy-first Windows photo organizer for local photo and video libraries.**

@@ -345,12 +345,7 @@ fn process_photo(
 ) -> Result<(i64, Vec<OcrRegion>), String> {
     let source = crate::safe_media_path(root, path)?;
     let modified = modified_unix(&source)?;
-    let image = image::ImageReader::open(&source)
-        .map_err(|e| e.to_string())?
-        .with_guessed_format()
-        .map_err(|e| e.to_string())?
-        .decode()
-        .map_err(|e| format!("Cannot decode this photo for OCR: {e}"))?;
+    let image = crate::image_decode::decode(&source)?;
     let rgb = image.to_rgb8();
     let boxes = detect_regions(detector, &image)?;
     let mut regions = Vec::new();

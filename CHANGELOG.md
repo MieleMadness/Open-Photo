@@ -1,3 +1,17 @@
+# 0.54.0 — Library integrity and editing foundations
+
+- Fixed the Tags initialization crash, complete metadata batching, active-filter invalidation, and partial tag-write reporting.
+- XMP keyword merges preserve existing XML properties and use namespace-aware parsing. Conflicting external edits are detected before replacement; Windows replacement is atomic with a recovery copy.
+- Incomplete scans retain previous index snapshots, with visible read errors.
+- Shared image decode normalizes EXIF orientation and applies explicit allocation/pixel limits. Editor jobs run off the UI thread, serialize allocations, and drop superseded queued previews.
+- Editor previews use export-scale blur/sharpen semantics.
+- Inline video uses scoped range-aware local streaming rather than whole-file base64; decoder-dependent fallback remains available.
+- Organizational data migrates into local SQLite with previous-value history; startup load failures do not replace saved data.
+- People IDs and names persist independently of filenames; named identities are never automatically merged with new suggestions. Existing compatible legacy names migrate when their original group is available.
+- Fixed save-dialog permissions and incremental Live Photo metadata loss.
+- Added dependency lockfiles, pinned toolchains, frontend regression tests, independent frontend/Rust checks, and gated installer packaging.
+- Added an authoritative Phase 6/7 roadmap. Video editing itself remains planned.
+
 # Changelog
 
 This file records the major Open-Photo feature milestones, important add-ons, safety changes, and notable build repairs.

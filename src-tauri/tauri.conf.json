@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Open-Photo",
-  "version": "0.53.1",
+  "version": "0.54.0",
   "identifier": "com.openphoto.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -10,8 +10,28 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{"title": "Open-Photo", "width": 1220, "height": 780, "minWidth": 800, "minHeight": 580}],
-    "security": {"csp": "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'"}
+    "windows": [
+      {
+        "title": "Open-Photo",
+        "width": 1220,
+        "height": 780,
+        "minWidth": 800,
+        "minHeight": 580
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: blob: https://*.tile.openstreetmap.org; media-src 'self' asset: http://asset.localhost; connect-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'",
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
+    }
   },
-  "bundle": { "active": true, "targets": ["nsis"], "icon": [] }
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": []
+  }
 }

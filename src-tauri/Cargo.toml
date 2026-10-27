@@ -1,6 +1,6 @@
 [package]
 name = "open-photo"
-version = "0.53.1"
+version = "0.54.0"
 description = "Offline-first Windows photo organizer"
 authors = ["Open-Photo contributors"]
 edition = "2021"
@@ -15,7 +15,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff", "avif"] }
 base64 = "0.22"
@@ -29,3 +29,10 @@ dirs = "5"
 notify = "8"
 ort = { version = "=2.0.0-rc.15", features = ["directml"] }
 tokenizers = { version = "=0.23.2", default-features = false, features = ["onig"] }
+
+# Parse RDF by namespace while preserving unrelated XML verbatim.
+roxmltree = "0.21"
+tokio = { version = "1", features = ["sync"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }

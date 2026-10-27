@@ -297,8 +297,7 @@ fn export_format(destination: &std::path::Path) -> Result<ImageFormat, String> {
     }
 }
 
-#[tauri::command]
-pub fn preview_edited_photo(
+fn preview_edited_photo_blocking(
     root: String,
     path: String,
     options: EditOptions,
@@ -313,20 +312,15 @@ pub fn preview_edited_photo(
     if source_bytes > MAX_EDIT_SOURCE_BYTES {
         return Err("Editing is limited to source images up to 250 MB".into());
     }
-    let image = image::ImageReader::open(&source)
-        .map_err(|e| e.to_string())?
-        .with_guessed_format()
-        .map_err(|e| e.to_string())?
-        .decode()
-        .map_err(|e| format!("Cannot decode this image for editing: {e}"))?;
+    let image = crate::image_decode::decode(&source)?;
     let source_width = image.width();
     let source_height = image.height();
     let (width, height) = edited_output_dimensions(source_width, source_height, &options)?;
+    // Render the same operations at source/output scale, then downsample.
+    // Applying blur/sharpen after downsampling exaggerates their visible strength.
+    let edited = apply_edits(image, &options)?;
     let (preview_width, preview_height) = preview_resize_dimensions(width, height, max_edge);
-    let mut preview_options = options;
-    preview_options.resize_width = Some(preview_width);
-    preview_options.resize_height = Some(preview_height);
-    let preview = apply_edits(image, &preview_options)?;
+    let preview = edited.resize_exact(preview_width, preview_height, FilterType::Lanczos3);
     let mut buffer = Cursor::new(Vec::new());
     preview
         .write_to(&mut buffer, ImageFormat::Png)
@@ -343,8 +337,7 @@ pub fn preview_edited_photo(
     })
 }
 
-#[tauri::command]
-pub fn export_edited_copy(
+fn export_edited_copy_blocking(
     root: String,
     path: String,
     destination: String,
@@ -387,12 +380,7 @@ pub fn export_edited_copy(
     }
     let format = export_format(&destination)?;
 
-    let image = image::ImageReader::open(&source)
-        .map_err(|e| e.to_string())?
-        .with_guessed_format()
-        .map_err(|e| e.to_string())?
-        .decode()
-        .map_err(|e| format!("Cannot decode this image for editing: {e}"))?;
+    let image = crate::image_decode::decode(&source)?;
     let edited = apply_edits(image, &options)?;
     let width = edited.width();
     let height = edited.height();
@@ -442,6 +430,59 @@ pub fn export_edited_copy(
         bytes,
         preserved_modified_time: source_modified.is_some(),
     })
+}
+
+#[tauri::command]
+pub async fn preview_edited_photo(
+    jobs: tauri::State<'_, crate::media_jobs::ImageJobs>,
+    root: String,
+    path: String,
+    options: EditOptions,
+    max_edge: u32,
+) -> Result<EditedPreviewResult, String> {
+    use std::sync::atomic::Ordering;
+    let generation = jobs.preview_generation.fetch_add(1, Ordering::SeqCst) + 1;
+    let latest = jobs.preview_generation.clone();
+    let permit = jobs
+        .gate
+        .clone()
+        .acquire_owned()
+        .await
+        .map_err(|e| e.to_string())?;
+    if latest.load(Ordering::SeqCst) != generation {
+        return Err("Preview superseded".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        if latest.load(Ordering::SeqCst) != generation {
+            return Err("Preview superseded".into());
+        }
+        preview_edited_photo_blocking(root, path, options, max_edge)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn export_edited_copy(
+    jobs: tauri::State<'_, crate::media_jobs::ImageJobs>,
+    root: String,
+    path: String,
+    destination: String,
+    options: EditOptions,
+) -> Result<EditedExportResult, String> {
+    let permit = jobs
+        .gate
+        .clone()
+        .acquire_owned()
+        .await
+        .map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        export_edited_copy_blocking(root, path, destination, options)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]

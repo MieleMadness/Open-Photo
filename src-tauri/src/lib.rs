@@ -10,12 +10,16 @@ mod ai_validation;
 mod cache_disk;
 mod edit_export;
 mod geo;
+mod image_decode;
 mod index;
+mod media_jobs;
+mod media_stream;
 mod similar;
+mod user_data;
 mod watch;
+mod xmp;
 use base64::Engine;
 use exif::{DateTime as ExifDateTime, In, Reader as ExifReader, Tag, Value};
-use image::ImageReader;
 use nom_exif::{read_exif as read_nom_exif, EntryValue as NomEntryValue, ExifTag as NomExifTag};
 use raw_files::{Orientation as RawOrientation, RawFile};
 use serde::Serialize;
@@ -70,6 +74,7 @@ struct BulkTagResult {
     errors: Vec<String>,
 }
 
+#[cfg(test)]
 const OPENPHOTO_XMP_MARKER: &str = "xmp:CreatorTool=\"Open-Photo\"";
 const MAX_XMP_SIDECAR_BYTES: u64 = 256 * 1024;
 
@@ -89,35 +94,8 @@ fn render_openphoto_xmp(tags: &[String]) -> String {
     )
 }
 
-fn decode_xml_entities(value: &str) -> String {
-    value
-        .replace("&apos;", "'")
-        .replace("&quot;", "\"")
-        .replace("&gt;", ">")
-        .replace("&lt;", "<")
-        .replace("&amp;", "&")
-}
-
 fn openphoto_xmp_tags(xml: &str) -> Option<Vec<String>> {
-    if !xml.contains(OPENPHOTO_XMP_MARKER) {
-        return None;
-    }
-    let bag_start = xml.find("<dc:subject><rdf:Bag>")? + "<dc:subject><rdf:Bag>".len();
-    let bag_end = xml[bag_start..].find("</rdf:Bag></dc:subject>")? + bag_start;
-    let bag = &xml[bag_start..bag_end];
-    let mut tags = Vec::new();
-    let mut cursor = 0usize;
-    while let Some(start_rel) = bag[cursor..].find("<rdf:li>") {
-        let value_start = cursor + start_rel + "<rdf:li>".len();
-        let value_end = bag[value_start..].find("</rdf:li>")? + value_start;
-        let tag = decode_xml_entities(&bag[value_start..value_end]);
-        if tag.is_empty() || tag.len() > 128 {
-            return None;
-        }
-        tags.push(tag);
-        cursor = value_end + "</rdf:li>".len();
-    }
-    Some(tags)
+    xmp::tags(xml)
 }
 
 #[derive(Serialize)]
@@ -138,7 +116,7 @@ fn read_managed_tags(root: String, paths: Vec<String>) -> Result<Vec<ManagedTagE
             Err(_) => continue,
         };
         let sidecar = PathBuf::from(format!("{}.xmp", file.display()));
-        let Ok(metadata) = fs::metadata(&sidecar) else {
+        let Ok(metadata) = fs::symlink_metadata(&sidecar) else {
             continue;
         };
         if !metadata.is_file() || metadata.len() > MAX_XMP_SIDECAR_BYTES {
@@ -155,7 +133,7 @@ fn read_managed_tags(root: String, paths: Vec<String>) -> Result<Vec<ManagedTagE
     Ok(entries)
 }
 
-fn replace_managed_sidecar(sidecar: &Path, contents: &str) -> Result<(), String> {
+fn replace_managed_sidecar(sidecar: &Path, expected: &str, contents: &str) -> Result<(), String> {
     let file_name = sidecar
         .file_name()
         .and_then(|name| name.to_str())
@@ -184,14 +162,30 @@ fn replace_managed_sidecar(sidecar: &Path, contents: &str) -> Result<(), String>
         }
     }
 
-    fs::rename(sidecar, &backup).map_err(|e| {
+    // Copy into a create-new backup; never remove the normal sidecar path.
+    let mut recovery = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&backup)
+        .map_err(|error| {
+            let _ = fs::remove_file(&temp);
+            error.to_string()
+        })?;
+    recovery
+        .write_all(expected.as_bytes())
+        .and_then(|_| recovery.sync_all())
+        .map_err(|error| error.to_string())?;
+    drop(recovery);
+    if fs::read_to_string(sidecar).map_err(|error| error.to_string())? != expected {
         let _ = fs::remove_file(&temp);
-        e.to_string()
-    })?;
-    if let Err(error) = fs::rename(&temp, sidecar) {
-        let _ = fs::rename(&backup, sidecar);
+        let _ = fs::remove_file(&backup);
+        return Err("XMP changed outside Open-Photo; refresh before retrying".into());
+    }
+    if let Err(error) = atomic_replace(&temp, sidecar) {
         let _ = fs::remove_file(&temp);
-        return Err(format!("Unable to replace managed XMP sidecar: {error}"));
+        return Err(format!(
+            "Unable to replace XMP; recovery backup retained: {error}"
+        ));
     }
     if let Err(error) = fs::remove_file(&backup) {
         return Err(format!(
@@ -200,6 +194,40 @@ fn replace_managed_sidecar(sidecar: &Path, contents: &str) -> Result<(), String>
     }
     Ok(())
 }
+
+#[cfg(windows)]
+fn atomic_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    let source: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
+    let destination: Vec<u16> = destination
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+    // SAFETY: both paths are live, NUL-terminated UTF-16 buffers; optional arguments are null.
+    let result = unsafe {
+        windows_sys::Win32::Storage::FileSystem::ReplaceFileW(
+            destination.as_ptr(),
+            source.as_ptr(),
+            std::ptr::null(),
+            0,
+            std::ptr::null(),
+            std::ptr::null(),
+        )
+    };
+    if result == 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(not(windows))]
+fn atomic_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
+    fs::rename(source, destination)
+}
+
+static XMP_WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 /// Create new Open-Photo XMP sidecars or merge keywords into sidecars that
 /// Open-Photo owns. Unknown/foreign XMP files are never overwritten.
@@ -233,6 +261,8 @@ fn bulk_create_tags(
         skipped: 0,
         errors: Vec::new(),
     };
+
+    let _write_guard = XMP_WRITE_LOCK.lock().map_err(|error| error.to_string())?;
 
     for path in paths {
         let file = match safe_media_path(&root, &path) {
@@ -278,7 +308,7 @@ fn bulk_create_tags(
             continue;
         }
 
-        let metadata = match fs::metadata(&sidecar) {
+        let metadata = match fs::symlink_metadata(&sidecar) {
             Ok(metadata) => metadata,
             Err(error) => {
                 output
@@ -325,8 +355,9 @@ fn bulk_create_tags(
             ));
             continue;
         }
-        let replacement = render_openphoto_xmp(&merged);
-        match replace_managed_sidecar(&sidecar, &replacement) {
+        let replacement = xmp::append_tags(&xml, &normalized_tags)
+            .ok_or("Cannot safely preserve this XMP document")?;
+        match replace_managed_sidecar(&sidecar, &xml, &replacement) {
             Ok(()) => output.updated += 1,
             Err(error) => output
                 .errors
@@ -357,6 +388,8 @@ pub struct ScanResult {
     photos: Vec<Photo>,
     scanned_files: usize,
     truncated: bool,
+    incomplete: bool,
+    errors: Vec<String>,
 }
 
 fn parse_exif_capture_value(value: &Value) -> Option<String> {
@@ -801,10 +834,16 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
     let mut photos = Vec::new();
     let mut scanned_files = 0usize;
     let mut truncated = false;
+    let mut errors = Vec::new();
 
     'scan: while let Some(dir) = pending.pop() {
-        let entries =
-            fs::read_dir(&dir).map_err(|e| format!("Unable to read {}: {}", dir.display(), e))?;
+        let entries = match fs::read_dir(&dir) {
+            Ok(entries) => entries,
+            Err(error) => {
+                errors.push(format!("Unable to read {}: {error}", dir.display()));
+                continue;
+            }
+        };
         for entry in entries {
             if scanned_files >= MAX_ENTRIES {
                 truncated = true;
@@ -813,11 +852,17 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
             scanned_files += 1;
             let entry = match entry {
                 Ok(e) => e,
-                Err(_) => continue,
+                Err(error) => {
+                    errors.push(format!("{}: {error}", dir.display()));
+                    continue;
+                }
             };
             let kind = match entry.file_type() {
                 Ok(t) => t,
-                Err(_) => continue,
+                Err(error) => {
+                    errors.push(format!("{}: {error}", entry.path().display()));
+                    continue;
+                }
             };
             if kind.is_symlink() {
                 continue;
@@ -840,7 +885,10 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
             }
             let metadata = match entry.metadata() {
                 Ok(m) => m,
-                Err(_) => continue,
+                Err(error) => {
+                    errors.push(format!("{}: {error}", path.display()));
+                    continue;
+                }
             };
             let modified_unix = metadata
                 .modified()
@@ -871,6 +919,8 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
         photos,
         scanned_files,
         truncated,
+        incomplete: truncated || !errors.is_empty(),
+        errors,
     })
 }
 
@@ -947,7 +997,11 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    let key = format!("{}:{size}:{modified}:{}", file.display(), max_edge);
+    let key = format!(
+        "oriented-v2:{}:{size}:{modified}:{}",
+        file.display(),
+        max_edge
+    );
     if let Ok(guard) = cache().lock() {
         if let Some(image) = guard.0.get(&key) {
             return Ok(image.clone());
@@ -963,13 +1017,7 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
     let decoded = if matches!(extension.as_str(), "nef" | "arw") {
         decode_raw_embedded_preview(&file)?
     } else {
-        let reader = ImageReader::open(&file)
-            .map_err(|e| e.to_string())?
-            .with_guessed_format()
-            .map_err(|e| e.to_string())?;
-        reader
-            .decode()
-            .map_err(|_| "This format cannot be previewed yet".to_string())?
+        image_decode::decode(&file)?
     };
     let thumb = decoded.thumbnail(edge, edge);
     let mut bytes = Cursor::new(Vec::new());
@@ -1019,6 +1067,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(std::sync::Mutex::new(watch::WatchState::default()))
+        .manage(media_jobs::ImageJobs::default())
         .invoke_handler(tauri::generate_handler![
             ai_embeddings::ai_embedding_status,
             ai_embeddings::ai_find_similar_by_photo,
@@ -1043,6 +1092,10 @@ pub fn run() {
             scan_library,
             preview_image,
             read_iphone_media,
+            media_stream::video_source,
+            user_data::load_user_data,
+            user_data::save_user_data,
+            ai_faces::ai_name_person,
             bulk_create_tags,
             read_managed_tags,
             edit_export::export_edited_copy,

@@ -1,62 +1,83 @@
 name: Windows Desktop Build
 run-name: ${{ github.event.pull_request.title || format('Open-Photo {0}', github.ref_name) }} · CI #${{ github.run_number }}
-concurrency:
-  group: openphoto-windows-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: openphoto-windows-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  windows:
-    name: Build on Windows
+  frontend:
+    name: Frontend checks
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
-          restore-keys: |
-            npm-${{ runner.os }}-
-      - name: Install dependencies
-        run: npm install --prefer-offline --no-audit --no-fund
-      - name: Verify consistent build version
+          node-version: '22.23.0'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Verify build versions
         shell: pwsh
         run: |
           $npm = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $tauri = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           $cargo = Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "([^"]+)"' | Select-Object -First 1
-          $rust = $cargo.Matches.Groups[1].Value
-          if (!$npm -or $npm -ne $tauri -or $npm -ne $rust) {
-            throw "Version mismatch: npm=$npm, Tauri=$tauri, Cargo=$rust"
-          }
-          Write-Output "Consistent Open-Photo version: $npm"
-      - name: Check Rust formatting (fail fast)
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
-      - name: Typecheck and build frontend
-        run: npm run build
-      - name: Generate app icons from maintained SVG source
-        run: npm run tauri icon assets/app-icon.svg
-      - name: Rust lint
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-      - name: Rust regression tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+          if (!$npm -or $npm -ne $tauri -or $npm -ne $cargo.Matches.Groups[1].Value) { throw 'Build versions differ' }
+      - run: npm test
+      - run: npm run build
+
+  rust:
+    name: Rust checks
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.1'
+          components: rustfmt, clippy
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: windows-validation
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.0'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run tauri icon assets/app-icon.svg
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+  windows:
+    name: Build on Windows
+    needs: [frontend, rust]
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.1'
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: windows-installer
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.0'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run tauri icon assets/app-icon.svg
       - name: Build Windows desktop installer
-        run: npm run tauri build
+        run: npm run tauri build -- -- --locked
       - uses: actions/upload-artifact@v4
         with:
           name: open-photo-windows-${{ github.run_number }}

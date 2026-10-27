@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import {useManagedTags} from "./useManagedTags";
+import {readMetadataBatches} from "./metadataBatches";
+import {saveSetting,retrySettings} from "./userData";
 import PhotoMap, {type PhotoLocation} from "./PhotoMap";
 import { IPhonePicture, IPhoneMotion } from "./IPhoneMedia";
 import { Images, FolderOpen, Users, Tags, Settings2, Search, Moon, Sun, Monitor, ShieldCheck, ImageOff, HardDrive, ListFilter, ChevronRight, X, LayoutGrid, List, ZoomIn, ZoomOut, ArrowUpDown } from "lucide-react";
@@ -14,16 +17,15 @@ type Theme = "light" | "dark" | "system";
 type PhotoView = "grid" | "list";
 type SortBy = "name" | "newest" | "oldest" | "largest" | "smallest";
 type Photo = { path: string; name: string; extension: string; bytes: number; modified_unix: number; capture_local?: string | null; live_asset_id?: string | null; libraryRoot?: string };
-type ScanResult = { photos: Photo[]; scanned_files: number; truncated: boolean };
+type ScanResult = { photos: Photo[]; scanned_files: number; truncated: boolean; incomplete?:boolean; errors?:string[] };
 type AiBatchResult = {requested:number;indexed:number;skipped:number;failed:number;errors:string[]};
 type FaceIndexBatch = {requested:number;indexed_images:number;skipped_images:number;failed_images:number;faces:number;errors:string[]};
 type PersonFace = {root:string;path:string;face_index:number;x:number;y:number;width:number;height:number;score:number};
-type PersonGroup = {id:string;members:PersonFace[]};
+type PersonGroup = {id:string;name?:string;legacy_id?:string;members:PersonFace[]};
 type FaceIndexStatus = {indexed_images:number;faces:number};
 type AiModelInfo = {kind:string;installed:boolean;bytes:number;sha256:string|null;expected_sha256:string;compatible:boolean};
 type AiBundleReadiness = {ready:boolean;missing:string[];incompatible:string[]};
 type AiValidationReport = {semantic:AiBundleReadiness;people:AiBundleReadiness;ocr:AiBundleReadiness;directml_available:boolean;cpu_fallback:boolean;core_implementation_complete:boolean;real_world_validation_required:boolean};
-type ManagedTagEntry = {path:string;tags:string[]};
 const NAV: {id: View; title: string; icon: typeof Images}[] = [
   { id: "library", title: "Library", icon: Images },
   { id: "folders", title: "Folders", icon: FolderOpen },
@@ -98,7 +100,7 @@ export default function App() {
   const [peopleBusy,setPeopleBusy]=useState(false);
   const [peopleMessage,setPeopleMessage]=useState("");
   const [peopleNames,setPeopleNames]=useState<Record<string,string>>(()=>{try{return JSON.parse(localStorage.getItem("openphoto.peopleNames")||"{}") as Record<string,string>}catch{return {}}});
-  useEffect(()=>localStorage.setItem("openphoto.peopleNames",JSON.stringify(peopleNames)),[peopleNames]);
+  useEffect(()=>saveSetting("openphoto.peopleNames",JSON.stringify(peopleNames)),[peopleNames]);
   const [aiRuntime,setAiRuntime]=useState<{directml_compiled:boolean;directml_available:boolean;automatic_policy:string;cpu_fallback:boolean}|null>(null);
   const refreshModels=()=>invoke<AiModelInfo[]>("ai_model_status").then(setAiModels).catch(e=>setAiModelMessage(String(e)));
   const refreshAiRuntime=()=>invoke<{directml_compiled:boolean;directml_available:boolean;automatic_policy:string;cpu_fallback:boolean}>("ai_runtime_status").then(setAiRuntime).catch(e=>setAiModelMessage(String(e)));
@@ -112,33 +114,6 @@ export default function App() {
     finally{setAiValidationBusy(false)}
   };
   useEffect(()=>{if(view==="settings"&&isDesktop){void refreshModels();void refreshAiRuntime()}},[view]);
-  useEffect(()=>{
-    if(view!=="tags"||!isDesktop||!result){return;}
-    let active=true;
-    setTagIndexBusy(true);setTagIndexError("");
-    const grouped=new Map<string,string[]>();
-    for(const photo of result.photos){
-      const parent=photo.libraryRoot||root;
-      if(!parent)continue;
-      const paths=grouped.get(parent)||[];
-      if(paths.length<5000)paths.push(photo.path);
-      grouped.set(parent,paths);
-    }
-    Promise.allSettled([...grouped].map(([parent,paths])=>invoke<ManagedTagEntry[]>("read_managed_tags",{root:parent,paths})))
-      .then(outcomes=>{
-        if(!active)return;
-        const next:Record<string,string[]>={};
-        for(const outcome of outcomes){
-          if(outcome.status!=="fulfilled")continue;
-          for(const entry of outcome.value)next[entry.path]=entry.tags;
-        }
-        setManagedTags(next);
-        const failures=outcomes.filter((outcome):outcome is PromiseRejectedResult=>outcome.status==="rejected");
-        if(failures.length)setTagIndexError(failures.map(failure=>String(failure.reason)).join("; "));
-      })
-      .finally(()=>{if(active)setTagIndexBusy(false)});
-    return()=>{active=false};
-  },[view,result,root,tagRefreshKey]);
   const importAiModel=async(kind:string)=>{
     setAiModelBusy(true);setAiModelMessage("");
     try{
@@ -154,20 +129,20 @@ export default function App() {
     finally{setAiModelBusy(false);}
   };
   const [aiDevice,setAiDevice]=useState<"auto"|"cpu">(()=>localStorage.getItem("openphoto.ai.device")==="cpu"?"cpu":"auto");
-  useEffect(()=>localStorage.setItem("openphoto.ai.optin",String(aiOptIn)),[aiOptIn]);
-  useEffect(()=>localStorage.setItem("openphoto.ai.device",aiDevice),[aiDevice]);
+  useEffect(()=>saveSetting("openphoto.ai.optin",String(aiOptIn)),[aiOptIn]);
+  useEffect(()=>saveSetting("openphoto.ai.device",aiDevice),[aiDevice]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>(()=>{try{return JSON.parse(localStorage.getItem("openphoto.workspaces")||"[]") as Workspace[]}catch{return []}});
   const [activeWorkspace,setActiveWorkspace] = useState<string>(()=>localStorage.getItem("openphoto.activeWorkspace")||"");
   const [folderFilter,setFolderFilter] = useState("");
   const [collectionFilter,setCollectionFilter]=useState("");
   const [collections,setCollections]=useState<Collection[]>(()=>{try{return JSON.parse(localStorage.getItem("openphoto.collections")||"[]") as Collection[]}catch{return []}});
-  useEffect(()=>localStorage.setItem("openphoto.collections",JSON.stringify(collections)),[collections]);
+  useEffect(()=>saveSetting("openphoto.collections",JSON.stringify(collections)),[collections]);
   const [geoPoints,setGeoPoints]=useState<PhotoLocation[]>([]);
   const [geoBusy,setGeoBusy]=useState(false);
   const [autoSync,setAutoSync]=useState(()=>localStorage.getItem("openphoto.autosync")==="true");
   const syncRunning=useRef<number|null>(null);
   const syncGeneration=useRef(0);
-  useEffect(()=>{localStorage.setItem("openphoto.autosync",String(autoSync))},[autoSync]);
+  useEffect(()=>{saveSetting("openphoto.autosync",String(autoSync))},[autoSync]);
   const [lastSync,setLastSync]=useState("");
   const [healthReport,setHealthReport]=useState<{indexed:number;available:number;missing:number;inaccessible:number;modified:number}|null>(null);
   const [healthError,setHealthError]=useState("");
@@ -181,7 +156,7 @@ export default function App() {
       return Object.fromEntries(Object.entries(stored).filter((entry):entry is [string,string]=>typeof entry[1]==="string"));
     } catch { return {}; }
   });
-  useEffect(()=>localStorage.setItem("openphoto.duplicateReview",JSON.stringify(duplicateReview)),[duplicateReview]);
+  useEffect(()=>saveSetting("openphoto.duplicateReview",JSON.stringify(duplicateReview)),[duplicateReview]);
   const [similarGroups,setSimilarGroups]=useState<{paths:string[];max_distance:number}[]>([]);
   const [mediaType,setMediaType] = useState<"all"|"photo"|"video">("all");
   const [organizeFilter,setOrganizeFilter] = useState<"all"|"favorites"|"rated">("all");
@@ -191,22 +166,20 @@ export default function App() {
       return Object.fromEntries(Object.entries(saved).filter(([,rating])=>Number.isInteger(rating)&&rating>=0&&rating<=5));
     } catch { return {}; }
   });
-  useEffect(()=>localStorage.setItem("openphoto.ratings",JSON.stringify(photoRatings)),[photoRatings]);
+  useEffect(()=>saveSetting("openphoto.ratings",JSON.stringify(photoRatings)),[photoRatings]);
   const ratePhoto=(path:string,rating:number)=>setPhotoRatings(previous=>({...previous,[path]:previous[path]===rating?0:rating}));
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("openphoto.theme") as Theme) || "system");
   const [root, setRoot] = useState("");
-  useEffect(()=>{localStorage.setItem("openphoto.workspaces",JSON.stringify(workspaces))},[workspaces]);
-  useEffect(()=>{localStorage.setItem("openphoto.activeWorkspace",activeWorkspace)},[activeWorkspace]);
+  useEffect(()=>{saveSetting("openphoto.workspaces",JSON.stringify(workspaces))},[workspaces]);
+  useEffect(()=>{saveSetting("openphoto.activeWorkspace",activeWorkspace)},[activeWorkspace]);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [query, setQuery] = useState("");
   const [smartFilter,setSmartFilter]=useState<""|"recent"|"thisDay"|"large"|"unrated"|"thisMonth">("");
   const [timelineMonth,setTimelineMonth]=useState("");
   const [memoryYear,setMemoryYear]=useState<number|null>(null);
   const [selectedTag,setSelectedTag]=useState("");
-  const [managedTags,setManagedTags]=useState<Record<string,string[]>>({});
-  const [tagIndexBusy,setTagIndexBusy]=useState(false);
-  const [tagIndexError,setTagIndexError]=useState("");
   const [tagRefreshKey,setTagRefreshKey]=useState(0);
+  const {managedTags,tagIndexBusy,tagIndexError}=useManagedTags(result?.photos,root,activeWorkspace,isDesktop&&(view==="tags"||!!selectedTag),tagRefreshKey);
   const [selectedSmartRule,setSelectedSmartRule]=useState("");
   const [smartRules,setSmartRules]=useState<SmartRule[]>(()=>{
     try {
@@ -214,7 +187,7 @@ export default function App() {
       return Array.isArray(saved)?saved.filter(item=>typeof item.id==="string"&&typeof item.name==="string"&&["all","photo","video"].includes(item.type)&&Number.isInteger(item.minRating)&&item.minRating>=0&&item.minRating<=5&&Number.isFinite(item.minMB)&&item.minMB>=0):[];
     }catch{return [];}
   });
-  useEffect(()=>localStorage.setItem("openphoto.smartRules",JSON.stringify(smartRules)),[smartRules]);
+  useEffect(()=>saveSetting("openphoto.smartRules",JSON.stringify(smartRules)),[smartRules]);
   const [photoView, setPhotoView] = useState<PhotoView>("grid");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
   const [tileSize, setTileSize] = useState(180);
@@ -226,6 +199,13 @@ export default function App() {
   const [gridWidth, setGridWidth] = useState(940);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [storageError,setStorageError]=useState("");
+  useEffect(()=>{
+    const onError=(event:Event)=>setStorageError((event as CustomEvent<string>).detail);
+    window.addEventListener("openphoto-storage-error",onError);
+    return()=>window.removeEventListener("openphoto-storage-error",onError);
+  },[]);
+
   const [selected, setSelected] = useState<Photo | null>(null);
   const [fullScreenPreview,setFullScreenPreview]=useState(false);
   const [editRotation,setEditRotation]=useState<0|90|180|270>(0);
@@ -274,7 +254,7 @@ export default function App() {
     return()=>{active=false;window.clearTimeout(timer)};
   },[selected?.path,selected?.libraryRoot,selected?.extension,root,editRotation,editFlipH,editFlipV,editBrightness,editContrast,editCropLeft,editCropTop,editCropRight,editCropBottom,editResizeWidth,editResizeHeight,editGrayscale,editHue,editBlur,editSharpen,editSharpenThreshold]);
   useEffect(() => {
-    localStorage.setItem("openphoto.theme", theme);
+    saveSetting("openphoto.theme", theme);
     const body = document.documentElement;
     const update = () => body.dataset.theme = theme === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : theme;
     update();
@@ -460,7 +440,7 @@ export default function App() {
     setPeopleMessage("");
     try{
       const [groups,status]=await Promise.all([
-        invoke<PersonGroup[]>("ai_people_groups",{roots}),
+        invoke<PersonGroup[]>("ai_people_groups",{roots,legacyNames:peopleNames}),
         invoke<FaceIndexStatus>("ai_face_index_status",{roots})
       ]);
       setPeopleGroups(groups);
@@ -523,8 +503,9 @@ export default function App() {
       const merged=new Map<string,Photo>();
       for(const scan of success)for(const photo of scan.value.photos)merged.set(photo.path,photo);
       if(generation!==syncGeneration.current)return;
-      setResult({photos:[...merged.values()],scanned_files:success.reduce((n,s)=>n+s.value.scanned_files,0),truncated:success.some(s=>s.value.truncated)});
-      if(failures.length)setError(failures.map(x=>String(x.reason)).join("; "));
+      setResult({photos:[...merged.values()],scanned_files:success.reduce((n,s)=>n+s.value.scanned_files,0),truncated:success.some(s=>s.value.truncated),incomplete:failures.length>0||success.some(s=>s.value.incomplete),errors:success.flatMap(s=>s.value.errors||[])});
+      const scanErrors=[...failures.map(x=>String(x.reason)),...success.flatMap(s=>s.value.errors||[])];
+      if(scanErrors.length)setError(scanErrors.slice(0,10).join("; "));
       setSyncChanges(success.reduce<{added:number;updated:number;unchanged:number;removed:number;incomplete:boolean}>((summary,entry)=>({added:summary.added+entry.value.changes.added,updated:summary.updated+entry.value.changes.updated,unchanged:summary.unchanged+entry.value.changes.unchanged,removed:summary.removed+entry.value.changes.removed,incomplete:summary.incomplete||entry.value.changes.incomplete}),{added:0,updated:0,unchanged:0,removed:0,incomplete:false}));
       setLastSync(new Date().toLocaleString());setDuplicates([]);
     } catch(e){if(generation===syncGeneration.current)setError(String(e))}finally{if(syncRunning.current===generation)syncRunning.current=null;if(generation===syncGeneration.current)setBusy(false)}
@@ -539,7 +520,7 @@ export default function App() {
       const nextRoots=[...new Set([...(current?.roots?.length?current.roots:current?.root?[current.root]:[]),path])];
       setWorkspaces(old=>old.some(w=>w.id===id)?old.map(w=>w.id===id?{...w,root:nextRoots[0],roots:nextRoots}:w):[...old,{id,name:`Workspace ${old.length+1}`,root:path,roots:nextRoots}]);
       syncGeneration.current+=1;
-      setActiveWorkspace(id);setRoot(nextRoots[0]);setSelection([]);setSelected(null);setFolderFilter("");
+      setActiveWorkspace(id);setRoot(nextRoots[0]);setSelection([]);setSelected(null);setFolderFilter("");setSelectedTag("");
       await syncFolders(nextRoots);
     }catch(e){setError(String(e))}
   };
@@ -564,7 +545,7 @@ export default function App() {
       const changed=[...pendingPaths];pendingPaths=new Set();
       const fullFallback=requireFullScan;
       requireFullScan=false;
-      if(!changed.length)return;
+      if(!changed.length&&!fullFallback)return;
       // A directory event or a large burst cannot be reconciled reliably one file at a time.
       if(fullFallback || changed.length>64 || changed.some(path=>!fileExtensions.has(path.split(".").pop()?.toLowerCase()||"")) || syncRunning.current===syncGeneration.current){
         fullSync();return;
@@ -575,7 +556,7 @@ export default function App() {
           const normalized=path.toLowerCase().replace(/\\/g,"/");
           const parent=activeRoots.find(root=>normalized.startsWith(root.toLowerCase().replace(/\\/g,"/").replace(/\/$/,"")+"/"));
           if(!parent)throw Error("Change outside workspace");
-          const change=await invoke<{path:string;present:boolean;bytes:number;modified_unix:number;capture_local:string|null}>("update_indexed_path",{root:parent,path});
+          const change=await invoke<{path:string;present:boolean;bytes:number;modified_unix:number;capture_local:string|null;live_asset_id:string|null}>("update_indexed_path",{root:parent,path});
           return {...change,parent};
         }));
         if(disposed)return;
@@ -585,7 +566,7 @@ export default function App() {
           for(const change of changes){
             if(change.present){
               const filename=change.path.replace(/\\/g,"/").split("/").pop()||change.path;
-              updated.set(change.path,{path:change.path,name:filename,extension:filename.split(".").pop()?.toLowerCase()||"",bytes:change.bytes,modified_unix:change.modified_unix,capture_local:change.capture_local,libraryRoot:change.parent});
+              updated.set(change.path,{path:change.path,name:filename,extension:filename.split(".").pop()?.toLowerCase()||"",bytes:change.bytes,modified_unix:change.modified_unix,capture_local:change.capture_local,live_asset_id:change.live_asset_id,libraryRoot:change.parent});
             }else updated.delete(change.path);
           }
           return {...previous,photos:[...updated.values()]};
@@ -604,6 +585,7 @@ export default function App() {
         await invoke("set_watched_folders",{roots:activeRoots});
         if(disposed||!autoSync)return;
         unlisten=await listen<{paths:string[]}>("openphoto-media-event",(event)=>{
+          if(event.payload.paths.some(path=>path.toLowerCase().endsWith(".xmp")))setTagRefreshKey(value=>value+1);
           for(const path of event.payload.paths)pendingPaths.add(path);
           if(!event.payload.paths.length)requireFullScan=true;
           if(debounce!==undefined)window.clearTimeout(debounce);
@@ -637,7 +619,7 @@ export default function App() {
   const openWorkspace=async(id:string)=>{
     const item=workspaces.find(w=>w.id===id);if(!item)return;
     syncGeneration.current+=1;
-    setActiveWorkspace(id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter("");
+    setActiveWorkspace(id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter("");setSelectedTag("");setPeopleGroups([]);setCollectionFilter("");setSelectedSmartRule("");setPeopleStatus(null);
     const folders=item.roots?.length?item.roots:item.root?[item.root]:[];
     if(folders.length)await syncFolders(folders);
   };
@@ -645,21 +627,12 @@ export default function App() {
     if(view!=="map"||!result){setGeoPoints([]);return;}
     let active=true;
     setGeoBusy(true);
-    const grouped=new Map<string,string[]>();
-    for(const photo of result.photos) {
-      if(!["jpg","jpeg","tif","tiff"].includes(photo.extension))continue;
-      const parent=photo.libraryRoot||root;
-      if(!parent)continue;
-      const paths=grouped.get(parent)||[];
-      if(paths.length<5000)paths.push(photo.path);
-      grouped.set(parent,paths);
-    }
-    Promise.allSettled([...grouped].map(([parent,paths])=>invoke<PhotoLocation[]>("gps_for_photos",{root:parent,paths})))
-      .then(scans=>{
+    void readMetadataBatches((result.photos).filter(photo=>["jpg","jpeg","tif","tiff"].includes(photo.extension)),root,1000,
+      (parent,paths)=>invoke<PhotoLocation[]>("gps_for_photos",{root:parent,paths}),()=>active)
+      .then(({values,errors})=>{
         if(!active)return;
-        setGeoPoints(scans.flatMap(scan=>scan.status==="fulfilled"?scan.value:[]));
-        const errors=scans.filter((scan):scan is PromiseRejectedResult=>scan.status==="rejected");
-        if(errors.length)setError(errors.map(scan=>String(scan.reason)).join("; "));
+        setGeoPoints(values);
+        if(errors.length)setError(`Some map locations could not be loaded: ${errors.join("; ")}`);
       }).finally(()=>{if(active)setGeoBusy(false)});
     return ()=>{active=false};
   },[root,result,view]);
@@ -830,16 +803,24 @@ export default function App() {
     if (!window.confirm(`Add ${tags.join(", ")} to ${selection.length} selected items? Open-Photo can create new sidecars or merge into sidecars it manages. Foreign/unknown XMP files will be skipped, and originals are never modified.`)) return;
     setApplying(true); setTagMessage("");
     try {
-      const groups=new Map<string,string[]>();for(const path of selection){const parent=result?.photos.find(p=>p.path===path)?.libraryRoot||root;groups.set(parent,[...(groups.get(parent)||[]),path]);}
-      const outcomes=await Promise.all([...groups].map(([parent,paths])=>invoke<{created:number;updated:number;skipped:number;errors:string[]}>("bulk_create_tags",{root:parent,paths,tags})));
-      const r={created:outcomes.reduce((n,x)=>n+x.created,0),updated:outcomes.reduce((n,x)=>n+x.updated,0),skipped:outcomes.reduce((n,x)=>n+x.skipped,0),errors:outcomes.flatMap(x=>x.errors)};
+      const generation=syncGeneration.current;
+      const photosByPath=new Map(result?.photos.map(photo=>[photo.path,photo]));
+      const selectedPaths=selection.map(path=>({path,libraryRoot:photosByPath.get(path)?.libraryRoot||root}));
+      const {values:outcomes,errors:batchErrors}=await readMetadataBatches(selectedPaths,root,1000,async(parent,paths)=>[
+        await invoke<{created:number;updated:number;skipped:number;errors:string[]}>("bulk_create_tags",{root:parent,paths,tags})
+      ]);
+      if(generation!==syncGeneration.current)return;
+      const r={created:outcomes.reduce((n,x)=>n+x.created,0),updated:outcomes.reduce((n,x)=>n+x.updated,0),skipped:outcomes.reduce((n,x)=>n+x.skipped,0),errors:[...batchErrors,...outcomes.flatMap(x=>x.errors)]};
       setTagMessage(`Created ${r.created} sidecars; updated ${r.updated}; skipped ${r.skipped}. ${r.errors.length ? r.errors.slice(0,3).join("; ") : ""}`);
-      if (!r.errors.length) {setSelection([]);setTagRefreshKey(value=>value+1);}
+      if(r.created+r.updated>0)setTagRefreshKey(value=>value+1);
+      if(!r.errors.length)setSelection([]);
     } catch(e) { setTagMessage(String(e)); } finally {setApplying(false);}
   };
   const bytes = result?.photos.reduce((n, p) => n + p.bytes, 0) || 0;
   const title = NAV.find(x => x.id === view)?.title || "Library";
   return <div className="app-shell">
+    {storageError&&<div role="alert" className="storage-error">Changes could not be saved: {storageError} <button onClick={()=>void retrySettings().then(()=>setStorageError("")).catch(e=>setStorageError(String(e)))}>Retry saving</button></div>}
+
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark"><Images size={23}/></div><div><strong>Open-Photo</strong><small>YOUR PHOTO LIBRARY</small></div></div>
       <div className="sidebar-label">WORKSPACE</div>
@@ -879,7 +860,7 @@ export default function App() {
             {memoryYear!==null && view==="library" && <div className="selection-toolbar"><strong>Memory year: {memoryYear}</strong><button className="secondary-button" onClick={()=>setMemoryYear(null)}>Show all years</button></div>}
             {selectedTag && view==="library" && <div className="selection-toolbar"><strong>Tag: {selectedTag}</strong><button className="secondary-button" onClick={()=>setSelectedTag("")}>Show all tags</button></div>}
             {result && <div className="selection-toolbar"><label className="sort-control">Organize <select aria-label="Organization filter" value={organizeFilter} onChange={e=>setOrganizeFilter(e.target.value as "all"|"favorites"|"rated")}><option value="all">All photos</option><option value="favorites">Favorites (5 stars)</option><option value="rated">Rated photos</option></select></label></div>}
-            {!busy && result && <><div className="results-note">{visible.length} matching files · {result.scanned_files.toLocaleString()} filesystem entries scanned {result.truncated ? "· scan limit reached" : ""}</div><div className={photoView === "grid" ? "photo-grid virtual-photo-grid" : "file-list"} onScroll={e=>setScrollTop(e.currentTarget.scrollTop)} ref={el=>{if(el && Math.abs(el.clientWidth-gridWidth)>5)setGridWidth(el.clientWidth);}} style={photoView === "grid" ? { display:"block", padding:0 } : undefined}>
+            {!busy && result && <><div className="results-note">{visible.length} matching files · {result.scanned_files.toLocaleString()} filesystem entries scanned {result.truncated ? "· scan limit reached" : result.incomplete ? "· incomplete scan; previous index retained" : ""}</div><div className={photoView === "grid" ? "photo-grid virtual-photo-grid" : "file-list"} onScroll={e=>setScrollTop(e.currentTarget.scrollTop)} ref={el=>{if(el && Math.abs(el.clientWidth-gridWidth)>5)setGridWidth(el.clientWidth);}} style={photoView === "grid" ? { display:"block", padding:0 } : undefined}>
               {photoView === "grid" ? <div style={{height:rowCount*rowHeight,position:"relative"}}><div className="virtual-rows" style={{position:"absolute",top:windowStart*rowHeight,left:24,right:24,display:"grid",gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`,gridAutoRows:rowHeight,gap:0}}>
                 {windowPhotos.map(p=><div className="tile-cell" key={p.path}><button className={selection.includes(p.path) ? "photo-tile is-selected" : "photo-tile"} onClick={e=>e.ctrlKey||e.metaKey ? toggleSelection(p.path):setSelected(p)}><PhotoThumb root={p.libraryRoot||root} photo={p} maxEdge={Math.max(360,tileSize*2)} /><span className="tile-name" title={p.name}>{photoRatings[p.path]? "★".repeat(photoRatings[p.path])+" · ":""}</span><span className="tile-name" title={p.name}>{p.name}{liveVideoByImage.has(p.path)?" · LIVE":""}</span></button><input type="checkbox" aria-label={`Select ${p.name}`} checked={selection.includes(p.path)} onChange={()=>toggleSelection(p.path)}/></div>)}
               </div></div> : visible.map(p=><div key={p.path} className="selectable-row"><input type="checkbox" aria-label={`Select ${p.name}`} checked={selection.includes(p.path)} onChange={()=>toggleSelection(p.path)}/><button className="file-row" onClick={()=>setSelected(p)}><div className="file-avatar"><PhotoThumb root={root} photo={p} maxEdge={96}/></div><div className="file-name"><strong>{p.name}</strong><small>{p.extension.toUpperCase()} · {formatBytes(p.bytes)}{liveVideoByImage.has(p.path)?" · LIVE":""}</small></div><ChevronRight size={16}/></button></div>)}
@@ -909,7 +890,7 @@ export default function App() {
         {view === "collections" && <><span className="eyebrow">VIRTUAL ORGANIZATION</span><h1>Collections</h1><p>Group media without moving original files.</p><button className="primary-button" onClick={()=>{const name=window.prompt("Collection name");if(name?.trim())setCollections(old=>[...old,{id:crypto.randomUUID(),workspaceId:activeWorkspace,name:name.trim(),paths:[...selection]}])}}>Create collection {selection.length? `with ${selection.length} selected` : ""}</button><div className="folder-list">{collections.filter(c=>c.workspaceId===activeWorkspace).map(c=><div key={c.id} className="collection-row"><button className="folder-item" onClick={()=>{setSelectedTag("");setMemoryYear(null);setTimelineMonth("");setCollectionFilter(c.id);setView("library")}}><Images size={18}/>{c.name} · {c.paths.length} items</button><button className="secondary-button" onClick={()=>setCollections(old=>old.filter(x=>x.id!==c.id))}>Remove</button></div>)}</div></>}
         {view === "timeline" && <><span className="eyebrow">BY CAPTURE DATE</span><h1>Timeline</h1><p>Select a month to open only media from that capture month. EXIF still-image dates and QuickTime MOV/MP4/M4V dates are preferred; file modified time is the fallback.</p><div className="folder-list">{[...new Set([...(result?.photos||[])].sort((a,b)=>photoTime(b)-photoTime(a)).map(photoMonthKey))].map(monthKey=>{const [year,month]=monthKey.split("-").map(Number);const label=new Date(year,month-1,1).toLocaleDateString(undefined,{year:"numeric",month:"long"});return <button className="folder-item" key={monthKey} onClick={()=>{setSelectedTag("");setMemoryYear(null);setTimelineMonth(monthKey);setSmartFilter("");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setSortBy("newest");setView("library")}}>{label}</button>})}</div></>}
         {view === "memories" && <><span className="eyebrow">ON THIS DAY</span><h1>Memories</h1><p>Revisit photos and videos captured on {new Date().toLocaleDateString(undefined,{month:"long",day:"numeric"})} in previous years. Embedded EXIF and QuickTime dates are preferred, with file modified time used only as a fallback.</p><div className="selection-toolbar"><strong>{onThisDayMemories.reduce((count,group)=>count+group.photos.length,0)} memories across {onThisDayMemories.length} past years</strong><button className="primary-button" disabled={!onThisDayMemories.length} onClick={()=>{setSelectedTag("");setMemoryYear(null);setTimelineMonth("");setSmartFilter("thisDay");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setSortBy("newest");setView("library")}}>Open all On This Day</button><button className="secondary-button" onClick={()=>{setSelectedTag("");setMemoryYear(null);setTimelineMonth("");setSmartFilter("thisMonth");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setSortBy("newest");setView("library")}}>This month in past years</button></div>{onThisDayMemories.length===0?<div className="placeholder-panel"><div className="empty-symbol"><Images size={30}/></div><h2>No memories for today yet</h2><p>Open-Photo will show past-year matches here when your indexed library contains media captured on today’s month and day.</p></div>:<div className="folder-list">{onThisDayMemories.map(group=><div className="settings-card" key={group.year}><div><h2>{new Date().getFullYear()-group.year} years ago · {group.year}</h2><p>{group.photos.length} item{group.photos.length===1?"":"s"} from this day.</p><button className="secondary-button" onClick={()=>{setMemoryYear(group.year);setTimelineMonth("");setSmartFilter("");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setSortBy("newest");setView("library")}}>Browse all media from {group.year}</button></div><div className="folder-list">{group.photos.slice(0,12).map(photo=><button className="folder-item" key={photo.path} onClick={()=>setSelected(photo)}><Images size={18}/>{photo.name} · {photoDate(photo).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})}</button>)}</div>{group.photos.length>12&&<small>Showing the first 12 of {group.photos.length} memories from {group.year}.</small>}</div>)}</div>}<span className="eyebrow">BROWSE BY YEAR</span><h2>All years</h2><p>Jump into any capture year in the current workspace, even when there are no On This Day matches.</p><div className="folder-list">{memoryYears.map(item=><button className="folder-item" key={item.year} onClick={()=>{setMemoryYear(item.year);setTimelineMonth("");setSmartFilter("");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setSortBy("newest");setView("library")}}><Images size={18}/><span>{item.year} · {item.count.toLocaleString()} item{item.count===1?"":"s"}<small>{item.exif.toLocaleString()} EXIF · {item.quicktime.toLocaleString()} QuickTime · {item.fallback.toLocaleString()} modified fallback</small></span><ChevronRight size={16}/></button>)}{memoryYears.length===0&&<p>Open a workspace and scan media to browse memories by year.</p>}</div></>}
-        {view === "people" && <PeopleView aiOptIn={aiOptIn} ready={peopleReady} status={peopleStatus} busy={peopleBusy} hasLibrary={!!result} message={peopleMessage} groups={peopleGroups} names={peopleNames} onOpenSettings={()=>setView("settings")} onIndex={()=>void indexPeopleWorkspace()} onRefresh={()=>void refreshPeople()} onName={(id,name)=>setPeopleNames(previous=>({...previous,[id]:name}))} onOpenPhoto={path=>{const candidate=result?.photos.find(photo=>photo.path===path);if(candidate)setSelected(candidate)}}/>}
+        {view === "people" && <PeopleView aiOptIn={aiOptIn} ready={peopleReady} status={peopleStatus} busy={peopleBusy} hasLibrary={!!result} message={peopleMessage} groups={peopleGroups} names={peopleNames} onOpenSettings={()=>setView("settings")} onIndex={()=>void indexPeopleWorkspace()} onRefresh={()=>void refreshPeople()} onName={(id,name)=>{void invoke("ai_name_person",{id,name}).then(()=>{setPeopleNames(previous=>({...previous,[id]:name}));setPeopleGroups(previous=>previous.map(group=>group.id===id?{...group,name}:group))}).catch(e=>setPeopleMessage(String(e)))}} onOpenPhoto={path=>{const candidate=result?.photos.find(photo=>photo.path===path);if(candidate)setSelected(candidate)}}/>}
         {view === "tags" && <><span className="eyebrow">PORTABLE METADATA</span><h1>Tags</h1><p>Browse keywords stored in Open-Photo-managed XMP sidecars. Use / to build hierarchy, for example People/Family/Marc or Places/Florida/Tampa.</p>{tagIndexBusy&&<p>Reading managed XMP sidecars…</p>}{tagIndexError&&<div role="alert" className="error">{tagIndexError}</div>}<div className="selection-toolbar"><strong>{tagBranches.length} tag branch{tagBranches.length===1?"":"es"}</strong><button className="secondary-button" disabled={!result||tagIndexBusy} onClick={()=>setTagRefreshKey(value=>value+1)}>Refresh tags</button></div><div className="folder-list">{tagBranches.map(item=><button className="folder-item" key={item.tag} style={{paddingLeft:Math.min(48,12+(item.depth-1)*18)}} onClick={()=>{setSelectedTag(item.tag);setMemoryYear(null);setTimelineMonth("");setSmartFilter("");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setView("library")}}><Tags size={18}/><span>{item.tag.split("/").at(-1)}<small>{item.tag} · {item.count} item{item.count===1?"":"s"}</small></span><ChevronRight size={16}/></button>)}{!tagIndexBusy&&tagBranches.length===0&&<div className="placeholder-panel"><div className="empty-symbol"><Tags size={30}/></div><h2>No Open-Photo tags yet</h2><p>Select media in the Library and use Add / merge XMP tags. Hierarchical tags use / between levels.</p></div>}</div></>}
         {view === "settings" && <div className="settings-view"><span className="eyebrow">PREFERENCES</span><h1>Settings</h1><p>Personalize the appearance of your workspace.</p><div className="settings-card"><div><h2>Appearance</h2><p>Choose your preferred color theme.</p></div><div className="theme-options">{([{id:"system",label:"System",Icon:Monitor},{id:"light",label:"Light",Icon:Sun},{id:"dark",label:"Dark",Icon:Moon}] as const).map(({id,label,Icon})=><button key={id} className={theme === id ? "theme-option selected" : "theme-option"} onClick={()=>setTheme(id)}><Icon size={17}/>{label}</button>)}</div></div><div className="settings-card"><div><h2>Local AI</h2><p>AI is opt-in and off by default. Semantic search runs locally with OpenCLIP. People uses YuNet + SFace. OCR uses a pinned English PP-OCR detector + recognizer. Automatic mode prefers Windows DirectML GPU acceleration and falls back to CPU.</p><div className="folder-list"><div className="collection-row"><strong>Semantic Search</strong><span>{semanticReady?"✓ Ready":"Needs verified model bundle"}</span></div><div className="collection-row"><strong>People</strong><span>{peopleReady?"✓ Ready":"Needs verified detector + embedder"}</span></div><div className="collection-row"><strong>OCR</strong><span>{ocrReady?"✓ Ready":"Needs verified detector + recognizer"}</span></div></div><label><input type="checkbox" checked={aiOptIn} onChange={e=>setAiOptIn(e.target.checked)}/> Allow local AI features when available</label><p>Processing preference: <select aria-label="AI processing preference" value={aiDevice} onChange={e=>setAiDevice(e.target.value as "auto"|"cpu")}><option value="auto">Automatic (DirectML GPU when available)</option><option value="cpu">CPU only</option></select></p>{aiRuntime&&<small>Runtime: {aiRuntime.directml_available?"DirectML available — Automatic can use the GPU":"DirectML not available — Automatic will safely use CPU"} · CPU fallback enabled</small>}<small>Status: {aiOptIn?"Opted in; compatible installed models can run locally":"Disabled — no AI scanning"}</small><div className="selection-toolbar"><button className="secondary-button" disabled={aiValidationBusy} onClick={()=>void runAiSelfCheck()}>{aiValidationBusy?"Running self-check…":"Run AI self-check"}</button>{aiValidation&&<span>{aiValidation.core_implementation_complete?"Phase 3 core implemented":"Core incomplete"} · {aiValidation.directml_available?"DirectML available":"CPU fallback"} · Real-world validation {aiValidation.real_world_validation_required?"still required":"complete"}</span>}</div>{aiValidation&&<div className="folder-list"><div className="collection-row"><strong>Semantic self-check</strong><span>{aiValidation.semantic.ready?"✓ Ready":"Missing: "+(aiValidation.semantic.missing.join(", ")||"none")+" · Incompatible: "+(aiValidation.semantic.incompatible.join(", ")||"none")}</span></div><div className="collection-row"><strong>People self-check</strong><span>{aiValidation.people.ready?"✓ Ready":"Missing: "+(aiValidation.people.missing.join(", ")||"none")+" · Incompatible: "+(aiValidation.people.incompatible.join(", ")||"none")}</span></div><div className="collection-row"><strong>OCR self-check</strong><span>{aiValidation.ocr.ready?"✓ Ready":"Missing: "+(aiValidation.ocr.missing.join(", ")||"none")+" · Incompatible: "+(aiValidation.ocr.incompatible.join(", ")||"none")}</span></div></div>}<p>Local ONNX models (manual import, checksum required):</p>{aiModels.map(model=><div className="collection-row" key={model.kind}><span>{model.kind}: {model.installed?(model.compatible?`✓ verified (${Math.round(model.bytes/1048576)} MB)`:`⚠ incompatible (${Math.round(model.bytes/1048576)} MB)`):"not installed"}</span><button className="secondary-button" disabled={!aiOptIn||model.installed||aiModelBusy} onClick={()=>void importAiModel(model.kind)}>{model.kind==="semantic_tokenizer"?"Import tokenizer":"Import ONNX"}</button>{model.installed&&<button className="secondary-button" disabled={aiModelBusy} onClick={()=>{if(!window.confirm(`Remove the locally stored ${model.kind} model? This does not affect photos.`))return;setAiModelBusy(true);setAiModelMessage("");void invoke("ai_remove_model",{kind:model.kind}).then(()=>refreshModels()).then(()=>setAiModelMessage("Local model removed. Original photos were not changed.")).catch(e=>setAiModelMessage(String(e))).finally(()=>setAiModelBusy(false))}}>Remove model</button>}</div>)}{aiModelMessage&&<p role="status">{aiModelMessage}</p>}<button className="secondary-button" onClick={()=>void refreshModels()}>Refresh model inventory</button><small>Semantic search requires the pinned OpenCLIP bundle. People requires faces + face_embedder. OCR requires ocr + ocr_recognizer. Open-Photo supplies pinned checksums automatically for all supported model slots.</small></div></div><div className="settings-card"><div><h2>Workspace backup</h2><p>Export selected workspace settings, folder references and virtual collections to JSON. Photo and video files are not copied.</p></div><button className="secondary-button" disabled={!activeWorkspace} onClick={exportWorkspace}>Export Workspace JSON</button></div><div className="settings-card"><div><h2>Library health check</h2><p>Inspect indexed files for missing, inaccessible, or modified items. This is read-only and never removes your media or index records.</p>{healthReport&&<p>{healthReport.indexed} indexed · {healthReport.available} available · {healthReport.missing} missing · {healthReport.inaccessible} inaccessible · {healthReport.modified} changed since indexing</p>}{healthError&&<p role="alert">{healthError}</p>}</div><button className="secondary-button" disabled={healthBusy||!root} onClick={()=>{setHealthBusy(true);setHealthError("");invoke<{indexed:number;available:number;missing:number;inaccessible:number;modified:number}>("library_health",{root}).then(setHealthReport).catch(e=>setHealthError(String(e))).finally(()=>setHealthBusy(false))}}>{healthBusy?"Checking…":"Check library health"}</button></div><div className="settings-card"><div><h2>File safety</h2><p>Original media stays read-only. The current write action only creates missing XMP sidecars when you explicitly add tags; existing sidecars are not overwritten. Photo/video deletion is not implemented.</p></div><span className="safety-pill">Protected</span></div></div>}
       </main>
@@ -921,7 +902,7 @@ export default function App() {
 function PeopleView({aiOptIn,ready,status,busy,hasLibrary,message,groups,names,onOpenSettings,onIndex,onRefresh,onName,onOpenPhoto}:{aiOptIn:boolean;ready:boolean;status:FaceIndexStatus|null;busy:boolean;hasLibrary:boolean;message:string;groups:PersonGroup[];names:Record<string,string>;onOpenSettings:()=>void;onIndex:()=>void;onRefresh:()=>void;onName:(id:string,name:string)=>void;onOpenPhoto:(path:string)=>void}) {
   if(!aiOptIn)return <><span className="eyebrow">LOCAL PEOPLE INDEX</span><h1>People</h1><p>Organize familiar faces without sending photos to a cloud recognition service.</p><div className="placeholder-panel"><h2>Local AI is off</h2><p>Enable Local AI in Settings before indexing faces.</p><button className="secondary-button" onClick={onOpenSettings}>Open AI settings</button></div></>;
   if(!ready)return <><span className="eyebrow">LOCAL PEOPLE INDEX</span><h1>People</h1><p>Detect and group familiar faces locally with YuNet + SFace.</p><div className="placeholder-panel"><h2>People models are not ready</h2><p>Install and verify both supported People model slots in Settings before indexing faces.</p><button className="secondary-button" onClick={onOpenSettings}>Open AI settings</button></div></>;
-  return <><span className="eyebrow">LOCAL PEOPLE INDEX</span><h1>People</h1><p>Detect and group familiar faces locally with YuNet + SFace. Suggested groups stay on this computer and original photos remain read-only.</p><div className="selection-toolbar"><strong>{status?`${status.faces} faces across ${status.indexed_images} indexed photos`:"People index not loaded"}</strong><button className="primary-button" disabled={busy||!hasLibrary} onClick={onIndex}>{busy?"Indexing faces…":"Index People"}</button><button className="secondary-button" disabled={busy} onClick={onRefresh}>Refresh groups</button></div>{message&&<div className="results-note" role="status">{message}</div>}{groups.length===0&&!busy&&<div className="placeholder-panel"><div className="empty-symbol"><Users size={30}/></div><h2>No suggested people groups yet</h2><p>Install the supported YuNet detector and SFace embedder in Settings, then choose Index People.</p></div>}<div className="folder-list">{groups.map((group,index)=><div className="settings-card" key={group.id}><div><h2>{names[group.id]||`Suggested person ${index+1}`}</h2><p>{group.members.length} face{group.members.length===1?"":"s"} in this local group.</p></div><div><button className="secondary-button" onClick={()=>{const name=window.prompt("Name this person",names[group.id]||"");if(name!==null)onName(group.id,name.trim())}}>Name person</button><div className="folder-list">{group.members.slice(0,12).map(member=><button className="folder-item" key={`${member.path}:${member.face_index}`} onClick={()=>onOpenPhoto(member.path)}><Users size={16}/>{member.path.split(/[\\/]/).pop()} · {Math.round(member.score*100)}% face confidence</button>)}</div>{group.members.length>12&&<small>Showing the first 12 of {group.members.length} faces.</small>}</div></div>)}</div></>;
+  return <><span className="eyebrow">LOCAL PEOPLE INDEX</span><h1>People</h1><p>Detect and group familiar faces locally with YuNet + SFace. Suggested groups stay on this computer and original photos remain read-only.</p><div className="selection-toolbar"><strong>{status?`${status.faces} faces across ${status.indexed_images} indexed photos`:"People index not loaded"}</strong><button className="primary-button" disabled={busy||!hasLibrary} onClick={onIndex}>{busy?"Indexing faces…":"Index People"}</button><button className="secondary-button" disabled={busy} onClick={onRefresh}>Refresh groups</button></div>{message&&<div className="results-note" role="status">{message}</div>}{groups.length===0&&!busy&&<div className="placeholder-panel"><div className="empty-symbol"><Users size={30}/></div><h2>No suggested people groups yet</h2><p>Install the supported YuNet detector and SFace embedder in Settings, then choose Index People.</p></div>}<div className="folder-list">{groups.map((group,index)=><div className="settings-card" key={group.id}><div><h2>{group.name||names[group.id]||names[group.legacy_id||""]||`Suggested person ${index+1}`}</h2><p>{group.members.length} face{group.members.length===1?"":"s"} in this local group.</p></div><div><button className="secondary-button" onClick={()=>{const name=window.prompt("Name this person",group.name||names[group.id]||names[group.legacy_id||""]||"");if(name!==null)onName(group.id,name.trim())}}>Name person</button><div className="folder-list">{group.members.slice(0,12).map(member=><button className="folder-item" key={`${member.path}:${member.face_index}`} onClick={()=>onOpenPhoto(member.path)}><Users size={16}/>{member.path.split(/[\\/]/).pop()} · {Math.round(member.score*100)}% face confidence</button>)}</div>{group.members.length>12&&<small>Showing the first 12 of {group.members.length} faces.</small>}</div></div>)}</div></>;
 }
 
 function Placeholder({title,subtitle,icon:Icon,description}:{title:string;subtitle:string;icon:typeof Images;description:string}) {
