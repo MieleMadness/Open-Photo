@@ -30,7 +30,7 @@ It is designed to work directly with folders you already own, keep original medi
 | Visual near-duplicate review | ✅ Working | Local CPU dHash grouping; review only, no automatic deletion |
 | Preferred duplicate copy | ✅ Working | User choice is stored locally and does not move/delete files |
 | iPhone HEIC/HEIF previews | ✅ Partial | Decoded locally; embedded EXIF capture dates are now indexed when present |
-| Live Photo pairing | ✅ Partial | Same folder + filename stem heuristic |
+| Live Photo pairing | ✅ Improved | Prefers Apple's shared content identifier; falls back to same-folder + filename stem when metadata is missing |
 | Local ONNX inference | ✅ Working foundation | CPU-first ONNX Runtime integration |
 | AI model import/removal | ✅ Working | Manual, local, checksum-verified and confined to app data |
 | Persistent semantic image embeddings | ✅ Working | Stored locally in SQLite and model/pipeline-versioned |
@@ -256,13 +256,11 @@ HEIC/HEIF images can be read from the selected library and decoded locally for p
 
 ### Live Photos
 
-Open-Photo currently pairs a Live Photo image and motion clip when they are:
+Open-Photo now prefers Apple's shared Live Photo content identifier when pairing a still image with its motion clip. The still identifier is read from Apple MakerNote tag 0x0011, while the MOV/MP4/M4V identifier is read from QuickTime metadata key `com.apple.quicktime.content.identifier`.
 
-- in the same folder,
-- share the same filename stem, and
-- form an unambiguous image/video pair.
+Some exports and third-party tools strip one side of this metadata. For unmatched files, Open-Photo conservatively falls back to the older rule: same folder, same filename stem, and exactly one still + one MOV candidate.
 
-This is a filename-based heuristic, not full Apple asset-identifier matching.
+The Library reports how many pairs were matched by Apple asset ID versus filename fallback. Pairing is presentation-only; the original image and movie remain separate read-only files.
 
 ### Motion video
 
