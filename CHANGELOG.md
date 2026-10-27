@@ -10,6 +10,19 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.48.0 — 2026-10-27
+
+### Added
+- Added capture-date coverage counts to each year in the Memories **All years** browser.
+- Each year now reports how many items use **EXIF metadata**, **QuickTime metadata**, or **file modified fallback**.
+
+### Changed
+- Memories makes date-source quality visible before users rely on year-based organization, helping identify libraries that still depend heavily on filesystem timestamps.
+
+### Safety
+- Coverage counts are derived from already-indexed metadata and do not trigger additional source-file reads.
+- No source media or metadata is moved, copied, renamed, or modified.
+
 ## 0.47.0 — 2026-10-27
 
 ### Added
