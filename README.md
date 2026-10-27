@@ -29,7 +29,7 @@ It is designed to work directly with folders you already own, keep original medi
 | Exact duplicate detection | ✅ Working | SHA-256 based review across workspace roots |
 | Visual near-duplicate review | ✅ Working | Local CPU dHash grouping; review only, no automatic deletion |
 | Preferred duplicate copy | ✅ Working | User choice is stored locally and does not move/delete files |
-| iPhone HEIC/HEIF previews | ✅ Partial | Decoded locally; see iPhone notes below |
+| iPhone HEIC/HEIF previews | ✅ Partial | Decoded locally; embedded EXIF capture dates are now indexed when present |
 | Live Photo pairing | ✅ Partial | Same folder + filename stem heuristic |
 | Local ONNX inference | ✅ Working foundation | CPU-first ONNX Runtime integration |
 | AI model import/removal | ✅ Working | Manual, local, checksum-verified and confined to app data |
@@ -40,7 +40,7 @@ It is designed to work directly with folders you already own, keep original medi
 | Face recognition / People | 🧪 Experimental | YuNet detection + SFace embeddings + local suggested groups; manual naming is local-only |
 | OCR | 🧪 Experimental | English-first PP-OCR detector + recognizer, local text index and photo-text search |
 | GPU acceleration | 🧪 Windows foundation | Automatic mode prefers DirectML when available and safely falls back to CPU |
-| Full RAW preview pipeline | 🚧 Not implemented | RAW files can be indexed but may not preview |
+| RAW support | 🧪 Partial | DNG/CR2/NEF/ARW plus CR3/RAF/IIQ can be indexed for metadata; full RAW pixel previews are not implemented |
 | Immich synchronization | 🚧 Not implemented | Architecture planning only; no API bridge is active |
 | Non-destructive photo editing/export | 🧪 Experimental | Live preview, crop, resize, rotate, flip, brightness and contrast; always saves a new copy |
 | Original photo deletion | 🚫 Not implemented | Open-Photo does not delete original media |
@@ -91,7 +91,7 @@ The sync summary reports added, updated, unchanged and removed index entries. Re
 
 ### Capture dates
 
-Open-Photo reads EXIF capture time during library scans for supported JPEG/TIFF-family still images. It checks DateTimeOriginal first, then DateTimeDigitized, then DateTime.
+Open-Photo reads embedded capture time during library scans. JPEG/TIFF-family still images use the existing EXIF path. HEIC/HEIF/AVIF and additional RAW containers (CR3, RAF and IIQ) use a pure-Rust metadata fallback that can read EXIF without decoding image pixels. The preferred order is original capture time, then creation/digitized time, then modified metadata time.
 
 Most EXIF camera timestamps do not include a reliable timezone, so Open-Photo stores the value as a local camera date/time rather than inventing an offset. Timeline, newest/oldest sorting, Last 30 Days, On This Day, and This Month prefer this capture date and fall back to file modified time.
 
@@ -252,7 +252,7 @@ Open-Photo has partial iPhone compatibility.
 
 ### HEIC / HEIF
 
-HEIC/HEIF images can be read from the selected library and decoded locally for preview.
+HEIC/HEIF images can be read from the selected library and decoded locally for preview. Embedded EXIF capture dates are also indexed when present, so iPhone still images can participate in Timeline and Memories without relying only on filesystem modified time.
 
 ### Live Photos
 
