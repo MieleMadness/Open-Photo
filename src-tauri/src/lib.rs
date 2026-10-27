@@ -316,7 +316,7 @@ fn normalize_metadata_datetime(raw: &str) -> Option<String> {
         && bytes.get(16) == Some(&b':');
     let iso_shape = bytes.get(4) == Some(&b'-')
         && bytes.get(7) == Some(&b'-')
-        && matches!(bytes.get(10), Some(b'T') | Some(b' '))
+        && matches!(bytes.get(10).copied(), Some(b'T') | Some(b' '))
         && bytes.get(13) == Some(&b':')
         && bytes.get(16) == Some(&b':');
     if !exif_shape && !iso_shape {
@@ -353,9 +353,16 @@ fn normalize_metadata_datetime(raw: &str) -> Option<String> {
 
 fn read_extended_image_capture(path: &Path) -> Option<String> {
     let exif = read_nom_exif(path).ok()?;
-    [NomExifTag::DateTimeOriginal, NomExifTag::CreateDate, NomExifTag::ModifyDate]
-        .into_iter()
-        .find_map(|tag| exif.get(tag).and_then(|value| normalize_metadata_datetime(&value.to_string())))
+    [
+        NomExifTag::DateTimeOriginal,
+        NomExifTag::CreateDate,
+        NomExifTag::ModifyDate,
+    ]
+    .into_iter()
+    .find_map(|tag| {
+        exif.get(tag)
+            .and_then(|value| normalize_metadata_datetime(&value.to_string()))
+    })
 }
 
 fn read_capture_local(path: &Path, extension: &str) -> Option<String> {
