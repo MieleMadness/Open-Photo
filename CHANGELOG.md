@@ -10,6 +10,23 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.42.0 — 2026-10-27
+
+### Added
+- Added read-only QuickTime movie-header capture-date extraction for MOV, MP4 and M4V media.
+- The parser walks ISO base-media/QuickTime box headers to find `moov → mvhd` without decoding video frames or loading the full file into memory.
+- Supports both version 0 (32-bit) and version 1 (64-bit) `mvhd` creation timestamps.
+- Added regression coverage for the QuickTime 1904 epoch and a minimal movie-header container.
+
+### Changed
+- Timeline, newest/oldest sorting and date-based smart collections can now use QuickTime video capture time before falling back to filesystem modified time.
+- QuickTime timestamps are stored as UTC ISO strings with a `Z` suffix; EXIF timestamps remain timezone-less camera-local values.
+
+### Safety
+- Invalid box sizes, unsupported movie-header versions and corrupt containers return no capture date and safely fall back to modified time.
+- Video files are opened read-only and never rewritten.
+- Capture-date parsing seeks over large media payloads instead of buffering them into memory.
+
 ## 0.41.4 — 2026-10-27
 
 ### Fixed
