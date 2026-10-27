@@ -21,6 +21,7 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 base64 = "0.22"
 kamadak-exif = "0.6"
 nom-exif = "3.8"
+raw-files = "0.5"
 opener = "0.8"
 rusqlite = { version = "0.32", features = ["bundled"] }
 sha2 = "0.10"
