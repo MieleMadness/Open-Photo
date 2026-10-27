@@ -10,6 +10,20 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.44.0 — 2026-10-27
+
+### Added
+- Timeline month entries now open the Library filtered to that exact year/month.
+- The Library shows the active Timeline month with a **Show all months** control.
+- Added a stable internal `YYYY-MM` month key so localized display labels do not drive filtering logic.
+
+### Changed
+- Timeline month filtering uses the same EXIF / QuickTime / modified-date fallback logic as sorting and smart collections.
+- Timeline month filtering is cleared when a smart collection, custom smart rule, or virtual collection is selected to avoid hidden filter stacking.
+
+### Safety
+- Timeline filtering is presentation-only and does not move, rename, copy, or modify source media.
+
 ## 0.43.0 — 2026-10-27
 
 ### Added
