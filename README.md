@@ -94,7 +94,7 @@ Open-Photo reads EXIF capture time during library scans for supported JPEG/TIFF-
 
 Most EXIF camera timestamps do not include a reliable timezone, so Open-Photo stores the value as a local camera date/time rather than inventing an offset. Timeline, newest/oldest sorting, Last 30 Days, On This Day, and This Month prefer this capture date and fall back to file modified time.
 
-QuickTime MOV/MP4/M4V files now read the movie-header creation timestamp from the local file. QuickTime timestamps use the UTC-based 1904 epoch, so Open-Photo stores them with a UTC `Z` suffix while EXIF camera dates remain timezone-less local camera time.
+QuickTime MOV/MP4/M4V files now read the movie-header creation timestamp from the local file. QuickTime timestamps use the UTC-based 1904 epoch, so Open-Photo stores them with a UTC `Z` suffix while EXIF camera dates remain timezone-less local camera time. The media details panel explicitly identifies which source is being used for the displayed date.
 
 ### 3. Browse and filter
 
@@ -110,6 +110,8 @@ The Library view supports:
 - Smart collection filters
 
 Select a photo to open the details viewer. Use the full-screen control for a larger preview.
+
+The details panel shows the date Open-Photo is actually using and labels its source as **EXIF metadata**, **QuickTime metadata**, or **File modified fallback**. When embedded capture metadata exists, both the embedded capture value and the filesystem modified value are shown so the fallback behavior is visible rather than hidden.
 
 ### 4. Ratings and favorites
 
