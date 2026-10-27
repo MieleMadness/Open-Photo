@@ -10,6 +10,21 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.45.0 — 2026-10-27
+
+### Added
+- Added a dedicated **Memories** view to the main navigation.
+- On This Day matches are grouped by capture year and labeled by how many years ago they were captured.
+- Individual memories can be opened directly from the Memories view.
+- Added one-click actions for **Open all On This Day** and **This month in past years**.
+
+### Changed
+- Memories now uses the same verified EXIF / QuickTime / modified-date fallback rules as Timeline and smart collections instead of being discoverable only as a smart filter.
+
+### Safety
+- Memories is a read-only presentation layer over the existing local index.
+- No source media or metadata is moved, copied, renamed, or modified.
+
 ## 0.44.0 — 2026-10-27
 
 ### Added
