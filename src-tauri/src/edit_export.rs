@@ -9,6 +9,7 @@ use std::fs::{self, FileTimes};
 use std::{io::Cursor, path::PathBuf};
 
 const MAX_EDIT_SOURCE_BYTES: u64 = 250 * 1024 * 1024;
+const MAX_EDIT_OUTPUT_PIXELS: u64 = 100_000_000;
 
 fn default_jpeg_quality() -> u8 {
     92
@@ -55,6 +56,13 @@ pub struct EditOptions {
 }
 
 #[derive(Serialize)]
+pub struct EditedPreviewResult {
+    data_uri: String,
+    width: u32,
+    height: u32,
+}
+
+#[derive(Serialize)]
 pub struct EditedExportResult {
     path: String,
     width: u32,
@@ -71,6 +79,14 @@ fn validate_rotation(rotation: i32) -> Result<i32, String> {
         270 => Ok(270),
         _ => Err("Rotation must be 0, 90, 180, or 270 degrees".into()),
     }
+}
+
+fn validate_output_dimensions(width: u32, height: u32) -> Result<(u32, u32), String> {
+    let pixels = u64::from(width) * u64::from(height);
+    if pixels == 0 || pixels > MAX_EDIT_OUTPUT_PIXELS {
+        return Err("Edited output is limited to 100 megapixels".into());
+    }
+    Ok((width, height))
 }
 
 fn apply_edits(mut image: DynamicImage, options: &EditOptions) -> Result<DynamicImage, String> {
@@ -130,23 +146,25 @@ fn apply_edits(mut image: DynamicImage, options: &EditOptions) -> Result<Dynamic
             return Err("Resize height must be between 1 and 20,000 pixels".into());
         }
     }
-    match (options.resize_width, options.resize_height) {
-        (Some(width), Some(height)) => {
-            image = image.resize_exact(width, height, FilterType::Lanczos3);
-        }
+    let (target_width, target_height) = match (options.resize_width, options.resize_height) {
+        (Some(width), Some(height)) => (width, height),
         (Some(width), None) => {
             let height = ((image.height() as f64 * width as f64 / image.width() as f64).round()
                 as u32)
                 .max(1);
-            image = image.resize_exact(width, height, FilterType::Lanczos3);
+            (width, height)
         }
         (None, Some(height)) => {
             let width = ((image.width() as f64 * height as f64 / image.height() as f64).round()
                 as u32)
                 .max(1);
-            image = image.resize_exact(width, height, FilterType::Lanczos3);
+            (width, height)
         }
-        (None, None) => {}
+        (None, None) => image.dimensions(),
+    };
+    validate_output_dimensions(target_width, target_height)?;
+    if (target_width, target_height) != image.dimensions() {
+        image = image.resize_exact(target_width, target_height, FilterType::Lanczos3);
     }
 
     if !(-100..=100).contains(&options.brightness) {
@@ -221,7 +239,7 @@ pub fn preview_edited_photo(
     path: String,
     options: EditOptions,
     max_edge: u32,
-) -> Result<String, String> {
+) -> Result<EditedPreviewResult, String> {
     let source = crate::safe_media_path(&root, &path)?;
     if !(128..=2_048).contains(&max_edge) {
         return Err("Preview size must be between 128 and 2048 pixels".into());
@@ -237,15 +255,21 @@ pub fn preview_edited_photo(
         .decode()
         .map_err(|e| format!("Cannot decode this image for editing: {e}"))?;
     let edited = apply_edits(image, &options)?;
+    let width = edited.width();
+    let height = edited.height();
     let preview = edited.thumbnail(max_edge, max_edge);
     let mut buffer = Cursor::new(Vec::new());
     preview
         .write_to(&mut buffer, ImageFormat::Png)
         .map_err(|e| format!("Cannot encode edit preview: {e}"))?;
-    Ok(format!(
-        "data:image/png;base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(buffer.into_inner())
-    ))
+    Ok(EditedPreviewResult {
+        data_uri: format!(
+            "data:image/png;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(buffer.into_inner())
+        ),
+        width,
+        height,
+    })
 }
 
 #[tauri::command]
@@ -542,5 +566,11 @@ mod tests {
     #[test]
     fn preserve_modified_time_defaults_on() {
         assert!(default_preserve_modified_time());
+    }    #[test]
+    fn output_pixel_limit_is_enforced() {
+        assert_eq!(validate_output_dimensions(10_000, 10_000).unwrap(), (10_000, 10_000));
+        assert!(validate_output_dimensions(20_000, 20_000).is_err());
     }
+
+
 }
