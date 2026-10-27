@@ -570,7 +570,10 @@ mod tests {
 
     #[test]
     fn output_pixel_limit_is_enforced() {
-        assert_eq!(validate_output_dimensions(10_000, 10_000).unwrap(), (10_000, 10_000));
+        assert_eq!(
+            validate_output_dimensions(10_000, 10_000).unwrap(),
+            (10_000, 10_000)
+        );
         assert!(validate_output_dimensions(20_000, 20_000).is_err());
     }
 }
