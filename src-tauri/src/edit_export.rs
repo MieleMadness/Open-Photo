@@ -125,11 +125,7 @@ fn crop_rect(
     Ok((left, top, crop_width, crop_height))
 }
 
-fn target_dimensions(
-    width: u32,
-    height: u32,
-    options: &EditOptions,
-) -> Result<(u32, u32), String> {
+fn target_dimensions(width: u32, height: u32, options: &EditOptions) -> Result<(u32, u32), String> {
     if let Some(resize_width) = options.resize_width {
         if resize_width == 0 || resize_width > 20_000 {
             return Err("Resize width must be between 1 and 20,000 pixels".into());
@@ -202,8 +198,7 @@ fn apply_edits(mut image: DynamicImage, options: &EditOptions) -> Result<Dynamic
         image = image.flipv();
     }
 
-    let (left, top, crop_width, crop_height) =
-        crop_rect(image.width(), image.height(), options)?;
+    let (left, top, crop_width, crop_height) = crop_rect(image.width(), image.height(), options)?;
     if (crop_width, crop_height) != image.dimensions() {
         image = image.crop_imm(left, top, crop_width, crop_height);
     }
@@ -631,10 +626,7 @@ mod tests {
             preview_resize_dimensions(20_000, 10_000, 1_400),
             (1_400, 700)
         );
-        assert_eq!(
-            preview_resize_dimensions(800, 600, 1_400),
-            (800, 600)
-        );
+        assert_eq!(preview_resize_dimensions(800, 600, 1_400), (800, 600));
     }
 
     #[test]
