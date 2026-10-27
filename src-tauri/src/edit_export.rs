@@ -251,6 +251,27 @@ fn apply_edits(mut image: DynamicImage, options: &EditOptions) -> Result<Dynamic
     Ok(image)
 }
 
+fn editable_source_extension(extension: &str) -> bool {
+    matches!(
+        extension.to_ascii_lowercase().as_str(),
+        "jpg" | "jpeg" | "png" | "webp" | "tif" | "tiff" | "bmp" | "avif"
+    )
+}
+
+fn validate_edit_source(source: &std::path::Path) -> Result<(), String> {
+    let extension = source
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
+    if !editable_source_extension(extension) {
+        return Err(
+            "This media type is not supported by the Phase 4 image editor. Animated GIF, HEIC/HEIF, RAW and video editing are not enabled yet."
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 fn validate_jpeg_quality(quality: u8) -> Result<u8, String> {
     if !(40..=100).contains(&quality) {
         return Err("JPEG quality must be between 40 and 100".into());
@@ -282,6 +303,7 @@ pub fn preview_edited_photo(
     max_edge: u32,
 ) -> Result<EditedPreviewResult, String> {
     let source = crate::safe_media_path(&root, &path)?;
+    validate_edit_source(&source)?;
     if !(128..=2_048).contains(&max_edge) {
         return Err("Preview size must be between 128 and 2048 pixels".into());
     }
@@ -323,17 +345,7 @@ pub fn export_edited_copy(
     options: EditOptions,
 ) -> Result<EditedExportResult, String> {
     let source = crate::safe_media_path(&root, &path)?;
-    let source_extension = source
-        .extension()
-        .and_then(|value| value.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    if !matches!(
-        source_extension.as_str(),
-        "jpg" | "jpeg" | "png" | "webp" | "gif" | "tif" | "tiff" | "bmp" | "avif"
-    ) {
-        return Err("This media type is not supported by the Phase 4 image editor".into());
-    }
+    validate_edit_source(&source)?;
     let source_metadata = fs::metadata(&source).map_err(|e| e.to_string())?;
     let source_bytes = source_metadata.len();
     if source_bytes > MAX_EDIT_SOURCE_BYTES {
@@ -655,5 +667,13 @@ mod tests {
             edited_output_dimensions(4_000, 3_000, &options).unwrap(),
             (1_000, 1_667)
         );
+    }    #[test]
+    fn editor_source_formats_exclude_animated_gif() {
+        assert!(editable_source_extension("jpg"));
+        assert!(editable_source_extension("AVIF"));
+        assert!(!editable_source_extension("gif"));
+        assert!(!editable_source_extension("heic"));
     }
+
+
 }
