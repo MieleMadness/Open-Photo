@@ -10,6 +10,23 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.50.0 — 2026-10-27
+
+### Added
+- Added Apple Live Photo content-identifier extraction for supported still images and MOV/MP4/M4V motion clips.
+- Added persistent `live_asset_id` indexing for full scans and incremental updates.
+- Live Photo pairing now prefers exact shared Apple asset IDs.
+- The Library reports metadata-matched versus filename-fallback pair counts.
+- Added regression coverage for Apple MakerNote tag 0x0011 parsing.
+
+### Changed
+- Same-folder + same-filename-stem pairing remains as a conservative fallback only when Apple asset metadata is absent or stripped by an exporter.
+
+### Safety
+- Live Photo identifier extraction reads metadata only; it never modifies source stills or movies.
+- Movie identifier parsing skips large media payloads and bounds the in-memory `moov` metadata read to 16 MB.
+- Ambiguous asset-ID groups are not paired automatically.
+
 ## 0.49.0 — 2026-10-27
 
 ### Added
