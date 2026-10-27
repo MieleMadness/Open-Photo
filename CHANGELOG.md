@@ -10,6 +10,24 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.41.0 — 2026-10-27
+
+### Added
+- Added EXIF capture-date extraction during library scans for supported JPEG/TIFF-family still images.
+- Capture date preference order is **DateTimeOriginal → DateTimeDigitized → DateTime**.
+- Added persistent `capture_local` storage to the SQLite media index with an in-place schema migration.
+- Incremental file updates now refresh capture-date metadata as well.
+
+### Changed
+- Timeline now prefers capture date and falls back to file modified date.
+- Newest/oldest sorting and date-based smart collections now use the same capture-date-first behavior.
+- File details now show both **Captured** and **Modified** dates.
+
+### Safety
+- Camera timestamps without a trustworthy timezone are stored as local date/time strings; Open-Photo does not invent a timezone.
+- Capture-date extraction is read-only and does not modify media.
+- QuickTime/iPhone video capture dates are not yet claimed as supported.
+
 ## 0.40.0 — 2026-10-27
 
 ### Added
