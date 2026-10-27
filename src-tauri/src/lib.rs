@@ -15,10 +15,11 @@ mod similar;
 mod watch;
 use base64::Engine;
 use image::ImageReader;
+use exif::{In, Reader as ExifReader, Tag, Value};
 use serde::Serialize;
 use std::{
     collections::{HashMap, VecDeque},
-    io::{Cursor, Write},
+    io::{BufReader, Cursor, Write},
     sync::{Mutex, OnceLock},
 };
 use std::{
@@ -157,6 +158,7 @@ struct Photo {
     extension: String,
     bytes: u64,
     modified_unix: u64,
+    capture_local: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -164,6 +166,54 @@ pub struct ScanResult {
     photos: Vec<Photo>,
     scanned_files: usize,
     truncated: bool,
+}
+
+fn parse_exif_capture_value(value: &Value) -> Option<String> {
+    let Value::Ascii(values) = value else {
+        return None;
+    };
+    let bytes = values.first()?;
+    let raw = std::str::from_utf8(bytes).ok()?.trim_matches(char::from(0)).trim();
+    let parts: Vec<&str> = raw.split([':', ' ', '-']).filter(|part| !part.is_empty()).collect();
+    if parts.len() < 6 {
+        return None;
+    }
+    let year = parts[0].parse::<u32>().ok()?;
+    let month = parts[1].parse::<u32>().ok()?;
+    let day = parts[2].parse::<u32>().ok()?;
+    let hour = parts[3].parse::<u32>().ok()?;
+    let minute = parts[4].parse::<u32>().ok()?;
+    let second = parts[5].parse::<u32>().ok()?;
+    if !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || hour > 23
+        || minute > 59
+        || second > 60
+        || year < 1601
+    {
+        return None;
+    }
+    Some(format!(
+        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}"
+    ))
+}
+
+fn read_capture_local(path: &Path, extension: &str) -> Option<String> {
+    if !matches!(
+        extension,
+        "jpg" | "jpeg" | "tif" | "tiff" | "dng" | "cr2" | "nef" | "arw"
+    ) {
+        return None;
+    }
+    let file = fs::File::open(path).ok()?;
+    let mut reader = BufReader::new(file);
+    let exif = ExifReader::new().read_from_container(&mut reader).ok()?;
+    [Tag::DateTimeOriginal, Tag::DateTimeDigitized, Tag::DateTime]
+        .into_iter()
+        .find_map(|tag| {
+            exif.get_field(tag, In::PRIMARY)
+                .and_then(|field| parse_exif_capture_value(&field.value))
+        })
 }
 
 /// Read-only folder scan. Never follows directory symlinks and never writes to the media path.
@@ -224,12 +274,14 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
+            let capture_local = read_capture_local(&path, &ext);
             photos.push(Photo {
                 path: path.to_string_lossy().into_owned(),
                 name: entry.file_name().to_string_lossy().into_owned(),
                 extension: ext,
                 bytes: metadata.len(),
                 modified_unix,
+                capture_local,
             });
         }
     }
@@ -476,5 +528,20 @@ mod tests {
         assert!(result.photos.is_empty());
         assert!(!result.truncated);
         fs::remove_dir_all(root).unwrap();
+    }    #[test]
+    fn parses_exif_capture_datetime_without_inventing_timezone() {
+        let value = Value::Ascii(vec![b"2024:07:04 18:23:59".to_vec()]);
+        assert_eq!(
+            parse_exif_capture_value(&value).as_deref(),
+            Some("2024-07-04T18:23:59")
+        );
     }
+
+    #[test]
+    fn rejects_invalid_exif_capture_datetime() {
+        let value = Value::Ascii(vec![b"2024:13:40 25:99:99".to_vec()]);
+        assert!(parse_exif_capture_value(&value).is_none());
+    }
+
+
 }
