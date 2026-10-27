@@ -10,6 +10,18 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.37.0 — 2026-10-26
+
+### Added
+- Added backend-reported final edited output dimensions to the live preview.
+- Added visible width × height and megapixel count before export.
+- Added a hard **100 megapixel** edited-output limit.
+
+### Safety
+- The pixel cap is enforced before resize allocation, reducing the risk of accidental extremely large image allocations.
+- Preview and export share the same output-dimension validation.
+- Original media remains read-only.
+
 ## 0.36.1 — 2026-10-26
 
 ### Fixed
