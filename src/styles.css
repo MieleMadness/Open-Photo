@@ -109,3 +109,8 @@
 /* Phase 4: output sizing */
 .edit-output-size{display:flex;justify-content:space-between;gap:12px;margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-muted);font-size:11px}
 .edit-output-size span{color:var(--muted);font-variant-numeric:tabular-nums}
+
+
+/* Phase 4: crop presets */
+.edit-crop-presets{display:grid;gap:8px;margin:14px 0}
+.edit-crop-presets>strong{font-size:12px}
