@@ -10,6 +10,22 @@ Open-Photo is still in **0.x active development**. During this phase:
 
 The detailed Git commit history remains the source of truth for every individual change.
 
+## 0.49.0 — 2026-10-27
+
+### Added
+- Added pure-Rust metadata fallback support for HEIC/HEIF, AVIF, Canon CR3, Fujifilm RAF and Phase One IIQ containers.
+- HEIC/HEIF capture dates can now participate in Timeline, Memories and date sorting when embedded EXIF capture metadata is present.
+- Added CR3, RAF and IIQ to supported library indexing for metadata-focused workflows.
+- Added regression coverage for timezone-less and timezone-aware extended metadata date normalization.
+
+### Changed
+- Existing JPEG/TIFF EXIF parsing and the verified MOV/MP4/M4V QuickTime parser remain unchanged.
+- RAW metadata indexing is now broader, but full RAW pixel previewing is still a separate unfinished feature.
+
+### Safety
+- Extended metadata parsing is read-only and does not decode or rewrite source image pixels.
+- Invalid or missing metadata safely falls back to filesystem modified time.
+
 ## 0.48.0 — 2026-10-27
 
 ### Added
