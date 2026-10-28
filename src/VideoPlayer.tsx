@@ -6,7 +6,8 @@ import {clockTime,markSeconds,markTime,type VideoTime} from "./videoTime";
 type Assets={source:string;proxy:boolean;info:VideoInfo;filmstrip:{seconds:number;image:string}[];warnings:string[]};
 type Status={state:"queued"|"running"|"complete"|"failed";result:Assets|null;error:string|null};
 
-export function VideoPlayer({root,path,onOpenExternal}:{root:string;path:string;onOpenExternal:()=>void}) {
+export type VideoSelection={start:VideoTime;end:VideoTime;onChange:(start:VideoTime,end:VideoTime)=>void};
+export function VideoPlayer({root,path,onOpenExternal,selection}:{root:string;path:string;onOpenExternal:()=>void;selection?:VideoSelection}) {
   const video=useRef<HTMLVideoElement>(null);
   const current=useRef(0);
   const restore=useRef(0);
@@ -23,8 +24,10 @@ export function VideoPlayer({root,path,onOpenExternal}:{root:string;path:string;
   const [playing,setPlaying]=useState(false);
   const [position,setPosition]=useState(0);
   const [duration,setDuration]=useState(0);
-  const [inMark,setInMark]=useState<VideoTime|null>(null);
-  const [outMark,setOutMark]=useState<VideoTime|null>(null);
+  const [temporaryIn,setInMark]=useState<VideoTime|null>(null);
+  const [temporaryOut,setOutMark]=useState<VideoTime|null>(null);
+  const inMark=selection?.start||temporaryIn;
+  const outMark=selection?.end||temporaryOut;
   const [rangeError,setRangeError]=useState("");
   useEffect(()=>{
     if(!requested)return;
@@ -73,7 +76,9 @@ export function VideoPlayer({root,path,onOpenExternal}:{root:string;path:string;
     if((which==="in"&&outMark&&seconds>=markSeconds(outMark))||(which==="out"&&seconds<=markSeconds(inMark||markTime(0,null)))){
       setRangeError("The out marker must be after the in marker.");return;
     }
-    setRangeError("");if(which==="in")setInMark(value);else setOutMark(value);
+    setRangeError("");
+    if(selection)selection.onChange(which==="in"?value:selection.start,which==="out"?value:selection.end);
+    else if(which==="in")setInMark(value);else setOutMark(value);
   }
   function keyboard(event:KeyboardEvent<HTMLElement>){
     const target=event.target as HTMLElement;
@@ -106,9 +111,9 @@ export function VideoPlayer({root,path,onOpenExternal}:{root:string;path:string;
         <button className="secondary-button" onClick={()=>mark("in")}>Mark in</button><button className="secondary-button" onClick={()=>mark("out")}>Mark out</button>
         <button className="secondary-button" onClick={()=>{seek(inMark?markSeconds(inMark):0);rangePlaying.current=true;void video.current?.play().catch(cause=>{rangePlaying.current=false;setError(String(cause));});}}>Play marked range</button>
         <span>In: {clockTime(inMark?markSeconds(inMark):0)} · Out: {outMark?clockTime(markSeconds(outMark)):"End"}</span>
-        <button className="secondary-button" disabled={!inMark&&!outMark} onClick={()=>{setInMark(null);setOutMark(null);setRangeError("");}}>Clear markers</button>
+        <button className="secondary-button" disabled={!inMark&&!outMark} onClick={()=>{rangePlaying.current=false;if(selection)selection.onChange(markTime(0,info?.time_base||null),markTime(info?.duration_seconds||duration,info?.time_base||null));else{setInMark(null);setOutMark(null);}setRangeError("");}}>Clear markers</button>
       </div>
-      <small>Preview markers are temporary and do not trim or save the video. Focus the player: Space to play/pause, arrows to seek, Shift+arrows for 10 seconds, I/O to mark.</small>
+      <small>{selection?"Markers set the project's saved trim range. Use Preview edits to view the result.":"Preview markers are temporary and do not trim or save the video."} Focus the player: Space to play/pause, arrows to seek, Shift+arrows for 10 seconds, I/O to mark.</small>
     </>}
     {rangeError&&<p role="alert">{rangeError}</p>}
     {!!assets?.filmstrip.length&&<div className="video-filmstrip" aria-label="Video filmstrip">{assets.filmstrip.map(frame=><button key={frame.seconds} aria-label={`Seek to ${clockTime(frame.seconds)}`} onClick={()=>seek(frame.seconds)}><img src={frame.image} alt=""/><span>{clockTime(frame.seconds)}</span></button>)}</div>}

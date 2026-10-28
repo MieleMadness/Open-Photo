@@ -510,3 +510,202 @@ fn closing_the_process_job_terminates_native_work() {
         std::thread::sleep(Duration::from_millis(20));
     }
 }
+
+fn pixels(path: &Path) -> Vec<u8> {
+    video_engine::run(
+        &video_engine::tool(&engine(), "ffmpeg").unwrap(),
+        &[
+            "-v".as_ref(),
+            "error".as_ref(),
+            "-i".as_ref(),
+            path.as_os_str(),
+            "-frames:v".as_ref(),
+            "1".as_ref(),
+            "-pix_fmt".as_ref(),
+            "rgb24".as_ref(),
+            "-f".as_ref(),
+            "rawvideo".as_ref(),
+            "pipe:1".as_ref(),
+        ],
+        Duration::from_secs(10),
+    )
+    .unwrap()
+}
+fn audio_rms(path: &Path) -> f64 {
+    let data = video_engine::run(
+        &video_engine::tool(&engine(), "ffmpeg").unwrap(),
+        &[
+            "-v".as_ref(),
+            "error".as_ref(),
+            "-i".as_ref(),
+            path.as_os_str(),
+            "-vn".as_ref(),
+            "-ac".as_ref(),
+            "1".as_ref(),
+            "-f".as_ref(),
+            "f32le".as_ref(),
+            "pipe:1".as_ref(),
+        ],
+        Duration::from_secs(10),
+    )
+    .unwrap();
+    let values: Vec<f64> = data
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|b| f64::from(f32::from_le_bytes(*b)))
+        .collect();
+    let middle = &values[4800..values.len() - 4800];
+    (middle.iter().map(|s| s * s).sum::<f64>() / middle.len() as f64).sqrt()
+}
+#[test]
+fn saved_project_renders_trim_crop_rotation_flip_canvas_and_audio_without_touching_source() {
+    use crate::video_project::{self, Crop, VideoTime};
+    let fixture = Fixture::new();
+    let source = fixture.0.join("project source.mp4");
+    ffmpeg(&["-nostdin","-v","error","-f","lavfi","-i","color=c=red:size=96x64:rate=30:duration=2,drawbox=x=48:y=0:w=48:h=64:color=blue:t=fill","-f","lavfi","-i","sine=frequency=440:sample_rate=48000:duration=2","-c:v","libopenh264","-c:a","aac","-ac","2"],&source);
+    let before = fingerprint(&source);
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    let mut project = video_project::new_project(
+        fixture.0.to_str().unwrap(),
+        &fs::canonicalize(&source).unwrap(),
+        info,
+    )
+    .unwrap();
+    let base = project.asset.info.time_base.clone().unwrap();
+    project.clips[0].source_in = VideoTime::from_seconds(0.5, &base).unwrap();
+    project.clips[0].source_out = VideoTime::from_seconds(1.5, &base).unwrap();
+    project.output.width = 96;
+    project.output.height = 64;
+    project.clips[0].edits.flip_horizontal = true;
+    project.clips[0].edits.gain_percent = 50;
+    let directory = fixture.0.join("flip");
+    fs::create_dir(&directory).unwrap();
+    let result = crate::video_edit_preview::build(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        &project,
+        &directory,
+        || false,
+    )
+    .unwrap();
+    assert!((result.info.duration_seconds - 1.0).abs() < 0.05);
+    let rgb = pixels(Path::new(&result.source));
+    let left = (32 * 96 + 10) * 3;
+    let right = (32 * 96 + 85) * 3;
+    assert!(rgb[left + 2] > rgb[left] + 100);
+    assert!(rgb[right] > rgb[right + 2] + 100);
+    let gain = audio_rms(Path::new(&result.source)) / audio_rms(&source);
+    assert!((gain - 0.5).abs() < 0.06, "gain={gain}");
+    project.clips[0].edits.flip_horizontal = false;
+    project.clips[0].edits.crop = Crop {
+        x: 5000,
+        y: 0,
+        width: 5000,
+        height: 10000,
+    };
+    project.clips[0].edits.quarter_turns = 1;
+    project.clips[0].edits.muted = true;
+    project.output.width = 64;
+    project.output.height = 48;
+    let directory = fixture.0.join("crop");
+    fs::create_dir(&directory).unwrap();
+    let result = crate::video_edit_preview::build(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        &project,
+        &directory,
+        || false,
+    )
+    .unwrap();
+    assert!(result.info.audio.is_empty());
+    assert_eq!((result.info.width, result.info.height), (64, 48));
+    let rgb = pixels(Path::new(&result.source));
+    assert!(rgb[2] > rgb[0] + 100);
+    project.clips[0].edits = video_project::Edits::default();
+    project.output.width = 96;
+    project.output.height = 96;
+    let directory = fixture.0.join("fit");
+    fs::create_dir(&directory).unwrap();
+    let result = crate::video_edit_preview::build(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        &project,
+        &directory,
+        || false,
+    )
+    .unwrap();
+    let rgb = pixels(Path::new(&result.source));
+    assert!(rgb[0] < 15 && rgb[1] < 15 && rgb[2] < 15);
+    project.output.fit = "fill".into();
+    let directory = fixture.0.join("fill");
+    fs::create_dir(&directory).unwrap();
+    let result = crate::video_edit_preview::build(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        &project,
+        &directory,
+        || false,
+    )
+    .unwrap();
+    let rgb = pixels(Path::new(&result.source));
+    assert!(rgb[0] > rgb[2] + 100);
+    assert_eq!(fingerprint(&source), before);
+}
+
+#[test]
+fn edited_vfr_preview_keeps_selected_source_timestamps() {
+    use crate::video_project::{self, VideoTime};
+    let fixture = Fixture::new();
+    let source = fixture.0.join("variable.mp4");
+    ffmpeg(
+        &[
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=96x64:rate=30:duration=2",
+            "-vf",
+            "select='not(mod(n,3))+not(mod(n,7))'",
+            "-fps_mode",
+            "vfr",
+            "-c:v",
+            "libopenh264",
+        ],
+        &source,
+    );
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    let mut p = video_project::new_project(
+        fixture.0.to_str().unwrap(),
+        &fs::canonicalize(&source).unwrap(),
+        info,
+    )
+    .unwrap();
+    let base = p.asset.info.time_base.clone().unwrap();
+    p.clips[0].source_in = VideoTime::from_seconds(0.4, &base).unwrap();
+    p.clips[0].source_out = VideoTime::from_seconds(1.3, &base).unwrap();
+    p.output.width = 96;
+    p.output.height = 64;
+    let directory = fixture.0.join("edit");
+    fs::create_dir(&directory).unwrap();
+    let result = crate::video_edit_preview::build(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        &p,
+        &directory,
+        || false,
+    )
+    .unwrap();
+    let expected: Vec<f64> = frame_times(&source)
+        .into_iter()
+        .filter(|t| *t >= 0.4 - 0.001 && *t < 1.3 - 0.001)
+        .map(|t| t - 0.4)
+        .collect();
+    let actual = frame_times(Path::new(&result.source));
+    assert_eq!(actual.len(), expected.len());
+    for (a, b) in actual.iter().zip(expected) {
+        assert!((a - b).abs() < 0.001, "{a} vs {b}");
+    }
+}

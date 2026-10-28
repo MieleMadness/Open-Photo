@@ -309,6 +309,27 @@ pub fn start_video_preview(
     proxy: bool,
 ) -> Result<String, String> {
     let source = crate::media_stream::validated_video(&root, &path)?;
+    start_job(app, jobs, source, proxy, None)
+}
+
+#[tauri::command]
+pub fn start_video_project_preview(
+    app: tauri::AppHandle,
+    jobs: tauri::State<'_, PreviewJobs>,
+    root: String,
+    project: crate::video_project::Project,
+) -> Result<String, String> {
+    crate::video_project::validate(&project)?;
+    start_job(app, jobs, PathBuf::new(), true, Some((root, project)))
+}
+
+fn start_job(
+    app: tauri::AppHandle,
+    jobs: tauri::State<'_, PreviewJobs>,
+    source: PathBuf,
+    proxy: bool,
+    project: Option<(String, crate::video_project::Project)>,
+) -> Result<String, String> {
     let engine = video_engine::directory(&app)?;
     let cache = app
         .path()
@@ -345,7 +366,13 @@ pub fn start_video_preview(
                 fs::create_dir(&directory).map_err(|e| e.to_string())?;
                 *job.directory.lock().map_err(|e| e.to_string())? = Some(directory.clone());
                 job.status.lock().map_err(|e| e.to_string())?.state = "running";
-                let result = build_assets(&engine, &source, &directory, proxy, || cancelled(&job))?;
+                let result = if let Some((root, project)) = project {
+                    crate::video_edit_preview::build(&engine, &root, &project, &directory, || {
+                        cancelled(&job)
+                    })?
+                } else {
+                    build_assets(&engine, &source, &directory, proxy, || cancelled(&job))?
+                };
                 if cancelled(&job) {
                     return Err("Video preview cancelled".into());
                 }

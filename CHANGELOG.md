@@ -1,3 +1,13 @@
+# 0.54.3 — Phase 6.3: Saved single-video edits
+
+- Add versioned projects with stable asset/clip IDs, relative source paths, full SHA-256 fingerprints, rational source-time trim ranges, transform/audio settings, and output canvas settings.
+- Save drafts in SQLite with revision checks and bounded previous-document history. Serialize/coalesce autosaves, retain pending saves when switching media, block window closure while saving, and surface failure/retry/recovery-copy options.
+- Add recent drafts, session undo/redo/reset, non-overwriting portable project copies, strict project-file validation, and fingerprint-verified relinking.
+- Persist trim, crop (free and common aspect presets), quarter-turn rotation, flips, mute/gain, and fit/fill canvas choices. Generate cancellable edited previews through a shared validated processing graph, rather than CSS transforms.
+- Check source fingerprints before/after rendering. Add decoded-pixel, audio-gain/mute, VFR-trim, persistence/conflict/relink, copy protection, queue recovery, and close-guard tests.
+- Correct video details sizing so long player/editor controls scroll instead of being clipped inside a photo preview box.
+- Export, HDR tone mapping, waveform UI, and real-media/hardware acceptance remain incomplete Phase 6 work.
+
 # 0.54.2 — Phase 6.2: Playback and compatible previews
 
 - Add play/pause, a scrubber, time display, keyboard seeking, clickable filmstrip frames, and temporary in/out markers with marked-range playback.

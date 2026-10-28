@@ -1,3 +1,9 @@
+# Phase 6.3 checks (0.54.3)
+
+Added SQLite reopen/round-trip and stale-revision rejection, strict project validation, moved/changed-source verification, project-copy no-overwrite, serial autosave/retry/undo, close-guard, relink UI, and stale-preview tests. Real-engine fixtures decode rendered pixels to verify crop/rotation/flip and fit/fill, compare audio RMS for gain, check muted output, compare selected VFR frame timestamps within 1 ms, and verify original bytes stay unchanged.
+
+Installed-app acceptance still needs real source videos, long recordings, relinking across drives/libraries, restart recovery, write/disk failures, and window closure during pending writes. Browser trim selection is approximate; a saved source tick is not proof of frame-accurate export. Undo/redo history is session-local; the current draft survives restart. Export is not implemented.
+
 # Phase 6.2 checks (0.54.2)
 
 The current suite adds generated VFR footage with per-frame source/proxy timestamp comparisons (1 ms tolerance), delayed audio (30 ms start-offset tolerance), rotated/silent video, actual proxy decode, HDR rejection, a 64 MB source, cancellation/owned-folder cleanup, and native process-job termination. Frontend tests cover seeking, marker validation and rational times, proxy switching, clip changes, late-start cancellation, and generation errors that preserve original playback.

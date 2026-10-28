@@ -1,6 +1,6 @@
 # Local video engine (Phase 6.1–6.2)
 
-Open-Photo 0.54.2 bundles FFmpeg and ffprobe for read-only video inspection on Windows x64. No system-wide FFmpeg installation or runtime download is required. Existing playback and the Windows player fallback remain available.
+Open-Photo 0.54.3 bundles FFmpeg and ffprobe for read-only video inspection on Windows x64. No system-wide FFmpeg installation or runtime download is required. Existing playback and the Windows player fallback remain available.
 
 ## Reproducible preparation
 
@@ -43,6 +43,10 @@ Generation accepts at most two hours / 100 megapixels per frame, limits each pro
 
 Jobs have server-generated IDs, cancel obsolete work, and ignore stale status responses. Switching media or closing the player releases its session-owned derivative folder after its worker exits. Only exact completed video files are authorized for streaming; cache directories are not broadly exposed. Windows job objects terminate subprocesses if Open-Photo exits. Cleanup is best effort (Windows may still hold a file); folders with our generated names older than a day are retried during subsequent preview generation. Recent folders may belong to another instance and are preserved. Persistent cache controls and reuse are future work.
 
+## Saved editing projects (0.54.3)
+
+See [VIDEO_PROJECTS.md](VIDEO_PROJECTS.md) for durable projects and editor behavior. Project previews share the single-job scheduler with ordinary compatible previews. They validate project/source identity, render the saved trim/crop/rotation/flip/audio/canvas graph, validate the result, and recheck source fingerprints. The original player is released while an edited preview is active, so an old playback lease cannot keep using a deleted proxy. Editing invalidates and cancels stale previews. HDR rendering remains rejected.
+
 ## Not yet implemented
 
-Single-video trim/crop/rotate/audio edits, saved editing projects, undo/redo, and video export remain Phase 6 work. Reading a video's metadata does not establish that it can be edited or exported successfully. HDR export stays unavailable until a tested tone-mapping workflow is implemented.
+Video export, tested HDR tone mapping, waveforms, and real-footage performance/hardware acceptance remain Phase 6 work. Project files save edit instructions and reference their sources; they do not contain an exported video. The shared edit graph is ready for export integration, but preview/export equivalence is not claimed until export is implemented and tested.

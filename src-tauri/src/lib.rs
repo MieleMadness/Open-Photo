@@ -17,11 +17,13 @@ mod media_stream;
 mod safe_output;
 mod similar;
 mod user_data;
+mod video_edit_preview;
 mod video_engine;
 #[cfg(test)]
 mod video_integration_tests;
 mod video_preview;
 mod video_probe;
+mod video_project;
 mod watch;
 mod xmp;
 use base64::Engine;
@@ -1090,6 +1092,14 @@ pub fn run() {
             video_preview::start_video_preview,
             video_preview::video_preview_status,
             video_preview::cancel_video_preview,
+            video_preview::start_video_project_preview,
+            video_project::create_video_project,
+            video_project::save_video_project,
+            video_project::load_video_project,
+            video_project::recent_video_projects,
+            video_project::import_video_project,
+            video_project::write_video_project_copy,
+            video_project::relink_video_project,
             user_data::load_user_data,
             user_data::save_user_data,
             user_data::export_user_data,

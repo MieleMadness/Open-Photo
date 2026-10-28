@@ -1,4 +1,4 @@
-import {VideoPlayer} from "./VideoPlayer";
+import {VideoWorkspace} from "./VideoWorkspace";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -45,5 +45,5 @@ export function IPhonePicture({ root, path, name }: { root: string; path: string
 
 /** A new media identity resets all transient player state. */
 export function IPhoneMotion(props: {root:string;path:string;onOpenExternal:()=>void}) {
-  return <VideoPlayer key={`${props.root}\0${props.path}`} {...props}/>;
+  return <VideoWorkspace key={`${props.root}\0${props.path}`} {...props}/>;
 }

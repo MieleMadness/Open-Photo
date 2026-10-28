@@ -1,6 +1,6 @@
 # Video editing roadmap
 
-Status: Phase 6 is in progress. Version 0.54.2 adds playback/seeking controls, a filmstrip, temporary rational-time preview marks, and cancellable compatible SDR previews, building on 0.54.1 inspection. Saved editing projects and video export remain unimplemented. Phase 6.2 still needs packaged-Windows acceptance with real footage and long/VFR sources; preview/export agreement will be checked when export exists. See [VIDEO_ENGINE.md](VIDEO_ENGINE.md).
+Status: Phase 6 is in progress. Version 0.54.3 adds saved single-video projects, persistent trim/transform/audio/canvas settings, undo/redo/reset, durable autosave, recent drafts, project copies, verified relinking, and rendered edit previews. Export remains unimplemented. Packaged Windows acceptance with real footage and long/VFR sources remains required; preview/export agreement will be checked when export exists. See [VIDEO_PROJECTS.md](VIDEO_PROJECTS.md) and [VIDEO_ENGINE.md](VIDEO_ENGINE.md).
 
 ## Phase 6 — Single-source video editing
 
