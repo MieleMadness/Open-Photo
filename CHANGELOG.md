@@ -1,3 +1,13 @@
+# 0.54.4 — Phase 6.4: Validated video export
+
+- Export saved single-video edits to a new SDR H.264/AAC MP4 using the same trim/crop/rotation/flip/audio/canvas graph as edited previews. Offer the project canvas or an orientation-aware 1080p limit.
+- Export an immutable saved snapshot, with explicit first-audio/stereo policy and confirmation for multiple source tracks. Drop subtitles, chapters, and source metadata intentionally; reject detected HDR until tone mapping is tested.
+- Add an app-wide progress/elapsed/cancellation panel. Exports survive editor closure, and normal app closure waits for exports to finish or be cancelled. Serialize native processing with preview jobs.
+- Check destination space, stage beside the destination, validate streams/timing/geometry/size, fully decode output, reverify source identity, then publish without overwrite. Cancel/failure cleans only the job's temporary file; racing destination files survive.
+- Fix timestamp quantization in compatible previews and edited render/export by carrying source encoder time bases and a finer movie clock. Add jittered-VFR and non-frame-grid trim coverage.
+- Add decoded-output, preview/export pixel/timestamp/audio comparisons, a 90-second VFR/audio fixture, portrait 1080p, cancellation/commit race, corrupt-output, changed-source, disk-space, overwrite, and UI lifecycle tests.
+- Real-media/hardware/performance acceptance remains required before Phase 6 can be considered complete. HDR tone mapping and waveform UI remain deferred.
+
 # 0.54.3 — Phase 6.3: Saved single-video edits
 
 - Add versioned projects with stable asset/clip IDs, relative source paths, full SHA-256 fingerprints, rational source-time trim ranges, transform/audio settings, and output canvas settings.

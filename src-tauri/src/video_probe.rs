@@ -15,6 +15,7 @@ pub struct VideoInfo {
     pub nominal_frame_rate: Option<String>,
     pub time_base: Option<String>,
     pub start_time: Option<String>,
+    pub format_start_time: Option<String>,
     pub rotation_degrees: f64,
     pub pixel_format: Option<String>,
     pub color_space: Option<String>,
@@ -33,6 +34,8 @@ pub struct AudioInfo {
     pub sample_rate: Option<String>,
     pub channels: Option<u32>,
     pub channel_layout: Option<String>,
+    pub start_time: Option<String>,
+    pub duration_seconds: Option<f64>,
 }
 
 fn string(value: &Value, key: &str) -> Option<String> {
@@ -123,6 +126,8 @@ pub(crate) fn parse_probe(bytes: &[u8]) -> Result<VideoInfo, String> {
             sample_rate: string(s, "sample_rate"),
             channels: s["channels"].as_u64().and_then(|v| u32::try_from(v).ok()),
             channel_layout: string(s, "channel_layout"),
+            start_time: string(s, "start_time"),
+            duration_seconds: number(&s["duration"]),
         })
         .collect::<Vec<_>>();
     let mut warnings = Vec::new();
@@ -150,6 +155,7 @@ pub(crate) fn parse_probe(bytes: &[u8]) -> Result<VideoInfo, String> {
         nominal_frame_rate,
         time_base: ratio(string(video, "time_base")),
         start_time: string(video, "start_time"),
+        format_start_time: string(&doc["format"], "start_time"),
         rotation_degrees: rotation,
         pixel_format: string(video, "pix_fmt"),
         color_space: string(video, "color_space"),

@@ -1,0 +1,329 @@
+//! One edit/stream mapping pipeline for previews and exports.
+use crate::{
+    video_engine,
+    video_probe::{self, VideoInfo},
+    video_project::{self, Project},
+};
+use serde::{Deserialize, Serialize};
+use std::{
+    ffi::{OsStr, OsString},
+    fs,
+    path::Path,
+    time::Duration,
+};
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportSize {
+    #[default]
+    Project,
+    Hd1080,
+}
+pub const MAX_EXPORT_BYTES: u64 = 16 * 1024 * 1024 * 1024;
+pub struct Plan {
+    pub info: VideoInfo,
+    pub width: u32,
+    pub height: u32,
+    pub start: f64,
+    pub duration: f64,
+    pub max_bytes: u64,
+    pub timeout: Duration,
+    pub args: Vec<OsString>,
+    pub warnings: Vec<String>,
+}
+fn seconds(value: Option<&str>) -> Option<f64> {
+    value?.parse::<f64>().ok().filter(|v| v.is_finite())
+}
+fn audio_span(plan: &Plan) -> Option<(f64, Option<f64>)> {
+    let audio = plan.info.audio.first()?;
+    let origin = seconds(plan.info.format_start_time.as_deref()).unwrap_or(0.0);
+    let raw = seconds(audio.start_time.as_deref()).unwrap_or(origin) - origin - plan.start;
+    Some((
+        raw.max(0.0),
+        audio
+            .duration_seconds
+            .map(|duration| (raw + duration).min(plan.duration)),
+    ))
+}
+#[derive(Clone, Copy)]
+pub struct RenderOptions {
+    pub preview: bool,
+    pub size: ExportSize,
+    pub acknowledge_first_audio: bool,
+}
+pub fn plan(
+    engine: &Path,
+    root: &str,
+    p: &Project,
+    output: &Path,
+    options: RenderOptions,
+    cancel: impl Fn() -> bool,
+) -> Result<Plan, String> {
+    let RenderOptions {
+        preview,
+        size,
+        acknowledge_first_audio,
+    } = options;
+    let source = video_project::source(root, p, &cancel)?;
+    let info = video_probe::probe(engine, &source, &cancel)?;
+    if info.hdr {
+        return Err("HDR rendering/export requires tested tone mapping. Use original playback for this clip.".into());
+    }
+    if info.width != p.asset.info.width
+        || info.height != p.asset.info.height
+        || (info.duration_seconds - p.asset.info.duration_seconds).abs() > 0.001
+        || info.time_base != p.asset.info.time_base
+    {
+        return Err("Project source metadata does not match the verified video".into());
+    }
+    let clip = &p.clips[0];
+    if !preview && !clip.edits.muted && info.audio.len() > 1 && !acknowledge_first_audio {
+        return Err(
+            "Confirm that export will use only the first audio track, converted to stereo".into(),
+        );
+    }
+    let start = clip.source_in.seconds()?;
+    let duration = clip.source_out.seconds()? - start;
+    let mut canvas = p.clone();
+    if !preview && size == ExportSize::Hd1080 {
+        let (w, h) = if canvas.output.height > canvas.output.width {
+            (1080.0, 1920.0)
+        } else {
+            (1920.0, 1080.0)
+        };
+        let factor = (w / f64::from(canvas.output.width))
+            .min(h / f64::from(canvas.output.height))
+            .min(1.0);
+        canvas.output.width =
+            ((f64::from(canvas.output.width) * factor / 2.0).floor() as u32 * 2).max(16);
+        canvas.output.height =
+            ((f64::from(canvas.output.height) * factor / 2.0).floor() as u32 * 2).max(16);
+    }
+    let (filter, width, height) = video_project::filters(&canvas, preview)?;
+    let max_bytes = if preview {
+        512 * 1024 * 1024
+    } else {
+        MAX_EXPORT_BYTES
+    };
+    // -y applies only to a job-owned cache file or StagedOutput's private staging path.
+    let mut args: Vec<OsString> = [
+        "-nostdin",
+        "-v",
+        "error",
+        "-xerror",
+        "-y",
+        "-max_alloc",
+        "268435456",
+        "-threads",
+        "2",
+        "-filter_threads",
+        "1",
+        "-protocol_whitelist",
+        "file,pipe",
+        "-format_whitelist",
+        "mov,matroska,webm,avi",
+        "-ss",
+    ]
+    .into_iter()
+    .map(Into::into)
+    .collect();
+    args.extend([
+        format!("{start:.9}").into(),
+        "-i".into(),
+        source.clone().into(),
+        "-t".into(),
+        format!("{duration:.9}").into(),
+        "-map".into(),
+        format!("0:{}", info.video_stream).into(),
+        "-vf".into(),
+        filter.into(),
+    ]);
+    if !clip.edits.muted {
+        if let Some(audio) = info.audio.first() {
+            args.extend([
+                "-map".into(),
+                format!("0:{}", audio.stream).into(),
+                "-af".into(),
+                format!("volume={:.4}", f64::from(clip.edits.gain_percent) / 100.0).into(),
+            ]);
+        }
+    }
+    args.extend(
+        [
+            "-fps_mode",
+            "vfr",
+            // Carry fine source timestamps instead of quantizing trims onto nominal frame ticks.
+            "-enc_time_base:v",
+            info.time_base.as_deref().unwrap_or("1/1000000"),
+            "-c:v",
+            "libopenh264",
+            "-b:v",
+            if preview { "2000k" } else { "12000k" },
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "-map_metadata",
+            "-1",
+            "-map_chapters",
+            "-1",
+            "-movflags",
+            "+faststart",
+            "-movie_timescale",
+            "90000",
+            "-fs",
+        ]
+        .into_iter()
+        .map(Into::into),
+    );
+    args.extend([
+        max_bytes.to_string().into(),
+        "-progress".into(),
+        "pipe:1".into(),
+        "-nostats".into(),
+        "-f".into(),
+        "mp4".into(),
+        output.into(),
+    ]);
+    let mut warnings=vec!["MP4 contains SDR H.264 video and optional AAC stereo audio. Subtitles, chapters, and source metadata are not copied.".into()];
+    if !clip.edits.muted && info.audio.len() > 1 {
+        warnings
+            .push("Only the first source audio track was included, converted to stereo.".into());
+    }
+    Ok(Plan {
+        info,
+        width,
+        height,
+        start,
+        duration,
+        max_bytes,
+        timeout: Duration::from_secs(if preview { 1800 } else { 21600 }),
+        args,
+        warnings,
+    })
+}
+pub fn encode(
+    engine: &Path,
+    plan: &Plan,
+    cancel: impl Fn() -> bool,
+    progress: impl Fn(video_engine::Progress) + Send + 'static,
+) -> Result<(), String> {
+    let args: Vec<&OsStr> = plan.args.iter().map(OsString::as_os_str).collect();
+    video_engine::run_progress(
+        &video_engine::tool(engine, "ffmpeg")?,
+        &args,
+        plan.timeout,
+        cancel,
+        progress,
+    )
+}
+pub fn validate_output(
+    engine: &Path,
+    p: &Project,
+    plan: &Plan,
+    output: &Path,
+    cancel: impl Fn() -> bool,
+) -> Result<VideoInfo, String> {
+    let result = video_probe::probe(engine, output, cancel)?;
+    let tolerance = plan
+        .info
+        .frame_rate
+        .as_deref()
+        .and_then(|s| s.split_once('/'))
+        .and_then(|(a, b)| Some(b.parse::<f64>().ok()? / a.parse::<f64>().ok()?))
+        .unwrap_or(0.05)
+        .max(0.05)
+        * 2.0;
+    if (result.duration_seconds - plan.duration).abs() > tolerance
+        || result.width != plan.width
+        || result.height != plan.height
+        || result.rotation_degrees.abs() > 0.01
+        || result.codec != "h264"
+        || result.pixel_format.as_deref() != Some("yuv420p")
+        || result.hdr
+        || fs::metadata(output).map_err(|e| e.to_string())?.len() >= plan.max_bytes
+    {
+        return Err("Rendered video failed duration, geometry, format, or size validation".into());
+    }
+    let expect_audio = !p.clips[0].edits.muted
+        && audio_span(plan)
+            .is_some_and(|(start, end)| start < plan.duration && end.is_none_or(|end| end > start));
+    if result.audio.len() != usize::from(expect_audio) {
+        return Err("Rendered video did not preserve the selected audio policy".into());
+    }
+    if let Some(audio) = result.audio.first() {
+        if audio.codec != "aac"
+            || audio.channels != Some(2)
+            || audio.sample_rate.as_deref() != Some("48000")
+        {
+            return Err("Rendered audio does not match the AAC stereo preset".into());
+        }
+        if let Some((expected_start, expected_end)) = audio_span(plan) {
+            if let Some(actual_start) = seconds(audio.start_time.as_deref()) {
+                if (actual_start - expected_start).abs() > 0.05 {
+                    return Err("Rendered audio start is out of sync".into());
+                }
+                if let Some((expected_end, duration)) = expected_end.zip(audio.duration_seconds) {
+                    if (actual_start + duration - expected_end).abs() > 0.1 {
+                        return Err("Rendered audio end is out of sync".into());
+                    }
+                }
+            }
+        }
+    }
+    Ok(result)
+}
+pub fn decode_check(
+    engine: &Path,
+    output: &Path,
+    cancel: impl Fn() -> bool,
+    progress: impl Fn(video_engine::Progress) + Send + 'static,
+) -> Result<(), String> {
+    let args: Vec<&OsStr> = [
+        "-nostdin",
+        "-v",
+        "error",
+        "-xerror",
+        "-max_alloc",
+        "268435456",
+        "-threads",
+        "2",
+        "-protocol_whitelist",
+        "file,pipe",
+        "-format_whitelist",
+        "mov",
+        "-i",
+    ]
+    .into_iter()
+    .map(OsStr::new)
+    .chain([output.as_os_str()])
+    .chain(
+        [
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
+            "-progress",
+            "pipe:1",
+            "-nostats",
+            "-f",
+            "null",
+            "-",
+        ]
+        .into_iter()
+        .map(OsStr::new),
+    )
+    .collect();
+    video_engine::run_progress(
+        &video_engine::tool(engine, "ffmpeg")?,
+        &args,
+        Duration::from_secs(21600),
+        cancel,
+        progress,
+    )
+}

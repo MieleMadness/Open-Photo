@@ -266,9 +266,13 @@ fn compatible_preview_preserves_vfr_frame_boundaries_and_audio_offsets() {
             "-i",
             "sine=frequency=440:sample_rate=48000:duration=1.8",
             "-vf",
-            "select='not(mod(n,3))+not(mod(n,7))'",
+            "settb=1/1000000,setpts=PTS+3000*sin(N),select='not(mod(n,3))+not(mod(n,7))'",
             "-fps_mode",
             "vfr",
+            "-enc_time_base:v",
+            "1/1000000",
+            "-movie_timescale",
+            "1000000",
             "-c:v",
             "libopenh264",
             "-c:a",
@@ -708,4 +712,565 @@ fn edited_vfr_preview_keeps_selected_source_timestamps() {
     for (a, b) in actual.iter().zip(expected) {
         assert!((a - b).abs() < 0.001, "{a} vs {b}");
     }
+}
+
+#[derive(Default)]
+struct ExportControl {
+    cancel: std::sync::atomic::AtomicBool,
+    cancel_at: Option<crate::video_export::Stage>,
+    no_space: bool,
+    race_destination: Option<PathBuf>,
+    corrupt_directory: Option<PathBuf>,
+    mutate_source: Option<PathBuf>,
+    stages: std::sync::Mutex<Vec<crate::video_export::Stage>>,
+}
+impl crate::video_export::Control for ExportControl {
+    fn cancelled(&self) -> bool {
+        self.cancel.load(Ordering::SeqCst)
+    }
+    fn update(&self, stage: crate::video_export::Stage, fraction: Option<f64>, _: u64) {
+        use crate::video_export::Stage;
+        assert!(fraction.is_none_or(|f| f < 1.0));
+        self.stages.lock().unwrap().push(stage);
+        if self.cancel_at == Some(stage) {
+            self.cancel.store(true, Ordering::SeqCst);
+        }
+        if stage == Stage::DecodingOutput {
+            if let Some(root) = &self.corrupt_directory {
+                for entry in fs::read_dir(root).unwrap().flatten() {
+                    if entry
+                        .file_name()
+                        .to_string_lossy()
+                        .starts_with(".openphoto-")
+                    {
+                        fs::write(entry.path(), b"broken after header validation").unwrap();
+                    }
+                }
+            }
+            if let Some(source) = &self.mutate_source {
+                fs::write(source, b"externally changed source").unwrap();
+            }
+        }
+    }
+    fn begin_publish(&self) -> Result<(), String> {
+        if self.cancelled() {
+            return Err("Export cancelled".into());
+        }
+        self.stages
+            .lock()
+            .unwrap()
+            .push(crate::video_export::Stage::Publishing);
+        if let Some(path) = &self.race_destination {
+            fs::write(path, b"external completed file").unwrap();
+        }
+        Ok(())
+    }
+    fn available_space(&self, _: &Path) -> Result<Option<u64>, String> {
+        Ok(if self.no_space { Some(0) } else { None })
+    }
+}
+fn assert_no_export_temporaries(root: &Path) {
+    assert!(!fs::read_dir(root).unwrap().flatten().any(|entry| entry
+        .file_name()
+        .to_string_lossy()
+        .starts_with(".openphoto-")));
+}
+fn sample_pixels(path: &Path) -> Vec<u8> {
+    video_engine::run(
+        &video_engine::tool(&engine(), "ffmpeg").unwrap(),
+        &[
+            "-v".as_ref(),
+            "error".as_ref(),
+            "-i".as_ref(),
+            path.as_os_str(),
+            "-frames:v".as_ref(),
+            "1".as_ref(),
+            "-vf".as_ref(),
+            "scale=96:54".as_ref(),
+            "-pix_fmt".as_ref(),
+            "rgb24".as_ref(),
+            "-f".as_ref(),
+            "rawvideo".as_ref(),
+            "pipe:1".as_ref(),
+        ],
+        Duration::from_secs(10),
+    )
+    .unwrap()
+}
+#[test]
+fn export_publishes_decoded_vfr_edits_and_matches_preview_geometry() {
+    use crate::{
+        video_export::{self, Request, Stage},
+        video_project::{self, VideoTime},
+        video_render::ExportSize,
+    };
+    let fixture = Fixture::new();
+    let source = fixture.0.join("旅行 source.mp4");
+    ffmpeg(
+        &[
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=96x64:rate=30:duration=2",
+            "-vf",
+            "select='not(mod(n,3))+not(mod(n,7))'",
+            "-fps_mode",
+            "vfr",
+            "-c:v",
+            "libopenh264",
+        ],
+        &source,
+    );
+    let before = fingerprint(&source);
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    let mut p = video_project::new_project(fixture.0.to_str().unwrap(), &source, info).unwrap();
+    let base = p.asset.info.time_base.clone().unwrap();
+    p.clips[0].source_in = VideoTime::from_seconds(0.4, &base).unwrap();
+    p.clips[0].source_out = VideoTime::from_seconds(1.3, &base).unwrap();
+    p.clips[0].edits.quarter_turns = 1;
+    p.clips[0].edits.flip_vertical = true;
+    p.clips[0].edits.crop.width = 7500;
+    p.output.width = 192;
+    p.output.height = 108;
+    let control = std::sync::Arc::new(ExportControl::default());
+    let output = fixture.0.join("旅行 edited clip.mp4");
+    let report = video_export::export_file(
+        Request {
+            engine: &engine(),
+            root: fixture.0.to_str().unwrap(),
+            project: &p,
+            destination: &output,
+            size: ExportSize::Project,
+            acknowledge_first_audio: false,
+        },
+        control.clone(),
+    )
+    .unwrap();
+    assert_eq!((report.width, report.height), (192, 108));
+    assert!(output.exists());
+    assert!((report.duration_seconds - 0.9).abs() < 0.1);
+    let directory = fixture.0.join("preview");
+    fs::create_dir(&directory).unwrap();
+    let preview = crate::video_edit_preview::build(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        &p,
+        &directory,
+        || false,
+    )
+    .unwrap();
+    let a = sample_pixels(&output);
+    let b = sample_pixels(Path::new(&preview.source));
+    let error = a
+        .iter()
+        .zip(b)
+        .map(|(a, b)| (f64::from(*a) - f64::from(b)).abs())
+        .sum::<f64>()
+        / a.len() as f64;
+    assert!(error < 6.0, "pixel error={error}");
+    let expected: Vec<f64> = frame_times(&source)
+        .into_iter()
+        .filter(|t| *t >= 0.4 - 0.001 && *t < 1.3 - 0.001)
+        .map(|t| t - 0.4)
+        .collect();
+    let actual = frame_times(&output);
+    assert_eq!(actual.len(), expected.len());
+    for (a, b) in actual.iter().zip(expected) {
+        assert!((a - b).abs() < 0.001);
+    }
+    let stages = control.stages.lock().unwrap();
+    assert!(stages.contains(&Stage::DecodingOutput));
+    assert_eq!(stages.last(), Some(&Stage::Publishing));
+    assert_no_export_temporaries(&fixture.0);
+    assert_eq!(fingerprint(&source), before);
+}
+#[test]
+fn export_preserves_audio_offsets_gain_and_explicit_multiple_track_policy() {
+    use crate::{
+        video_export::{self, Request},
+        video_project,
+        video_render::ExportSize,
+    };
+    let fixture = Fixture::new();
+    let source = fixture.0.join("audio.mp4");
+    ffmpeg(
+        &[
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=96x64:rate=30:duration=2",
+            "-itsoffset",
+            "0.2",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000:duration=1.8",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=880:sample_rate=48000:duration=2",
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+            "-map",
+            "2:a",
+            "-c:v",
+            "libopenh264",
+            "-c:a",
+            "aac",
+            "-ac",
+            "2",
+        ],
+        &source,
+    );
+    let before = fingerprint(&source);
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    let mut p = video_project::new_project(fixture.0.to_str().unwrap(), &source, info).unwrap();
+    p.output.width = 96;
+    p.output.height = 64;
+    p.clips[0].edits.gain_percent = 50;
+    let output = fixture.0.join("audio-export.mp4");
+
+    assert!(video_export::export_file(
+        Request {
+            engine: &engine(),
+            root: fixture.0.to_str().unwrap(),
+            project: &p,
+            destination: &output,
+            size: ExportSize::Project,
+            acknowledge_first_audio: false
+        },
+        std::sync::Arc::new(ExportControl::default())
+    )
+    .unwrap_err()
+    .contains("first audio"));
+    assert!(!output.exists());
+    let report = video_export::export_file(
+        Request {
+            engine: &engine(),
+            root: fixture.0.to_str().unwrap(),
+            project: &p,
+            destination: &output,
+            size: ExportSize::Project,
+            acknowledge_first_audio: true,
+        },
+        std::sync::Arc::new(ExportControl::default()),
+    )
+    .unwrap();
+    assert!(report
+        .warnings
+        .iter()
+        .any(|w| w.contains("first source audio")));
+    let info = video_probe::probe(&engine(), &output, || false).unwrap();
+    assert_eq!(info.audio.len(), 1);
+    let audio_start = info.audio[0]
+        .start_time
+        .as_ref()
+        .unwrap()
+        .parse::<f64>()
+        .unwrap();
+    assert!((audio_start - 0.178).abs() < 0.05);
+    let directory = fixture.0.join("preview");
+    fs::create_dir(&directory).unwrap();
+    let preview = crate::video_edit_preview::build(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        &p,
+        &directory,
+        || false,
+    )
+    .unwrap();
+    assert!((audio_rms(&output) / audio_rms(Path::new(&preview.source)) - 1.0).abs() < 0.05);
+    p.clips[0].edits.muted = true;
+    let silent = fixture.0.join("silent-export.mp4");
+    video_export::export_file(
+        Request {
+            engine: &engine(),
+            root: fixture.0.to_str().unwrap(),
+            project: &p,
+            destination: &silent,
+            size: ExportSize::Project,
+            acknowledge_first_audio: false,
+        },
+        std::sync::Arc::new(ExportControl::default()),
+    )
+    .unwrap();
+    assert!(video_probe::probe(&engine(), &silent, || false)
+        .unwrap()
+        .audio
+        .is_empty());
+    assert_eq!(fingerprint(&source), before);
+    assert_no_export_temporaries(&fixture.0);
+}
+#[test]
+fn export_cancellation_failures_and_racing_destinations_never_publish_partial_files() {
+    use crate::{
+        video_export::{self, Request, Stage},
+        video_project,
+        video_render::ExportSize,
+    };
+    let fixture = Fixture::new();
+    let source = fixture.0.join("source.mp4");
+    ffmpeg(
+        &[
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=96x64:rate=24:duration=1",
+            "-c:v",
+            "libopenh264",
+        ],
+        &source,
+    );
+    let before = fingerprint(&source);
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    let mut p = video_project::new_project(fixture.0.to_str().unwrap(), &source, info).unwrap();
+    p.output.width = 96;
+    p.output.height = 64;
+    for (index, control) in [
+        ExportControl {
+            cancel_at: Some(Stage::Encoding),
+            ..Default::default()
+        },
+        ExportControl {
+            cancel_at: Some(Stage::DecodingOutput),
+            ..Default::default()
+        },
+        ExportControl {
+            no_space: true,
+            ..Default::default()
+        },
+        ExportControl {
+            corrupt_directory: Some(fixture.0.clone()),
+            ..Default::default()
+        },
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let output = fixture.0.join(format!("failed-{index}.mp4"));
+        assert!(video_export::export_file(
+            Request {
+                engine: &engine(),
+                root: fixture.0.to_str().unwrap(),
+                project: &p,
+                destination: &output,
+                size: ExportSize::Project,
+                acknowledge_first_audio: false
+            },
+            std::sync::Arc::new(control)
+        )
+        .is_err());
+        assert!(!output.exists());
+        assert_no_export_temporaries(&fixture.0);
+        assert_eq!(fingerprint(&source), before);
+    }
+    let output = fixture.0.join("race.mp4");
+    let control = ExportControl {
+        race_destination: Some(output.clone()),
+        ..Default::default()
+    };
+    assert!(video_export::export_file(
+        Request {
+            engine: &engine(),
+            root: fixture.0.to_str().unwrap(),
+            project: &p,
+            destination: &output,
+            size: ExportSize::Project,
+            acknowledge_first_audio: false
+        },
+        std::sync::Arc::new(control)
+    )
+    .is_err());
+    assert_eq!(fs::read(output).unwrap(), b"external completed file");
+    assert_eq!(fingerprint(&source), before);
+    assert_no_export_temporaries(&fixture.0);
+    let changed = fixture.0.join("changed.mp4");
+    let control = ExportControl {
+        mutate_source: Some(source.clone()),
+        ..Default::default()
+    };
+    assert!(video_export::export_file(
+        Request {
+            engine: &engine(),
+            root: fixture.0.to_str().unwrap(),
+            project: &p,
+            destination: &changed,
+            size: ExportSize::Project,
+            acknowledge_first_audio: false
+        },
+        std::sync::Arc::new(control)
+    )
+    .is_err());
+    assert!(!changed.exists());
+    assert_no_export_temporaries(&fixture.0);
+}
+
+#[test]
+fn export_1080p_portrait_preset_is_validated_and_hdr_is_rejected() {
+    use crate::{
+        video_export::{self, Request},
+        video_project,
+        video_render::ExportSize,
+    };
+    assert_eq!(
+        serde_json::from_str::<ExportSize>("\"hd1080\"").unwrap(),
+        ExportSize::Hd1080
+    );
+    let fixture = Fixture::new();
+    let source = fixture.0.join("source.mp4");
+    ffmpeg(
+        &[
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=24:duration=0.5",
+            "-c:v",
+            "libopenh264",
+        ],
+        &source,
+    );
+    let before = fingerprint(&source);
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    let mut p = video_project::new_project(fixture.0.to_str().unwrap(), &source, info).unwrap();
+    p.output.width = 2160;
+    p.output.height = 3840;
+    let output = fixture.0.join("portrait.mp4");
+    let report = video_export::export_file(
+        Request {
+            engine: &engine(),
+            root: fixture.0.to_str().unwrap(),
+            project: &p,
+            destination: &output,
+            size: ExportSize::Hd1080,
+            acknowledge_first_audio: false,
+        },
+        std::sync::Arc::new(ExportControl::default()),
+    )
+    .unwrap();
+    assert_eq!((report.width, report.height), (1080, 1920));
+    assert_eq!(fingerprint(&source), before);
+    let hdr = fixture.0.join("hdr.mp4");
+    ffmpeg(
+        &[
+            "-nostdin",
+            "-v",
+            "error",
+            "-i",
+            source.to_str().unwrap(),
+            "-c",
+            "copy",
+            "-bsf:v",
+            "h264_metadata=colour_primaries=9:transfer_characteristics=16:matrix_coefficients=9",
+        ],
+        &hdr,
+    );
+    let info = video_probe::probe(&engine(), &hdr, || false).unwrap();
+    let p = video_project::new_project(fixture.0.to_str().unwrap(), &hdr, info).unwrap();
+    let rejected = fixture.0.join("rejected.mp4");
+    assert!(video_export::export_file(
+        Request {
+            engine: &engine(),
+            root: fixture.0.to_str().unwrap(),
+            project: &p,
+            destination: &rejected,
+            size: ExportSize::Project,
+            acknowledge_first_audio: false
+        },
+        std::sync::Arc::new(ExportControl::default())
+    )
+    .unwrap_err()
+    .contains("HDR"));
+    assert!(!rejected.exists());
+    assert_no_export_temporaries(&fixture.0);
+}
+
+#[test]
+fn export_longer_vfr_audio_fixture_keeps_timestamps_and_audio_ends_aligned() {
+    use crate::{
+        video_export::{self, Request},
+        video_project::{self, VideoTime},
+        video_render::ExportSize,
+    };
+    let fixture = Fixture::new();
+    let source = fixture.0.join("long.mp4");
+    ffmpeg(
+        &[
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=96x64:rate=30:duration=90",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000:duration=90",
+            "-vf",
+            "select='not(mod(n,2))+not(mod(n,7))'",
+            "-fps_mode",
+            "vfr",
+            "-c:v",
+            "libopenh264",
+            "-c:a",
+            "aac",
+            "-ac",
+            "2",
+        ],
+        &source,
+    );
+    let before = fingerprint(&source);
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    let mut p = video_project::new_project(fixture.0.to_str().unwrap(), &source, info).unwrap();
+    let base = p.asset.info.time_base.clone().unwrap();
+    p.clips[0].source_in = VideoTime::from_seconds(1.23, &base).unwrap();
+    p.clips[0].source_out = VideoTime::from_seconds(88.67, &base).unwrap();
+    p.output.width = 96;
+    p.output.height = 64;
+    let output = fixture.0.join("long-export.mp4");
+    video_export::export_file(
+        Request {
+            engine: &engine(),
+            root: fixture.0.to_str().unwrap(),
+            project: &p,
+            destination: &output,
+            size: ExportSize::Project,
+            acknowledge_first_audio: false,
+        },
+        std::sync::Arc::new(ExportControl::default()),
+    )
+    .unwrap();
+    let start = p.clips[0].source_in.seconds().unwrap();
+    let end = p.clips[0].source_out.seconds().unwrap();
+    let expected: Vec<f64> = frame_times(&source)
+        .into_iter()
+        .filter(|t| *t >= start - 0.00001 && *t < end - 0.00001)
+        .map(|t| t - start)
+        .collect();
+    let actual = frame_times(&output);
+    assert_eq!(actual.len(), expected.len());
+    for (a, b) in actual.iter().zip(expected) {
+        assert!((a - b).abs() < 0.001, "{a} vs {b}");
+    }
+    let info = video_probe::probe(&engine(), &output, || false).unwrap();
+    let audio = &info.audio[0];
+    let audio_end = audio.start_time.as_ref().unwrap().parse::<f64>().unwrap()
+        + audio.duration_seconds.unwrap();
+    assert!((audio_end - (end - start)).abs() < 0.05);
+    assert_eq!(fingerprint(&source), before);
+    assert_no_export_temporaries(&fixture.0);
 }

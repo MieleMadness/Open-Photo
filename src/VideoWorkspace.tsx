@@ -4,6 +4,7 @@ import {open,save} from "@tauri-apps/plugin-dialog";
 import {VideoPlayer} from "./VideoPlayer";
 import {ProjectSession,defaultEdits,defaultOutput,cropForAspect,type LoadedProject,type VideoProject,type Edits} from "./videoProject";
 import {clockTime,markSeconds,markTime} from "./videoTime";
+import {exportFilename,startVideoExport,useVideoExport,type ExportSize} from "./videoExport";
 
 function NumberField({label,value,min,max,step=1,onCommit}:{label:string;value:number;min:number;max:number;step?:number;onCommit:(value:number)=>void}){
   const [draft,setDraft]=useState(String(value));
@@ -25,6 +26,10 @@ export function VideoWorkspace({root,path,onOpenExternal}:{root:string;path:stri
   const [previewWarnings,setPreviewWarnings]=useState<string[]>([]);
   const cancelPreview=useRef(()=>{});
   const project=session?.history.present;
+  const exportStatus=useVideoExport();
+  const [exportSize,setExportSize]=useState<ExportSize>("project");
+  const [acknowledgeAudio,setAcknowledgeAudio]=useState(false);
+  useEffect(()=>setAcknowledgeAudio(false),[project?.id]);
   const updateRecent=useCallback(()=>{void invoke<unknown>("recent_video_projects",{root}).then(rows=>{if(alive.current)setRecent(Array.isArray(rows)?rows:[]);}).catch(cause=>{if(alive.current)setError(String(cause));});},[root]);
   useEffect(()=>{alive.current=true;updateRecent();return()=>{alive.current=false;sessionRef.current?.release();cancelPreview.current();};},[updateRecent]);
   useEffect(()=>session?.subscribe(()=>{if(alive.current)refresh(v=>v+1);}),[session]);
@@ -65,6 +70,14 @@ export function VideoWorkspace({root,path,onOpenExternal}:{root:string;path:stri
     }catch(cause){if(!active||!alive.current)return;cancel();setError(String(cause));setPreviewBusy(false);}
   }
   const c=project?.clips[0],e=c?.edits;
+  async function exportVideo(){
+    const owner=sessionRef.current;if(!owner||!loaded?.source_path)return;
+    await owner.flush();
+    const destination=await save({defaultPath:exportFilename(owner.history.present.title),filters:[{name:"MP4 video",extensions:["mp4"]}]});
+    if(!destination||!alive.current||owner!==sessionRef.current)return;
+    await owner.flush();if(!alive.current||owner!==sessionRef.current)return;
+    await startVideoExport(root,structuredClone(owner.history.present),{destination,size:exportSize,acknowledge_first_audio:acknowledgeAudio});
+  }
   return <div className="video-workspace">
     {!previewBusy&&!previewSrc&&(!project||loaded?.source_path)&&<VideoPlayer key={loaded?.source_path||path} root={root} path={loaded?.source_path||path} onOpenExternal={project?()=>{void invoke("open_video",{root,path:loaded?.source_path}).catch(cause=>setError(String(cause)));}:onOpenExternal}
       selection={c?{start:c.source_in,end:c.source_out,onChange:(start,end)=>change(p=>{p.clips[0].source_in=start;p.clips[0].source_out=end;})}:undefined}/>}
@@ -116,7 +129,14 @@ export function VideoWorkspace({root,path,onOpenExternal}:{root:string;path:stri
           <button className="secondary-button" disabled={busy} onClick={()=>void action(async()=>{await flush();const destination=await save({defaultPath:`${project.title}.openphoto-video.json`,filters:[{name:"Video project",extensions:["json"]}]});if(destination){await invoke("write_video_project_copy",{project:session.history.present,destination});setMessage("Project copy saved. The video source is referenced, not copied.");}})}>Save project copy…</button>
           <button className="secondary-button" disabled={busy} onClick={()=>void action(async()=>{await flush();const file=await open({multiple:false,filters:[{name:"Original project video",extensions:["mp4","mov","m4v","mkv","webm","avi"]}]});if(typeof file==="string")adopt(await invoke<LoadedProject>("relink_video_project",{root,id:project.id,path:file,expectedRevision:session.revision}));})}>Relink original video…</button>
         </div>
-        <small>Edits autosave locally and leave the original unchanged. Open a recent draft to resume after restart. Project files reference video relative to the selected library; relink moved originals using the same file contents. Export is a later milestone.</small>
+        <fieldset><legend>Export MP4</legend>
+          <label>Output size<select aria-label="Video export size" value={exportSize} onChange={event=>setExportSize(event.target.value as ExportSize)}><option value="project">Project canvas ({project.output.width} × {project.output.height})</option><option value="hd1080">Up to 1080p (keep smaller canvases)</option></select></label>
+          <p>Saved trim: {clockTime(markSeconds(c.source_in))} to {clockTime(markSeconds(c.source_out))}. H.264 SDR video; {e.muted?"audio removed":project.asset.info.audio.length?"first audio track as AAC stereo, with saved volume":"no source audio"}. Existing files are never overwritten. Subtitles, chapters, and source metadata are not copied.</p>
+          {!e.muted&&project.asset.info.audio.length>1&&<label><input aria-label="Confirm first audio track only" type="checkbox" checked={acknowledgeAudio} onChange={event=>setAcknowledgeAudio(event.target.checked)}/>Use only the first audio track; exclude the others.</label>}
+          <button className="primary-button" disabled={busy||!!exportStatus?.active||!loaded?.source_path||!!project.asset.info.hdr||(!e.muted&&project.asset.info.audio.length>1&&!acknowledgeAudio)} onClick={()=>void action(exportVideo)}>Export video MP4…</button>
+          {exportStatus?.active&&<small>An export is already running. Progress and cancellation are available in the export panel.</small>}
+        </fieldset>
+        <small>Edits autosave locally and leave the original unchanged. Open a recent draft to resume after restart. Project files reference video relative to the selected library; relink moved originals using the same file contents. Export writes a separate validated video.</small>
       </>}
       {error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
     </section>

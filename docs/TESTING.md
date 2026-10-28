@@ -1,3 +1,11 @@
+# Phase 6.4 checks (0.54.4)
+
+Run `scripts/check.ps1 -Package` for formatting, frontend tests/build, Clippy, Rust tests, and installer packaging. New tests verify shared preview/export decoded pixels, VFR timestamps within 1 ms, AAC gain/offsets/mute, multiple-track confirmation, a 90-second fixture trimmed at non-frame-grid positions, portrait 1080p, source preservation, full-decode rejection, cancellation before publication, destination races, injected insufficient space, external source changes, progress parsing bounds, app-close protection, and editor-independent export lifecycle.
+
+The longer fixture exposed nominal encoder-timebase quantization; the fix preserves fine source timing in both edited renders and compatible previews. The jittered-VFR proxy test now includes timestamps outside a nominal frame grid. Publication tests assert no final-looking broken file and no job temporary file after normal cancellation/failure; a racing completed destination remains untouched.
+
+Remaining installed-Windows gates: real phone/camera codecs, hour-scale recordings, visual/audio synchronization, long/Unicode paths, actual disk-full/quota/unplug/write failures, close/restart behavior, installer playback on a machine without system FFmpeg, and measured speed/memory on a named reference PC. The synthetic 90-second fixture is not an hour-scale performance claim. HDR and waveform UI remain deferred. Sections below describe historical milestones; current behavior takes precedence.
+
 # Phase 6.3 checks (0.54.3)
 
 Added SQLite reopen/round-trip and stale-revision rejection, strict project validation, moved/changed-source verification, project-copy no-overwrite, serial autosave/retry/undo, close-guard, relink UI, and stale-preview tests. Real-engine fixtures decode rendered pixels to verify crop/rotation/flip and fit/fill, compare audio RMS for gain, check muted output, compare selected VFR frame timestamps within 1 ms, and verify original bytes stay unchanged.

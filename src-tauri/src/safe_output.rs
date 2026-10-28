@@ -51,6 +51,11 @@ impl StagedOutput {
         self.file.as_mut().expect("output is open until commit")
     }
 
+    /// Native encoders may write only this unique, already-owned staging file.
+    pub(crate) fn temporary_path(&self) -> &Path {
+        &self.temporary
+    }
+
     pub fn commit(mut self) -> Result<PathBuf, String> {
         self.file().sync_all().map_err(|e| e.to_string())?;
         self.file.take();

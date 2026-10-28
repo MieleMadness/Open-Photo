@@ -1,4 +1,4 @@
-> Development update: **0.54.3** adds saved single-video editing projects: persistent trims, crop/rotate/flip, audio gain/mute, canvas fit/fill, undo/redo, durable autosave, project copies, source relinking, and rendered edit previews. Originals remain unchanged. Video export is the next milestone. See [video projects](docs/VIDEO_PROJECTS.md) and the [Phase 6/7 roadmap](docs/VIDEO_ROADMAP.md).
+> Development update: **0.54.4** adds MP4 export for saved video projects, with progress, cancellation, source verification, full output decoding, and publication without overwriting existing files. Preview and export share the edit graph and precise source timing. Phase 6 still needs installed-app acceptance with real footage. See [video export](docs/VIDEO_EXPORT.md), [video projects](docs/VIDEO_PROJECTS.md), and the [Phase 6/7 roadmap](docs/VIDEO_ROADMAP.md).
 
 # Open-Photo
 
@@ -198,9 +198,9 @@ Safety behavior:
 - JPEG quality is ignored for PNG, WebP, BMP and TIFF exports.
 - Edited copies preserve the source file's modified timestamp by default. Turn **Preserve source modified date** off to use the export time instead.
 - Timestamp preservation applies only to the new copy and never changes the source file.
-- Export is currently limited to JPG/JPEG, PNG, WebP, BMP and TIFF.
+- Photo export is currently limited to JPG/JPEG, PNG, WebP, BMP and TIFF. Video projects have a separate MP4 export workflow.
 - The editor currently supports JPG/JPEG, PNG, WebP, TIFF, BMP and AVIF sources. Animated GIF editing is intentionally disabled so Open-Photo does not silently flatten an animation to a single frame.
-- HEIC/HEIF, RAW and video editing are intentionally excluded until dedicated decode/export handling is validated. NEF/ARW can now show their camera-embedded JPEG preview in the viewer, but editing still does not operate on RAW sensor data.
+- HEIC/HEIF and RAW editing remain excluded until dedicated decode/export handling is validated. Video editing uses the separate saved-project workflow. NEF/ARW can now show their camera-embedded JPEG preview in the viewer, but editing still does not operate on RAW sensor data.
 - Metadata preservation is not yet guaranteed for edited exports; treat an edited copy as a newly rendered image.
 
 ## XMP keyword sidecars

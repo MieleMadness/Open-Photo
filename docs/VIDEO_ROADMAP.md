@@ -1,6 +1,6 @@
 # Video editing roadmap
 
-Status: Phase 6 is in progress. Version 0.54.3 adds saved single-video projects, persistent trim/transform/audio/canvas settings, undo/redo/reset, durable autosave, recent drafts, project copies, verified relinking, and rendered edit previews. Export remains unimplemented. Packaged Windows acceptance with real footage and long/VFR sources remains required; preview/export agreement will be checked when export exists. See [VIDEO_PROJECTS.md](VIDEO_PROJECTS.md) and [VIDEO_ENGINE.md](VIDEO_ENGINE.md).
+Status: Phase 6 core single-source features are implemented through version 0.54.4: inspection, streaming/proxies, saved edits/projects, undo/redo/autosave/relink, and validated new-file MP4 export. Phase 6 remains in progress pending packaged-Windows acceptance with real footage, long recordings, drive/disk failures, and measured performance/hardware behavior. Generated tests cover preview/export timing, pixels, audio, and failure paths; they do not replace those acceptance checks. HDR tone mapping and waveforms are deferred. See [VIDEO_EXPORT.md](VIDEO_EXPORT.md), [VIDEO_PROJECTS.md](VIDEO_PROJECTS.md), and [VIDEO_ENGINE.md](VIDEO_ENGINE.md).
 
 ## Phase 6 — Single-source video editing
 

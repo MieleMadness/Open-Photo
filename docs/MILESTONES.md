@@ -1,6 +1,6 @@
 # Milestones and validation status
 
-## Current branch — 0.54.3
+## Current branch — 0.54.4
 
 The development branch contains a Windows Tauri photo library with workspaces, local indexing, previews, nondestructive photo-copy export, managed XMP keywords, maps, and opt-in local semantic/People/OCR features. Source-media originals remain read-only. CI success and installed-app acceptance are separate requirements.
 
@@ -21,7 +21,7 @@ Use a copied media library to verify packaged WebView2 playback, all EXIF orient
 
 ## Phase 6 — Single-video editing
 
-Phases 6.1/6.2 supply inspection, local streaming, playback controls, filmstrips, and compatible SDR previews. Version 0.54.3 adds versioned single-source projects, persistent edit settings, revision-checked autosave, recent drafts, undo/redo/reset, project-file copies, verified relinking, and rendered edit previews. Video export is not implemented. Packaged Windows acceptance with real media and hardware remains required. See [VIDEO_PROJECTS.md](VIDEO_PROJECTS.md), [VIDEO_ENGINE.md](VIDEO_ENGINE.md), and [VIDEO_ROADMAP.md](VIDEO_ROADMAP.md).
+Phases 6.1/6.2 supply inspection, local streaming, playback controls, filmstrips, and compatible SDR previews. Version 0.54.3 adds versioned single-source projects, persistent edit settings, revision-checked autosave, recent drafts, undo/redo/reset, project-file copies, verified relinking, and rendered edit previews. Version 0.54.4 adds staged, validated MP4 export with shared edit rendering, progress/cancel, source revalidation, full output decode, explicit audio policy, and no-overwrite publication. Packaged Windows acceptance with real media and hardware remains required. See [VIDEO_EXPORT.md](VIDEO_EXPORT.md), [VIDEO_PROJECTS.md](VIDEO_PROJECTS.md), [VIDEO_ENGINE.md](VIDEO_ENGINE.md), and [VIDEO_ROADMAP.md](VIDEO_ROADMAP.md).
 
 ## Phase 7 — Basic multi-video editing
 

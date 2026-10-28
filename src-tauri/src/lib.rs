@@ -19,11 +19,13 @@ mod similar;
 mod user_data;
 mod video_edit_preview;
 mod video_engine;
+mod video_export;
 #[cfg(test)]
 mod video_integration_tests;
 mod video_preview;
 mod video_probe;
 mod video_project;
+mod video_render;
 mod watch;
 mod xmp;
 use base64::Engine;
@@ -1062,6 +1064,7 @@ pub fn run() {
         .manage(media_jobs::ImageJobs::default())
         .manage(video_probe::InspectionJobs::default())
         .manage(video_preview::PreviewJobs::default())
+        .manage(video_export::ExportJobs::default())
         .invoke_handler(tauri::generate_handler![
             ai_embeddings::ai_embedding_status,
             ai_embeddings::ai_find_similar_by_photo,
@@ -1100,6 +1103,11 @@ pub fn run() {
             video_project::import_video_project,
             video_project::write_video_project_copy,
             video_project::relink_video_project,
+            video_export::start_video_export,
+            video_export::video_export_status,
+            video_export::cancel_video_export,
+            video_export::dismiss_video_export,
+            video_export::open_video_export,
             user_data::load_user_data,
             user_data::save_user_data,
             user_data::export_user_data,

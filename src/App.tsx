@@ -6,6 +6,7 @@ import {useManagedTags} from "./useManagedTags";
 import {readMetadataBatches} from "./metadataBatches";
 import {saveSetting,retrySettings} from "./userData";
 import PhotoMap, {type PhotoLocation} from "./PhotoMap";
+import {VideoExportPanel} from "./VideoExportPanel";
 import {ProjectSaveGuard} from "./ProjectSaveGuard";
 import { IPhonePicture, IPhoneMotion } from "./IPhoneMedia";
 import { Images, FolderOpen, Users, Tags, Settings2, Search, Moon, Sun, Monitor, ShieldCheck, ImageOff, HardDrive, ListFilter, ChevronRight, X, LayoutGrid, List, ZoomIn, ZoomOut, ArrowUpDown } from "lucide-react";
@@ -833,7 +834,7 @@ export default function App() {
   };
   const bytes = result?.photos.reduce((n, p) => n + p.bytes, 0) || 0;
   const title = NAV.find(x => x.id === view)?.title || "Library";
-  return <div className="app-shell"><ProjectSaveGuard/>
+  return <div className="app-shell"><ProjectSaveGuard/><VideoExportPanel/>
     {storageError&&<div role="alert" className="storage-error">Changes could not be saved: {storageError} <button onClick={()=>void retrySettings().then(()=>setStorageError("")).catch(e=>setStorageError(String(e)))}>Retry saving</button></div>}
 
     <aside className="sidebar">

@@ -67,6 +67,9 @@ impl Default for PreviewJobs {
     }
 }
 impl PreviewJobs {
+    pub(crate) fn processing_gate(&self) -> Arc<tokio::sync::Semaphore> {
+        self.gate.clone()
+    }
     fn replace(&self, job: Arc<Job>) -> Result<(), String> {
         if let Some(previous) = self.current.lock().map_err(|e| e.to_string())?.replace(job) {
             previous.cancel.store(true, Ordering::SeqCst);
@@ -203,7 +206,7 @@ pub(crate) fn build_assets(
         if let Some(audio) = info.audio.first() {
             args.extend(["-map".into(), format!("0:{}", audio.stream).into()]);
         }
-        args.extend(["-vf", "scale=w='min(960,iw*sar)':h='min(540,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1", "-fps_mode", "vfr", "-c:v", "libopenh264", "-b:v", "2000k", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-map_metadata", "-1", "-movflags", "+faststart", "-fs", "536870912"].into_iter().map(Into::into));
+        args.extend(["-vf", "scale=w='min(960,iw*sar)':h='min(540,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1", "-fps_mode", "vfr", "-enc_time_base:v", info.time_base.as_deref().unwrap_or("1/1000000"), "-c:v", "libopenh264", "-b:v", "2000k", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-map_metadata", "-1", "-movflags", "+faststart", "-movie_timescale", "90000", "-fs", "536870912"].into_iter().map(Into::into));
         args.push(destination.clone().into());
         call(engine, args, Duration::from_secs(1800), &cancel)?;
         let output = video_probe::probe(engine, &destination, &cancel)?;

@@ -122,6 +122,84 @@ pub(crate) fn run_until(
     timeout: Duration,
     cancel: impl Fn() -> bool,
 ) -> Result<Vec<u8>, String> {
+    run_reader(executable, args, timeout, cancel, |reader, overflow| {
+        collect(reader, 4 * 1024 * 1024, overflow)
+    })
+}
+
+#[derive(Clone, Copy, Default)]
+pub(crate) struct Progress {
+    pub seconds: f64,
+    pub bytes: u64,
+}
+
+fn progress_reader(
+    reader: impl Read,
+    overflow: Arc<AtomicBool>,
+    progress: impl Fn(Progress),
+) -> Result<Vec<u8>, String> {
+    use std::io::BufRead;
+    let mut reader = std::io::BufReader::new(reader);
+    let mut state = Progress::default();
+    loop {
+        let mut line = vec![];
+        let n = Read::by_ref(&mut reader)
+            .take(4097)
+            .read_until(b'\n', &mut line)
+            .map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        if n > 4096 {
+            overflow.store(true, Ordering::Release);
+            break;
+        }
+        let text = String::from_utf8_lossy(&line);
+        let Some((key, value)) = text.trim().split_once('=') else {
+            continue;
+        };
+        match key {
+            "out_time_us" => {
+                if let Ok(micros) = value.parse::<i64>() {
+                    state.seconds = (micros as f64 / 1_000_000.0).max(0.0);
+                }
+            }
+            "total_size" => {
+                if let Ok(bytes) = value.parse() {
+                    state.bytes = bytes;
+                }
+            }
+            "progress" => progress(state),
+            _ => {}
+        }
+    }
+    Ok(vec![])
+}
+pub(crate) fn run_progress(
+    executable: &Path,
+    args: &[&std::ffi::OsStr],
+    timeout: Duration,
+    cancel: impl Fn() -> bool,
+    progress: impl Fn(Progress) + Send + 'static,
+) -> Result<(), String> {
+    run_reader(
+        executable,
+        args,
+        timeout,
+        cancel,
+        move |reader, overflow| progress_reader(reader, overflow, progress),
+    )
+    .map(|_| ())
+}
+fn run_reader(
+    executable: &Path,
+    args: &[&std::ffi::OsStr],
+    timeout: Duration,
+    cancel: impl Fn() -> bool,
+    reader: impl FnOnce(std::process::ChildStdout, Arc<AtomicBool>) -> Result<Vec<u8>, String>
+        + Send
+        + 'static,
+) -> Result<Vec<u8>, String> {
     let mut command = Command::new(executable);
     command
         .args(args)
@@ -149,7 +227,7 @@ pub(crate) fn run_until(
     let out = child.stdout.take().ok_or("Video tool stdout unavailable")?;
     let err = child.stderr.take().ok_or("Video tool stderr unavailable")?;
     let flag = overflow.clone();
-    let stdout = thread::spawn(move || collect(out, 4 * 1024 * 1024, flag));
+    let stdout = thread::spawn(move || reader(out, flag));
     let flag = overflow.clone();
     let stderr = thread::spawn(move || collect(err, 64 * 1024, flag));
     let started = Instant::now();
@@ -158,11 +236,11 @@ pub(crate) fn run_until(
         if cancel() || overflow.load(Ordering::Acquire) || started.elapsed() > timeout {
             failure = Some(
                 if cancel() {
-                    "Video inspection superseded"
+                    "Video processing cancelled or superseded"
                 } else if overflow.load(Ordering::Acquire) {
                     "Video tool output exceeded its safety limit"
                 } else {
-                    "Video inspection timed out"
+                    "Video processing timed out"
                 }
                 .to_string(),
             );
@@ -191,7 +269,7 @@ pub(crate) fn run_until(
     }
     if !status.map_err(|e| e.to_string())?.success() {
         return Err(format!(
-            "Cannot inspect this video: {}",
+            "Video processing failed: {}",
             String::from_utf8_lossy(&diagnostics).trim()
         ));
     }
@@ -268,6 +346,18 @@ mod tests {
         let flag = Arc::new(AtomicBool::new(false));
         let result = collect(&b"0123456789"[..], 4, flag.clone()).unwrap();
         assert_eq!(result, b"0123");
+        assert!(flag.load(Ordering::Acquire));
+    }
+    #[test]
+    fn progress_stream_reports_time_without_retaining_logs_and_bounds_each_line() {
+        let values = Arc::new(std::sync::Mutex::new(vec![]));
+        let copy = values.clone();
+        let flag = Arc::new(AtomicBool::new(false));
+        let output=progress_reader(&b"out_time_us=1500000\ntotal_size=2048\nprogress=continue\nout_time_us=2500000\nprogress=end\n"[..],flag.clone(),move|p|copy.lock().unwrap().push((p.seconds,p.bytes))).unwrap();
+        assert!(output.is_empty());
+        assert_eq!(*values.lock().unwrap(), vec![(1.5, 2048), (2.5, 2048)]);
+        assert!(!flag.load(Ordering::Acquire));
+        progress_reader(&vec![b'x'; 100_000][..], flag.clone(), |_| {}).unwrap();
         assert!(flag.load(Ordering::Acquire));
     }
 }

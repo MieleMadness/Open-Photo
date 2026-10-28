@@ -1,7 +1,8 @@
 import {act,cleanup,fireEvent,render,screen,waitFor} from "@testing-library/react";
 import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {invoke} from "@tauri-apps/api/core";
-import {open} from "@tauri-apps/plugin-dialog";
+import {open,save} from "@tauri-apps/plugin-dialog";
+import {refreshVideoExport} from "./videoExport";
 import {VideoWorkspace} from "./VideoWorkspace";
 import {defaultEdits,discardProjectSaves,type LoadedProject} from "./videoProject";
 vi.mock("@tauri-apps/api/core",()=>({invoke:vi.fn(),convertFileSrc:(p:string)=>`asset:${p}`}));
@@ -14,7 +15,7 @@ beforeEach(()=>{vi.mocked(invoke).mockImplementation(async(command,args)=>{
   if(command==="create_video_project"||command==="load_video_project"||command==="relink_video_project")return value();
   if(command==="save_video_project")return (args as {expectedRevision:number}).expectedRevision+1;
 });});
-afterEach(()=>{cleanup();discardProjectSaves();vi.resetAllMocks();});
+afterEach(async()=>{cleanup();discardProjectSaves();vi.mocked(invoke).mockResolvedValue(null);await refreshVideoExport();vi.resetAllMocks();});
 it("autosaves a transform, supports durable undo/redo, and reopens a recent draft",async()=>{
   render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);
   fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
@@ -65,4 +66,34 @@ it("renders the latest saved edit when controls change while preview waits for a
   fireEvent.change(screen.getByLabelText("Video rotation"),{target:{value:"1"}});fireEvent.click(screen.getByText("Preview edits"));
   fireEvent.change(screen.getByLabelText("Video rotation"),{target:{value:"2"}});await act(async()=>finish(2));
   await waitFor(()=>expect(invoke).toHaveBeenCalledWith("start_video_project_preview",expect.objectContaining({project:expect.objectContaining({clips:[expect.objectContaining({edits:expect.objectContaining({quarter_turns:2})})]})})));
+});
+it("exports an immutable saved snapshot and leaves the native job running after editor closure",async()=>{
+  let snapshot:unknown;
+  vi.mocked(save).mockResolvedValue("/output/new.mp4");
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{
+    if(command==="recent_video_projects")return [];
+    if(command==="inspect_video")return info;
+    if(command==="create_video_project")return value();
+    if(command==="save_video_project")return (args as {expectedRevision:number}).expectedRevision+1;
+    if(command==="start_video_export"){snapshot=structuredClone(args);return "export-job";}
+    if(command==="video_export_status")return {id:"export-job",active:true,stage:"encoding"};
+  });
+  const view=render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
+  fireEvent.change(screen.getByLabelText("Video rotation"),{target:{value:"1"}});fireEvent.click(screen.getByText("Export video MP4…"));
+  await waitFor(()=>expect(invoke).toHaveBeenCalledWith("start_video_export",expect.objectContaining({options:{destination:"/output/new.mp4",size:"project",acknowledge_first_audio:false}})));
+  fireEvent.change(screen.getByLabelText("Video rotation"),{target:{value:"2"}});expect(snapshot).toEqual(expect.objectContaining({project:expect.objectContaining({clips:[expect.objectContaining({edits:expect.objectContaining({quarter_turns:1})})]})}));
+  view.unmount();expect(vi.mocked(invoke).mock.calls.some(([command])=>command==="cancel_video_export")).toBe(false);
+});
+it("does not start an export if the editor closes while its save dialog is pending",async()=>{
+  let finish:(path:string)=>void=()=>{};vi.mocked(save).mockImplementation(()=>new Promise(resolve=>{finish=resolve}));
+  const view=render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");fireEvent.click(screen.getByText("Export video MP4…"));
+  await waitFor(()=>expect(save).toHaveBeenCalled());view.unmount();await act(async()=>finish("/output/late.mp4"));expect(vi.mocked(invoke).mock.calls.some(([command])=>command==="start_video_export")).toBe(false);
+});
+it("requires an explicit first-track choice for multiple audio tracks unless audio is muted",async()=>{
+  const multi=value();multi.project.asset.info.audio=[1,2].map(stream=>({stream,codec:"aac",sample_rate:"48000",channels:2,channel_layout:"stereo"}));
+  vi.mocked(invoke).mockImplementation(async(command)=>{if(command==="recent_video_projects")return [];if(command==="inspect_video")return multi.project.asset.info;if(command==="create_video_project")return multi;if(command==="save_video_project")return 2;});
+  render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
+  await waitFor(()=>expect((screen.getByText("New project from selected video") as HTMLButtonElement).disabled).toBe(false));
+  const button=screen.getByText("Export video MP4…") as HTMLButtonElement;expect(button.disabled).toBe(true);fireEvent.click(screen.getByLabelText("Confirm first audio track only"));expect(button.disabled).toBe(false);
+  fireEvent.click(screen.getByLabelText("Confirm first audio track only"));expect(button.disabled).toBe(true);fireEvent.click(screen.getByLabelText("Mute video audio"));expect(button.disabled).toBe(false);
 });

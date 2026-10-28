@@ -1,6 +1,6 @@
-# Local video engine (Phase 6.1–6.2)
+# Local video engine (Phase 6.1–6.4)
 
-Open-Photo 0.54.3 bundles FFmpeg and ffprobe for read-only video inspection on Windows x64. No system-wide FFmpeg installation or runtime download is required. Existing playback and the Windows player fallback remain available.
+Open-Photo 0.54.4 bundles FFmpeg and ffprobe for video inspection, playback derivatives, and saved-edit export on Windows x64. No system-wide FFmpeg installation or runtime download is required. Existing playback and the Windows player fallback remain available.
 
 ## Reproducible preparation
 
@@ -35,7 +35,7 @@ The frontend checks cover displayed properties, stale inspection responses, and 
 
 ## Playback derivatives (0.54.2)
 
-The player streams the original immediately. Filmstrip generation is separate, so a failed filmstrip does not prevent playback. Six small JPEG samples support approximate seeking. Keyboard controls apply while the player is focused; in/out markers are temporary preview selections stored as integer source ticks (microseconds when no usable time base is reported). The browser's current time and seek behavior are approximate. Saved trim projects and frame-accurate export are separate milestones.
+The player streams the original immediately. Filmstrip generation is separate, so a failed filmstrip does not prevent playback. Six small JPEG samples support approximate seeking. Keyboard controls apply while the player is focused; in/out markers are temporary preview selections stored as integer source ticks (microseconds when no usable time base is reported). The browser's current time and seek behavior are approximate. Saved project markers are persistent; markers outside a project remain temporary. Export consumes the saved source ticks, with browser seek/selection accuracy still subject to installed-app acceptance.
 
 Choose **Create compatible preview** if original playback fails or is slow. One serialized job makes an SDR H.264/AAC MP4 with square pixels, applied orientation, and a maximum 960 by 540 display size without unnecessary upscaling. It retains variable frame timestamps and relative stream offsets, validates duration (150 ms tolerance), rotation and size, and plays the first audio stream as stereo. Extra audio streams are explicitly disclosed. Source metadata remains authoritative for preview marks. This is a playback derivative, not a user export.
 
@@ -47,6 +47,10 @@ Jobs have server-generated IDs, cancel obsolete work, and ignore stale status re
 
 See [VIDEO_PROJECTS.md](VIDEO_PROJECTS.md) for durable projects and editor behavior. Project previews share the single-job scheduler with ordinary compatible previews. They validate project/source identity, render the saved trim/crop/rotation/flip/audio/canvas graph, validate the result, and recheck source fingerprints. The original player is released while an edited preview is active, so an old playback lease cannot keep using a deleted proxy. Editing invalidates and cancels stale previews. HDR rendering remains rejected.
 
-## Not yet implemented
+## Export (0.54.4)
 
-Video export, tested HDR tone mapping, waveforms, and real-footage performance/hardware acceptance remain Phase 6 work. Project files save edit instructions and reference their sources; they do not contain an exported video. The shared edit graph is ready for export integration, but preview/export equivalence is not claimed until export is implemented and tested.
+[VIDEO_EXPORT.md](VIDEO_EXPORT.md) describes the supported preset, process limits, audio policy, validation, cancellation/publication boundary, and remaining acceptance. Edited preview and export use the same edit graph and encoder stream mapping. All compatible/video edit renders now carry source encoder time bases rather than quantizing VFR trims to nominal frame ticks; MP4 movie timing uses a 90 kHz clock. Optional audio/format-start metadata enriches existing schema-1 project documents without requiring a schema migration.
+
+## Remaining work
+
+Tested HDR tone mapping, waveforms, and real-footage performance/hardware acceptance remain. Single-video export is implemented for the SDR preset; phase completion still requires the roadmap's real installed-app gates. Project JSON files remain instructions/source references and are distinct from exported MP4s.
