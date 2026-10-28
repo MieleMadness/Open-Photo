@@ -1,4 +1,4 @@
-> Development update: **0.54.8** adds direct timestamp navigation for long videos and repeatable beginning/middle/end export checks for hour-scale recordings. UHD/source-resolution export remains available. Installed-app playback and complete long-export/perceptual synchronization acceptance remain open. See [video acceptance](docs/VIDEO_ACCEPTANCE.md), [video export](docs/VIDEO_EXPORT.md), and the [roadmap](docs/VIDEO_ROADMAP.md).
+> Development update: **0.54.9** adds Previous saves for video projects. Browse up to 20 earlier autosaves, open one as a separate recovered draft, and return to the previous draft. Recovery preserves the current source relink and checks for conflicting edits. UHD export and long-video timestamp navigation remain available. See [video projects](docs/VIDEO_PROJECTS.md), [acceptance](docs/VIDEO_ACCEPTANCE.md), and the [roadmap](docs/VIDEO_ROADMAP.md).
 
 # Open-Photo
 

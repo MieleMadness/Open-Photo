@@ -114,3 +114,48 @@ it("autosaves 4K and source-resolution canvas choices without changing the sourc
   await waitFor(()=>expect(invoke).toHaveBeenCalledWith("save_video_project",expect.objectContaining({project:expect.objectContaining({output:{width:3840,height:1080,fit:"fit"}})})));
   expect(loaded.project.asset.info.width).toBe(3840);expect(loaded.project.output.width).toBe(1920);
 });
+
+const previousEntry={id:"42",revision:2,saved_at:null,title:"Earlier edit",start_seconds:1,end_seconds:5,width:1920,height:1080};
+it("opens a previous save as a separate recovered draft",async()=>{
+  const fallback=vi.mocked(invoke).getMockImplementation()!;const current=value();current.revision=3;
+  const recovered=value();recovered.project.id="recovered-p";recovered.project.title="Earlier edit (recovered)";
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{
+    if(command==="create_video_project"||command==="load_video_project")return current;
+    if(command==="video_project_history")return {revision:3,entries:[previousEntry]};
+    if(command==="recover_video_project")return recovered;
+    return fallback(command,args);
+  });
+  render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);
+  fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
+  fireEvent.click(screen.getByText("Previous saves"));await screen.findByLabelText("Previous video save");expect(screen.getByText(/Save time unavailable/)).toBeTruthy();
+  fireEvent.click(screen.getByText("Open previous save as new draft"));await screen.findByDisplayValue("Earlier edit (recovered)");
+  expect(invoke).toHaveBeenCalledWith("recover_video_project",{root:"library",id:"p",historyId:"42",expectedRevision:3});
+  expect(current.project.id).toBe("p");expect(current.project.title).toBe("My edit");expect(screen.getByText(/Opened a recovered draft/)).toBeTruthy();expect(screen.queryByLabelText("Previous video save")).toBeNull();
+  fireEvent.click(screen.getByText("Return to previous draft"));await screen.findByDisplayValue("My edit");
+  expect(invoke).toHaveBeenCalledWith("load_video_project",{root:"library",id:"p"});
+});
+it("requires history refresh after a newer local autosave",async()=>{
+  const fallback=vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async(command,args)=>command==="video_project_history"?{revision:1,entries:[previousEntry]}:fallback(command,args));
+  render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);
+  fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
+  fireEvent.click(screen.getByText("Previous saves"));await screen.findByLabelText("Previous video save");
+  fireEvent.change(screen.getByLabelText("Video rotation"),{target:{value:"1"}});await screen.findByText("All project changes saved locally.");
+  fireEvent.click(screen.getByText("Open previous save as new draft"));await screen.findByText(/Project changed. Refresh previous saves/);
+  expect(vi.mocked(invoke).mock.calls.some(([command])=>command==="recover_video_project")).toBe(false);
+  expect((screen.getByLabelText("Video rotation") as HTMLSelectElement).value).toBe("1");
+});
+it("keeps the current draft when recovery fails and handles empty history",async()=>{
+  const fallback=vi.mocked(invoke).getMockImplementation()!;let empty=true;
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{
+    if(command==="video_project_history")return {revision:1,entries:empty?[]:[previousEntry]};
+    if(command==="recover_video_project")throw Error("Project changed elsewhere. Refresh previous saves before recovering.");
+    return fallback(command,args);
+  });
+  render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);
+  fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
+  fireEvent.click(screen.getByText("Previous saves"));await screen.findByText("No previous saves are available yet.");expect(screen.queryByText("Open previous save as new draft")).toBeNull();
+  empty=false;fireEvent.click(screen.getByText("Refresh previous saves"));await screen.findByLabelText("Previous video save");
+  fireEvent.click(screen.getByText("Open previous save as new draft"));await screen.findByText(/Project changed elsewhere/);
+  expect(screen.getByDisplayValue("My edit")).toBeTruthy();expect(screen.queryByText(/Opened a recovered draft/)).toBeNull();
+});

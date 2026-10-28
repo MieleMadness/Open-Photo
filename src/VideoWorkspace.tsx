@@ -7,6 +7,8 @@ import {clockTime,markSeconds,markTime} from "./videoTime";
 import {exportFilename,startVideoExport,useVideoExport,type ExportSize} from "./videoExport";
 
 const CANVASES=[{value:"1920x1080",label:"1080p landscape (1920 × 1080)"},{value:"1080x1920",label:"1080p portrait (1080 × 1920)"},{value:"1080x1080",label:"Square (1080 × 1080)"},{value:"3840x2160",label:"4K landscape (3840 × 2160)"},{value:"2160x3840",label:"4K portrait (2160 × 3840)"}];
+type PreviousSave={id:string;revision:number|null;saved_at:number|null;title:string;start_seconds:number;end_seconds:number;width:number;height:number};
+type SavedHistory={revision:number;entries:PreviousSave[]};
 function NumberField({label,value,min,max,step=1,onCommit}:{label:string;value:number;min:number;max:number;step?:number;onCommit:(value:number)=>void}){
   const [draft,setDraft]=useState(String(value));
   useEffect(()=>setDraft(String(value)),[value]);
@@ -18,8 +20,12 @@ export function VideoWorkspace({root,path,onOpenExternal}:{root:string;path:stri
   const [loaded,setLoaded]=useState<LoadedProject|null>(null);
   const [recent,setRecent]=useState<{id:string;title:string}[]>([]);
   const [busy,setBusy]=useState(false);
+  const [recovering,setRecovering]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
+  const [previousSaves,setPreviousSaves]=useState<SavedHistory|null>(null);
+  const [previousId,setPreviousId]=useState("");
+  const [previousDraft,setPreviousDraft]=useState<{id:string;title:string}|null>(null);
   const [,refresh]=useState(0);
   const alive=useRef(true);
   const [previewSrc,setPreviewSrc]=useState("");
@@ -39,18 +45,35 @@ export function VideoWorkspace({root,path,onOpenExternal}:{root:string;path:stri
   useEffect(()=>session?.subscribe(()=>{if(alive.current)refresh(v=>v+1);}),[session]);
   const stopPreview=useCallback(()=>{cancelPreview.current();setPreviewSrc("");setPreviewBusy(false);setPreviewWarnings([]);},[]);
   useEffect(()=>{stopPreview();},[project,stopPreview]);
-  async function action(task:()=>Promise<void>){setBusy(true);setError("");setMessage("");try{await task();}catch(cause){if(alive.current)setError(String(cause));}finally{if(alive.current)setBusy(false);}}
+  async function action(task:()=>Promise<void>,lockEdits=false){setBusy(true);if(lockEdits)setRecovering(true);setError("");setMessage("");try{await task();}catch(cause){if(alive.current)setError(String(cause));}finally{if(alive.current){setBusy(false);if(lockEdits)setRecovering(false);}}}
   function adopt(value:LoadedProject){
     if(!alive.current)return;
+    setPreviousSaves(null);setPreviousId("");setPreviousDraft(null);
     sessionRef.current?.release();const next=new ProjectSession(root,value);sessionRef.current=next;setSession(next);setLoaded(value);stopPreview();updateRecent();
   }
   async function flush(){await sessionRef.current?.flush();}
   function change(mutator:(copy:VideoProject)=>void){
     if(!session)return;
+    if(recovering){setError("Wait for project recovery to finish.");return;}
     try{const next=structuredClone(session.history.present);mutator(next);session.commit(next);setError("");}catch(cause){setError(String(cause));}
   }
   function edits(mutator:(edit:Edits)=>void){change(p=>mutator(p.clips[0].edits));}
   function history(command:"undo"|"redo"){try{session?.commit(command);}catch(cause){setError(String(cause));}}
+  async function loadPreviousSaves(){
+    const owner=sessionRef.current;if(!owner)return;await owner.flush();
+    const result=await invoke<SavedHistory>("video_project_history",{root,id:owner.history.present.id});
+    if(!alive.current||owner!==sessionRef.current)return;
+    setPreviousSaves(result);setPreviousId(result.entries[0]?.id||"");
+  }
+  async function recoverPreviousSave(){
+    const owner=sessionRef.current;if(!owner||!previousSaves||!previousId)return;
+    await owner.flush();if(!alive.current||owner!==sessionRef.current)return;
+    if(owner.revision!==previousSaves.revision)throw Error("Project changed. Refresh previous saves before opening one.");
+    const recovered=await invoke<LoadedProject>("recover_video_project",{root,id:owner.history.present.id,historyId:previousId,expectedRevision:owner.revision});
+    if(!alive.current||owner!==sessionRef.current)return;
+    const origin={id:owner.history.present.id,title:owner.history.present.title};
+    adopt(recovered);setPreviousDraft(origin);setMessage("Opened a recovered draft. Your previous draft was kept unchanged.");
+  }
   async function preview(){
     if(!project||!loaded?.source_path)return;
     const owner=sessionRef.current;await owner?.flush();
@@ -99,8 +122,9 @@ export function VideoWorkspace({root,path,onOpenExternal}:{root:string;path:stri
       </div>
       {!!recent.length&&<label>Recent projects<select aria-label="Recent video projects" value="" disabled={busy} onChange={event=>{const id=event.target.value;if(id)void action(async()=>{await flush();adopt(await invoke<LoadedProject>("load_video_project",{root,id}));});}}><option value="">Choose a saved draft…</option>{recent.map(item=><option key={item.id} value={item.id}>{item.title}</option>)}</select></label>}
       {busy&&<p role="status">Verifying project and source…</p>}
-      {project&&c&&e&&<>
+      {project&&c&&e&&<fieldset disabled={recovering} aria-label="Video project editor" style={{border:0,padding:0,margin:0,minWidth:0}}>
         <label>Project name<input aria-label="Video project name" value={project.title} maxLength={200} onChange={event=>change(p=>{p.title=event.target.value;})}/></label>
+        {previousDraft&&<p>Recovered from {previousDraft.title}. <button className="secondary-button" disabled={busy} onClick={()=>void action(async()=>{await flush();adopt(await invoke<LoadedProject>("load_video_project",{root,id:previousDraft.id}));})}>Return to previous draft</button></p>}
         <p className="results-note" role="status">{session.status==="saved"?"All project changes saved locally.":session.status==="saving"?"Saving project changes…":"Project changes have not been saved."}</p>
         {session.error&&<div role="alert">{session.error}<button className="secondary-button" onClick={()=>session.retry()}>Retry project save</button>
           <button className="secondary-button" onClick={()=>void action(async()=>{const value=await invoke<LoadedProject>("load_video_project",{root,id:project.id});session.discard();adopt(value);})}>Discard unsaved changes and reload draft</button>
@@ -108,11 +132,21 @@ export function VideoWorkspace({root,path,onOpenExternal}:{root:string;path:stri
         </div>}
         {!loaded?.source_path&&<p role="alert">Source needs relinking: {loaded?.source_status}</p>}
         <div className="video-transport">
+          <button className="secondary-button" disabled={busy} onClick={()=>void action(loadPreviousSaves)}>Previous saves</button>
           <button className="secondary-button" disabled={!session.history.past.length||busy} onClick={()=>history("undo")}>Undo video edit</button>
           <button className="secondary-button" disabled={!session.history.future.length||busy} onClick={()=>history("redo")}>Redo video edit</button>
           <button className="secondary-button" disabled={busy} onClick={()=>change(p=>{p.clips[0].edits=defaultEdits();p.output=defaultOutput(p.asset.info);p.clips[0].source_in=markTime(0,p.asset.info.time_base);p.clips[0].source_out=markTime(p.asset.info.duration_seconds,p.asset.info.time_base);})}>Reset video edits</button>
           <button className="secondary-button" disabled={busy||previewBusy||!loaded?.source_path||!!project.asset.info.hdr} onClick={()=>void action(preview)}>Preview edits</button>
         </div>
+        {previousSaves&&<section aria-label="Previous video saves">
+          <p>Earlier saves are kept automatically, up to 20 per draft. Opening one creates a separate recovered draft.</p>
+          {!previousSaves.entries.length?<p>No previous saves are available yet.</p>:<>
+            <label>Previous save<select aria-label="Previous video save" style={{maxWidth:"100%"}} value={previousId} onChange={event=>setPreviousId(event.target.value)}>{previousSaves.entries.map(entry=><option key={entry.id} value={entry.id}>{entry.revision===null?"Earlier save":`Save ${entry.revision}`} · {entry.title}</option>)}</select></label>
+            {previousSaves.entries.filter(entry=>entry.id===previousId).map(entry=><p key={entry.id}>{entry.saved_at===null?"Save time unavailable":new Date(entry.saved_at*1000).toLocaleString()} · {clockTime(entry.start_seconds)} to {clockTime(entry.end_seconds)} · {entry.width} × {entry.height}</p>)}
+            <button className="secondary-button" disabled={busy||!previousId} onClick={()=>void action(recoverPreviousSave,true)}>Open previous save as new draft</button>
+          </>}
+          <button className="secondary-button" disabled={busy} onClick={()=>void action(loadPreviousSaves)}>Refresh previous saves</button>
+        </section>}
         <div className="video-edit-fields">
           <NumberField label="Trim start (seconds)" value={markSeconds(c.source_in)} min={0} max={project.asset.info.duration_seconds} step={0.001} onCommit={value=>change(p=>{p.clips[0].source_in=markTime(value,p.asset.info.time_base);})}/>
           <NumberField label="Trim end (seconds)" value={markSeconds(c.source_out)} min={0} max={project.asset.info.duration_seconds} step={0.001} onCommit={value=>change(p=>{p.clips[0].source_out=markTime(value,p.asset.info.time_base);})}/>
@@ -142,7 +176,7 @@ export function VideoWorkspace({root,path,onOpenExternal}:{root:string;path:stri
           {exportStatus?.active&&<small>An export is already running. Progress and cancellation are available in the export panel.</small>}
         </fieldset>
         <small>Edits autosave locally and leave the original unchanged. Open a recent draft to resume after restart. Project files reference video relative to the selected library; relink moved originals using the same file contents. Export writes a separate validated video.</small>
-      </>}
+      </fieldset>}
       {error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
     </section>
   </div>;

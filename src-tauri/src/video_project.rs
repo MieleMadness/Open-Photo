@@ -1,6 +1,6 @@
 //! Versioned single-source projects. SQLite drafts are independent of source files and caches.
 use crate::video_probe::{self, VideoInfo};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -324,7 +324,41 @@ pub(crate) fn new_project(root: &str, file: &Path, info: VideoInfo) -> Result<Pr
 fn initialize(db: &Connection) -> Result<(), String> {
     db.busy_timeout(std::time::Duration::from_secs(5))
         .map_err(|e| e.to_string())?;
-    db.execute_batch("PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY,root TEXT NOT NULL,title TEXT NOT NULL,revision INTEGER NOT NULL,data TEXT NOT NULL,updated INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS project_history(id INTEGER PRIMARY KEY,project_id TEXT NOT NULL,data TEXT NOT NULL); CREATE TRIGGER IF NOT EXISTS project_backup BEFORE UPDATE ON projects BEGIN INSERT INTO project_history(project_id,data) VALUES(old.id,old.data); DELETE FROM project_history WHERE project_id=old.id AND id NOT IN (SELECT id FROM project_history WHERE project_id=old.id ORDER BY id DESC LIMIT 20); END;").map_err(|e|e.to_string())
+    db.execute_batch("PRAGMA synchronous=FULL;")
+        .map_err(|e| e.to_string())?;
+    let tx = Transaction::new_unchecked(db, TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    let version: u32 = tx
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    if version > 1 {
+        return Err("Project storage was created by a newer app version".into());
+    }
+    if version == 0 {
+        tx.execute_batch("CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY,root TEXT NOT NULL,title TEXT NOT NULL,revision INTEGER NOT NULL,data TEXT NOT NULL,updated INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS project_history(id INTEGER PRIMARY KEY,project_id TEXT NOT NULL,data TEXT NOT NULL,revision INTEGER,saved_at INTEGER);").map_err(|e|e.to_string())?;
+        let columns = {
+            let mut q = tx
+                .prepare("PRAGMA table_info(project_history)")
+                .map_err(|e| e.to_string())?;
+            let rows = q
+                .query_map([], |row| row.get::<_, String>(1))
+                .map_err(|e| e.to_string())?;
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(|e| e.to_string())?
+        };
+        for column in ["revision", "saved_at"] {
+            if !columns.iter().any(|c| c == column) {
+                tx.execute_batch(&format!(
+                    "ALTER TABLE project_history ADD COLUMN {column} INTEGER;"
+                ))
+                .map_err(|e| e.to_string())?;
+            }
+        }
+        tx.execute_batch("DROP TRIGGER IF EXISTS project_backup; CREATE TRIGGER project_backup BEFORE UPDATE ON projects BEGIN INSERT INTO project_history(project_id,data,revision,saved_at) VALUES(old.id,old.data,old.revision,old.updated); DELETE FROM project_history WHERE project_id=old.id AND id NOT IN (SELECT id FROM project_history WHERE project_id=old.id ORDER BY id DESC LIMIT 20); END;").map_err(|e|e.to_string())?;
+        tx.pragma_update(None, "user_version", 1)
+            .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())
 }
 fn database() -> Result<Connection, String> {
     let dir = dirs::data_local_dir()
@@ -389,6 +423,129 @@ fn loaded(root: &str, p: Project, revision: u64) -> LoadedProject {
             source_status: error,
         },
     }
+}
+#[derive(Serialize)]
+pub struct PreviousSave {
+    id: String,
+    revision: Option<u64>,
+    saved_at: Option<u64>,
+    title: String,
+    start_seconds: f64,
+    end_seconds: f64,
+    width: u32,
+    height: u32,
+}
+#[derive(Serialize)]
+pub struct ProjectHistory {
+    revision: u64,
+    entries: Vec<PreviousSave>,
+}
+fn previous_saves(db: &Connection, root: &str, id: &str) -> Result<ProjectHistory, String> {
+    let (_, revision) = read(db, root, id)?;
+    let mut q=db.prepare("SELECT id,revision,saved_at,CASE WHEN length(CAST(data AS BLOB))<=?2 THEN data END FROM project_history WHERE project_id=?1 ORDER BY id DESC LIMIT 20").map_err(|e|e.to_string())?;
+    let rows = q
+        .query_map(params![id, MAX_DOCUMENT], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, Option<u64>>(1)?,
+                r.get::<_, Option<u64>>(2)?,
+                r.get::<_, Option<String>>(3)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+    let mut entries = vec![];
+    for row in rows {
+        let (key, revision, saved_at, data) = row.map_err(|e| e.to_string())?;
+        let p: Project =
+            serde_json::from_str(&data.ok_or("Previous project document is too large")?)
+                .map_err(|e| e.to_string())?;
+        validate(&p)?;
+        if p.id != id {
+            return Err("Previous save belongs to a different project".into());
+        }
+        entries.push(PreviousSave {
+            id: key.to_string(),
+            revision,
+            saved_at,
+            title: p.title,
+            start_seconds: p.clips[0].source_in.seconds()?,
+            end_seconds: p.clips[0].source_out.seconds()?,
+            width: p.output.width,
+            height: p.output.height,
+        });
+    }
+    Ok(ProjectHistory { revision, entries })
+}
+fn recover_save(
+    db: &Connection,
+    root: &str,
+    id: &str,
+    history_id: &str,
+    expected_revision: u64,
+) -> Result<(Project, u64), String> {
+    let key = history_id
+        .parse::<i64>()
+        .ok()
+        .filter(|n| *n > 0)
+        .ok_or("Invalid previous save")?;
+    let tx = Transaction::new_unchecked(db, TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    let (current, revision) = read(&tx, root, id)?;
+    if revision != expected_revision {
+        return Err("Project changed elsewhere. Refresh previous saves before recovering.".into());
+    }
+    let data:Option<Option<String>>=tx.query_row("SELECT CASE WHEN length(CAST(data AS BLOB))<=?3 THEN data END FROM project_history WHERE id=?1 AND project_id=?2",params![key,id,MAX_DOCUMENT],|r|r.get(0)).optional().map_err(|e|e.to_string())?;
+    let mut previous: Project = serde_json::from_str(
+        &data
+            .ok_or("Previous save is no longer available; refresh the list")?
+            .ok_or("Previous project document is too large")?,
+    )
+    .map_err(|e| e.to_string())?;
+    validate(&previous)?;
+    if previous.id != current.id
+        || previous.asset.id != current.asset.id
+        || previous.asset.sha256 != current.asset.sha256
+        || previous.asset.bytes != current.asset.bytes
+        || previous.clips[0].id != current.clips[0].id
+    {
+        return Err("Previous save does not match this project's source identity".into());
+    }
+    // Recovery keeps current relink information while branching the historical edits.
+    previous.asset = current.asset;
+    previous.id = self::id();
+    let mut title = String::new();
+    let mut units = 0;
+    for ch in previous.title.chars() {
+        if units + ch.len_utf16() > 188 {
+            break;
+        }
+        units += ch.len_utf16();
+        title.push(ch);
+    }
+    previous.title = format!("{title} (recovered)");
+    let revision = store(&tx, root, &previous, None)?;
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok((previous, revision))
+}
+#[tauri::command]
+pub async fn video_project_history(root: String, id: String) -> Result<ProjectHistory, String> {
+    tauri::async_runtime::spawn_blocking(move || previous_saves(&database()?, &root, &id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+pub async fn recover_video_project(
+    root: String,
+    id: String,
+    history_id: String,
+    expected_revision: u64,
+) -> Result<LoadedProject, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (p, revision) = recover_save(&database()?, &root, &id, &history_id, expected_revision)?;
+        Ok(loaded(&root, p, revision))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 #[tauri::command]
 pub async fn create_video_project(
@@ -583,6 +740,141 @@ mod tests {
         let info=video_probe::parse_probe(br#"{"streams":[{"index":0,"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"avg_frame_rate":"30/1","time_base":"1/90000"}],"format":{"duration":"10.0"}}"#).unwrap();
         let p = new_project(root.to_str().unwrap(), &file, info).unwrap();
         (root, p)
+    }
+
+    #[test]
+    fn previous_saves_are_bounded_and_recovery_branches_without_changing_current() {
+        let (root, mut p) = fixture();
+        let r = root.to_str().unwrap();
+        let path = root.join("history.sqlite");
+        let db = Connection::open(&path).unwrap();
+        initialize(&db).unwrap();
+        store(&db, r, &p, None).unwrap();
+        let mut expected = None;
+        for revision in 1..=25 {
+            p.clips[0].edits.gain_percent = 80 + revision as u16;
+            p.clips[0].edits.quarter_turns = (revision % 4) as u8;
+            p.clips[0].source_in =
+                VideoTime::from_seconds(revision as f64 / 10.0, "1/90000").unwrap();
+            p.output.width = if revision % 3 == 2 { 3840 } else { 1920 };
+            p.output.height = if revision % 3 == 2 { 2160 } else { 1080 };
+            if revision == 5 {
+                expected = Some(p.clone());
+            }
+            store(&db, r, &p, Some(revision)).unwrap();
+        }
+        drop(db);
+        let db = Connection::open(&path).unwrap();
+        initialize(&db).unwrap();
+        let history = previous_saves(&db, r, &p.id).unwrap();
+        assert_eq!(history.revision, 26);
+        assert_eq!(history.entries.len(), 20);
+        assert_eq!(history.entries[0].revision, Some(25));
+        assert_eq!(history.entries[19].revision, Some(6));
+        assert!(history.entries[0].saved_at.is_some());
+        let (recovered, revision) =
+            recover_save(&db, r, &p.id, &history.entries[19].id, 26).unwrap();
+        assert_eq!(revision, 1);
+        assert_ne!(recovered.id, p.id);
+        assert!(recovered.title.ends_with(" (recovered)"));
+        assert_eq!(recovered.clips[0].edits.gain_percent, 85);
+        let expected = expected.unwrap();
+        assert_eq!(recovered.clips, expected.clips);
+        assert_eq!(recovered.output, expected.output);
+        assert_eq!(recovered.asset, p.asset);
+        assert_eq!(read(&db, r, &p.id).unwrap(), (p.clone(), 26));
+        assert_eq!(previous_saves(&db, r, &p.id).unwrap().entries.len(), 20);
+        assert!(previous_saves(&db, r, &recovered.id)
+            .unwrap()
+            .entries
+            .is_empty());
+        assert!(recover_save(&db, r, &p.id, "1", 26)
+            .unwrap_err()
+            .contains("no longer available"));
+        assert_eq!(
+            fs::read(root.join("original.mp4")).unwrap(),
+            b"original bytes"
+        );
+        drop(db);
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn history_migration_preserves_legacy_saves_and_current_relink() {
+        let (root, mut p) = fixture();
+        let r = root.to_str().unwrap();
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE projects(id TEXT PRIMARY KEY,root TEXT NOT NULL,title TEXT NOT NULL,revision INTEGER NOT NULL,data TEXT NOT NULL,updated INTEGER NOT NULL); CREATE TABLE project_history(id INTEGER PRIMARY KEY,project_id TEXT NOT NULL,data TEXT NOT NULL); CREATE TRIGGER project_backup BEFORE UPDATE ON projects BEGIN INSERT INTO project_history(project_id,data) VALUES(old.id,old.data); END;").unwrap();
+        p.title = "🎬".repeat(100);
+        store(&db, r, &p, None).unwrap();
+        p.clips[0].edits.gain_percent = 75;
+        store(&db, r, &p, Some(1)).unwrap();
+        initialize(&db).unwrap();
+        initialize(&db).unwrap();
+        let old = previous_saves(&db, r, &p.id).unwrap();
+        assert_eq!(old.entries.len(), 1);
+        assert_eq!(old.entries[0].revision, None);
+        assert_eq!(old.entries[0].saved_at, None);
+        fs::rename(root.join("original.mp4"), root.join("moved.mp4")).unwrap();
+        p.asset.relative_path = "moved.mp4".into();
+        store(&db, r, &p, Some(2)).unwrap();
+        let (copy, _) = recover_save(&db, r, &p.id, &old.entries[0].id, 3).unwrap();
+        assert_eq!(copy.asset.relative_path, "moved.mp4");
+        assert!(copy.title.encode_utf16().count() <= 200);
+        assert!(copy.title.ends_with(" (recovered)"));
+        assert_eq!(copy.clips[0].edits.gain_percent, 100);
+        assert!(source(r, &copy, || false).is_ok());
+        let history = previous_saves(&db, r, &p.id).unwrap();
+        assert_eq!(history.entries.len(), 2);
+        assert_eq!(history.entries[0].revision, Some(2));
+        assert!(history.entries[0].saved_at.is_some());
+        assert_eq!(read(&db, r, &p.id).unwrap(), (p, 3));
+        db.pragma_update(None, "user_version", 2).unwrap();
+        assert!(initialize(&db).unwrap_err().contains("newer app"));
+        drop(db);
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn recovery_rejects_stale_cross_library_cross_project_and_wrong_source_snapshots() {
+        let (root, mut p) = fixture();
+        let (other_root, _) = fixture();
+        let r = root.to_str().unwrap();
+        let db = Connection::open_in_memory().unwrap();
+        initialize(&db).unwrap();
+        store(&db, r, &p, None).unwrap();
+        p.title = "Current edit".into();
+        store(&db, r, &p, Some(1)).unwrap();
+        let key = previous_saves(&db, r, &p.id).unwrap().entries[0].id.clone();
+        assert!(previous_saves(&db, other_root.to_str().unwrap(), &p.id).is_err());
+        assert!(recover_save(&db, other_root.to_str().unwrap(), &p.id, &key, 2).is_err());
+        let mut other = p.clone();
+        other.id = id();
+        store(&db, r, &other, None).unwrap();
+        assert!(recover_save(&db, r, &other.id, &key, 1).is_err());
+        p.clips[0].edits.muted = true;
+        store(&db, r, &p, Some(2)).unwrap();
+        assert!(recover_save(&db, r, &p.id, &key, 2)
+            .unwrap_err()
+            .contains("changed elsewhere"));
+        let mut forged = p.clone();
+        forged.asset.sha256 = "0".repeat(64);
+        db.execute(
+            "UPDATE project_history SET data=?1 WHERE id=?2",
+            params![serde_json::to_string(&forged).unwrap(), key],
+        )
+        .unwrap();
+        assert!(recover_save(&db, r, &p.id, &key, 3)
+            .unwrap_err()
+            .contains("source identity"));
+        assert_eq!(read(&db, r, &p.id).unwrap(), (p, 3));
+        assert_eq!(
+            db.query_row("SELECT COUNT(*) FROM projects", [], |row| row
+                .get::<_, u64>(0))
+                .unwrap(),
+            2
+        );
+        drop(db);
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(other_root).unwrap();
     }
     #[test]
     fn durable_round_trip_keeps_edits_and_rejects_a_stale_writer() {

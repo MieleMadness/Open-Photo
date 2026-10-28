@@ -1100,6 +1100,8 @@ pub fn run() {
             video_project::create_video_project,
             video_project::save_video_project,
             video_project::load_video_project,
+            video_project::video_project_history,
+            video_project::recover_video_project,
             video_project::recent_video_projects,
             video_project::import_video_project,
             video_project::write_video_project_copy,

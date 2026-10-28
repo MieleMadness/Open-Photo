@@ -6,7 +6,7 @@ Choose **Preview edits** to render the current saved instructions. This closes t
 
 ## Saving and recovery
 
-Drafts autosave under the local Open-Photo application-data folder in `video-projects.sqlite`, independently of preferences and media caches. Each successful write increments a revision; stale writers are rejected. The queue serializes/coalesces changes and survives player unmounts. Window closure waits for pending saves; failures remain visible with retry or explicit close-without-saving. A failed session can save a recovery project copy or explicitly discard unsaved edits and reload its durable draft. SQLite keeps up to 20 previous documents per project; a UI for browsing those historical documents is not implemented.
+Drafts autosave under the local Open-Photo application-data folder in `video-projects.sqlite`, independently of preferences and media caches. Each successful write increments a revision; stale writers are rejected. The queue serializes/coalesces changes and survives player unmounts. Window closure waits for pending saves; failures remain visible with retry or explicit close-without-saving. A failed session can save a recovery project copy or explicitly discard unsaved edits and reload its durable draft. SQLite keeps up to 20 previous documents per project. **Previous saves** lists them with available save number/time, title, trim range, and output dimensions. **Open previous save as new draft** creates a separate recovered draft; the current draft and its existing history remain unchanged. **Return to previous draft** saves pending work and reopens the parent draft during the same editor session. Recovered drafts are also ordinary saved projects.
 
 **Recent projects** lists the latest 30 drafts for the selected library. Select one after restart to resume the saved state. Undo/redo keeps up to 100 edits during the current session; current edit settings persist across restarts, undo stacks do not. Reset is itself undoable. Organizational photo/AI data is unaffected.
 
@@ -25,3 +25,13 @@ Selection is derived from approximate browser playback time, quantized into sour
 Still required: installed Windows tests for restart recovery, window close during saves, copied real media, long paths/videos, unavailable drives, disk failures, and hardware behavior. Waveform UI and HDR tone mapping remain deferred. Export writes a new SDR MP4 and intentionally omits source subtitles/chapters/metadata.
 
 Version 0.54.7 exposes UHD landscape/portrait and supported source-resolution canvases, alongside the existing 1080p and square choices. Source-resolution geometry accounts for pixel aspect and source rotation; imported canvases remain available. Export using Project canvas to keep that resolution, or choose the 1080p export limit to reduce it.
+
+## Previous-save recovery (0.54.9)
+
+The history list is newest first and shows the latest 20 stored prior autosaves, rather than every keystroke or the session undo stack. Saves created before this update remain usable but may have no recorded number/time; the interface labels that metadata as unavailable. Later saves record the original save revision and timestamp. Dates use the desktop user's local display settings.
+
+Opening an earlier save first flushes pending edits, then checks that the current save revision still matches the history list. Refresh the list after editing or after another window changes the draft. The backend checks the selected library, project, snapshot, and source identity in a transaction before creating a fresh project ID. A snapshot pruned by newer saves is rejected explicitly. Recovery never writes over the current draft.
+
+Recovered edits retain the current source relink path and metadata for the identical source asset. A missing or changed source is reported normally; recovery of project instructions does not replace or recreate media. Unicode recovered titles are shortened as necessary to fit the editor limit. New drafts begin their own autosave history and session undo stack. The original history remains bounded to 20 records.
+
+History database migration is atomic and repeatable, preserves legacy documents, and rejects storage from a newer unsupported schema. This recovery feature is not a backup of the source media or of the entire application-data directory.

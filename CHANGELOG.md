@@ -1,3 +1,12 @@
+# 0.54.9 — Previous-save recovery for video projects
+
+- Browse up to 20 prior automatic saves with available save number/time, title, trim range, and canvas dimensions. Open a selected version as a separate recovered draft and return to the previous draft.
+- Preserve the current draft and its history. Carry forward the current verified source identity and relink path while recovering historical edit settings. Missing sources remain explicitly unavailable until relinked.
+- Check library/project ownership, snapshot identity, and the current save revision inside a write transaction. Reject stale, pruned, oversized, or incompatible snapshots instead of replacing current work.
+- Migrate existing history storage atomically and idempotently. Preserve legacy saves with unknown number/time rather than inventing metadata; record those fields for subsequent saves. Keep recovered Unicode titles within editor limits.
+- Add migration, retention/reopen, exact edit recovery, relink, conflict/ownership, source protection, UI recovery/return, empty-history, and failure coverage. Preserve editing during pending previews; only recovery locks edit controls.
+- Installed-app playback, complete long-export/perceptual synchronization, drive-failure, and whole-app performance acceptance remain open. Phase 7 remains planned.
+
 # 0.54.8 — Long-video navigation and seek acceptance
 
 - Add Go to time for seconds, minutes:seconds, and hours:minutes:seconds with millisecond precision. Validate malformed and out-of-range entries before seeking; keep browser seeking explicitly approximate.
