@@ -1,4 +1,4 @@
-> Development update: **0.54.9** adds Previous saves for video projects. Browse up to 20 earlier autosaves, open one as a separate recovered draft, and return to the previous draft. Recovery preserves the current source relink and checks for conflicting edits. UHD export and long-video timestamp navigation remain available. See [video projects](docs/VIDEO_PROJECTS.md), [acceptance](docs/VIDEO_ACCEPTANCE.md), and the [roadmap](docs/VIDEO_ROADMAP.md).
+> Development update: **0.54.10** adds saved brightness and contrast controls for SDR video. Preview and export share the same adjustments, black canvas borders stay black, and existing projects keep their original appearance. Previous-save recovery, UHD export, and long-video navigation remain available. See [video projects](docs/VIDEO_PROJECTS.md), [acceptance](docs/VIDEO_ACCEPTANCE.md), and the [roadmap](docs/VIDEO_ROADMAP.md).
 
 # Open-Photo
 

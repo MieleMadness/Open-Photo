@@ -1,3 +1,11 @@
+# 0.54.10 — Video brightness and contrast
+
+- Add saved brightness and contrast controls, each from -100 to 100, with neutral defaults, undo/redo, autosave, and a dedicated reset that preserves other edits.
+- Apply identical full-range RGB lookup tables in edited preview and export before canvas padding. Neutral settings skip the conversion, preserving existing rendering. Use filters supported by the pinned LGPL engine.
+- Load older project files, drafts, and history without adjustment fields at neutral settings. Validate integer ranges in both the editor and native backend. New adjustment fields require this version or newer when opening project copies.
+- Verify decoded pixels against the adjustment formula at positive/negative settings and extremes, preview/export agreement, frame timing, black borders, source protection, legacy loading, durable storage, and UI reset/undo.
+- Installed-app playback, complete long-export/perceptual synchronization, drive-failure, and whole-app performance acceptance remain open. Phase 7 remains planned.
+
 # 0.54.9 — Previous-save recovery for video projects
 
 - Anchor reference-frame inspection between earlier random-access points, with no initial seek when there is insufficient preroll information. Add keyframe-boundary regressions and actionable empty-window diagnostics.

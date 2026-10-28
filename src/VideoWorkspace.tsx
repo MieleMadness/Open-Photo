@@ -156,6 +156,10 @@ export function VideoWorkspace({root,path,onOpenExternal}:{root:string;path:stri
           <label><input type="checkbox" checked={e.flip_vertical} onChange={event=>edits(edit=>{edit.flip_vertical=event.target.checked;})}/>Flip vertically</label>
           <label><input type="checkbox" checked={e.muted} onChange={event=>edits(edit=>{edit.muted=event.target.checked;})}/>Mute video audio</label>
           <NumberField label="Audio volume (%)" value={e.gain_percent} min={0} max={200} onCommit={value=>edits(edit=>{edit.gain_percent=value;})}/>
+          <NumberField label="Video brightness" value={e.brightness} min={-100} max={100} onCommit={value=>edits(edit=>{edit.brightness=value;})}/>
+          <NumberField label="Video contrast" value={e.contrast} min={-100} max={100} onCommit={value=>edits(edit=>{edit.contrast=value;})}/>
+          <button className="secondary-button" onClick={()=>edits(edit=>{edit.brightness=0;edit.contrast=0;})}>Reset brightness and contrast</button>
+          <small>Zero keeps the original appearance. Choose Preview edits to see saved brightness and contrast; source playback shows the original.</small>
           <label>Canvas<select aria-label="Video canvas" value={`${project.output.width}x${project.output.height}`} onChange={event=>change(p=>{const [width,height]=event.target.value.split("x").map(Number);p.output.width=width;p.output.height=height;})}>{canvases.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}{!canvases.some(c=>c.value===`${project.output.width}x${project.output.height}`)&&<option value={`${project.output.width}x${project.output.height}`}>Imported canvas ({project.output.width} × {project.output.height})</option>}</select></label>
           <p>Choose the source resolution to keep an ultra-wide frame. A larger canvas cannot add detail to lower-resolution footage.</p>
           <label>Canvas placement<select aria-label="Video canvas placement" value={project.output.fit} onChange={event=>change(p=>{p.output.fit=event.target.value as "fit"|"fill";})}><option value="fit">Fit, with black borders</option><option value="fill">Fill, with centered crop</option></select></label>

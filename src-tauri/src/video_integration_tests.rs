@@ -861,6 +861,87 @@ struct ExportControl {
     mutate_source: Option<PathBuf>,
     stages: std::sync::Mutex<Vec<crate::video_export::Stage>>,
 }
+#[test]
+fn brightness_contrast_preview_and_export_match_decoded_pixels_and_keep_black_borders() {
+    use crate::{
+        video_export::{self, Request},
+        video_project,
+        video_render::ExportSize,
+    };
+    let fixture = Fixture::new();
+    let source = fixture.0.join("gray levels.mp4");
+    ffmpeg(&["-nostdin","-v","error","-f","lavfi","-i","color=c=0x404040:size=96x64:rate=10:duration=0.5,drawbox=x=48:y=0:w=48:h=64:color=0xc0c0c0:t=fill","-c:v","libopenh264"], &source);
+    let before = fingerprint(&source);
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    let mut p = video_project::new_project(fixture.0.to_str().unwrap(), &source, info).unwrap();
+    p.output.width = 192;
+    p.output.height = 192;
+    let input = pixels(&source);
+    for (index, (brightness, contrast)) in
+        [(20, 0), (-20, 0), (0, 50), (20, -50), (100, 0), (0, -100)]
+            .into_iter()
+            .enumerate()
+    {
+        p.clips[0].edits.brightness = brightness;
+        p.clips[0].edits.contrast = contrast;
+        let output = fixture.0.join(format!("adjusted-{index}.mp4"));
+        video_export::export_file(
+            Request {
+                engine: &engine(),
+                root: fixture.0.to_str().unwrap(),
+                project: &p,
+                destination: &output,
+                size: ExportSize::Project,
+                acknowledge_first_audio: false,
+            },
+            std::sync::Arc::new(ExportControl::default()),
+        )
+        .unwrap();
+        let directory = fixture.0.join(format!("preview-{index}"));
+        fs::create_dir(&directory).unwrap();
+        let preview = crate::video_edit_preview::build(
+            &engine(),
+            fixture.0.to_str().unwrap(),
+            &p,
+            &directory,
+            || false,
+        )
+        .unwrap();
+        let rendered = pixels(&output);
+        let preview_pixels = pixels(Path::new(&preview.source));
+        assert_eq!(rendered.len(), preview_pixels.len());
+        let error = rendered
+            .iter()
+            .zip(&preview_pixels)
+            .map(|(a, b)| (f64::from(*a) - f64::from(*b)).abs())
+            .sum::<f64>()
+            / rendered.len() as f64;
+        assert!(error < 4.0, "preview/export difference {error}");
+        for x in [12, 84] {
+            for channel in 0..3 {
+                let original = f64::from(input[(32 * 96 + x) * 3 + channel]);
+                let expected = ((original - 127.5) * (1.0 + f64::from(contrast) / 100.0)
+                    + 127.5
+                    + 255.0 * f64::from(brightness) / 100.0)
+                    .clamp(0.0, 255.0);
+                let actual = f64::from(rendered[(96 * 192 + x * 2) * 3 + channel]);
+                assert!(
+                    (actual - expected).abs() < 7.0,
+                    "brightness={brightness} contrast={contrast}: {actual} vs {expected}"
+                );
+            }
+        }
+        assert!(
+            rendered[..192 * 16 * 3].iter().all(|v| *v < 8),
+            "padding must remain black"
+        );
+        assert_eq!(
+            frame_times(&output),
+            frame_times(Path::new(&preview.source))
+        );
+    }
+    assert_eq!(fingerprint(&source), before);
+}
 impl crate::video_export::Control for ExportControl {
     fn cancelled(&self) -> bool {
         self.cancel.load(Ordering::SeqCst)

@@ -76,6 +76,10 @@ pub struct Edits {
     pub flip_vertical: bool,
     pub muted: bool,
     pub gain_percent: u16,
+    #[serde(default)]
+    pub brightness: i16,
+    #[serde(default)]
+    pub contrast: i16,
 }
 impl Default for Edits {
     fn default() -> Self {
@@ -91,6 +95,8 @@ impl Default for Edits {
             flip_vertical: false,
             muted: false,
             gain_percent: 100,
+            brightness: 0,
+            contrast: 0,
         }
     }
 }
@@ -206,6 +212,8 @@ pub fn validate(p: &Project) -> Result<(), String> {
     let crop = &e.crop;
     if e.quarter_turns > 3
         || e.gain_percent > 200
+        || !(-100..=100).contains(&e.brightness)
+        || !(-100..=100).contains(&e.contrast)
         || crop.width < 100
         || crop.height < 100
         || crop.x > 10000
@@ -213,7 +221,7 @@ pub fn validate(p: &Project) -> Result<(), String> {
         || crop.width > 10000 - crop.x
         || crop.height > 10000 - crop.y
     {
-        return Err("Invalid crop, rotation, or audio gain".into());
+        return Err("Invalid crop, rotation, audio gain, brightness, or contrast".into());
     }
     let o = &p.output;
     if o.width < 16
@@ -711,6 +719,19 @@ pub fn filters(p: &Project, preview: bool) -> Result<(String, u32, u32), String>
     if e.flip_vertical {
         f.push("vflip".into());
     }
+    // Full-range RGB lookup tables are available in the pinned LGPL engine.
+    // Skip the conversion at neutral settings to retain legacy rendering exactly.
+    // Apply before canvas padding so brightness never lifts the black borders.
+    if e.brightness != 0 || e.contrast != 0 {
+        let expression = format!(
+            "clip((val-maxval/2)*{:.2}+maxval/2+maxval*{:.2},0,maxval)",
+            1.0 + f64::from(e.contrast) / 100.0,
+            f64::from(e.brightness) / 100.0
+        );
+        f.push(format!(
+            "lutrgb=r='{expression}':g='{expression}':b='{expression}',format=yuv420p"
+        ));
+    }
     let ratio = if preview {
         (960.0 / f64::from(p.output.width))
             .min(540.0 / f64::from(p.output.height))
@@ -742,6 +763,44 @@ mod tests {
         (root, p)
     }
 
+    #[test]
+    fn brightness_contrast_preserve_legacy_projects_and_validate_saved_settings() {
+        let (root, mut p) = fixture();
+        let neutral = filters(&p, false).unwrap();
+        let mut legacy = serde_json::to_value(&p).unwrap();
+        legacy["clips"][0]["edits"]
+            .as_object_mut()
+            .unwrap()
+            .remove("brightness");
+        legacy["clips"][0]["edits"]
+            .as_object_mut()
+            .unwrap()
+            .remove("contrast");
+        let restored: Project = serde_json::from_value(legacy).unwrap();
+        assert_eq!(restored, p);
+        assert_eq!(filters(&restored, false).unwrap(), neutral);
+        assert!(!neutral.0.contains("lutrgb"));
+        p.clips[0].edits.brightness = 20;
+        p.clips[0].edits.contrast = -30;
+        let db = Connection::open_in_memory().unwrap();
+        initialize(&db).unwrap();
+        store(&db, root.to_str().unwrap(), &p, None).unwrap();
+        assert_eq!(read(&db, root.to_str().unwrap(), &p.id).unwrap().0, p);
+        for value in [-101, 101, i16::MIN, i16::MAX] {
+            p.clips[0].edits.brightness = value;
+            assert!(validate(&p).is_err());
+            p.clips[0].edits.brightness = 0;
+            p.clips[0].edits.contrast = value;
+            assert!(validate(&p).is_err());
+            p.clips[0].edits.contrast = 0;
+        }
+        for value in [-100, 100] {
+            p.clips[0].edits.brightness = value;
+            p.clips[0].edits.contrast = value;
+            assert!(validate(&p).is_ok());
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn previous_saves_are_bounded_and_recovery_branches_without_changing_current() {
         let (root, mut p) = fixture();

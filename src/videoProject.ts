@@ -2,10 +2,10 @@ import {invoke} from "@tauri-apps/api/core";
 import {markSeconds,type VideoTime} from "./videoTime";
 import type {VideoInfo} from "./VideoDetails";
 export type Crop={x:number;y:number;width:number;height:number};
-export type Edits={crop:Crop;quarter_turns:number;flip_horizontal:boolean;flip_vertical:boolean;muted:boolean;gain_percent:number};
+export type Edits={crop:Crop;quarter_turns:number;flip_horizontal:boolean;flip_vertical:boolean;muted:boolean;gain_percent:number;brightness:number;contrast:number};
 export type VideoProject={schema_version:1;id:string;title:string;asset:{id:string;relative_path:string;sha256:string;bytes:number;info:VideoInfo};clips:{id:string;asset_id:string;source_in:VideoTime;source_out:VideoTime;edits:Edits}[];output:{width:number;height:number;fit:"fit"|"fill"}};
 export type LoadedProject={project:VideoProject;revision:number;source_path:string|null;source_status:string};
-export const defaultEdits=():Edits=>({crop:{x:0,y:0,width:10000,height:10000},quarter_turns:0,flip_horizontal:false,flip_vertical:false,muted:false,gain_percent:100});
+export const defaultEdits=():Edits=>({crop:{x:0,y:0,width:10000,height:10000},quarter_turns:0,flip_horizontal:false,flip_vertical:false,muted:false,gain_percent:100,brightness:0,contrast:0});
 export function sourceCanvas(info:VideoInfo):VideoProject["output"]|null{
   const [a,b]=(info.sample_aspect_ratio||"1:1").split(":").map(Number);
   const sar=Number.isFinite(a/b)&&a/b>0?a/b:1;
@@ -34,6 +34,7 @@ export function validProject(project:VideoProject):string {
   if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end-start<0.04||end>project.asset.info.duration_seconds+a/b/2+0.000001)return "Keep at least 0.04 seconds, within the original duration.";
   if(![crop.x,crop.y,crop.width,crop.height].every(Number.isInteger)||crop.x<0||crop.y<0||crop.width<100||crop.height<100||crop.x+crop.width>10000||crop.y+crop.height>10000)return "The crop must fit inside the video and keep at least 1% of each dimension.";
   if(clip.edits.gain_percent<0||clip.edits.gain_percent>200||!Number.isInteger(clip.edits.gain_percent))return "Audio volume must be between 0 and 200%.";
+  if(![clip.edits.brightness,clip.edits.contrast].every(value=>Number.isInteger(value)&&value>=-100&&value<=100))return "Brightness and contrast must be whole numbers from -100 to 100.";
   return "";
 }
 type History={past:VideoProject[];present:VideoProject;future:VideoProject[]};

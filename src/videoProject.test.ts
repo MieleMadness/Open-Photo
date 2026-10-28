@@ -1,9 +1,20 @@
 import {afterEach,expect,it,vi} from "vitest";
 import {invoke} from "@tauri-apps/api/core";
-import {cropForAspect,sourceCanvas,defaultEdits,ProjectSession,hasUnsavedProjects,flushProjects,discardProjectSaves,type VideoProject} from "./videoProject";
+import {cropForAspect,sourceCanvas,defaultEdits,validProject,ProjectSession,hasUnsavedProjects,flushProjects,discardProjectSaves,type VideoProject} from "./videoProject";
 vi.mock("@tauri-apps/api/core",()=>({invoke:vi.fn()}));
 function project():VideoProject{return {schema_version:1,id:"p",title:"Saved project",asset:{id:"asset",relative_path:"source.mp4",sha256:"0".repeat(64),bytes:123,info:{duration_seconds:10,codec:"h264",width:1920,height:1080,time_base:"1/90000",frame_rate:"30/1",nominal_frame_rate:"30/1",sample_aspect_ratio:"1:1",rotation_degrees:0,color_transfer:null,hdr:false,audio:[],warnings:[]}},clips:[{id:"clip",asset_id:"asset",source_in:{ticks:"0",time_base:"1/90000"},source_out:{ticks:"900000",time_base:"1/90000"},edits:defaultEdits()}],output:{width:1920,height:1080,fit:"fit"}};}
 afterEach(()=>{discardProjectSaves();vi.resetAllMocks();});
+it("rejects malformed brightness/contrast before autosave and accepts the adjustment endpoints",()=>{
+  for(const field of ["brightness","contrast"] as const){
+    for(const value of [-101,101,0.5,NaN,Infinity]){
+      const p=project();p.clips[0].edits[field]=value;
+      expect(validProject(p)).toMatch(/Brightness and contrast/);
+    }
+    for(const value of [-100,0,100]){
+      const p=project();p.clips[0].edits[field]=value;expect(validProject(p)).toBe("");
+    }
+  }
+});
 it("serializes revisions, persists the latest edit after unmount, and makes undo/redo durable",async()=>{
   let finish:(revision:number)=>void=()=>{};
   vi.mocked(invoke).mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve})).mockResolvedValueOnce(3).mockResolvedValueOnce(4).mockResolvedValueOnce(5);

@@ -35,3 +35,11 @@ Opening an earlier save first flushes pending edits and checks that no newer loc
 Recovered edits retain the current source relink path and metadata for the identical source asset. A missing or changed source is reported normally; recovery of project instructions does not replace or recreate media. Unicode recovered titles are shortened as necessary to fit the editor limit. New drafts begin their own autosave history and session undo stack. The original history remains bounded to 20 records.
 
 History database migration is atomic and repeatable, preserves legacy documents, and rejects storage from a newer unsupported schema. This recovery feature is not a backup of the source media or of the entire application-data directory.
+
+## Brightness and contrast (0.54.10)
+
+**Video brightness** and **Video contrast** accept whole numbers from -100 to 100; zero is neutral. Commit a value by leaving its field or pressing Enter. Choose **Preview edits** to view the saved result; source playback continues to show the original. **Reset brightness and contrast** clears only these two adjustments and is undoable. Both settings autosave and travel with saved project copies and recovered drafts.
+
+Preview and export use the same per-channel full-range RGB transform: `(channel - 127.5) × (1 + contrast/100) + 127.5 + 255 × brightness/100`, clipped to 0–255 and converted to the SDR output format. Positive brightness lifts the picture; positive contrast increases the difference from middle gray. At contrast -100 the picture becomes flat gray before brightness. Extreme settings can clip detail. These are basic adjustments on encoded SDR color, rather than HDR tone mapping or linear-light exposure controls. Padding is applied afterward, so fit borders remain black.
+
+Neutral settings omit the RGB adjustment stage entirely. Existing project files, local drafts, and previous saves with missing adjustment fields load at zero and retain the original render graph. Current documents include the new fields; open those copies with 0.54.10 or newer. Earlier releases reject unknown fields rather than silently ignoring saved adjustments. HDR rendering remains explicitly unavailable.

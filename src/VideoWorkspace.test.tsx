@@ -16,6 +16,20 @@ beforeEach(()=>{vi.mocked(invoke).mockImplementation(async(command,args)=>{
   if(command==="save_video_project")return (args as {expectedRevision:number}).expectedRevision+1;
 });});
 afterEach(async()=>{cleanup();discardProjectSaves();vi.mocked(invoke).mockResolvedValue(null);await refreshVideoExport();vi.resetAllMocks();});
+it("saves brightness and contrast together, supports undo, and resets only those adjustments",async()=>{
+  render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);
+  fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
+  fireEvent.change(screen.getByLabelText("Video rotation"),{target:{value:"1"}});
+  const brightness=screen.getByLabelText("Video brightness"),contrast=screen.getByLabelText("Video contrast");
+  fireEvent.change(brightness,{target:{value:"20"}});fireEvent.blur(brightness);
+  fireEvent.change(contrast,{target:{value:"-30"}});fireEvent.blur(contrast);
+  await waitFor(()=>expect(invoke).toHaveBeenCalledWith("save_video_project",expect.objectContaining({project:expect.objectContaining({clips:[expect.objectContaining({edits:expect.objectContaining({brightness:20,contrast:-30,quarter_turns:1})})]})})));
+  fireEvent.click(screen.getByText("Reset brightness and contrast"));
+  expect((brightness as HTMLInputElement).value).toBe("0");expect((contrast as HTMLInputElement).value).toBe("0");
+  expect((screen.getByLabelText("Video rotation") as HTMLSelectElement).value).toBe("1");
+  fireEvent.click(screen.getByText("Undo video edit"));
+  expect((brightness as HTMLInputElement).value).toBe("20");expect((contrast as HTMLInputElement).value).toBe("-30");
+});
 it("autosaves a transform, supports durable undo/redo, and reopens a recent draft",async()=>{
   render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);
   fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
