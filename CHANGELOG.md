@@ -2,6 +2,7 @@
 
 - Restore the saved active workspace and scan its folders on startup, including legacy single-root workspaces. Show a clear source-folder list with Remove from library. Invalidate older scans and AI work when membership changes; removing a folder never deletes its media or saved edits.
 - Connect the uninstaller's existing Delete application data checkbox to the known Open-Photo databases and caches. Keep data by default and during updates; never traverse library paths or recursively remove the old app-data parent. Explicit /PURGEAPPDATA=1 supports isolated lifecycle testing.
+- Include the linked DirectML and Microsoft C++ runtime DLLs beside the installed app; verify hashes and execute AI acceptance from the install directory with a restricted dependency search path.
 - Ship all seven pinned AI assets, model provenance, licenses, and notices in the installer. Verify downloads at build time and installed files in CI. Runtime uses the installed assets without downloads or another per-user copy.
 - Replace manual model setup with one Local AI switch; retain diagnostics and CPU selection. Turning off stops subsequent indexing batches while retaining indexes and names.
 - Share one process-wide ONNX environment across all AI sessions. Fix repeated/cross-feature inference failing with “only one environment is allowed per process.” Verify every model through synthetic CPU inference.

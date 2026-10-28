@@ -521,3 +521,5 @@ Third-party dependencies and AI model assets retain their own licenses and usage
 - [Historical milestone plan](docs/MILESTONES.md)
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
+
+The Windows installer includes the linked DirectML and Microsoft C++ runtime files beside the app, avoiding a separate runtime setup step. See [bundled AI packaging](docs/AI_MODEL_BUNDLE.md).

@@ -7,6 +7,7 @@ $manifest=Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 $destinationRoot=Join-Path $projectRoot 'src-tauri/resources/ai-models'
 $cacheRoot=Join-Path $projectRoot 'src-tauri/target/ai-model-cache'
 New-Item -ItemType Directory -Force -Path $destinationRoot,$cacheRoot | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $projectRoot 'src-tauri/resources/native') | Out-Null
 foreach ($model in $manifest.models) {
     if ($model.sha256 -notmatch '^[a-f0-9]{64}$' -or [IO.Path]::GetFileName($model.name) -ne $model.name) {throw 'Invalid AI bundle manifest'}
     $destination=Join-Path $destinationRoot $model.name
