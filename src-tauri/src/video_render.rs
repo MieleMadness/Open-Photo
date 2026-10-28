@@ -3,6 +3,7 @@ use crate::{
     video_engine,
     video_probe::{self, VideoInfo},
     video_project::{self, Project},
+    video_timing::{self, Span},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -23,7 +24,8 @@ pub struct Plan {
     pub info: VideoInfo,
     pub width: u32,
     pub height: u32,
-    pub start: f64,
+    pub video_span: Span,
+    pub audio_span: Option<Span>,
     pub duration: f64,
     pub max_bytes: u64,
     pub timeout: Duration,
@@ -32,17 +34,6 @@ pub struct Plan {
 }
 fn seconds(value: Option<&str>) -> Option<f64> {
     value?.parse::<f64>().ok().filter(|v| v.is_finite())
-}
-fn audio_span(plan: &Plan) -> Option<(f64, Option<f64>)> {
-    let audio = plan.info.audio.first()?;
-    let origin = seconds(plan.info.format_start_time.as_deref()).unwrap_or(0.0);
-    let raw = seconds(audio.start_time.as_deref()).unwrap_or(origin) - origin - plan.start;
-    Some((
-        raw.max(0.0),
-        audio
-            .duration_seconds
-            .map(|duration| (raw + duration).min(plan.duration)),
-    ))
 }
 #[derive(Clone, Copy)]
 pub struct RenderOptions {
@@ -83,6 +74,8 @@ pub fn plan(
     }
     let start = clip.source_in.seconds()?;
     let duration = clip.source_out.seconds()? - start;
+    let (video_span, audio_span) =
+        video_timing::source_spans(engine, &source, &info, start, duration, &cancel)?;
     let mut canvas = p.clone();
     if !preview && size == ExportSize::Hd1080 {
         let (w, h) = if canvas.output.height > canvas.output.width {
@@ -137,7 +130,7 @@ pub fn plan(
         "-vf".into(),
         filter.into(),
     ]);
-    if !clip.edits.muted {
+    if !clip.edits.muted && audio_span.is_some() {
         if let Some(audio) = info.audio.first() {
             args.extend([
                 "-map".into(),
@@ -199,7 +192,8 @@ pub fn plan(
         info,
         width,
         height,
-        start,
+        video_span,
+        audio_span,
         duration,
         max_bytes,
         timeout: Duration::from_secs(if preview { 1800 } else { 21600 }),
@@ -230,16 +224,26 @@ pub fn validate_output(
     cancel: impl Fn() -> bool,
 ) -> Result<VideoInfo, String> {
     let result = video_probe::probe(engine, output, cancel)?;
-    let tolerance = plan
-        .info
-        .frame_rate
-        .as_deref()
-        .and_then(|s| s.split_once('/'))
-        .and_then(|(a, b)| Some(b.parse::<f64>().ok()? / a.parse::<f64>().ok()?))
-        .unwrap_or(0.05)
-        .max(0.05)
-        * 2.0;
-    if (result.duration_seconds - plan.duration).abs() > tolerance
+    let tolerance = (video_timing::frame_interval(&plan.info) * 2.0).clamp(0.005, 0.1);
+    let video_start =
+        seconds(result.start_time.as_deref()).ok_or("Rendered video has no start timestamp")?;
+    let video_duration = result
+        .video_duration_seconds
+        .ok_or("Rendered video has no stream duration")?;
+    if (video_start - plan.video_span.start).abs() > tolerance
+        || (video_start + video_duration - plan.video_span.end).abs() > tolerance
+    {
+        return Err("Rendered video track failed independent timing validation".into());
+    }
+    if (result.duration_seconds
+        - if p.clips[0].edits.muted {
+            plan.video_span.end
+        } else {
+            plan.audio_span
+                .map_or(plan.video_span.end, |a| a.end.max(plan.video_span.end))
+        })
+    .abs()
+        > tolerance
         || result.width != plan.width
         || result.height != plan.height
         || result.rotation_degrees.abs() > 0.01
@@ -250,9 +254,7 @@ pub fn validate_output(
     {
         return Err("Rendered video failed duration, geometry, format, or size validation".into());
     }
-    let expect_audio = !p.clips[0].edits.muted
-        && audio_span(plan)
-            .is_some_and(|(start, end)| start < plan.duration && end.is_none_or(|end| end > start));
+    let expect_audio = !p.clips[0].edits.muted && plan.audio_span.is_some();
     if result.audio.len() != usize::from(expect_audio) {
         return Err("Rendered video did not preserve the selected audio policy".into());
     }
@@ -263,16 +265,16 @@ pub fn validate_output(
         {
             return Err("Rendered audio does not match the AAC stereo preset".into());
         }
-        if let Some((expected_start, expected_end)) = audio_span(plan) {
-            if let Some(actual_start) = seconds(audio.start_time.as_deref()) {
-                if (actual_start - expected_start).abs() > 0.05 {
-                    return Err("Rendered audio start is out of sync".into());
-                }
-                if let Some((expected_end, duration)) = expected_end.zip(audio.duration_seconds) {
-                    if (actual_start + duration - expected_end).abs() > 0.1 {
-                        return Err("Rendered audio end is out of sync".into());
-                    }
-                }
+        if let Some(expected) = plan.audio_span {
+            let start = seconds(audio.start_time.as_deref())
+                .ok_or("Rendered audio has no start timestamp")?;
+            let duration = audio
+                .duration_seconds
+                .ok_or("Rendered audio has no stream duration")?;
+            if (start - expected.start).abs() > 0.05
+                || (start + duration - expected.end).abs() > 0.1
+            {
+                return Err("Rendered audio timing is out of sync".into());
             }
         }
     }

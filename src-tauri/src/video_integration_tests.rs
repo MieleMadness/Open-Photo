@@ -1274,3 +1274,119 @@ fn export_longer_vfr_audio_fixture_keeps_timestamps_and_audio_ends_aligned() {
     assert_eq!(fingerprint(&source), before);
     assert_no_export_temporaries(&fixture.0);
 }
+
+#[test]
+fn independent_stream_validation_rejects_short_video_hidden_by_long_audio() {
+    use crate::{
+        video_project,
+        video_render::{self, ExportSize, RenderOptions},
+    };
+    let fixture = Fixture::new();
+    let source = fixture.0.join("source.mp4");
+    let bad = fixture.0.join("short-video.mp4");
+    for (path, length) in [(&source, "2"), (&bad, "0.5")] {
+        ffmpeg(
+            &[
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                &format!("testsrc2=size=64x48:rate=30:duration={length}"),
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=sample_rate=48000:duration=2",
+                "-c:v",
+                "libopenh264",
+                "-c:a",
+                "aac",
+                "-ac",
+                "2",
+            ],
+            path,
+        );
+    }
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    let mut p = video_project::new_project(fixture.0.to_str().unwrap(), &source, info).unwrap();
+    p.output.width = 64;
+    p.output.height = 48;
+    let plan = video_render::plan(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        &p,
+        &fixture.0.join("output.mp4"),
+        RenderOptions {
+            preview: false,
+            size: ExportSize::Project,
+            acknowledge_first_audio: false,
+        },
+        || false,
+    )
+    .unwrap();
+    assert!(
+        video_render::validate_output(&engine(), &p, &plan, &bad, || false)
+            .unwrap_err()
+            .contains("independent timing")
+    );
+    // Unequal tracks are valid when they match the verified source.
+    let info = video_probe::probe(&engine(), &bad, || false).unwrap();
+    let mut p = video_project::new_project(fixture.0.to_str().unwrap(), &bad, info).unwrap();
+    p.output.width = 64;
+    p.output.height = 48;
+    let plan = video_render::plan(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        &p,
+        &fixture.0.join("output.mp4"),
+        RenderOptions {
+            preview: false,
+            size: ExportSize::Project,
+            acknowledge_first_audio: false,
+        },
+        || false,
+    )
+    .unwrap();
+    video_render::validate_output(&engine(), &p, &plan, &bad, || false).unwrap();
+    video_render::encode(&engine(), &plan, || false, |_| {}).unwrap();
+    video_render::validate_output(&engine(), &p, &plan, &fixture.0.join("output.mp4"), || {
+        false
+    })
+    .unwrap();
+    let mut old = serde_json::to_value(&p.asset.info).unwrap();
+    old.as_object_mut()
+        .unwrap()
+        .remove("video_duration_seconds");
+    let restored: crate::video_probe::VideoInfo = serde_json::from_value(old).unwrap();
+    assert!(restored.video_duration_seconds.is_none());
+}
+#[test]
+fn packet_timing_fallback_handles_matroska_without_stream_duration() {
+    let fixture = Fixture::new();
+    let source = fixture.0.join("timing.mkv");
+    ffmpeg(
+        &[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=30:duration=2",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=sample_rate=48000:duration=2",
+            "-c:v",
+            "libopenh264",
+            "-c:a",
+            "aac",
+        ],
+        &source,
+    );
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    assert!(info.video_duration_seconds.is_none());
+    let (video, audio) =
+        crate::video_timing::source_spans(&engine(), &source, &info, 0.4, 1.0, || false).unwrap();
+    assert!((video.end - 1.0).abs() < 0.05);
+    assert!((audio.unwrap().end - 1.0).abs() < 0.05);
+}

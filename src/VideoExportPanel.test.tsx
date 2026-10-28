@@ -31,3 +31,24 @@ it("tracks pending native starts and rejects new starts once window closure begi
   await expect(startVideoExport("library",project,options)).rejects.toThrow("app is closing");expect(vi.mocked(invoke).mock.calls.filter(([command])=>command==="start_video_export")).toHaveLength(1);
   finish("job");await pending;expect(hasStartingVideoExport()).toBe(false);
 });
+
+it("ignores delayed status replies from before a newly accepted export",async()=>{
+  let finish:(value:ExportStatus|null)=>void=()=>{};
+  let polls=0;
+  vi.mocked(invoke).mockImplementation(async(command)=>{
+    if(command==="start_video_export")return "new-job";
+    if(command==="video_export_status"&&++polls===1)return new Promise(resolve=>{finish=resolve});
+    return {...status(),id:"new-job"};
+  });
+  const stale=refreshVideoExport();
+  await startVideoExport("library",{title:"New export"} as VideoProject,{destination:"new.mp4",size:"project",acknowledge_first_audio:false});
+  finish(null);
+  expect((await stale)?.id).toBe("new-job");
+});
+it("does not let an older response replace a completed export",async()=>{
+  let finish:(value:ExportStatus)=>void=()=>{};let polls=0;
+  const completed={...status(),active:false,stage:"completed"} as ExportStatus;
+  vi.mocked(invoke).mockImplementation(async()=>++polls===1?new Promise(resolve=>{finish=resolve}):completed);
+  const old=refreshVideoExport();await refreshVideoExport();finish(status());
+  expect((await old)?.stage).toBe("completed");
+});

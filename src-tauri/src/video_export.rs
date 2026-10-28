@@ -72,7 +72,12 @@ fn available_space(parent: &Path) -> Result<Option<u64>, String> {
     #[cfg(windows)]
     {
         use std::os::windows::ffi::OsStrExt;
-        let path: Vec<u16> = parent.as_os_str().encode_wide().chain(Some(0)).collect();
+        let mut path: Vec<u16> = parent.as_os_str().encode_wide().collect();
+        // GetDiskFreeSpaceExW requires a trailing separator for UNC share roots.
+        if !matches!(path.last(), Some(92 | 47)) {
+            path.push(92);
+        }
+        path.push(0);
         let mut free = 0u64;
         // SAFETY: path is NUL terminated and free is a live output buffer.
         let ok = unsafe {
@@ -430,6 +435,16 @@ pub fn open_video_export(jobs: tauri::State<'_, ExportJobs>, id: String) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[cfg(windows)]
+    fn queries_real_destination_space() {
+        assert!(
+            available_space(Path::new(env!("CARGO_MANIFEST_DIR")))
+                .unwrap()
+                .unwrap()
+                > 0
+        );
+    }
     fn job() -> Arc<Job> {
         Arc::new(Job {
             cancel: AtomicBool::new(false),

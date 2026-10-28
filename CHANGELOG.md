@@ -1,3 +1,11 @@
+# 0.54.5 — Phase 6 export hardening
+
+- Validate video and audio spans independently, so longer audio cannot hide truncated video. Preserve legitimately unequal source tracks and omit audio when the kept range has none.
+- Inspect packet timing with bounded streaming reads when source containers omit stream durations. Require timing metadata on generated MP4 tracks and cap video timing tolerance at 100 ms.
+- Prevent delayed or out-of-order export-status responses from clearing a newly started job or regressing completed progress.
+- Add the directory separator required by Windows free-space checks for UNC shares.
+- Add timing and status-race regression coverage. Installed-app GUI, real-footage/hardware, and measured performance/memory acceptance remain incomplete.
+
 # 0.54.4 — Phase 6.4: Validated video export
 
 - Export saved single-video edits to a new SDR H.264/AAC MP4 using the same trim/crop/rotation/flip/audio/canvas graph as edited previews. Offer the project canvas or an orientation-aware 1080p limit.

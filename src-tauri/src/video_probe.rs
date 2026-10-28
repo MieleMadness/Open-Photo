@@ -6,6 +6,7 @@ use std::{path::Path, time::Duration};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct VideoInfo {
     pub duration_seconds: f64,
+    pub video_duration_seconds: Option<f64>,
     pub video_stream: usize,
     pub codec: String,
     pub width: u32,
@@ -86,8 +87,13 @@ pub(crate) fn parse_probe(bytes: &[u8]) -> Result<VideoInfo, String> {
         .and_then(|v| u32::try_from(v).ok())
         .filter(|v| *v > 0)
         .ok_or("Video height unavailable")?;
+    let video_duration_seconds = number(&video["duration"])
+        .or_else(|| {
+            Some(number(&video["duration_ts"])? * ratio_value(video["time_base"].as_str()?)?)
+        })
+        .filter(|v| *v > 0.0);
     let duration = number(&doc["format"]["duration"])
-        .or_else(|| number(&video["duration"]))
+        .or(video_duration_seconds)
         .filter(|v| *v > 0.0)
         .ok_or("Video duration unavailable")?;
     let frame_rate = ratio(string(video, "avg_frame_rate"));
@@ -146,6 +152,7 @@ pub(crate) fn parse_probe(bytes: &[u8]) -> Result<VideoInfo, String> {
     }
     Ok(VideoInfo {
         duration_seconds: duration,
+        video_duration_seconds,
         video_stream: video["index"].as_u64().unwrap_or(0) as usize,
         codec: string(video, "codec_name").unwrap_or_else(|| "unknown".into()),
         width,

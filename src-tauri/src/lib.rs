@@ -26,6 +26,7 @@ mod video_preview;
 mod video_probe;
 mod video_project;
 mod video_render;
+mod video_timing;
 mod watch;
 mod xmp;
 use base64::Engine;

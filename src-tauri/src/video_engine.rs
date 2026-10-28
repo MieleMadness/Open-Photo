@@ -133,16 +133,16 @@ pub(crate) struct Progress {
     pub bytes: u64,
 }
 
-fn progress_reader(
+fn read_lines(
     reader: impl Read,
     overflow: Arc<AtomicBool>,
-    progress: impl Fn(Progress),
+    mut line_handler: impl FnMut(&[u8]) -> Result<(), String>,
 ) -> Result<Vec<u8>, String> {
     use std::io::BufRead;
     let mut reader = std::io::BufReader::new(reader);
-    let mut state = Progress::default();
+    let mut line = Vec::with_capacity(256);
     loop {
-        let mut line = vec![];
+        line.clear();
         let n = Read::by_ref(&mut reader)
             .take(4097)
             .read_until(b'\n', &mut line)
@@ -152,11 +152,25 @@ fn progress_reader(
         }
         if n > 4096 {
             overflow.store(true, Ordering::Release);
-            break;
+            return Err("Video tool output line exceeded its safety limit".into());
         }
-        let text = String::from_utf8_lossy(&line);
+        if let Err(error) = line_handler(&line) {
+            overflow.store(true, Ordering::Release);
+            return Err(error);
+        }
+    }
+    Ok(vec![])
+}
+fn progress_reader(
+    reader: impl Read,
+    overflow: Arc<AtomicBool>,
+    progress: impl Fn(Progress),
+) -> Result<Vec<u8>, String> {
+    let mut state = Progress::default();
+    read_lines(reader, overflow, |line| {
+        let text = String::from_utf8_lossy(line);
         let Some((key, value)) = text.trim().split_once('=') else {
-            continue;
+            return Ok(());
         };
         match key {
             "out_time_us" => {
@@ -172,8 +186,24 @@ fn progress_reader(
             "progress" => progress(state),
             _ => {}
         }
-    }
-    Ok(vec![])
+        Ok(())
+    })
+}
+pub(crate) fn run_lines(
+    executable: &Path,
+    args: &[&std::ffi::OsStr],
+    timeout: Duration,
+    cancel: impl Fn() -> bool,
+    line_handler: impl FnMut(&[u8]) -> Result<(), String> + Send + 'static,
+) -> Result<(), String> {
+    run_reader(
+        executable,
+        args,
+        timeout,
+        cancel,
+        move |reader, overflow| read_lines(reader, overflow, line_handler),
+    )
+    .map(|_| ())
 }
 pub(crate) fn run_progress(
     executable: &Path,
@@ -357,7 +387,7 @@ mod tests {
         assert!(output.is_empty());
         assert_eq!(*values.lock().unwrap(), vec![(1.5, 2048), (2.5, 2048)]);
         assert!(!flag.load(Ordering::Acquire));
-        progress_reader(&vec![b'x'; 100_000][..], flag.clone(), |_| {}).unwrap();
+        assert!(progress_reader(&vec![b'x'; 100_000][..], flag.clone(), |_| {}).is_err());
         assert!(flag.load(Ordering::Acquire));
     }
 }

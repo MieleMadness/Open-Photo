@@ -1,4 +1,4 @@
-> Development update: **0.54.4** adds MP4 export for saved video projects, with progress, cancellation, source verification, full output decoding, and publication without overwriting existing files. Preview and export share the edit graph and precise source timing. Phase 6 still needs installed-app acceptance with real footage. See [video export](docs/VIDEO_EXPORT.md), [video projects](docs/VIDEO_PROJECTS.md), and the [Phase 6/7 roadmap](docs/VIDEO_ROADMAP.md).
+> Development update: **0.54.5** hardens MP4 export with independent video/audio timing validation, bounded packet-timing fallback, and protection against delayed export-status replies. Phase 6 still needs installed-app acceptance with real footage. See [video export](docs/VIDEO_EXPORT.md), [video projects](docs/VIDEO_PROJECTS.md), and the [Phase 6/7 roadmap](docs/VIDEO_ROADMAP.md).
 
 # Open-Photo
 
