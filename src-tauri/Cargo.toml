@@ -1,6 +1,6 @@
 [package]
 name = "open-photo"
-version = "0.54.5"
+version = "0.54.6"
 description = "Offline-first Windows photo organizer"
 authors = ["Open-Photo contributors"]
 edition = "2021"
@@ -36,3 +36,6 @@ tokio = { version = "1", features = ["sync"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_Security"] }
+
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "0.61", features = ["Win32_System_ProcessStatus"] }

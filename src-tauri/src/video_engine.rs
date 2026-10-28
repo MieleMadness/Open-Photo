@@ -263,6 +263,8 @@ fn run_reader(
     let started = Instant::now();
     let mut failure = None;
     let status = loop {
+        #[cfg(all(test, windows))]
+        sample_native_memory(&child);
         if cancel() || overflow.load(Ordering::Acquire) || started.elapsed() > timeout {
             failure = Some(
                 if cancel() {
@@ -287,6 +289,8 @@ fn run_reader(
             }
         }
     };
+    #[cfg(all(test, windows))]
+    sample_native_memory(&child);
     let output = stdout.join().map_err(|_| "Video output reader failed")??;
     let diagnostics = stderr
         .join()
@@ -304,6 +308,32 @@ fn run_reader(
         ));
     }
     Ok(output)
+}
+
+// Test-only measurement: maximum individual child peak, never whole-app memory.
+#[cfg(all(test, windows))]
+static NATIVE_PEAK: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+#[cfg(all(test, windows))]
+pub(crate) fn reset_native_peak() {
+    NATIVE_PEAK.store(0, Ordering::Relaxed);
+}
+#[cfg(all(test, windows))]
+pub(crate) fn native_peak() -> u64 {
+    NATIVE_PEAK.load(Ordering::Relaxed)
+}
+#[cfg(all(test, windows))]
+fn sample_native_memory(child: &std::process::Child) {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::System::ProcessStatus::{
+        GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS,
+    };
+    let mut counters = PROCESS_MEMORY_COUNTERS::default();
+    let size = std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
+    counters.cb = size;
+    // SAFETY: Child owns a live process handle and counters is a correctly sized output buffer.
+    if unsafe { GetProcessMemoryInfo(child.as_raw_handle(), &mut counters, size) } != 0 {
+        NATIVE_PEAK.fetch_max(counters.PeakWorkingSetSize as u64, Ordering::Relaxed);
+    }
 }
 
 #[derive(Serialize)]

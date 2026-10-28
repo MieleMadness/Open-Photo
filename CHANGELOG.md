@@ -1,3 +1,10 @@
+# 0.54.6 — Repeatable release video acceptance
+
+- Add an opt-in optimized-build acceptance test using an eight-second 1080p/audio fixture, non-frame-grid trimming, crop, rotation, gain, and the real export/publication pipeline.
+- Record export wall time, processing rate, stage start times, output properties, and the maximum individual native child peak working set. Memory instrumentation exists only in test builds; this does not measure whole-app memory.
+- Save a machine-labeled environment report without personal library paths or host identifiers. Fresh output directories and report creation prevent reuse of stale results.
+- Run the acceptance test in the Windows installer job and publish JSON reports alongside the installer. Keep real-media/GUI, hour-scale synchronization, actual drive failures, startup/seek performance, and whole-app memory as open Phase 6 gates.
+
 # 0.54.5 — Phase 6 export hardening
 
 - Validate video and audio spans independently, so longer audio cannot hide truncated video. Preserve legitimately unequal source tracks and omit audio when the kept range has none.

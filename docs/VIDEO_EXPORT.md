@@ -1,4 +1,4 @@
-# Single-video MP4 export (0.54.5)
+# Single-video MP4 export (0.54.6)
 
 Create or open a video project, choose **Preview edits** if desired, then **Export video MP4** and a new output filename. The app waits for autosave and submits a separate snapshot of the saved trim/transform/audio/canvas settings. Subsequent edits do not alter a running export. Export continues if the editor closes; the app-wide panel shows the destination, phase, progress, elapsed time, cancellation, and completed-file opening. Only one export is accepted at a time, and native processing is serialized with preview jobs. Normal app closure stays open while an export is active; finish or cancel it first.
 
@@ -28,3 +28,5 @@ Existing project limits apply (one source/kept range, up to two hours / 100 mega
 Generated fixtures compare source/export frame timestamps within 1 ms, sample decoded preview/export pixels, check audio gain/mute/start/end timing, and fully decode output. Coverage includes a 90-second VFR/audio source, jittered timestamps, non-frame-grid trims, portrait output, HDR rejection, cancellation, corrupt output after header checks, changed source, insufficient-space simulation, and destination races. Additional regressions cover short video hidden by longer audio, unequal track lengths, missing Matroska stream durations, and delayed/out-of-order status replies.
 
 Phase 6 remains in progress until real installed-Windows media/hardware, hour-scale synchronization, drive/disk failures, installer independence from system FFmpeg, and measured performance/memory pass. Browser marker placement is approximate; generated timing tests do not establish frame-accurate user seeking on every codec. HDR tone mapping and waveform UI remain deferred; Phase 7 multi-video editing is not part of this release.
+
+The optimized synthetic export baseline is documented in [video acceptance](VIDEO_ACCEPTANCE.md). GitHub Actions publishes its JSON measurements separately from the installer; these do not establish GUI, real-media, or whole-app performance acceptance.

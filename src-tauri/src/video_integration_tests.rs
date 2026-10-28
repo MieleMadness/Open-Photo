@@ -10,6 +10,140 @@ use std::{
 };
 
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+/// Run alone in release mode: the native peak recorder is process-wide.
+#[cfg(windows)]
+#[test]
+#[ignore = "release acceptance: use scripts/accept-video.ps1"]
+fn video_release_acceptance() {
+    use crate::{
+        video_export::{self, Control, Request, Stage},
+        video_project::{self, VideoTime},
+        video_render::ExportSize,
+    };
+    use std::{
+        io::Write,
+        sync::{Arc, Mutex},
+        time::Instant,
+    };
+    if cfg!(debug_assertions) {
+        panic!("Acceptance must use an optimized release build");
+    }
+    let report_path =
+        std::env::var_os("OPENPHOTO_ACCEPTANCE_OUTPUT").expect("Set an acceptance report path");
+    struct AcceptanceControl {
+        started: Instant,
+        stages: Mutex<Vec<(Stage, f64)>>,
+    }
+    impl Control for AcceptanceControl {
+        fn cancelled(&self) -> bool {
+            false
+        }
+        fn update(&self, stage: Stage, _: Option<f64>, _: u64) {
+            let mut stages = self.stages.lock().unwrap();
+            if stages.last().is_none_or(|(old, _)| *old != stage) {
+                stages.push((stage, self.started.elapsed().as_secs_f64()));
+            }
+        }
+        fn begin_publish(&self) -> Result<(), String> {
+            self.update(Stage::Publishing, None, 0);
+            Ok(())
+        }
+    }
+    let fixture = Fixture::new();
+    let source = fixture.0.join("1080p acceptance.mp4");
+    ffmpeg(
+        &[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=1920x1080:rate=30:duration=8",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000:duration=8",
+            "-c:v",
+            "libopenh264",
+            "-b:v",
+            "8000k",
+            "-c:a",
+            "aac",
+            "-ac",
+            "2",
+        ],
+        &source,
+    );
+    let before = fingerprint(&source);
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    let mut project =
+        video_project::new_project(fixture.0.to_str().unwrap(), &source, info).unwrap();
+    let base = project.asset.info.time_base.clone().unwrap();
+    project.clips[0].source_in = VideoTime::from_seconds(0.37, &base).unwrap();
+    project.clips[0].source_out = VideoTime::from_seconds(7.61, &base).unwrap();
+    project.clips[0].edits.crop.width = 9000;
+    project.clips[0].edits.quarter_turns = 2;
+    project.clips[0].edits.gain_percent = 75;
+    let output = fixture.0.join("accepted.mp4");
+    video_engine::reset_native_peak();
+    let control = Arc::new(AcceptanceControl {
+        started: Instant::now(),
+        stages: Mutex::new(vec![]),
+    });
+    let report = video_export::export_file(
+        Request {
+            engine: &engine(),
+            root: fixture.0.to_str().unwrap(),
+            project: &project,
+            destination: &output,
+            size: ExportSize::Hd1080,
+            acknowledge_first_audio: false,
+        },
+        control.clone(),
+    )
+    .unwrap();
+    let elapsed = control.started.elapsed().as_secs_f64();
+    let peak = video_engine::native_peak();
+    assert!(
+        peak > 0,
+        "Windows native-process memory measurement was unavailable"
+    );
+    assert_eq!(fingerprint(&source), before);
+    assert_eq!((report.width, report.height), (1920, 1080));
+    assert!((report.duration_seconds - 7.24).abs() < 0.1);
+    assert_eq!(fs::metadata(&output).unwrap().len(), report.bytes);
+    assert_no_export_temporaries(&fixture.0);
+    let stages = control.stages.lock().unwrap();
+    for required in [
+        Stage::VerifyingSource,
+        Stage::Encoding,
+        Stage::CheckingOutput,
+        Stage::DecodingOutput,
+        Stage::Publishing,
+    ] {
+        assert!(stages.iter().any(|(s, _)| *s == required));
+    }
+    let document = serde_json::json!({
+        "schema_version":1,"app_version":env!("CARGO_PKG_VERSION"),"engine_version":video_engine::VERSION,
+        "scope":"Optimized native export pipeline using synthetic media; excludes GUI/WebView, startup, seeking, fixture generation, and real-footage acceptance",
+        "fixture":{"width":1920,"height":1080,"source_seconds":8,"fps":30,"audio_hz":48000,"trim_in_seconds":0.37,"trim_out_seconds":7.61},
+        "export_wall_seconds":elapsed,"media_seconds_per_wall_second":7.24/elapsed,
+        "maximum_individual_native_child_peak_working_set_bytes":peak,
+        "memory_scope":"Maximum Windows-reported PeakWorkingSetSize of an individual owned FFmpeg/ffprobe process, sampled every 20 ms; not combined process-tree or whole-app memory",
+        "stage_started_seconds":*stages,"output":{"width":report.width,"height":report.height,"seconds":report.duration_seconds,"bytes":report.bytes},
+        "checks":{"source_unchanged":true,"stream_validation":true,"full_decode":true,"publication":true,"temporary_cleanup":true},
+        "performance_budget":null
+    });
+    let mut file = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(report_path)
+        .unwrap();
+    file.write_all(&serde_json::to_vec_pretty(&document).unwrap())
+        .unwrap();
+    file.sync_all().unwrap();
+}
 struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Self {

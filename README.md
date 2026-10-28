@@ -1,4 +1,4 @@
-> Development update: **0.54.5** hardens MP4 export with independent video/audio timing validation, bounded packet-timing fallback, and protection against delayed export-status replies. Phase 6 still needs installed-app acceptance with real footage. See [video export](docs/VIDEO_EXPORT.md), [video projects](docs/VIDEO_PROJECTS.md), and the [Phase 6/7 roadmap](docs/VIDEO_ROADMAP.md).
+> Development update: **0.54.6** adds a repeatable optimized 1080p export acceptance test with timing and native-process memory reports, run locally and in GitHub Actions. Phase 6 still needs installed-app acceptance with real footage and whole-app performance measurements. See [video acceptance](docs/VIDEO_ACCEPTANCE.md), [video export](docs/VIDEO_EXPORT.md), and the [Phase 6/7 roadmap](docs/VIDEO_ROADMAP.md).
 
 # Open-Photo
 
