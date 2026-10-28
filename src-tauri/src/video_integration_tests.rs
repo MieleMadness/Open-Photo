@@ -1706,11 +1706,11 @@ fn video_real_media_acceptance() {
     file.sync_all().unwrap();
 }
 
-// Packet inspection finds the preceding random-access point without decoding an hour.
-// ffprobe's nearest-keyframe seek can otherwise start after a requested B-frame.
-fn preceding_keyframe(path: &Path, stream: usize, start: f64) -> f64 {
+// Seek between two earlier random-access points so either neighboring keyframe
+// selected by the demuxer precedes the range. Exact-boundary seeks can jump forward.
+fn preroll_seek(path: &Path, stream: usize, start: f64) -> Option<f64> {
     use std::sync::{atomic::AtomicBool, Arc, Mutex};
-    let key = Arc::new(Mutex::new(0.0_f64));
+    let key = Arc::new(Mutex::new(Vec::<f64>::with_capacity(2)));
     let copy = key.clone();
     let done = Arc::new(AtomicBool::new(false));
     let complete = done.clone();
@@ -1757,7 +1757,14 @@ fn preceding_keyframe(path: &Path, stream: usize, start: f64) -> f64 {
             }
             if let Some(pts) = pts {
                 if is_key && pts <= start {
-                    *copy.lock().map_err(|e| e.to_string())? = dts.unwrap_or(pts).max(0.0);
+                    let time = dts.unwrap_or(pts);
+                    let mut keys = copy.lock().map_err(|e| e.to_string())?;
+                    if keys.last().is_none_or(|last| time > *last) {
+                        if keys.len() == 2 {
+                            keys.remove(0);
+                        }
+                        keys.push(time);
+                    }
                 }
                 if pts >= start {
                     complete.store(true, Ordering::Release);
@@ -1772,16 +1779,67 @@ fn preceding_keyframe(path: &Path, stream: usize, start: f64) -> f64 {
             "Source keyframe inspection failed: {error}"
         );
     }
-    Arc::try_unwrap(key).unwrap().into_inner().unwrap()
+    let keys = Arc::try_unwrap(key).unwrap().into_inner().unwrap();
+    match keys.as_slice() {
+        [earlier, later] => Some(earlier + (later - earlier) / 2.0).filter(|t| t.is_finite()),
+        _ => None, // No initial seek is safer when only the first access point is known.
+    }
 }
 // Inspect decoded presentation order until a frame beyond the selected range is observed.
 // Stopping at a packet timestamp can discard a still-buffered B-frame inside the range.
+#[derive(Debug)]
+struct FrameWindow {
+    start: f64,
+    end: f64,
+    frames: Vec<f64>,
+    complete: bool,
+    first_seen: Option<f64>,
+}
+impl FrameWindow {
+    fn new(start: f64, end: f64) -> Self {
+        Self {
+            start,
+            end,
+            frames: vec![],
+            complete: false,
+            first_seen: None,
+        }
+    }
+    fn consume(&mut self, line: &[u8]) -> Result<bool, String> {
+        // A killed probe can leave a final partial line that looks like a smaller timestamp.
+        // Once the presentation range is complete, subsequent output cannot change it.
+        if self.complete {
+            return Ok(true);
+        }
+        let text = String::from_utf8_lossy(line);
+        for field in text.trim().split('|') {
+            if let Some(("best_effort_timestamp_time", value)) = field.split_once('=') {
+                if let Some(time) = crate::video_timing::number(Some(value)) {
+                    self.first_seen.get_or_insert(time);
+                    if time >= self.end {
+                        self.complete = true;
+                        return Ok(true);
+                    }
+                    if time >= self.start {
+                        if self.frames.len() >= 50_000 {
+                            return Err("Source window exceeds the frame inspection limit".into());
+                        }
+                        self.frames.push(time);
+                    }
+                }
+            }
+        }
+        Ok(false)
+    }
+}
 fn range_frame_times(path: &Path, stream: usize, start: f64, end: f64) -> Vec<f64> {
     use std::sync::{atomic::AtomicBool, Arc, Mutex};
-    let seek = preceding_keyframe(path, stream, start);
-    let interval = format!("{seek:.9}%");
+    let seek = preroll_seek(path, stream, start);
+    let interval = seek
+        .map(|time| format!("{time:.9}%"))
+        .unwrap_or_else(|| "%".into());
     let stream = stream.to_string();
-    let frames = Arc::new(Mutex::new(Vec::new()));
+    let frames = Arc::new(Mutex::new(FrameWindow::new(start, end)));
     let copy = frames.clone();
     let done = Arc::new(AtomicBool::new(false));
     let complete = done.clone();
@@ -1809,23 +1867,8 @@ fn range_frame_times(path: &Path, stream: usize, start: f64, end: f64) -> Vec<f6
         Duration::from_secs(180),
         || done.load(Ordering::Acquire),
         move |line| {
-            let text = String::from_utf8_lossy(line);
-            for field in text.trim().split('|') {
-                if let Some(("best_effort_timestamp_time", value)) = field.split_once('=') {
-                    if let Some(time) = crate::video_timing::number(Some(value)) {
-                        if time >= end {
-                            complete.store(true, Ordering::Release);
-                        } else if time >= start {
-                            let mut frames = copy.lock().map_err(|e| e.to_string())?;
-                            if frames.len() >= 50_000 {
-                                return Err(
-                                    "Source window exceeds the frame inspection limit".into()
-                                );
-                            }
-                            frames.push(time);
-                        }
-                    }
-                }
+            if copy.lock().map_err(|e| e.to_string())?.consume(line)? {
+                complete.store(true, Ordering::Release);
             }
             Ok(())
         },
@@ -1836,7 +1879,27 @@ fn range_frame_times(path: &Path, stream: usize, start: f64, end: f64) -> Vec<f6
             "Source frame inspection failed: {error}"
         );
     }
-    Arc::try_unwrap(frames).unwrap().into_inner().unwrap()
+    let window = Arc::try_unwrap(frames).unwrap().into_inner().unwrap();
+    assert!(!window.frames.is_empty(),"Source inspection yielded no frames for {start:.9}..{end:.9}; seek target {seek:?}; first decoded timestamp {:?}",window.first_seen);
+    window.frames
+}
+#[test]
+fn completed_frame_windows_ignore_buffered_and_partial_probe_output() {
+    let mut window = FrameWindow::new(0.37, 1.61);
+    assert!(!window
+        .consume(b"best_effort_timestamp_time=0.383333\n")
+        .unwrap());
+    assert!(!window
+        .consume(b"best_effort_timestamp_time=1.600000\n")
+        .unwrap());
+    assert!(window
+        .consume(b"best_effort_timestamp_time=1.616667\n")
+        .unwrap());
+    assert!(window
+        .consume(b"best_effort_timestamp_time=10.000000\n")
+        .unwrap());
+    assert!(window.consume(b"best_effort_timestamp_time=1").unwrap());
+    assert_eq!(window.frames, vec![0.383333, 1.6]);
 }
 #[test]
 fn range_inspection_drains_reordered_frames_before_stopping() {
@@ -1863,6 +1926,41 @@ fn range_inspection_drains_reordered_frames_before_stopping() {
         .collect();
     assert!(!expected.is_empty());
     assert_eq!(range_frame_times(&source, 0, 0.37, 1.61), expected);
+}
+#[test]
+fn frame_inspection_keeps_ranges_adjacent_to_random_access_boundaries() {
+    let fixture = Fixture::new();
+    let source = fixture.0.join("key-boundaries.mp4");
+    ffmpeg(
+        &[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=10:duration=60",
+            "-c:v",
+            "libopenh264",
+            "-g",
+            "100",
+        ],
+        &source,
+    );
+    let all = frame_times(&source);
+    for start in [0.37, 10.000001, 20.000001, 49.999999, 50.000001] {
+        let end = start + 4.24;
+        let expected: Vec<f64> = all
+            .iter()
+            .copied()
+            .filter(|t| *t >= start && *t < end)
+            .collect();
+        assert!(!expected.is_empty());
+        assert_eq!(
+            range_frame_times(&source, 0, start, end),
+            expected,
+            "Source range {start}..{end}"
+        );
+    }
 }
 fn verify_long_windows(source: &Path, output_root: &Path) -> serde_json::Value {
     use crate::{

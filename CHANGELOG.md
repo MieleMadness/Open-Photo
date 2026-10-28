@@ -1,5 +1,9 @@
 # 0.54.9 — Previous-save recovery for video projects
 
+- Anchor reference-frame inspection between earlier random-access points, with no initial seek when there is insufficient preroll information. Add keyframe-boundary regressions and actionable empty-window diagnostics.
+- Freeze completed frame-inspection windows so buffered/partial output during probe termination cannot alter reference counts. Add cancellation-tail regression coverage.
+- Update checkout, Node setup, and artifact upload actions to verified Node 24 releases; keep the app build Node version pinned.
+
 - Browse up to 20 prior automatic saves with available save number/time, title, trim range, and canvas dimensions. Open a selected version as a separate recovered draft and return to the previous draft.
 - Preserve the current draft and its history. Carry forward the current verified source identity and relink path while recovering historical edit settings. Missing sources remain explicitly unavailable until relinked.
 - Check library/project ownership, snapshot identity, and the current save revision inside a write transaction. Reject stale, pruned, oversized, or incompatible snapshots instead of replacing current work.

@@ -1,4 +1,4 @@
-# Repeatable video acceptance (0.54.8)
+# Repeatable video acceptance (0.54.9)
 
 Phase 6 has an automated native export baseline. It is a measurement and correctness check, not completion of installed-app acceptance.
 
@@ -57,7 +57,7 @@ The real report includes the chosen filename, source properties/hash, and per-ex
 
 This optimized, opt-in gate requires an SDR recording at least one hour long, square pixels, and a supported source canvas. It exports 4.24-second windows near the beginning, middle, and end to separate files at source resolution. Each window compares decoded video frame counts/timestamps with a bounded source inspection, checks independent stream timing through the production validator, and fully decodes the output. The original source hash must remain unchanged. Reports and portable project copies stay in the chosen fresh output folder.
 
-The ordinary native suite includes the same three-window check using generated hour-scale media. Source inspection locates a preceding random-access packet using a bounded-memory packet scan, then streams decoded presentation timestamps until the next frame is beyond the selected range, then stops the owned probe process. Packet-boundary stopping can miss buffered B-frames; a reordered-frame regression compares the bounded scanner with a complete short-source decode. Reads are limited to 4096 bytes per line, 50,000 selected frames, and 180 seconds. Fixture generation has a separate 120-second limit.
+The ordinary native suite includes the same three-window check using generated hour-scale media. Source inspection uses a bounded-memory packet scan to select a seek point between earlier random-access packets, avoiding exact-boundary forward seeks. With fewer than two earlier points it starts from the beginning without an initial seek. It then streams decoded presentation timestamps until the next frame is beyond the selected range, then stops the owned probe process. Completed windows ignore all later probe output, including a final partial line during termination. Packet-boundary stopping can miss buffered B-frames; a reordered-frame regression compares the bounded scanner with a complete short-source decode. Reads are limited to 4096 bytes per line, 50,000 selected frames, and 180 seconds. Fixture generation has a separate 120-second limit.
 
 These checks establish short-window seeking and timing at distant source positions. They do not establish complete hour-long encoding, perceptual A/V synchronization, GUI seeking latency, or installed-app playback.
 
