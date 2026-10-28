@@ -146,10 +146,10 @@ it("requires history refresh after a newer local autosave",async()=>{
   expect((screen.getByLabelText("Video rotation") as HTMLSelectElement).value).toBe("1");
 });
 it("keeps the current draft when recovery fails and handles empty history",async()=>{
-  const fallback=vi.mocked(invoke).getMockImplementation()!;let empty=true;
+  const fallback=vi.mocked(invoke).getMockImplementation()!;let empty=true,conflict=true;
   vi.mocked(invoke).mockImplementation(async(command,args)=>{
-    if(command==="video_project_history")return {revision:1,entries:empty?[]:[previousEntry]};
-    if(command==="recover_video_project")throw Error("Project changed elsewhere. Refresh previous saves before recovering.");
+    if(command==="video_project_history")return {revision:conflict?1:2,entries:empty?[]:[previousEntry]};
+    if(command==="recover_video_project"){if(conflict)throw Error("Project changed elsewhere. Refresh previous saves before recovering.");const recovered=value();recovered.project.id="recovered-after-refresh";recovered.project.title="Recovered after refresh";return recovered;}
     return fallback(command,args);
   });
   render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);
@@ -158,4 +158,8 @@ it("keeps the current draft when recovery fails and handles empty history",async
   empty=false;fireEvent.click(screen.getByText("Refresh previous saves"));await screen.findByLabelText("Previous video save");
   fireEvent.click(screen.getByText("Open previous save as new draft"));await screen.findByText(/Project changed elsewhere/);
   expect(screen.getByDisplayValue("My edit")).toBeTruthy();expect(screen.queryByText(/Opened a recovered draft/)).toBeNull();
+  conflict=false;fireEvent.click(screen.getByText("Refresh previous saves"));await waitFor(()=>expect((screen.getByText("Open previous save as new draft") as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByText("Open previous save as new draft"));await screen.findByDisplayValue("Recovered after refresh");
+  expect(invoke).toHaveBeenLastCalledWith("recent_video_projects",{root:"library"});
+  expect(invoke).toHaveBeenCalledWith("recover_video_project",{root:"library",id:"p",historyId:"42",expectedRevision:2});
 });

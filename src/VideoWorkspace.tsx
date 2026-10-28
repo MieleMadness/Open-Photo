@@ -8,7 +8,7 @@ import {exportFilename,startVideoExport,useVideoExport,type ExportSize} from "./
 
 const CANVASES=[{value:"1920x1080",label:"1080p landscape (1920 × 1080)"},{value:"1080x1920",label:"1080p portrait (1080 × 1920)"},{value:"1080x1080",label:"Square (1080 × 1080)"},{value:"3840x2160",label:"4K landscape (3840 × 2160)"},{value:"2160x3840",label:"4K portrait (2160 × 3840)"}];
 type PreviousSave={id:string;revision:number|null;saved_at:number|null;title:string;start_seconds:number;end_seconds:number;width:number;height:number};
-type SavedHistory={revision:number;entries:PreviousSave[]};
+type SavedHistory={revision:number;entries:PreviousSave[];localRevision:number};
 function NumberField({label,value,min,max,step=1,onCommit}:{label:string;value:number;min:number;max:number;step?:number;onCommit:(value:number)=>void}){
   const [draft,setDraft]=useState(String(value));
   useEffect(()=>setDraft(String(value)),[value]);
@@ -61,15 +61,16 @@ export function VideoWorkspace({root,path,onOpenExternal}:{root:string;path:stri
   function history(command:"undo"|"redo"){try{session?.commit(command);}catch(cause){setError(String(cause));}}
   async function loadPreviousSaves(){
     const owner=sessionRef.current;if(!owner)return;await owner.flush();
-    const result=await invoke<SavedHistory>("video_project_history",{root,id:owner.history.present.id});
+    const localRevision=owner.revision;
+    const result=await invoke<Omit<SavedHistory,"localRevision">>("video_project_history",{root,id:owner.history.present.id});
     if(!alive.current||owner!==sessionRef.current)return;
-    setPreviousSaves(result);setPreviousId(result.entries[0]?.id||"");
+    setPreviousSaves({...result,localRevision});setPreviousId(result.entries[0]?.id||"");
   }
   async function recoverPreviousSave(){
     const owner=sessionRef.current;if(!owner||!previousSaves||!previousId)return;
     await owner.flush();if(!alive.current||owner!==sessionRef.current)return;
-    if(owner.revision!==previousSaves.revision)throw Error("Project changed. Refresh previous saves before opening one.");
-    const recovered=await invoke<LoadedProject>("recover_video_project",{root,id:owner.history.present.id,historyId:previousId,expectedRevision:owner.revision});
+    if(owner.revision!==previousSaves.localRevision)throw Error("Project changed. Refresh previous saves before opening one.");
+    const recovered=await invoke<LoadedProject>("recover_video_project",{root,id:owner.history.present.id,historyId:previousId,expectedRevision:previousSaves.revision});
     if(!alive.current||owner!==sessionRef.current)return;
     const origin={id:owner.history.present.id,title:owner.history.present.title};
     adopt(recovered);setPreviousDraft(origin);setMessage("Opened a recovered draft. Your previous draft was kept unchanged.");
