@@ -1,4 +1,4 @@
-> Development update: **0.54.1** starts Phase 6 with bundled local video inspection. Video details now include timing, dimensions, rotation, HDR flags, and audio streams. See [video engine setup and behavior](docs/VIDEO_ENGINE.md) and the [Phase 6/7 roadmap](docs/VIDEO_ROADMAP.md). Editing/export controls are not yet implemented.
+> Development update: **0.54.2** adds Phase 6.2 playback controls, seeking, a filmstrip, temporary in/out preview markers, and cancellable compatible previews for SDR video. Originals remain unchanged. Saved edits and video export are still upcoming. See [video engine behavior](docs/VIDEO_ENGINE.md) and the [Phase 6/7 roadmap](docs/VIDEO_ROADMAP.md).
 
 # Open-Photo
 

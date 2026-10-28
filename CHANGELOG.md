@@ -1,3 +1,14 @@
+# 0.54.2 — Phase 6.2: Playback and compatible previews
+
+- Add play/pause, a scrubber, time display, keyboard seeking, clickable filmstrip frames, and temporary in/out markers with marked-range playback.
+- Preserve preview marks as integer source ticks; switching between original and compatible playback retains the selection and playhead. These markers do not yet save or trim a video.
+- Add serialized, cancellable background jobs for filmstrips and compatible SDR H.264/AAC previews. Apply rotation and square-pixel scaling while preserving variable frame timing and relative audio offsets.
+- Keep original media read-only and stream video bytes. Bound derivative size, duration, dimensions, runtime, and thumbnail output; surface errors while retaining original/Windows playback options.
+- Give native video processes Windows job ownership so app exit terminates native work. Clean session-owned derivatives on release and retry abandoned-cache cleanup after a day.
+- Prevent seeking shortcuts from navigating to another library item; ignore stale jobs and cancel work on player closure/source changes.
+- Add real-media timing/rotation/audio/large-file/source-preservation tests, process ownership and cancellation cleanup tests, and player/marker lifecycle coverage.
+- HDR proxy conversion, saved editing projects, undo/redo, and export remain incomplete Phase 6 work.
+
 # 0.54.1 — Phase 6.1: Local video inspection
 
 - Bundle a fixed, checksum-verified LGPL FFmpeg/ffprobe engine and its shared libraries/licenses in the Windows installer.

@@ -1,6 +1,6 @@
-import {VideoDetails} from "./VideoDetails";
+import {VideoPlayer} from "./VideoPlayer";
 import { useEffect, useState } from "react";
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 
 function decodeBase64(encoded: string): Uint8Array {
   const raw = atob(encoded);
@@ -43,33 +43,7 @@ export function IPhonePicture({ root, path, name }: { root: string; path: string
     <div className="photo-fallback"><span>{error ? "HEIC preview unavailable" : "Decoding iPhone photo…"}</span></div>;
 }
 
-/** Inline motion playback is attempted locally; codec support varies by Windows install. */
-export function IPhoneMotion({ root, path, onOpenExternal }: {
-  root: string;
-  path: string;
-  onOpenExternal: () => void;
-}) {
-  const [src,setSrc]=useState("");
-  const [error,setError]=useState("");
-  const [loading,setLoading]=useState(false);
-  const [requested,setRequested]=useState(false);
-  useEffect(()=>{setRequested(false)},[root,path]);
-  useEffect(()=>{
-    let active=true;
-    setSrc("");setError("");setLoading(false);
-    if(!requested)return()=>{active=false};
-    setLoading(true);
-    void invoke<string>("video_source",{root,path})
-      .then(source=>{if(active)setSrc(convertFileSrc(source))})
-      .catch(cause=>{if(active)setError(String(cause))})
-      .finally(()=>{if(active)setLoading(false)});
-    return()=>{active=false};
-  },[root,path,requested]);
-  return <div className="iphone-motion">
-    <VideoDetails root={root} path={path}/>
-    {src ? <video controls autoPlay playsInline onError={() => setError("Windows WebView2 cannot decode this MOV/HEVC clip. Use the Windows player.")} src={src} style={{maxWidth:"100%",maxHeight:420}} /> :
-      <button className="secondary-button" onClick={() => setRequested(true)} disabled={loading}>{loading ? "Loading motion…" : "Play Live Photo / video"}</button>}
-    {error && <p>{error}</p>}
-    {(error || src) && <button className="secondary-button" onClick={onOpenExternal}>Open in Windows player</button>}
-  </div>;
+/** A new media identity resets all transient player state. */
+export function IPhoneMotion(props: {root:string;path:string;onOpenExternal:()=>void}) {
+  return <VideoPlayer key={`${props.root}\0${props.path}`} {...props}/>;
 }

@@ -17,6 +17,48 @@ pub(crate) const VERSION: &str = "n8.1.3-24-g92611900bb";
 pub(crate) const ARCHIVE_SHA256: &str =
     "6c6167da57decb941a0466b60d95f7f51e4edd6b2d79c24dc4860c1c15701292";
 
+// Closing this handle (including on app exit) kills native work rather than leaving an orphan.
+#[cfg(windows)]
+pub(crate) struct ProcessJob(windows_sys::Win32::Foundation::HANDLE);
+#[cfg(windows)]
+impl ProcessJob {
+    pub(crate) fn attach(child: &std::process::Child) -> Result<Self, String> {
+        use std::os::windows::io::AsRawHandle;
+        use windows_sys::Win32::System::JobObjects::*;
+        // SAFETY: null security/name arguments create a private, non-inheritable job.
+        let handle = unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) };
+        if handle.is_null() {
+            return Err(std::io::Error::last_os_error().to_string());
+        }
+        let job = Self(handle);
+        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        // SAFETY: the buffer matches the requested Windows structure and both handles are live.
+        let success = unsafe {
+            SetInformationJobObject(
+                handle,
+                JobObjectExtendedLimitInformation,
+                (&limits as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+                std::mem::size_of_val(&limits) as u32,
+            ) != 0
+                && AssignProcessToJobObject(handle, child.as_raw_handle()) != 0
+        };
+        if !success {
+            return Err(std::io::Error::last_os_error().to_string());
+        }
+        Ok(job)
+    }
+}
+#[cfg(windows)]
+impl Drop for ProcessJob {
+    fn drop(&mut self) {
+        // SAFETY: this guard owns the job handle and closes it exactly once.
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(self.0);
+        }
+    }
+}
+
 pub(crate) fn directory(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     if cfg!(debug_assertions) {
         Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/video-engine"))
@@ -94,6 +136,15 @@ pub(crate) fn run_until(
     let mut child = command
         .spawn()
         .map_err(|e| format!("Cannot start the bundled video tool: {e}"))?;
+    #[cfg(windows)]
+    let _process_job = match ProcessJob::attach(&child) {
+        Ok(job) => job,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(format!("Cannot contain the video process: {error}"));
+        }
+    };
     let overflow = Arc::new(AtomicBool::new(false));
     let out = child.stdout.take().ok_or("Video tool stdout unavailable")?;
     let err = child.stderr.take().ok_or("Video tool stderr unavailable")?;

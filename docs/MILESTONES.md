@@ -1,6 +1,6 @@
 # Milestones and validation status
 
-## Current branch — 0.54.1
+## Current branch — 0.54.2
 
 The development branch contains a Windows Tauri photo library with workspaces, local indexing, previews, nondestructive photo-copy export, managed XMP keywords, maps, and opt-in local semantic/People/OCR features. Source-media originals remain read-only. CI success and installed-app acceptance are separate requirements.
 
@@ -21,7 +21,7 @@ Use a copied media library to verify packaged WebView2 playback, all EXIF orient
 
 ## Phase 6 — Single-video editing
 
-Phase 6.1 now includes the bundled pinned engine, bounded/cancellable video inspection, video/audio metadata, HDR and timing warnings, and real-media tests. Proxies, editing projects, controls, and video export remain incomplete. See [VIDEO_ENGINE.md](VIDEO_ENGINE.md).
+Phase 6.1 now includes the bundled pinned engine, bounded/cancellable video inspection, video/audio metadata, HDR and timing warnings, and real-media tests. Phase 6.2 adds seeking/playback controls, a filmstrip, temporary in/out preview marks, and cancellable compatible SDR previews. Packaged-app acceptance, saved editing projects, undo/redo, and video export remain incomplete. See [VIDEO_ENGINE.md](VIDEO_ENGINE.md).
 
 Probe media, scoped playback/proxies, one-source trim/crop/rotate/audio edits, saved projects/undo, and verified new-file export. See [VIDEO_ROADMAP.md](VIDEO_ROADMAP.md) for implementation order and acceptance criteria.
 

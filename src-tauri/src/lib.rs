@@ -20,6 +20,7 @@ mod user_data;
 mod video_engine;
 #[cfg(test)]
 mod video_integration_tests;
+mod video_preview;
 mod video_probe;
 mod watch;
 mod xmp;
@@ -1058,6 +1059,7 @@ pub fn run() {
         .manage(std::sync::Mutex::new(watch::WatchState::default()))
         .manage(media_jobs::ImageJobs::default())
         .manage(video_probe::InspectionJobs::default())
+        .manage(video_preview::PreviewJobs::default())
         .invoke_handler(tauri::generate_handler![
             ai_embeddings::ai_embedding_status,
             ai_embeddings::ai_find_similar_by_photo,
@@ -1085,6 +1087,9 @@ pub fn run() {
             media_stream::video_source,
             video_probe::inspect_video,
             video_engine::video_engine_status,
+            video_preview::start_video_preview,
+            video_preview::video_preview_status,
+            video_preview::cancel_video_preview,
             user_data::load_user_data,
             user_data::save_user_data,
             user_data::export_user_data,

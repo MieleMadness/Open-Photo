@@ -1,3 +1,9 @@
+# Phase 6.2 checks (0.54.2)
+
+The current suite adds generated VFR footage with per-frame source/proxy timestamp comparisons (1 ms tolerance), delayed audio (30 ms start-offset tolerance), rotated/silent video, actual proxy decode, HDR rejection, a 64 MB source, cancellation/owned-folder cleanup, and native process-job termination. Frontend tests cover seeking, marker validation and rational times, proxy switching, clip changes, late-start cancellation, and generation errors that preserve original playback.
+
+For installed-app acceptance, use copied real media: seek through clips over 48 MB, compare original/proxy orientation and aspect, confirm audio synchronization over long recordings, cancel and close during generation, test insufficient disk space, and confirm player shortcuts do not change the selected library item. Browser seeks are approximate; they are not a frame-accurate export guarantee. Markers remain temporary. Waveforms, saved edits, undo/redo, and export are not delivered by this milestone.
+
 # Phase 6.1 checks (0.54.1)
 
 Run `npm ci`, then `scripts/check.ps1 -Package` to prepare the pinned video engine and icons, run formatting/frontend/Rust checks, and package the installer. GitHub Actions prepares the identical engine before Rust tests and packaging. Generated executables, icons, and schemas are not committed.

@@ -3,19 +3,19 @@ import {invoke} from "@tauri-apps/api/core";
 
 export type VideoInfo={duration_seconds:number;codec:string;width:number;height:number;sample_aspect_ratio:string|null;frame_rate:string|null;nominal_frame_rate:string|null;time_base:string|null;rotation_degrees:number;hdr:boolean;color_transfer:string|null;audio:{stream:number;codec:string;sample_rate:string|null;channels:number|null;channel_layout:string|null}[];warnings:string[]};
 
-export function VideoDetails({root,path}:{root:string;path:string}){
+export function VideoDetails({root,path,onInfo}:{root:string;path:string;onInfo?:(value:VideoInfo|null)=>void}){
   const [info,setInfo]=useState<VideoInfo|null>(null);
   const [error,setError]=useState("");
   const [busy,setBusy]=useState(false);
   const [refresh,setRefresh]=useState(0);
   useEffect(()=>{
-    let active=true;setInfo(null);setError("");setBusy(true);
+    let active=true;setInfo(null);setError("");setBusy(true);onInfo?.(null);
     void invoke<VideoInfo>("inspect_video",{root,path})
-      .then(value=>{if(active)setInfo(value)})
+      .then(value=>{if(active){setInfo(value);onInfo?.(value)}})
       .catch(reason=>{if(active)setError(String(reason))})
       .finally(()=>{if(active)setBusy(false)});
     return()=>{active=false};
-  },[root,path,refresh]);
+  },[root,path,refresh,onInfo]);
   return <section className="video-details" aria-label="Video details">
     <h3>Video details</h3>
     {busy&&<p role="status">Reading video information…</p>}

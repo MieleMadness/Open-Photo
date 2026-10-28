@@ -798,9 +798,10 @@ export default function App() {
   useEffect(()=>{
     if(!selected)return;
     const handle=(event:KeyboardEvent)=>{
+      if(event.defaultPrevented)return;
       if(event.key==="Escape"){setFullScreenPreview(false);setSelected(null);return;}
       if(event.key!=="ArrowLeft"&&event.key!=="ArrowRight")return;
-      if((event.target as HTMLElement)?.closest("input,select,textarea"))return;
+      if((event.target as HTMLElement)?.closest("input,select,textarea,.video-player"))return;
       const index=visible.findIndex(photo=>photo.path===selected.path);
       const next=index+(event.key==="ArrowRight"?1:-1);
       if(next>=0&&next<visible.length){event.preventDefault();setSelected(visible[next]);}

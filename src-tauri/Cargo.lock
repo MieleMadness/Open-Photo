@@ -3022,7 +3022,7 @@ dependencies = [
 
 [[package]]
 name = "open-photo"
-version = "0.54.1"
+version = "0.54.2"
 dependencies = [
  "base64 0.22.1",
  "dirs 5.0.1",

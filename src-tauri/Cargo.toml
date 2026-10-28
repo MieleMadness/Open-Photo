@@ -1,6 +1,6 @@
 [package]
 name = "open-photo"
-version = "0.54.1"
+version = "0.54.2"
 description = "Offline-first Windows photo organizer"
 authors = ["Open-Photo contributors"]
 edition = "2021"
@@ -35,4 +35,4 @@ roxmltree = "0.21"
 tokio = { version = "1", features = ["sync"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_Security"] }
