@@ -115,6 +115,7 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false}:
     {src&&<><video ref={video} src={src} poster={poster||assets?.filmstrip[0]?.image} autoPlay={playIntent} controls playsInline preload="metadata" aria-label="Selected video"
       onLoadedMetadata={()=>{const element=video.current;if(!element)return;if(Number.isFinite(element.duration))setDuration(element.duration);element.currentTime=Math.min(restore.current,element.duration||0);setPosition(element.currentTime);current.current=element.currentTime;}}
       onDurationChange={()=>{if(video.current&&Number.isFinite(video.current.duration))setDuration(video.current.duration);}}
+      onLoadedData={event=>{if(event.currentTarget.videoWidth===0&&event.currentTarget.videoHeight===0)playbackFailure(4,"The file loaded without a decodable video track");}}
       onTimeUpdate={()=>{if(video.current){current.current=video.current.currentTime;if(rangePlaying.current&&current.current>=(outMark?markSeconds(outMark):duration)){video.current.pause();video.current.currentTime=outMark?markSeconds(outMark):duration;current.current=video.current.currentTime;rangePlaying.current=false;}setPosition(current.current);}}}
       onPlay={()=>{setPlaying(true);setPlayIntent(true);}} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)}
       onError={event=>playbackFailure(event.currentTarget.error?.code||0,event.currentTarget.error?.message||"")}/>

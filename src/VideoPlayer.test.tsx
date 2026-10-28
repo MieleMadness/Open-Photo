@@ -49,6 +49,13 @@ it("reports streaming failures without starting a codec conversion",async()=>{
   expect(await screen.findByText(/original video could not play.*media error 2/)).toBeTruthy();
   expect(vi.mocked(invoke).mock.calls.filter(([command])=>command==="start_video_preview")).toHaveLength(1);
 });
+it("uses compatibility when the browser loads audio without a video track",async()=>{
+  const {video}=await open();
+  Object.defineProperty(video,"videoWidth",{configurable:true,value:0});Object.defineProperty(video,"videoHeight",{configurable:true,value:0});
+  fireEvent.loadedData(video);
+  await screen.findByText(/Playing a smaller compatible preview/);
+  expect(invoke).toHaveBeenCalledWith("start_video_preview",{root:"library",path:"one.mp4",proxy:true});
+});
 async function open(){
   const view=render(<IPhoneMotion root="library" path="one.mp4" onOpenExternal={()=>{}}/>);
   fireEvent.click(screen.getByText("Play Live Photo / video"));

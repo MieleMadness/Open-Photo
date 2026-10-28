@@ -5,6 +5,7 @@
 - Show a still before playback and retain it as the player's poster. Allow starting or retrying preview from the still rather than leaving an unexplained blank area.
 - Make the explicit Play action request playback after loading, rather than only fetching metadata. Keep native controls available if browser autoplay policy requires another user gesture.
 - Automatically attempt one compatible preview after original-format decode/unsupported errors, retaining playback position. Keep streaming errors distinct, disclose conversion, and show media error details if a compatible preview also fails. Preserve HDR rejection and Windows-player fallback.
+- Detect loaded media with no decodable video dimensions, covering audio-only browser playback that otherwise shows a blank player without firing a media error.
 - Add poster cache invalidation, large-source/source-protection and malformed/out-of-library coverage, plus poster display, automatic fallback, position restoration, no-loop, and streaming-error UI checks.
 - Installed WebView playback of the reported files remains a user acceptance check; native extraction and synthetic UI event tests cannot establish that every Windows codec/GPU setup works.
 
