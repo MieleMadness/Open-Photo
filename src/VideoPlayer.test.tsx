@@ -9,6 +9,7 @@ beforeEach(()=>{
   sequence=0;
   vi.mocked(invoke).mockImplementation(async(command,args)=>{
     if(command==="inspect_video")return info;
+    if(command==="video_poster")return "data:image/png;base64,poster";
     if(command==="video_source")return "original.mp4";
     if(command==="start_video_preview")return `job-${++sequence}`;
     if(command==="video_preview_status")return {state:"complete",result:{source:"preview.mp4",proxy:sequence>1,info,filmstrip:[{seconds:5,image:"data:image/jpeg;base64,abc"}],warnings:[]},error:null};
@@ -16,6 +17,29 @@ beforeEach(()=>{
   });
 });
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.resetAllMocks()});
+it("shows a video poster before playback and keeps it on the player",async()=>{
+  render(<IPhoneMotion root="library" path="one.mp4" onOpenExternal={()=>{}}/>);
+  expect((await screen.findByAltText("Selected video preview") as HTMLImageElement).src).toBe("data:image/png;base64,poster");
+  expect(invoke).toHaveBeenCalledWith("video_poster",{root:"library",path:"one.mp4",maxEdge:640,forPlayer:true});
+  fireEvent.click(screen.getByLabelText("Play selected video"));
+  expect((await screen.findByLabelText("Selected video") as HTMLVideoElement).poster).toBe("data:image/png;base64,poster");
+});
+it("automatically switches unsupported originals to one compatible preview and reports a proxy failure",async()=>{
+  const {video}=await open();video.currentTime=6;fireEvent.timeUpdate(video);
+  Object.defineProperty(video,"error",{configurable:true,value:{code:4,message:"Unsupported source format"}});fireEvent.error(video);
+  await screen.findByText(/Playing a smaller compatible preview/);
+  expect(invoke).toHaveBeenCalledWith("start_video_preview",{root:"library",path:"one.mp4",proxy:true});
+  const proxy=screen.getByLabelText("Selected video") as HTMLVideoElement;
+  Object.defineProperty(proxy,"duration",{configurable:true,value:20});fireEvent.loadedMetadata(proxy);expect(proxy.currentTime).toBe(6);
+  Object.defineProperty(proxy,"error",{configurable:true,value:{code:3,message:"Decoder failed"}});fireEvent.error(proxy);
+  expect(await screen.findByText(/compatible preview could not play.*media error 3/)).toBeTruthy();
+  expect(vi.mocked(invoke).mock.calls.filter(([command])=>command==="start_video_preview")).toHaveLength(2);
+});
+it("reports streaming failures without starting a codec conversion",async()=>{
+  const {video}=await open();Object.defineProperty(video,"error",{configurable:true,value:{code:2,message:"Stream read failed"}});fireEvent.error(video);
+  expect(await screen.findByText(/original video could not play.*media error 2/)).toBeTruthy();
+  expect(vi.mocked(invoke).mock.calls.filter(([command])=>command==="start_video_preview")).toHaveLength(1);
+});
 async function open(){
   const view=render(<IPhoneMotion root="library" path="one.mp4" onOpenExternal={()=>{}}/>);
   fireEvent.click(screen.getByText("Play Live Photo / video"));

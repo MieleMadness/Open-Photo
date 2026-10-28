@@ -517,6 +517,19 @@ fn portrait_silent_preview_applies_rotation_and_preserves_source() {
     assert_eq!(info.rotation_degrees, 0.0);
     assert!(info.audio.is_empty());
     assert_eq!(fingerprint(&source), before);
+    use base64::Engine;
+    let poster = crate::video_poster::poster(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        source.to_str().unwrap(),
+        64,
+    )
+    .unwrap();
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(poster.strip_prefix("data:image/png;base64,").unwrap())
+        .unwrap();
+    let image = image::load_from_memory(&bytes).unwrap();
+    assert!(image.height() > image.width());
 }
 
 #[test]
@@ -555,6 +568,14 @@ fn preview_rejects_hdr_and_cancelled_work_without_changing_sources() {
     let directory = fixture.0.join("preview");
     fs::create_dir(&directory).unwrap();
     let before = fingerprint(&hdr);
+    assert!(crate::video_poster::poster(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        hdr.to_str().unwrap(),
+        64
+    )
+    .unwrap_err()
+    .contains("HDR"));
     assert!(
         crate::video_preview::build_assets(&engine(), &hdr, &directory, true, || false)
             .err()
@@ -590,7 +611,7 @@ fn filmstrip_uses_original_streaming_path_for_a_large_clip() {
         .write(true)
         .open(&source)
         .unwrap()
-        .set_len(64 * 1024 * 1024)
+        .set_len(80 * 1024 * 1024)
         .unwrap();
     let original =
         crate::media_stream::validated_video(fixture.0.to_str().unwrap(), source.to_str().unwrap())
@@ -612,6 +633,101 @@ fn filmstrip_uses_original_streaming_path_for_a_large_clip() {
     assert_eq!(result.filmstrip.len(), 6);
     assert!(!directory.join("preview.mp4").exists());
     assert!(result.filmstrip.iter().all(|f| f.image.len() < 90_000));
+    use base64::Engine;
+    let before = crate::video_project::fingerprint(&source, || false).unwrap();
+    let poster = crate::video_poster::poster(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        source.to_str().unwrap(),
+        160,
+    )
+    .unwrap();
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(poster.strip_prefix("data:image/png;base64,").unwrap())
+        .unwrap();
+    let image = image::load_from_memory(&bytes).unwrap();
+    assert!(image.width() <= 160 && image.height() <= 160);
+    assert_eq!(
+        crate::video_project::fingerprint(&source, || false).unwrap(),
+        before
+    );
+}
+
+#[test]
+fn video_posters_cache_by_source_identity_and_reject_unavailable_media() {
+    use base64::Engine;
+    let fixture = Fixture::new();
+    let source = fixture.0.join("poster source.mp4");
+    ffmpeg(
+        &[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=red:size=96x64:rate=10:duration=1",
+            "-c:v",
+            "libopenh264",
+        ],
+        &source,
+    );
+    let render = || {
+        crate::video_poster::poster(
+            &engine(),
+            fixture.0.to_str().unwrap(),
+            source.to_str().unwrap(),
+            64,
+        )
+        .unwrap()
+    };
+    let red = render();
+    assert_eq!(render(), red);
+    let image = |value: &str| {
+        image::load_from_memory(
+            &base64::engine::general_purpose::STANDARD
+                .decode(value.strip_prefix("data:image/png;base64,").unwrap())
+                .unwrap(),
+        )
+        .unwrap()
+        .to_rgb8()
+    };
+    let red_image = image(&red);
+    assert_eq!(red_image.dimensions(), (64, 42));
+    assert!(red_image.get_pixel(32, 21)[0] > 200);
+    ffmpeg(
+        &[
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=blue:size=96x64:rate=10:duration=1",
+            "-c:v",
+            "libopenh264",
+        ],
+        &source,
+    );
+    let blue = render();
+    assert_ne!(red, blue);
+    assert!(image(&blue).get_pixel(32, 21)[2] > 200);
+    let other = Fixture::new();
+    assert!(crate::video_poster::poster(
+        &engine(),
+        other.0.to_str().unwrap(),
+        source.to_str().unwrap(),
+        64
+    )
+    .is_err());
+    let broken = fixture.0.join("broken.mp4");
+    fs::write(&broken, b"not video").unwrap();
+    assert!(crate::video_poster::poster(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        broken.to_str().unwrap(),
+        64
+    )
+    .is_err());
 }
 
 #[cfg(windows)]
@@ -1720,6 +1836,15 @@ fn video_real_media_acceptance() {
         info.duration_seconds >= 4.61,
         "Choose a clip at least 4.61 seconds long"
     );
+    use base64::Engine;
+    let poster =
+        crate::video_poster::poster(&engine(), root, source.to_str().unwrap(), 640).unwrap();
+    let png = base64::engine::general_purpose::STANDARD
+        .decode(poster.strip_prefix("data:image/png;base64,").unwrap())
+        .unwrap();
+    let image = image::load_from_memory(&png).unwrap();
+    assert!(image.width() <= 640 && image.height() <= 640);
+    fs::write(output_root.join("poster.png"), png).unwrap();
     let mut p = video_project::new_project(root, &source, info.clone()).unwrap();
     let base = info.time_base.as_deref().unwrap();
     p.clips[0].source_in = VideoTime::from_seconds(0.37, base).unwrap();

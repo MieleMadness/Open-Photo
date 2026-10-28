@@ -1,3 +1,11 @@
+# 0.54.11 — Video posters and playback fallback
+
+- Route video library thumbnails through a dedicated bundled-video decoder instead of the photo decoder and its 75 MB input limit. Generate bounded, cached PNG posters with source identity checks, library authorization, fixed decoder limits, and separate library/player work slots.
+- Show a still before playback and retain it as the player's poster. Allow starting or retrying preview from the still rather than leaving an unexplained blank area.
+- Automatically attempt one compatible preview after original-format decode/unsupported errors, retaining playback position. Keep streaming errors distinct, disclose conversion, and show media error details if a compatible preview also fails. Preserve HDR rejection and Windows-player fallback.
+- Add poster cache invalidation, large-source/source-protection and malformed/out-of-library coverage, plus poster display, automatic fallback, position restoration, no-loop, and streaming-error UI checks.
+- Installed WebView playback of the reported files remains a user acceptance check; native extraction and synthetic UI event tests cannot establish that every Windows codec/GPU setup works.
+
 # 0.54.10 — Video brightness and contrast
 
 - Replace intermittent empty FFprobe interval-frame inspection in acceptance tests with strict source decoding and streamed frame CRC timestamps. Preserve original time bases, VFR ordering, preroll, bounded memory, and cancellation; reject incomplete or malformed timestamp records. Keep full reference-frame count/time assertions.

@@ -22,6 +22,7 @@ mod video_engine;
 mod video_export;
 #[cfg(test)]
 mod video_integration_tests;
+mod video_poster;
 mod video_preview;
 mod video_probe;
 mod video_project;
@@ -1065,6 +1066,7 @@ pub fn run() {
         .manage(media_jobs::ImageJobs::default())
         .manage(video_probe::InspectionJobs::default())
         .manage(video_preview::PreviewJobs::default())
+        .manage(video_poster::PosterJobs::default())
         .manage(video_export::ExportJobs::default())
         .invoke_handler(tauri::generate_handler![
             ai_embeddings::ai_embedding_status,
@@ -1091,6 +1093,7 @@ pub fn run() {
             preview_image,
             read_iphone_media,
             media_stream::video_source,
+            video_poster::video_poster,
             video_probe::inspect_video,
             video_engine::video_engine_status,
             video_preview::start_video_preview,

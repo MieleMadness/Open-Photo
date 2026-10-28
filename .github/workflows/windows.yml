@@ -1,5 +1,5 @@
-name: Open-Photo 0.54.10 · Windows Desktop Build
-run-name: 'Open-Photo 0.54.10 · CI #${{ github.run_number }}'
+name: Open-Photo 0.54.11 · Windows Desktop Build
+run-name: 'Open-Photo 0.54.11 · CI #${{ github.run_number }}'
 on:
   push:
     branches: [main]

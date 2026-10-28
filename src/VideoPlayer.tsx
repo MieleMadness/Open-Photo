@@ -31,6 +31,14 @@ export function VideoPlayer({root,path,onOpenExternal,selection}:{root:string;pa
   const [rangeError,setRangeError]=useState("");
   const [seekDraft,setSeekDraft]=useState("");
   const [seekError,setSeekError]=useState("");
+  const [poster,setPoster]=useState("");
+  const [notice,setNotice]=useState("");
+  const fallbackAttempted=useRef(false);
+  useEffect(()=>{
+    let active=true;setPoster("");
+    void invoke<string>("video_poster",{root,path,maxEdge:640,forPlayer:true}).then(value=>{if(active&&typeof value==="string")setPoster(value);}).catch(()=>{});
+    return()=>{active=false};
+  },[root,path]);
   useEffect(()=>{
     if(!requested)return;
     let active=true;let id="";let timer:ReturnType<typeof setTimeout>|undefined;
@@ -72,6 +80,12 @@ export function VideoPlayer({root,path,onOpenExternal,selection}:{root:string;pa
     const element=video.current;if(!element)return;
     if(element.paused)void element.play().catch(cause=>setError(`Playback could not start: ${String(cause)}`));else element.pause();
   }
+  function playbackFailure(code:number,detail=""){
+    if(mode==="original"&&(code===3||code===4)&&!info?.hdr&&!fallbackAttempted.current){
+      fallbackAttempted.current=true;setError("");setNotice("This video needs a compatible preview for playback here. Creating it now; the original stays unchanged.");setMode("proxy");return;
+    }
+    setError(`${mode==="proxy"?"The compatible preview could not play":"The original video could not play"} (media error ${code||"unknown"})${detail?`: ${detail}`:"."} ${info?.hdr?"HDR conversion is unavailable. ":""}Try the Windows player${mode==="original"&&!info?.hdr?" or Create compatible preview":""}.`);
+  }
   function mark(which:"in"|"out"){
     const value=markTime(current.current,info?.time_base||null);
     const seconds=markSeconds(value);
@@ -95,13 +109,14 @@ export function VideoPlayer({root,path,onOpenExternal,selection}:{root:string;pa
   }
   return <section className="video-player" aria-label="Video playback" tabIndex={0} onKeyDown={keyboard}>
     <VideoDetails root={root} path={path} onInfo={setInfo}/>
+    {!src&&poster&&<button className="video-poster" disabled={busy} aria-label={requested?"Retry video preview":"Play selected video"} onClick={()=>requested?setRevision(v=>v+1):setRequested(true)}><img src={poster} alt="Selected video preview"/></button>}
     {!requested&&<button className="secondary-button" onClick={()=>setRequested(true)}>Play Live Photo / video</button>}
-    {src&&<><video ref={video} src={src} controls playsInline preload="metadata" aria-label="Selected video"
+    {src&&<><video ref={video} src={src} poster={poster||assets?.filmstrip[0]?.image} controls playsInline preload="metadata" aria-label="Selected video"
       onLoadedMetadata={()=>{const element=video.current;if(!element)return;if(Number.isFinite(element.duration))setDuration(element.duration);element.currentTime=Math.min(restore.current,element.duration||0);setPosition(element.currentTime);current.current=element.currentTime;}}
       onDurationChange={()=>{if(video.current&&Number.isFinite(video.current.duration))setDuration(video.current.duration);}}
       onTimeUpdate={()=>{if(video.current){current.current=video.current.currentTime;if(rangePlaying.current&&current.current>=(outMark?markSeconds(outMark):duration)){video.current.pause();video.current.currentTime=outMark?markSeconds(outMark):duration;current.current=video.current.currentTime;rangePlaying.current=false;}setPosition(current.current);}}}
       onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)}
-      onError={()=>setError(mode==="proxy"?"Windows could not play the compatible preview. Try the Windows player.":"Windows could not play this video. Create a compatible preview or open it in the Windows player.")}/>
+      onError={event=>playbackFailure(event.currentTarget.error?.code||0,event.currentTarget.error?.message||"")}/>
       <div className="video-transport">
         <button className="secondary-button" onClick={toggle}>{playing?"Pause":"Play"}</button>
         <button className="secondary-button" aria-label="Back one second" onClick={()=>seek(current.current-1)}>−1s</button>
@@ -132,6 +147,7 @@ export function VideoPlayer({root,path,onOpenExternal,selection}:{root:string;pa
     {!!assets?.filmstrip.length&&<div className="video-filmstrip" aria-label="Video filmstrip">{assets.filmstrip.map(frame=><button key={frame.seconds} aria-label={`Seek to ${clockTime(frame.seconds)}`} onClick={()=>seek(frame.seconds)}><img src={frame.image} alt=""/><span>{clockTime(frame.seconds)}</span></button>)}</div>}
     {busy&&<p role="status">{mode==="proxy"?"Creating compatible preview…":"Creating filmstrip…"} <button className="secondary-button" onClick={()=>{cancelJob.current();setBusy(false);}}>Cancel</button></p>}
     {error&&<p role="alert">{error}</p>}
+    {notice&&busy&&<p role="status">{notice}</p>}
     {assets?.warnings.map(warning=><p key={warning}>{warning}</p>)}
     {requested&&<div className="video-transport">
       <button className="secondary-button" disabled={busy||!!info?.hdr} onClick={()=>{setMode("proxy");setRevision(v=>v+1);}}>Create compatible preview</button>

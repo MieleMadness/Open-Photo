@@ -933,7 +933,7 @@ function PhotoThumb({root,photo,maxEdge}:{root:string;photo:Photo;maxEdge:number
     let active = true;
     setSrc(""); setFailed(false);
     if (!isDesktop || !root || ["heic","heif"].includes(photo.extension)) return;
-    invoke<string>("preview_image",{root,path:photo.path,maxEdge})
+    invoke<string>(["mov","mp4","m4v","avi","mkv","webm"].includes(photo.extension.toLowerCase())?"video_poster":"preview_image",{root,path:photo.path,maxEdge})
       .then(data=>{if(active)setSrc(data);})
       .catch(()=>{if(active)setFailed(true);});
     return ()=>{active=false;};
