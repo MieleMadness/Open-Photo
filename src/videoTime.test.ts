@@ -1,5 +1,5 @@
 import {expect,it} from "vitest";
-import {clockTime,markSeconds,markTime} from "./videoTime";
+import {clockTime,parseClockTime,markSeconds,markTime} from "./videoTime";
 it("retains source ticks across NTSC time bases and long selections",()=>{
   const mark=markTime(3600.123456,"1/90000");
   expect(mark).toEqual({ticks:"324011111",time_base:"1/90000"});
@@ -10,4 +10,10 @@ it("uses integer microseconds when the source has no usable time base",()=>{
   expect(markTime(0.123456,null)).toEqual({ticks:"123456",time_base:"1/1000000"});
   expect(markTime(1,"0/0").time_base).toBe("1/1000000");
   expect(clockTime(3661.123)).toBe("01:01:01.123");
+});
+
+it("parses hours, long minute values, and millisecond timestamps without accepting malformed clocks",()=>{
+  for(const value of ["01:04:28.125","64:28.125","3868.125"])expect(parseClockTime(value)).toBe(3868.125);
+  expect(parseClockTime(" 0 ")).toBe(0);expect(parseClockTime("00:00:00.001")).toBe(.001);
+  for(const value of ["","-1","1:60","1:60:00","1::2","1:2:3:4","Infinity","1e3","1.2345","1.5:02"])expect(parseClockTime(value)).toBeNull();
 });

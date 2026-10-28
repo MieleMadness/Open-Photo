@@ -1,3 +1,10 @@
+# 0.54.8 — Long-video navigation and seek acceptance
+
+- Add Go to time for seconds, minutes:seconds, and hours:minutes:seconds with millisecond precision. Validate malformed and out-of-range entries before seeking; keep browser seeking explicitly approximate.
+- Add a synthetic hour-scale source test that exports short windows near the beginning, middle, and end, checks decoded frame counts/timestamps against the source, validates independent audio/video spans, fully decodes outputs, and verifies the source hash.
+- Extend opt-in real-footage acceptance with -LongRecording, saving three separate test edits, portable projects, and a local report. Stream decoded frame timestamps until the presentation range is complete, preserving buffered B-frames, with timeout and frame/line limits.
+- Keep complete hour-long export, perceptual audio/video synchronization, installed-app playback, drive failures, and whole-app performance as separate acceptance gates.
+
 # 0.54.7 — UHD and source-resolution video export
 
 - Add explicit UHD landscape (3840×2160), UHD portrait (2160×3840), and supported source-resolution canvas choices. Preserve ultra-wide source geometry, square-pixel aspect, and source rotation when choosing source resolution; retain imported canvases.

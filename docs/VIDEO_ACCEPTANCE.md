@@ -1,4 +1,4 @@
-# Repeatable video acceptance (0.54.7)
+# Repeatable video acceptance (0.54.8)
 
 Phase 6 has an automated native export baseline. It is a measurement and correctness check, not completion of installed-app acceptance.
 
@@ -48,3 +48,17 @@ Use a source file explicitly chosen for testing. Outputs go into a fresh separat
 This runs the exact ignored optimized real-media test instead of the synthetic baseline. It requires an SDR clip at least 4.61 seconds long with a supported source canvas. It exports 0.37–4.61 seconds at 75% audio gain to separate source-resolution and 3840×2160 fit canvases. Each export uses the real validation, full-decode, source-reverification, and publication pipeline. Project JSON copies reference the selected source relative to its containing library folder; open them with that folder selected in the app. This does not test GUI interaction or establish perceptual quality.
 
 The real report includes the chosen filename, source properties/hash, and per-export results. Keep it and its media local unless you intentionally choose to share them. CI runs only synthetic media and does not upload this local footage. A 3840×1080 recording can retain its ultra-wide source resolution or be fitted into UHD with borders; it is not native 3840×2160 footage.
+
+## Hour-scale source windows
+
+```powershell
+./scripts/accept-video.ps1 -Source 'C:/test-media/hour-recording.mp4' -LongRecording -OutputDirectory 'C:/reports/new-long-run'
+```
+
+This optimized, opt-in gate requires an SDR recording at least one hour long, square pixels, and a supported source canvas. It exports 4.24-second windows near the beginning, middle, and end to separate files at source resolution. Each window compares decoded video frame counts/timestamps with a bounded source inspection, checks independent stream timing through the production validator, and fully decodes the output. The original source hash must remain unchanged. Reports and portable project copies stay in the chosen fresh output folder.
+
+The ordinary native suite includes the same three-window check using generated hour-scale media. Source inspection locates a preceding random-access packet using a bounded-memory packet scan, then streams decoded presentation timestamps until the next frame is beyond the selected range, then stops the owned probe process. Packet-boundary stopping can miss buffered B-frames; a reordered-frame regression compares the bounded scanner with a complete short-source decode. Reads are limited to 4096 bytes per line, 50,000 selected frames, and 180 seconds. Fixture generation has a separate 120-second limit.
+
+These checks establish short-window seeking and timing at distant source positions. They do not establish complete hour-long encoding, perceptual A/V synchronization, GUI seeking latency, or installed-app playback.
+
+The player now supports Go to time using seconds (3868.125), minutes:seconds (64:28.125), or hours:minutes:seconds (01:04:28.125). Invalid or out-of-range entries show an error and preserve the current position. Browser seeking remains approximate; saved trim positions continue to use rational source ticks.

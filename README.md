@@ -1,4 +1,4 @@
-> Development update: **0.54.7** exposes UHD 4K and source-resolution video canvases, including ultra-wide recordings. Export bitrate and disk-space estimates scale with output resolution. Repeatable synthetic and opt-in real-footage checks produce reports and separate test edits. Phase 6 still needs installed-app and whole-app performance acceptance. See [video export](docs/VIDEO_EXPORT.md), [video acceptance](docs/VIDEO_ACCEPTANCE.md), and the [roadmap](docs/VIDEO_ROADMAP.md).
+> Development update: **0.54.8** adds direct timestamp navigation for long videos and repeatable beginning/middle/end export checks for hour-scale recordings. UHD/source-resolution export remains available. Installed-app playback and complete long-export/perceptual synchronization acceptance remain open. See [video acceptance](docs/VIDEO_ACCEPTANCE.md), [video export](docs/VIDEO_EXPORT.md), and the [roadmap](docs/VIDEO_ROADMAP.md).
 
 # Open-Photo
 

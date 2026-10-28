@@ -1,5 +1,14 @@
 // HTML playback supplies approximate seconds. Store preview marks as integer source ticks.
 export type VideoTime={ticks:string;time_base:string};
+export function parseClockTime(value:string):number|null {
+  const parts=value.trim().split(":");
+  if(parts.length>3||!parts.every((part,index)=>index===parts.length-1?/^\d+(?:\.\d{1,3})?$/.test(part):/^\d+$/.test(part)))return null;
+  const numbers=parts.map(Number);
+  if(parts.length>1&&numbers[numbers.length-1]>=60)return null;
+  if(parts.length===3&&numbers[1]>=60)return null;
+  const seconds=numbers.reduce((total,part)=>total*60+part,0);
+  return Number.isFinite(seconds)?seconds:null;
+}
 export function markTime(seconds:number,timeBase:string|null):VideoTime {
   const base=timeBase&&/^[1-9]\d*\/[1-9]\d*$/.test(timeBase)?timeBase:"1/1000000";
   const [numerator,denominator]=base.split("/").map(BigInt);

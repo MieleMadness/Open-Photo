@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState,type KeyboardEvent} from "react";
 import {convertFileSrc,invoke} from "@tauri-apps/api/core";
 import {VideoDetails,type VideoInfo} from "./VideoDetails";
-import {clockTime,markSeconds,markTime,type VideoTime} from "./videoTime";
+import {clockTime,markSeconds,markTime,parseClockTime,type VideoTime} from "./videoTime";
 
 type Assets={source:string;proxy:boolean;info:VideoInfo;filmstrip:{seconds:number;image:string}[];warnings:string[]};
 type Status={state:"queued"|"running"|"complete"|"failed";result:Assets|null;error:string|null};
@@ -29,6 +29,8 @@ export function VideoPlayer({root,path,onOpenExternal,selection}:{root:string;pa
   const inMark=selection?.start||temporaryIn;
   const outMark=selection?.end||temporaryOut;
   const [rangeError,setRangeError]=useState("");
+  const [seekDraft,setSeekDraft]=useState("");
+  const [seekError,setSeekError]=useState("");
   useEffect(()=>{
     if(!requested)return;
     let active=true;let id="";let timer:ReturnType<typeof setTimeout>|undefined;
@@ -107,6 +109,17 @@ export function VideoPlayer({root,path,onOpenExternal,selection}:{root:string;pa
         <output aria-label="Playback time">{clockTime(position)} / {clockTime(duration)}</output>
       </div>
       <input className="video-scrubber" type="range" aria-label="Seek video" min={0} max={duration||info?.duration_seconds||0} step={0.001} value={Math.min(position,duration||info?.duration_seconds||0)} onChange={event=>seek(Number(event.target.value))}/>
+      <form className="video-transport" onSubmit={event=>{
+        event.preventDefault();const seconds=parseClockTime(seekDraft),limit=duration||info?.duration_seconds||0;
+        if(seconds===null){setSeekError("Enter seconds or a time such as 01:04:28.125.");return;}
+        if(!Number.isFinite(limit)||limit<=0){setSeekError("Video timing is not ready yet.");return;}
+        if(seconds>limit){setSeekError(`Choose a time from 00:00:00.000 to ${clockTime(limit)}.`);return;}
+        setSeekError("");seek(seconds);setSeekDraft(clockTime(seconds));
+      }}>
+        <label>Go to time<input aria-label="Video seek time" value={seekDraft} placeholder="HH:MM:SS.mmm or seconds" onChange={event=>{setSeekDraft(event.target.value);setSeekError("");}}/></label>
+        <button className="secondary-button" type="submit">Go to time</button>
+      </form>
+      {seekError&&<p role="alert">{seekError}</p>}
       <div className="video-markers">
         <button className="secondary-button" onClick={()=>mark("in")}>Mark in</button><button className="secondary-button" onClick={()=>mark("out")}>Mark out</button>
         <button className="secondary-button" onClick={()=>{seek(inMark?markSeconds(inMark):0);rangePlaying.current=true;void video.current?.play().catch(cause=>{rangePlaying.current=false;setError(String(cause));});}}>Play marked range</button>

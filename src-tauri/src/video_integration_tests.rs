@@ -165,13 +165,16 @@ fn engine() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/video-engine")
 }
 fn ffmpeg(args: &[&str], destination: &Path) {
+    ffmpeg_with_timeout(args, destination, Duration::from_secs(30));
+}
+fn ffmpeg_with_timeout(args: &[&str], destination: &Path, timeout: Duration) {
     let mut owned: Vec<OsString> = args.iter().map(OsString::from).collect();
     owned.push(destination.into());
     let borrowed: Vec<&OsStr> = owned.iter().map(OsString::as_os_str).collect();
     video_engine::run(
         &video_engine::tool(&engine(), "ffmpeg").unwrap(),
         &borrowed,
-        Duration::from_secs(30),
+        timeout,
     )
     .unwrap();
 }
@@ -1699,6 +1702,308 @@ fn video_real_media_acceptance() {
         .open(report_path)
         .unwrap();
     file.write_all(&serde_json::to_vec_pretty(&document).unwrap())
+        .unwrap();
+    file.sync_all().unwrap();
+}
+
+// Packet inspection finds the preceding random-access point without decoding an hour.
+// ffprobe's nearest-keyframe seek can otherwise start after a requested B-frame.
+fn preceding_keyframe(path: &Path, stream: usize, start: f64) -> f64 {
+    use std::sync::{atomic::AtomicBool, Arc, Mutex};
+    let key = Arc::new(Mutex::new(0.0_f64));
+    let copy = key.clone();
+    let done = Arc::new(AtomicBool::new(false));
+    let complete = done.clone();
+    let stream = stream.to_string();
+    let result = video_engine::run_lines(
+        &video_engine::tool(&engine(), "ffprobe").unwrap(),
+        &[
+            "-v".as_ref(),
+            "error".as_ref(),
+            "-max_alloc".as_ref(),
+            "268435456".as_ref(),
+            "-protocol_whitelist".as_ref(),
+            "file,pipe".as_ref(),
+            "-format_whitelist".as_ref(),
+            "mov,matroska,webm,avi".as_ref(),
+            "-select_streams".as_ref(),
+            stream.as_ref(),
+            "-show_packets".as_ref(),
+            "-show_entries".as_ref(),
+            "packet=pts_time,dts_time,flags".as_ref(),
+            "-of".as_ref(),
+            "compact=p=0:nk=0".as_ref(),
+            path.as_os_str(),
+        ],
+        Duration::from_secs(180),
+        || done.load(Ordering::Acquire),
+        move |line| {
+            if complete.load(Ordering::Acquire) {
+                return Ok(());
+            }
+            let text = String::from_utf8_lossy(line);
+            let mut pts = None;
+            let mut dts = None;
+            let mut is_key = false;
+            for field in text.trim().split('|') {
+                if let Some((name, value)) = field.split_once('=') {
+                    match name {
+                        "pts_time" => pts = crate::video_timing::number(Some(value)),
+                        "dts_time" => dts = crate::video_timing::number(Some(value)),
+                        "flags" => is_key = value.contains('K'),
+                        _ => {}
+                    }
+                }
+            }
+            if let Some(pts) = pts {
+                if is_key && pts <= start {
+                    *copy.lock().map_err(|e| e.to_string())? = dts.unwrap_or(pts).max(0.0);
+                }
+                if pts >= start {
+                    complete.store(true, Ordering::Release);
+                }
+            }
+            Ok(())
+        },
+    );
+    if let Err(error) = result {
+        assert!(
+            done.load(Ordering::Acquire) && error == "Video processing cancelled or superseded",
+            "Source keyframe inspection failed: {error}"
+        );
+    }
+    Arc::try_unwrap(key).unwrap().into_inner().unwrap()
+}
+// Inspect decoded presentation order until a frame beyond the selected range is observed.
+// Stopping at a packet timestamp can discard a still-buffered B-frame inside the range.
+fn range_frame_times(path: &Path, stream: usize, start: f64, end: f64) -> Vec<f64> {
+    use std::sync::{atomic::AtomicBool, Arc, Mutex};
+    let seek = preceding_keyframe(path, stream, start);
+    let interval = format!("{seek:.9}%");
+    let stream = stream.to_string();
+    let frames = Arc::new(Mutex::new(Vec::new()));
+    let copy = frames.clone();
+    let done = Arc::new(AtomicBool::new(false));
+    let complete = done.clone();
+    let result = video_engine::run_lines(
+        &video_engine::tool(&engine(), "ffprobe").unwrap(),
+        &[
+            "-v".as_ref(),
+            "error".as_ref(),
+            "-max_alloc".as_ref(),
+            "268435456".as_ref(),
+            "-protocol_whitelist".as_ref(),
+            "file,pipe".as_ref(),
+            "-format_whitelist".as_ref(),
+            "mov,matroska,webm,avi".as_ref(),
+            "-select_streams".as_ref(),
+            stream.as_ref(),
+            "-read_intervals".as_ref(),
+            interval.as_ref(),
+            "-show_entries".as_ref(),
+            "frame=best_effort_timestamp_time".as_ref(),
+            "-of".as_ref(),
+            "compact=p=0:nk=0".as_ref(),
+            path.as_os_str(),
+        ],
+        Duration::from_secs(180),
+        || done.load(Ordering::Acquire),
+        move |line| {
+            let text = String::from_utf8_lossy(line);
+            for field in text.trim().split('|') {
+                if let Some(("best_effort_timestamp_time", value)) = field.split_once('=') {
+                    if let Some(time) = crate::video_timing::number(Some(value)) {
+                        if time >= end {
+                            complete.store(true, Ordering::Release);
+                        } else if time >= start {
+                            let mut frames = copy.lock().map_err(|e| e.to_string())?;
+                            if frames.len() >= 50_000 {
+                                return Err(
+                                    "Source window exceeds the frame inspection limit".into()
+                                );
+                            }
+                            frames.push(time);
+                        }
+                    }
+                }
+            }
+            Ok(())
+        },
+    );
+    if let Err(error) = result {
+        assert!(
+            done.load(Ordering::Acquire) && error == "Video processing cancelled or superseded",
+            "Source frame inspection failed: {error}"
+        );
+    }
+    Arc::try_unwrap(frames).unwrap().into_inner().unwrap()
+}
+#[test]
+fn range_inspection_drains_reordered_frames_before_stopping() {
+    let fixture = Fixture::new();
+    let source = fixture.0.join("reordered.mp4");
+    ffmpeg(
+        &[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=60:duration=2",
+            "-c:v",
+            "mpeg4",
+            "-bf",
+            "2",
+        ],
+        &source,
+    );
+    let expected: Vec<f64> = frame_times(&source)
+        .into_iter()
+        .filter(|t| *t >= 0.37 && *t < 1.61)
+        .collect();
+    assert!(!expected.is_empty());
+    assert_eq!(range_frame_times(&source, 0, 0.37, 1.61), expected);
+}
+fn verify_long_windows(source: &Path, output_root: &Path) -> serde_json::Value {
+    use crate::{
+        video_export::{self, Control, Request, Stage},
+        video_project::{self, VideoTime},
+        video_render::ExportSize,
+    };
+    use std::{sync::Arc, time::Instant};
+    struct LongControl;
+    impl Control for LongControl {
+        fn cancelled(&self) -> bool {
+            false
+        }
+        fn update(&self, _: Stage, _: Option<f64>, _: u64) {}
+        fn begin_publish(&self) -> Result<(), String> {
+            Ok(())
+        }
+    }
+    let info = video_probe::probe(&engine(), source, || false).unwrap();
+    assert!(
+        info.duration_seconds >= 3600.0,
+        "Choose a recording at least one hour long"
+    );
+    assert!(
+        !info.hdr,
+        "Long-recording acceptance currently requires SDR footage"
+    );
+    let root = source.parent().unwrap().to_str().unwrap();
+    let mut project = video_project::new_project(root, source, info.clone()).unwrap();
+    let identity = (project.asset.bytes, project.asset.sha256.clone());
+    // Preserve a supported square-pixel source canvas; this gate is about seeking/timing.
+    assert_eq!(info.sample_aspect_ratio.as_deref(), Some("1:1"));
+    project.output.width = info.width / 2 * 2;
+    project.output.height = info.height / 2 * 2;
+    if (info.rotation_degrees / 90.0).round() as i64 % 2 != 0 {
+        std::mem::swap(&mut project.output.width, &mut project.output.height);
+    }
+    let base = info.time_base.as_deref().unwrap();
+    let origin = crate::video_timing::number(info.format_start_time.as_deref()).unwrap_or(0.0);
+    let mut results = vec![];
+    for (name, start) in [
+        ("beginning", 0.37),
+        ("middle", info.duration_seconds / 2.0 + 0.37),
+        ("end", info.duration_seconds - 4.61),
+    ] {
+        project.clips[0].source_in = VideoTime::from_seconds(start, base).unwrap();
+        project.clips[0].source_out = VideoTime::from_seconds(start + 4.24, base).unwrap();
+        let actual_start = project.clips[0].source_in.seconds().unwrap();
+        let actual_end = project.clips[0].source_out.seconds().unwrap();
+        let expected = range_frame_times(
+            source,
+            info.video_stream,
+            origin + actual_start,
+            origin + actual_end,
+        );
+        assert!(!expected.is_empty());
+        let output = output_root.join(format!("{name}.mp4"));
+        let started = Instant::now();
+        let report = video_export::export_file(
+            Request {
+                engine: &engine(),
+                root,
+                project: &project,
+                destination: &output,
+                size: ExportSize::Project,
+                acknowledge_first_audio: info.audio.len() > 1,
+            },
+            Arc::new(LongControl),
+        )
+        .unwrap();
+        let elapsed = started.elapsed().as_secs_f64();
+        let actual = frame_times(&output);
+        assert_eq!(expected.len(), actual.len(), "Frame loss in {name} window");
+        let max_error = expected
+            .iter()
+            .zip(&actual)
+            .map(|(a, b)| (a - origin - actual_start - b).abs())
+            .fold(0.0, f64::max);
+        assert!(max_error < 0.001, "Timestamp error in {name}: {max_error}");
+        let output_info = video_probe::probe(&engine(), &output, || false).unwrap();
+        // The production validator checks audio against its actual intersection with this window.
+        video_project::write_copy(
+            &project,
+            &output_root.join(format!("{name}.openphoto-video.json")),
+        )
+        .unwrap();
+        results.push(serde_json::json!({"window":name,"source_in_seconds":actual_start,"source_out_seconds":actual_end,"decoded_frames":actual.len(),"max_frame_timestamp_error_seconds":max_error,"export_wall_seconds":elapsed,"output_seconds":report.duration_seconds,"width":report.width,"height":report.height,"bytes":report.bytes,"audio":output_info.audio,"full_decode":true,"independent_stream_validation":true}));
+    }
+    assert_eq!(
+        video_project::fingerprint(source, || false).unwrap(),
+        identity
+    );
+    assert_no_export_temporaries(output_root);
+    serde_json::json!({"app_version":env!("CARGO_PKG_VERSION"),"engine_version":video_engine::VERSION,"scope":"Beginning/middle/end short-window native exports from an hour-scale recording; does not establish complete hour-long export or perceptual A/V synchronization or GUI playback","source_filename":source.file_name().unwrap().to_string_lossy(),"source_duration_seconds":info.duration_seconds,"source_bytes":identity.0,"source_sha256":identity.1,"source_unchanged":true,"windows":results})
+}
+#[test]
+fn hour_scale_source_seeks_keep_decoded_timestamps_at_three_positions() {
+    let fixture = Fixture::new();
+    let source = fixture.0.join("hour.mp4");
+    ffmpeg_with_timeout(
+        &[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=10:duration=3605",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=sample_rate=8000:duration=3605",
+            "-c:v",
+            "libopenh264",
+            "-c:a",
+            "aac",
+        ],
+        &source,
+        Duration::from_secs(120),
+    );
+    verify_long_windows(&source, &fixture.0);
+}
+#[test]
+#[ignore = "hour-scale real media acceptance: scripts/accept-video.ps1 -Source -LongRecording"]
+fn video_long_recording_acceptance() {
+    use std::io::Write;
+    if cfg!(debug_assertions) {
+        panic!("Long-recording acceptance requires an optimized release build");
+    }
+    let source =
+        fs::canonicalize(std::env::var_os("OPENPHOTO_REAL_SOURCE").expect("Choose a real source"))
+            .unwrap();
+    let report_path = PathBuf::from(
+        std::env::var_os("OPENPHOTO_ACCEPTANCE_OUTPUT").expect("Choose a report path"),
+    );
+    let report = verify_long_windows(&source, report_path.parent().unwrap());
+    let mut file = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(report_path)
+        .unwrap();
+    file.write_all(&serde_json::to_vec_pretty(&report).unwrap())
         .unwrap();
     file.sync_all().unwrap();
 }

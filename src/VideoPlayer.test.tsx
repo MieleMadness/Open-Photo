@@ -98,3 +98,12 @@ it("cancels active generation and ignores a late completed status",async()=>{
   expect(invoke).toHaveBeenCalledWith("cancel_video_preview",{id:"active-job"});
   expect((screen.getByLabelText("Selected video") as HTMLVideoElement).src).toBe("asset:original.mp4");
 });
+
+it("jumps to a typed timestamp in a long video and rejects invalid or out-of-range input",async()=>{
+  const {video}=await open();Object.defineProperty(video,"duration",{configurable:true,value:3872.8});fireEvent.durationChange(video);
+  const input=screen.getByLabelText("Video seek time");
+  fireEvent.change(input,{target:{value:"01:04:28.125"}});fireEvent.click(screen.getByRole("button",{name:"Go to time"}));expect(video.currentTime).toBe(3868.125);
+  fireEvent.change(input,{target:{value:"1:99"}});fireEvent.click(screen.getByRole("button",{name:"Go to time"}));expect(screen.getByText(/Enter seconds or a time/)).toBeTruthy();expect(video.currentTime).toBe(3868.125);
+  fireEvent.change(input,{target:{value:"02:00:00"}});fireEvent.click(screen.getByRole("button",{name:"Go to time"}));expect(screen.getByText(/Choose a time from/)).toBeTruthy();expect(video.currentTime).toBe(3868.125);
+  fireEvent.change(input,{target:{value:"10.125"}});fireEvent.submit(input.closest("form")!);expect(video.currentTime).toBe(10.125);
+});
