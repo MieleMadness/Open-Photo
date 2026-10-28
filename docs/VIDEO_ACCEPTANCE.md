@@ -1,6 +1,8 @@
-# Repeatable video acceptance (0.54.9)
+# Repeatable video acceptance (0.54.10)
 
 Phase 6 has an automated native export baseline. It is a measurement and correctness check, not completion of installed-app acceptance.
+
+Source-window reference inspection decodes with strict FFmpeg error handling and streams frame CRC records, retaining the original presentation timestamps and demux time base. Preroll begins before the selected range; inspection stops after the next decoded frame beyond its end, so reordered frames are drained. The reader retains only selected timestamps, caps each line and the frame count, and rejects malformed or incomplete records. This replaces FFprobe interval seeking, which intermittently returned no frame records on the Windows CI runner. Boundary fixtures compare counts and timestamps with an independently probed complete short-source decode. This changes acceptance inspection, not the editor's rendering pipeline.
 
 ## Run the baseline
 

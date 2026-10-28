@@ -1875,6 +1875,7 @@ struct FrameWindow {
     frames: Vec<f64>,
     complete: bool,
     first_seen: Option<f64>,
+    time_base: Option<f64>,
 }
 impl FrameWindow {
     fn new(start: f64, end: f64) -> Self {
@@ -1884,31 +1885,54 @@ impl FrameWindow {
             frames: vec![],
             complete: false,
             first_seen: None,
+            time_base: None,
         }
     }
     fn consume(&mut self, line: &[u8]) -> Result<bool, String> {
-        // A killed probe can leave a final partial line that looks like a smaller timestamp.
+        // A terminated decoder can leave a partial final record.
         // Once the presentation range is complete, subsequent output cannot change it.
         if self.complete {
             return Ok(true);
         }
-        let text = String::from_utf8_lossy(line);
-        for field in text.trim().split('|') {
-            if let Some(("best_effort_timestamp_time", value)) = field.split_once('=') {
-                if let Some(time) = crate::video_timing::number(Some(value)) {
-                    self.first_seen.get_or_insert(time);
-                    if time >= self.end {
-                        self.complete = true;
-                        return Ok(true);
-                    }
-                    if time >= self.start {
-                        if self.frames.len() >= 50_000 {
-                            return Err("Source window exceeds the frame inspection limit".into());
-                        }
-                        self.frames.push(time);
-                    }
-                }
+        if !line.ends_with(b"\n") {
+            return Err("Incomplete decoded-frame record".into());
+        }
+        let text = std::str::from_utf8(line).map_err(|e| e.to_string())?.trim();
+        if let Some(base) = text.strip_prefix("#tb 0:") {
+            let (a, b) = base
+                .trim()
+                .split_once('/')
+                .ok_or("Missing decoded-frame time base")?;
+            let a = a.parse::<u32>().map_err(|e| e.to_string())?;
+            let b = b.parse::<u32>().map_err(|e| e.to_string())?;
+            if a == 0 || b == 0 {
+                return Err("Invalid decoded-frame time base".into());
             }
+            self.time_base = Some(f64::from(a) / f64::from(b));
+            return Ok(false);
+        }
+        if text.is_empty() || text.starts_with('#') {
+            return Ok(false);
+        }
+        let fields: Vec<_> = text.split(',').map(str::trim).collect();
+        if fields.len() != 6 || fields[0] != "0" || !fields[5].starts_with("0x") {
+            return Err("Invalid decoded-frame record".into());
+        }
+        let ticks = fields[2].parse::<i64>().map_err(|e| e.to_string())?;
+        let time = ticks as f64
+            * self
+                .time_base
+                .ok_or("Decoded-frame record before time base")?;
+        self.first_seen.get_or_insert(time);
+        if time >= self.end {
+            self.complete = true;
+            return Ok(true);
+        }
+        if time >= self.start {
+            if self.frames.len() >= 50_000 {
+                return Err("Source window exceeds the frame inspection limit".into());
+            }
+            self.frames.push(time);
         }
         Ok(false)
     }
@@ -1916,35 +1940,65 @@ impl FrameWindow {
 fn range_frame_times(path: &Path, stream: usize, start: f64, end: f64) -> Vec<f64> {
     use std::sync::{atomic::AtomicBool, Arc, Mutex};
     let seek = preroll_seek(path, stream, start);
-    let interval = seek
-        .map(|time| format!("{time:.9}%"))
-        .unwrap_or_else(|| "%".into());
-    let stream = stream.to_string();
+    let stream = format!("0:{stream}");
     let frames = Arc::new(Mutex::new(FrameWindow::new(start, end)));
     let copy = frames.clone();
     let done = Arc::new(AtomicBool::new(false));
     let complete = done.clone();
+    // Decode source frames directly. FFprobe interval seeking can exit successfully
+    // without emitting any frames. Framecrc emits a record only after a full decode,
+    // while copyts/demux time base retain original VFR timestamps independently of
+    // the render graph. Disable accurate-seek discarding to retain decoder preroll.
+    let mut args: Vec<OsString> = [
+        "-nostdin",
+        "-v",
+        "error",
+        "-xerror",
+        "-threads",
+        "2",
+        "-copyts",
+        "-max_alloc",
+        "268435456",
+        "-protocol_whitelist",
+        "file,pipe",
+        "-format_whitelist",
+        "mov,matroska,webm,avi",
+    ]
+    .into_iter()
+    .map(Into::into)
+    .collect();
+    if let Some(time) = seek {
+        args.extend([
+            "-noaccurate_seek".into(),
+            "-ss".into(),
+            format!("{time:.9}").into(),
+        ]);
+    }
+    args.extend(["-i".into(), path.into(), "-map".into(), stream.into()]);
+    args.extend(
+        [
+            "-an",
+            "-sn",
+            "-dn",
+            "-c:v",
+            "rawvideo",
+            "-threads:v",
+            "1",
+            "-enc_time_base:v",
+            "demux",
+            "-fps_mode",
+            "passthrough",
+            "-f",
+            "framecrc",
+            "pipe:1",
+        ]
+        .into_iter()
+        .map(Into::into),
+    );
+    let borrowed: Vec<_> = args.iter().map(OsString::as_os_str).collect();
     let result = video_engine::run_lines(
-        &video_engine::tool(&engine(), "ffprobe").unwrap(),
-        &[
-            "-v".as_ref(),
-            "error".as_ref(),
-            "-max_alloc".as_ref(),
-            "268435456".as_ref(),
-            "-protocol_whitelist".as_ref(),
-            "file,pipe".as_ref(),
-            "-format_whitelist".as_ref(),
-            "mov,matroska,webm,avi".as_ref(),
-            "-select_streams".as_ref(),
-            stream.as_ref(),
-            "-read_intervals".as_ref(),
-            interval.as_ref(),
-            "-show_entries".as_ref(),
-            "frame=best_effort_timestamp_time".as_ref(),
-            "-of".as_ref(),
-            "compact=p=0:nk=0".as_ref(),
-            path.as_os_str(),
-        ],
+        &video_engine::tool(&engine(), "ffmpeg").unwrap(),
+        &borrowed,
         Duration::from_secs(180),
         || done.load(Ordering::Acquire),
         move |line| {
@@ -1967,20 +2021,47 @@ fn range_frame_times(path: &Path, stream: usize, start: f64, end: f64) -> Vec<f6
 #[test]
 fn completed_frame_windows_ignore_buffered_and_partial_probe_output() {
     let mut window = FrameWindow::new(0.37, 1.61);
+    assert!(!window.consume(b"#tb 0: 1/1000000\n").unwrap());
     assert!(!window
-        .consume(b"best_effort_timestamp_time=0.383333\n")
+        .consume(b"0, 383333, 383333, 16667, 4608, 0x12345678\n")
         .unwrap());
     assert!(!window
-        .consume(b"best_effort_timestamp_time=1.600000\n")
+        .consume(b"0, 1600000, 1600000, 16667, 4608, 0x12345678\n")
         .unwrap());
     assert!(window
-        .consume(b"best_effort_timestamp_time=1.616667\n")
+        .consume(b"0, 1616667, 1616667, 16667, 4608, 0x12345678\n")
         .unwrap());
     assert!(window
-        .consume(b"best_effort_timestamp_time=10.000000\n")
+        .consume(b"0, 10000000, 10000000, 16667, 4608, 0x12345678\n")
         .unwrap());
-    assert!(window.consume(b"best_effort_timestamp_time=1").unwrap());
-    assert_eq!(window.frames, vec![0.383333, 1.6]);
+    assert!(window.consume(b"0, 1").unwrap());
+    assert_eq!(window.frames.len(), 2);
+    assert!((window.frames[0] - 0.383333).abs() < 0.000001);
+    assert!((window.frames[1] - 1.6).abs() < 0.000001);
+}
+#[test]
+fn decoded_frame_records_require_valid_time_bases_and_complete_records() {
+    for base in [
+        b"#tb 0: 0/1\n".as_slice(),
+        b"#tb 0: 1/0\n",
+        b"#tb 0: invalid\n",
+    ] {
+        assert!(FrameWindow::new(0.0, 1.0).consume(base).is_err());
+    }
+    let mut window = FrameWindow::new(0.0, 1.0);
+    assert!(window.consume(b"0, 0, 0, 512, 4608, 0x12345678\n").is_err());
+    window.consume(b"#tb 0: 1/15360\n").unwrap();
+    assert!(window.consume(b"0, 512, 512").is_err());
+    assert!(window
+        .consume(b"0, x, invalid, 512, 4608, 0x12345678\n")
+        .is_err());
+    assert!(!window
+        .consume(b"0, -256, -256, 256, 4608, 0x12345678\n")
+        .unwrap());
+    assert!(!window
+        .consume(b"0, 512, 512, 256, 4608, 0x12345678\n")
+        .unwrap());
+    assert_eq!(window.frames, vec![1.0 / 30.0]);
 }
 #[test]
 fn range_inspection_drains_reordered_frames_before_stopping() {
@@ -2006,7 +2087,12 @@ fn range_inspection_drains_reordered_frames_before_stopping() {
         .filter(|t| *t >= 0.37 && *t < 1.61)
         .collect();
     assert!(!expected.is_empty());
-    assert_eq!(range_frame_times(&source, 0, 0.37, 1.61), expected);
+    let actual = range_frame_times(&source, 0, 0.37, 1.61);
+    assert_eq!(actual.len(), expected.len());
+    assert!(actual
+        .iter()
+        .zip(expected)
+        .all(|(a, b)| (a - b).abs() < 0.000001));
 }
 #[test]
 fn frame_inspection_keeps_ranges_adjacent_to_random_access_boundaries() {
@@ -2036,9 +2122,13 @@ fn frame_inspection_keeps_ranges_adjacent_to_random_access_boundaries() {
             .filter(|t| *t >= start && *t < end)
             .collect();
         assert!(!expected.is_empty());
-        assert_eq!(
-            range_frame_times(&source, 0, start, end),
-            expected,
+        let actual = range_frame_times(&source, 0, start, end);
+        assert_eq!(actual.len(), expected.len(), "Source range {start}..{end}");
+        assert!(
+            actual
+                .iter()
+                .zip(expected)
+                .all(|(a, b)| (a - b).abs() < 0.000001),
             "Source range {start}..{end}"
         );
     }

@@ -1,5 +1,6 @@
 # 0.54.10 — Video brightness and contrast
 
+- Replace intermittent empty FFprobe interval-frame inspection in acceptance tests with strict source decoding and streamed frame CRC timestamps. Preserve original time bases, VFR ordering, preroll, bounded memory, and cancellation; reject incomplete or malformed timestamp records. Keep full reference-frame count/time assertions.
 - Add saved brightness and contrast controls, each from -100 to 100, with neutral defaults, undo/redo, autosave, and a dedicated reset that preserves other edits.
 - Apply identical full-range RGB lookup tables in edited preview and export before canvas padding. Neutral settings skip the conversion, preserving existing rendering. Use filters supported by the pinned LGPL engine.
 - Load older project files, drafts, and history without adjustment fields at neutral settings. Validate integer ranges in both the editor and native backend. New adjustment fields require this version or newer when opening project copies.
