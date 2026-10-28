@@ -111,7 +111,7 @@ export function VideoPlayer({root,path,onOpenExternal,selection}:{root:string;pa
     <VideoDetails root={root} path={path} onInfo={setInfo}/>
     {!src&&poster&&<button className="video-poster" disabled={busy} aria-label={requested?"Retry video preview":"Play selected video"} onClick={()=>requested?setRevision(v=>v+1):setRequested(true)}><img src={poster} alt="Selected video preview"/></button>}
     {!requested&&<button className="secondary-button" onClick={()=>setRequested(true)}>Play Live Photo / video</button>}
-    {src&&<><video ref={video} src={src} poster={poster||assets?.filmstrip[0]?.image} controls playsInline preload="metadata" aria-label="Selected video"
+    {src&&<><video ref={video} src={src} poster={poster||assets?.filmstrip[0]?.image} autoPlay controls playsInline preload="metadata" aria-label="Selected video"
       onLoadedMetadata={()=>{const element=video.current;if(!element)return;if(Number.isFinite(element.duration))setDuration(element.duration);element.currentTime=Math.min(restore.current,element.duration||0);setPosition(element.currentTime);current.current=element.currentTime;}}
       onDurationChange={()=>{if(video.current&&Number.isFinite(video.current.duration))setDuration(video.current.duration);}}
       onTimeUpdate={()=>{if(video.current){current.current=video.current.currentTime;if(rangePlaying.current&&current.current>=(outMark?markSeconds(outMark):duration)){video.current.pause();video.current.currentTime=outMark?markSeconds(outMark):duration;current.current=video.current.currentTime;rangePlaying.current=false;}setPosition(current.current);}}}

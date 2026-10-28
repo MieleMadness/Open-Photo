@@ -22,7 +22,8 @@ it("shows a video poster before playback and keeps it on the player",async()=>{
   expect((await screen.findByAltText("Selected video preview") as HTMLImageElement).src).toBe("data:image/png;base64,poster");
   expect(invoke).toHaveBeenCalledWith("video_poster",{root:"library",path:"one.mp4",maxEdge:640,forPlayer:true});
   fireEvent.click(screen.getByLabelText("Play selected video"));
-  expect((await screen.findByLabelText("Selected video") as HTMLVideoElement).poster).toBe("data:image/png;base64,poster");
+  const video=await screen.findByLabelText("Selected video") as HTMLVideoElement;
+  expect(video.poster).toBe("data:image/png;base64,poster");expect(video.autoplay).toBe(true);
 });
 it("automatically switches unsupported originals to one compatible preview and reports a proxy failure",async()=>{
   const {video}=await open();video.currentTime=6;fireEvent.timeUpdate(video);
