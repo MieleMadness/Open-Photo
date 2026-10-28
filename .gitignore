@@ -33,6 +33,7 @@ desktop.ini
 
 # Checksum-verified generated video runtime (prepared locally and by CI)
 src-tauri/resources/video-engine/
+src-tauri/resources/ai-models/
 
 # Generated Tauri schemas and icons (maintained SVG is in assets/)
 src-tauri/gen/

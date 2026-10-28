@@ -183,11 +183,7 @@ fn cosine_similarity(left: &[f32], right: &[f32]) -> f32 {
 
 fn face_sessions(device: Option<&str>) -> Result<(Session, Session, String, String), String> {
     let (detector_key, embedder_key) = crate::ai_models::validate_supported_face_bundle()?;
-    let environment = ort::init()
-        .with_name("Open-Photo-People")
-        .with_telemetry(false)
-        .build()
-        .map_err(|e| e.to_string())?;
+    let environment = crate::ai_runtime::environment()?;
 
     let detector_path = crate::ai_models::installed_model_path("faces")?;
     let detector_builder = Session::builder(&environment).map_err(|e| e.to_string())?;
@@ -750,6 +746,24 @@ pub fn ai_detect_faces(
 #[derive(Clone)]
 struct GroupCandidate {
     face: PersonFace,
+}
+
+#[cfg(test)]
+pub(crate) fn bundled_inference_acceptance() -> Result<(), String> {
+    let (mut detector, mut embedder, _, _) = face_sessions(Some("cpu"))?;
+    let image =
+        image::DynamicImage::ImageRgb8(RgbImage::from_pixel(320, 320, image::Rgb([120, 140, 160])));
+    let _ = detect_faces(&mut detector, &image)?;
+    let crop = RgbImage::from_pixel(
+        EMBED_SIZE as u32,
+        EMBED_SIZE as u32,
+        image::Rgb([120, 140, 160]),
+    );
+    let values = face_embedding(&mut embedder, &crop)?;
+    if values.len() != 128 || values.iter().any(|v| !v.is_finite()) {
+        return Err("Bundled SFace inference failed".into());
+    }
+    Ok(())
 }
 
 struct WorkingGroup {

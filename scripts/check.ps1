@@ -22,6 +22,7 @@ try {
         if ($LASTEXITCODE -ne 0) {throw "Check failed with exit code $LASTEXITCODE"}
     }
     Invoke-Check {npm run prepare:video}
+    Invoke-Check {npm run prepare:models}
     Invoke-Check {npm run tauri icon assets/app-icon.svg}
     Invoke-Check {cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check}
     Invoke-Check {npm test}

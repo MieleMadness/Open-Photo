@@ -1,4 +1,4 @@
-> Development update: **0.54.11** fixes video library posters and loads the player automatically when a video is opened, with a visible still before playback. Videos use the bundled video decoder rather than the photo decoder, including large files. Unsupported original playback automatically tries a compatible preview once; streaming and preview failures show media error details. Saved brightness/contrast, previous-save recovery, and UHD export remain available. See [video projects](docs/VIDEO_PROJECTS.md), [acceptance](docs/VIDEO_ACCEPTANCE.md), and the [roadmap](docs/VIDEO_ROADMAP.md).
+> Development update: **0.54.12** restores saved folders on startup, adds a clear folder list with Remove from library, and connects uninstall cleanup to the Delete application data checkbox (off by default). AI models now ship with the installer: enable Local AI with one switch, with no separate model downloads. See [application data](docs/APPLICATION_DATA.md) and [bundled AI](docs/AI_MODEL_BUNDLE.md).
 
 # Open-Photo
 
@@ -34,7 +34,7 @@ It is designed to work directly with folders you already own, keep original medi
 | iPhone HEIC/HEIF previews | ✅ Partial | Decoded locally; embedded EXIF capture dates are now indexed when present |
 | Live Photo pairing | ✅ Improved | Prefers Apple's shared content identifier; falls back to same-folder + filename stem when metadata is missing |
 | Local ONNX inference | ✅ Working foundation | CPU-first ONNX Runtime integration |
-| AI model import/removal | ✅ Working | Manual, local, checksum-verified and confined to app data |
+| Bundled local AI | ✅ Included | Seven pinned assets installed with the app; one on/off switch; CPU inference contracts verified |
 | Persistent semantic image embeddings | ✅ Working | Stored locally in SQLite and model/pipeline-versioned |
 | Incremental AI indexing | ✅ Working foundation | Selected or full-library indexing; already-current embeddings are skipped |
 | AI photo-to-photo similarity | ✅ Working | Cosine similarity over locally stored embeddings |
@@ -286,24 +286,11 @@ Special limitations:
 
 ## Local AI
 
-Local AI is **opt-in and off by default**.
+The Windows installer includes the verified image/text search, People, and English OCR models. Open Settings and turn **Local AI** on; no model download or import is required. New installations start with AI off. Models and media stay local.
 
-Open **Settings → Local AI** and enable **Allow local AI features when available**.
+Choose an indexing action when ready. Turning AI off stops subsequent batches and retains existing indexes and person names; a batch in progress may finish. Diagnostics and the optional CPU setting are under the collapsed AI diagnostics section. See [bundled AI assets and validation](docs/AI_MODEL_BUNDLE.md).
 
-Current AI architecture:
-
-- ONNX Runtime executes models locally.
-- CPU remains the compatibility fallback. On Windows, Automatic mode now attempts the ONNX Runtime DirectML execution provider first and falls back to CPU if DirectML cannot be registered.
-- Models are manually imported; Open-Photo does not silently download them.
-- Settings exposes backend-derived compatibility status for every pinned AI slot and shows whether Semantic Search, People and OCR are ready.
-- **Run AI self-check** reports bundle readiness, DirectML availability, CPU fallback and whether real-world validation is still outstanding.
-- Imported assets are copied into Open-Photo's private local app-data model directory.
-- SHA-256 verification is required.
-- Semantic model slots reject assets that do not match the currently supported OpenCLIP bundle.
-- AI actions are disabled until their complete pinned model bundle is installed and verified.
-- People model slots reject anything except the pinned YuNet 2026may detector and SFace 2021dec embedder.
-- Image embeddings are stored in a separate local SQLite database.
-- Original photos are never modified by AI indexing.
+The model contracts below document the assets shipped by the installer. AI results remain experimental until accuracy and GPU behavior have been evaluated on representative libraries.
 
 ### Supported OCR model bundle
 
@@ -314,7 +301,7 @@ The first OCR milestone is intentionally **English-first** and uses RapidOCR/Pad
 | ocr | en_PP-OCRv3_det_mobile.onnx | ea07c15d38ac40cd69da3c493444ec75b44ff23840553ff8ba102c1219ed39c2 |
 | ocr_recognizer | en_PP-OCRv4_rec_mobile.onnx | e8770c967605983d1570cdf5352041dfb68fa0c21664f49f47b155abd3e0e318 |
 
-Open-Photo validates both assets before inference and supplies their pinned hashes automatically during import.
+The installer includes both pinned assets. Open-Photo validates their identities before inference.
 
 Current OCR behavior:
 - Runs locally on CPU or DirectML using the existing AI processing preference.
@@ -337,7 +324,7 @@ People indexing uses two pinned OpenCV Zoo models:
 | faces | face_detection_yunet_2026may.onnx | ebafce4e3c118d6554634be5c27ab333b4c047a9a8c3faf1d7cf93101c22f0f0 | MIT |
 | face_embedder | face_recognition_sface_2021dec.onnx | 0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79 | Apache-2.0 |
 
-Download the exact upstream files yourself, then import them in Settings. Open-Photo supplies the pinned checksum automatically for these known slots and refuses a mismatched model.
+The installer includes these exact assets and their licenses. Turn on Local AI in Settings; no separate downloads or imports are needed.
 
 The current pipeline:
 - resizes and pads photos locally for YuNet detection;
@@ -358,7 +345,7 @@ The current semantic pipeline is explicitly built around:
 **OpenCLIP ViT-B/32 — LAION-2B, split ONNX export**  
 Source: https://huggingface.co/amikos/openclip-vit-b-32-laion2b-s34b-b79k-onnx
 
-Import these exact files in Settings:
+The installer includes these exact files:
 
 | Open-Photo slot | Upstream file | Required SHA-256 |
 | --- | --- | --- |
@@ -366,19 +353,11 @@ Import these exact files in Settings:
 | semantic_text | text_model.onnx | 252b86e0ef1fc95b22cfd52fbf647142727fdbecc152556ffe0fba0b10a80370 |
 | semantic_tokenizer | tokenizer.json | b556ac8c99757ffb677208af34bc8c6721572114111a6e0aaf5fa69ff0b8d842 |
 
-The upstream bundle is roughly 600 MB combined. Consult its model card and license before redistribution or deployment. Semantic search should be considered experimental until it has been tested against representative real-world photo libraries.
+The upstream bundle is roughly 600 MB combined. The installer retains its model card, license, and attribution notices. Semantic search should be considered experimental until it has been tested against representative real-world photo libraries.
 
-### Importing the semantic bundle
+### Enabling the semantic bundle
 
-For each slot:
-
-1. Download the matching upstream file yourself.
-2. In Settings, choose the import action for that slot.
-3. Select the downloaded file.
-4. Paste the trusted SHA-256 value when prompted.
-5. Open-Photo verifies the checksum before copying the asset.
-
-An existing slot is never silently overwritten. Remove the installed slot explicitly before replacing it.
+All three semantic assets are installed with Open-Photo. Turn on Local AI in Settings, then choose an indexing or search action. If verification reports missing or incompatible files, repair/reinstall the application. Manual import APIs remain available for legacy developer tooling, but are not part of the standard setup UI.
 
 ### Index photos with AI
 
@@ -434,19 +413,11 @@ If the image preprocessing/model contract changes, re-index the affected photos 
 
 ## Local data locations
 
-On Windows, Open-Photo uses the user's local application-data/cache folders.
+Open-Photo stores its durable preferences, folder references, ratings, collections, AI indexes, reviewed names, and video drafts in six SQLite databases under `%LOCALAPPDATA%/Open-Photo`. Browser storage is a working cache hydrated from durable preferences before the app opens; clearing browser storage alone does not reset the durable database.
 
-Typical local application data under %LOCALAPPDATA%\Open-Photo includes:
+Installed AI assets and notices live under `bundled-ai` in the installation directory. Legacy manually imported copies may remain under the private `ai-models` data folder. Preview caches are app-private and pruned. Original media and exported copies remain in the user-selected locations.
 
-- media-index.sqlite — rebuildable media index
-- ai-embeddings.sqlite — local semantic embeddings
-- ai-models\ — imported local AI assets
-
-Preview thumbnails use the Windows cache directory under an Open-Photo\previews-v1 folder and are bounded/pruned.
-
-Browser-side preferences such as ratings, collections, smart rules, theme and some workspace settings are currently stored in local application storage.
-
-Deleting Open-Photo application data can remove indexes, embeddings and local-only organization state even though it does not delete the original photos. Export workspace metadata and keep backups of anything important.
+Uninstall retains app data by default. The new uninstaller's **Delete the application data** checkbox also clears the known Open-Photo databases/caches, including local saved edits and organization. Updates always retain data. To hide a source folder without clearing metadata or deleting files, use **Remove from library**. See [application-data behavior and lifecycle acceptance](docs/APPLICATION_DATA.md).
 
 ## Supported media
 

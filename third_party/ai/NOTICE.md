@@ -1,0 +1,10 @@
+# Bundled AI assets
+
+Open-Photo redistributes the exact unmodified model files listed in manifest.json. Models run locally; including these files does not enable AI indexing or upload media.
+
+- OpenCLIP ViT-B/32 LAION-2B image/text ONNX export and tokenizer: Amikos model repository, revision 248a2ed76a7189fc080e654e36930171331ef085. The model card declares MIT. Trained by Romain Beaumont using OpenCLIP/LAION-2B. Retain MODEL-CARD-OpenCLIP.md and LICENSE-OpenCLIP.txt, including upstream attribution and model limitations. Source: https://huggingface.co/amikos/openclip-vit-b-32-laion2b-s34b-b79k-onnx
+- YuNet 2026may: OpenCV Zoo revision 48b10fa505aeb51fbd127fc60a5c660040e823b7, models/face_detection_yunet. Copyright (c) 2020 Shiqi Yu, MIT. See LICENSE-YuNet.txt.
+- SFace 2021dec: OpenCV Zoo, same revision, models/face_recognition_sface. Apache-2.0. See LICENSE-SFace.txt and https://github.com/opencv/opencv_zoo/tree/48b10fa505aeb51fbd127fc60a5c660040e823b7/models/face_recognition_sface.
+- English PP-OCRv3 mobile detector and PP-OCRv4 mobile recognizer: ONNX conversions distributed by RapidAI/RapidOCR, ModelScope release v3.10.0. The upstream model weights are copyright Baidu and/or the applicable PaddleOCR rights holders and licensed under Apache-2.0. Conversion/repackaging does not transfer ownership. Open-Photo does not modify these ONNX files. See LICENSE-PaddleOCR.txt and LICENSE-RapidOCR.txt. Exact source URLs and SHA-256 identities are in manifest.json. The authoritative registry matches both hashes: https://github.com/RapidAI/RapidOCR/blob/80b427d69bfc5b91a12913394875910296c6f315/python/rapidocr/default_models.yaml. PaddleOCR license source: https://github.com/PaddlePaddle/PaddleOCR/blob/dab3fe35379033fdcb2d0e9572fac0b36c9a9ebf/LICENSE.
+
+These assets are separate from the application's source and inference runtime. Their names identify provenance and do not imply upstream endorsement. Review the retained licenses and model card for applicable terms and limitations.

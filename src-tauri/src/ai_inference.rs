@@ -11,11 +11,7 @@ pub struct InferenceResult {
 pub(crate) fn semantic_image_session(device: Option<&str>) -> Result<Session, String> {
     crate::ai_models::validate_supported_clip_vision()?;
     let model = crate::ai_models::installed_model_path("semantic")?;
-    let environment = ort::init()
-        .with_name("Open-Photo")
-        .with_telemetry(false)
-        .build()
-        .map_err(|e| e.to_string())?;
+    let environment = crate::ai_runtime::environment()?;
     let builder = Session::builder(&environment).map_err(|e| e.to_string())?;
     let mut builder = crate::ai_runtime::configure_session(builder, device)?;
     let session = builder

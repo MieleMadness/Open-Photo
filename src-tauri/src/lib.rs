@@ -1061,6 +1061,16 @@ fn open_video(root: String, path: String) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            use tauri::Manager;
+            let directory = if cfg!(debug_assertions) {
+                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/ai-models")
+            } else {
+                app.path().resource_dir()?.join("bundled-ai")
+            };
+            ai_models::configure_bundled_directory(directory);
+            Ok(())
+        })
         .plugin(tauri_plugin_dialog::init())
         .manage(std::sync::Mutex::new(watch::WatchState::default()))
         .manage(media_jobs::ImageJobs::default())

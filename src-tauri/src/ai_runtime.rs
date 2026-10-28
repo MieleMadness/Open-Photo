@@ -3,6 +3,22 @@
 use ort::ep::{DirectML, ExecutionProvider};
 use ort::session::builder::SessionBuilder;
 use serde::Serialize;
+use std::sync::OnceLock;
+
+pub(crate) fn environment() -> Result<ort::environment::Environment, String> {
+    // ORT rc.15 permits one environment per process, including after a session
+    // drops. Keep it alive and share it across images, text, People, and OCR.
+    static ENVIRONMENT: OnceLock<Result<ort::environment::Environment, String>> = OnceLock::new();
+    ENVIRONMENT
+        .get_or_init(|| {
+            ort::init()
+                .with_name("Open-Photo")
+                .with_telemetry(false)
+                .build()
+                .map_err(|e| e.to_string())
+        })
+        .clone()
+}
 
 #[derive(Serialize)]
 pub struct AiRuntimeStatus {
@@ -51,6 +67,16 @@ pub fn ai_runtime_status() -> AiRuntimeStatus {
 #[cfg(test)]
 mod tests {
     use super::normalized_device;
+    #[test]
+    fn inference_environment_is_reusable_and_shared_across_threads() {
+        let threads: Vec<_> = (0..4)
+            .map(|_| std::thread::spawn(|| super::environment().map(|_| ())))
+            .collect();
+        for thread in threads {
+            thread.join().unwrap().unwrap();
+        }
+        super::environment().unwrap();
+    }
 
     #[test]
     fn accepts_known_device_preferences() {

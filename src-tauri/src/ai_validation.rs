@@ -40,7 +40,7 @@ fn evaluate_bundle(models: &[crate::ai_models::ModelInfo], kinds: &[&str]) -> Ai
 
 #[tauri::command]
 pub fn ai_validation_report() -> Result<AiValidationReport, String> {
-    let models = crate::ai_models::ai_model_status()?;
+    let models = crate::ai_models::model_inventory()?;
     Ok(AiValidationReport {
         semantic: evaluate_bundle(
             &models,

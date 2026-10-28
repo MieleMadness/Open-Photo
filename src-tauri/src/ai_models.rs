@@ -7,7 +7,18 @@ use std::{
     fs,
     io::{Read, Write},
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
+static BUNDLED_DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
+pub(crate) fn configure_bundled_directory(path: PathBuf) {
+    let _ = BUNDLED_DIRECTORY.set(path);
+}
+fn bundled_directory() -> PathBuf {
+    BUNDLED_DIRECTORY
+        .get()
+        .cloned()
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/ai-models"))
+}
 
 const MAX_MODEL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 pub(crate) const SUPPORTED_CLIP_VISION_SHA256: &str =
@@ -89,8 +100,16 @@ fn fingerprint(path: &Path) -> Result<(u64, String), String> {
     }
     Ok((bytes, format!("{:x}", hash.finalize())))
 }
+fn model_candidate(kind: &str) -> Result<PathBuf, String> {
+    let bundled = bundled_directory().join(model_name(kind)?);
+    if bundled.is_file() {
+        Ok(bundled)
+    } else {
+        Ok(model_directory()?.join(model_name(kind)?))
+    }
+}
 pub(crate) fn installed_model_path(kind: &str) -> Result<PathBuf, String> {
-    let path = model_directory()?.join(model_name(kind)?);
+    let path = model_candidate(kind)?;
     if !path.is_file() {
         return Err(format!("{kind} model is not installed"));
     }
@@ -158,9 +177,7 @@ pub(crate) fn validate_supported_face_bundle() -> Result<(String, String), Strin
     ))
 }
 
-#[tauri::command]
-pub fn ai_model_status() -> Result<Vec<ModelInfo>, String> {
-    let dir = model_directory()?;
+pub(crate) fn model_inventory() -> Result<Vec<ModelInfo>, String> {
     [
         "semantic",
         "semantic_text",
@@ -172,8 +189,8 @@ pub fn ai_model_status() -> Result<Vec<ModelInfo>, String> {
     ]
     .iter()
     .map(|kind| {
-        let file = dir.join(model_name(kind)?);
-        if !file.exists() {
+        let file = model_candidate(kind)?;
+        if !file.is_file() {
             return Ok(ModelInfo {
                 kind: (*kind).into(),
                 installed: false,
@@ -196,6 +213,12 @@ pub fn ai_model_status() -> Result<Vec<ModelInfo>, String> {
         })
     })
     .collect()
+}
+#[tauri::command]
+pub async fn ai_model_status() -> Result<Vec<ModelInfo>, String> {
+    tauri::async_runtime::spawn_blocking(model_inventory)
+        .await
+        .map_err(|e| e.to_string())?
 }
 #[tauri::command]
 pub fn ai_import_model(
@@ -295,6 +318,67 @@ pub fn ai_remove_model(kind: String) -> Result<bool, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn installer_manifest_matches_every_supported_model_contract() {
+        let manifest: serde_json::Value =
+            serde_json::from_str(include_str!("../../config/ai-models.json")).unwrap();
+        let models = manifest["models"].as_array().unwrap();
+        assert_eq!(models.len(), 7);
+        let mut kinds = std::collections::BTreeSet::new();
+        for model in models {
+            let kind = model["kind"].as_str().unwrap();
+            assert!(kinds.insert(kind));
+            assert_eq!(model["name"], model_name(kind).unwrap());
+            assert_eq!(model["sha256"], supported_sha256(kind).unwrap());
+            assert!(model["url"].as_str().unwrap().starts_with("https://"));
+        }
+    }
+    #[test]
+    #[ignore = "bundled CPU inference acceptance; run explicitly with installed or prepared AI assets"]
+    fn bundled_ai_models_acceptance() {
+        if let Some(directory) = std::env::var_os("OPENPHOTO_AI_BUNDLE_DIRECTORY") {
+            configure_bundled_directory(directory.into());
+        }
+        let models = model_inventory().unwrap();
+        assert_eq!(models.len(), 7);
+        assert!(models.iter().all(|m| m.compatible));
+        let root =
+            std::env::temp_dir().join(format!("openphoto-ai-{}", crate::video_project::id()));
+        std::fs::create_dir(&root).unwrap();
+        let file = root.join("synthetic.png");
+        image::RgbImage::from_fn(320, 192, |x, y| {
+            image::Rgb([(x % 256) as u8, (y % 256) as u8, 120])
+        })
+        .save(&file)
+        .unwrap();
+        let before = std::fs::read(&file).unwrap();
+        let vision = crate::ai_inference::run_semantic_image(
+            root.to_string_lossy().into(),
+            file.to_string_lossy().into(),
+            Some("cpu".into()),
+        )
+        .unwrap();
+        assert_eq!(vision.values.len(), 512);
+        assert!(vision.values.iter().all(|v| v.is_finite()));
+        let text = crate::ai_text::run_semantic_text("a red photograph", Some("cpu")).unwrap();
+        assert_eq!(text.len(), 512);
+        assert!(text.iter().all(|v| v.is_finite()));
+        crate::ai_faces::bundled_inference_acceptance().unwrap();
+        crate::ai_ocr::bundled_inference_acceptance().unwrap();
+        assert_eq!(std::fs::read(&file).unwrap(), before);
+        if let Some(output) = std::env::var_os("OPENPHOTO_AI_ACCEPTANCE_OUTPUT") {
+            use std::io::Write;
+            let report = serde_json::json!({"app_version":env!("CARGO_PKG_VERSION"),"models_verified":7,"provider":"cpu","semantic_image":true,"semantic_text":true,"face_detector":true,"face_embedder":true,"ocr_detector":true,"ocr_recognizer":true,"source_unchanged":true,"scope":"Synthetic inference with bundled assets; not accuracy or GPU acceptance"});
+            let mut f = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(output)
+                .unwrap();
+            f.write_all(&serde_json::to_vec_pretty(&report).unwrap())
+                .unwrap();
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn invalid_model_type_is_rejected() {
         assert!(model_name("../escape").is_err());

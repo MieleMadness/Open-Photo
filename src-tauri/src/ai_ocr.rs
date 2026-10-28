@@ -89,11 +89,7 @@ fn modified_unix(path: &Path) -> Result<i64, String> {
 
 fn sessions(device: Option<&str>) -> Result<(Session, Session, String, String), String> {
     let (detector_key, recognizer_key) = crate::ai_models::validate_supported_ocr_bundle()?;
-    let environment = ort::init()
-        .with_name("Open-Photo-OCR")
-        .with_telemetry(false)
-        .build()
-        .map_err(|e| e.to_string())?;
+    let environment = crate::ai_runtime::environment()?;
 
     let detector_path = crate::ai_models::installed_model_path("ocr")?;
     let detector_builder = Session::builder(&environment).map_err(|e| e.to_string())?;
@@ -537,6 +533,19 @@ pub fn ai_ocr_photo(
     })
 }
 
+#[cfg(test)]
+pub(crate) fn bundled_inference_acceptance() -> Result<(), String> {
+    let (mut detector, mut recognizer, _, _) = sessions(Some("cpu"))?;
+    let image =
+        image::DynamicImage::ImageRgb8(RgbImage::from_pixel(320, 192, image::Rgb([240, 240, 240])));
+    let _ = detect_regions(&mut detector, &image)?;
+    let crop = RgbImage::from_pixel(160, 48, image::Rgb([240, 240, 240]));
+    let (_, confidence) = recognize_region(&mut recognizer, &crop)?;
+    if !confidence.is_finite() {
+        return Err("Bundled OCR inference failed".into());
+    }
+    Ok(())
+}
 #[tauri::command]
 pub fn ai_search_ocr(
     roots: Vec<String>,

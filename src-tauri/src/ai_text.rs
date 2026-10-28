@@ -35,11 +35,7 @@ pub(crate) fn run_semantic_text(query: &str, device: Option<&str>) -> Result<Vec
     ids.resize(CLIP_SEQUENCE_LENGTH, CLIP_PAD_EOS_ID);
     attention_mask.resize(CLIP_SEQUENCE_LENGTH, 0);
 
-    let environment = ort::init()
-        .with_name("Open-Photo")
-        .with_telemetry(false)
-        .build()
-        .map_err(|e| e.to_string())?;
+    let environment = crate::ai_runtime::environment()?;
     let model = crate::ai_models::installed_model_path("semantic_text")?;
     let builder = ort::session::Session::builder(&environment).map_err(|e| e.to_string())?;
     let mut builder = crate::ai_runtime::configure_session(builder, device)?;

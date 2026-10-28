@@ -29,7 +29,7 @@ Decode keyframes with a supported media backend (FFmpeg licensing review and shi
 - Store workspace membership separately from physical file identity.
 - Never export face embeddings or precise GPS locations by default.
 - No auto-deletion or automatic person merging.
-- Use a robust model download/update consent flow with integrity verification.
+- Ship pinned models and redistribution notices with the installer; verify build downloads and installed assets. Runtime does not download models.
 
 ## Test plan
 - Hash comparisons across identical and altered fixtures.
@@ -47,7 +47,7 @@ Decode keyframes with a supported media backend (FFmpeg licensing review and shi
 - Incremental/full-library AI indexing with stale-embedding skips.
 - Windows DirectML-first execution in Automatic mode with CPU fallback.
 - Bounded frontend AI batches with visible progress and safe cancellation between batches.
-- Manual, checksum-verified local model storage.
+- Installer-bundled, checksum-verified local model storage and an AI on/off switch.
 - Backend-derived compatibility metadata and Settings readiness states for Semantic Search, People and OCR.
 - Frontend gating so incomplete or incompatible model bundles cannot start AI jobs.
 - Phase 3 self-check command/UI for model bundle readiness, DirectML availability and explicit real-world validation status.

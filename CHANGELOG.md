@@ -1,3 +1,12 @@
+# 0.54.12 — Library restoration, folder management, and bundled AI
+
+- Restore the saved active workspace and scan its folders on startup, including legacy single-root workspaces. Show a clear source-folder list with Remove from library. Invalidate older scans and AI work when membership changes; removing a folder never deletes its media or saved edits.
+- Connect the uninstaller's existing Delete application data checkbox to the known Open-Photo databases and caches. Keep data by default and during updates; never traverse library paths or recursively remove the old app-data parent. Explicit /PURGEAPPDATA=1 supports isolated lifecycle testing.
+- Ship all seven pinned AI assets, model provenance, licenses, and notices in the installer. Verify downloads at build time and installed files in CI. Runtime uses the installed assets without downloads or another per-user copy.
+- Replace manual model setup with one Local AI switch; retain diagnostics and CPU selection. Turning off stops subsequent indexing batches while retaining indexes and names.
+- Share one process-wide ONNX environment across all AI sessions. Fix repeated/cross-feature inference failing with “only one environment is allowed per process.” Verify every model through synthetic CPU inference.
+- Add startup/removal/stale-scan and AI-off integration coverage, bundle/manifest contracts, concurrent runtime reuse, and a hosted Windows installed-model/default-keep/update-keep/explicit-cleanup lifecycle gate. Actual GUI behavior, AI accuracy, and GPU validation remain separate acceptance work.
+
 # 0.54.11 — Video posters and playback fallback
 
 - Automatically load the player when opening a standalone video, without another Play click. Show its poster and controls without starting audio automatically; retain manual Live Photo motion and remember playback intent through codec fallback.
