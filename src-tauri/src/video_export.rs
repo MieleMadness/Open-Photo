@@ -134,7 +134,8 @@ pub fn export_file(
     let duration = request.project.clips[0].source_out.seconds()?
         - request.project.clips[0].source_in.seconds()?;
     // A conservative allowance for the target bitrate plus muxing/faststart overhead.
-    let required = (duration * 12_192_000.0 / 8.0 * 1.25).ceil() as u64 + 64 * 1024 * 1024;
+    let bitrate = video_render::target_bitrate(request.project, request.size) + 192_000;
+    let required = (duration * bitrate as f64 / 8.0 * 1.25).ceil() as u64 + 64 * 1024 * 1024;
     if control
         .available_space(&parent)?
         .is_some_and(|free| free < required)

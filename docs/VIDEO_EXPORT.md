@@ -1,10 +1,11 @@
-# Single-video MP4 export (0.54.6)
+# Single-video MP4 export (0.54.7)
 
 Create or open a video project, choose **Preview edits** if desired, then **Export video MP4** and a new output filename. The app waits for autosave and submits a separate snapshot of the saved trim/transform/audio/canvas settings. Subsequent edits do not alter a running export. Export continues if the editor closes; the app-wide panel shows the destination, phase, progress, elapsed time, cancellation, and completed-file opening. Only one export is accepted at a time, and native processing is serialized with preview jobs. Normal app closure stays open while an export is active; finish or cancel it first.
 
 ## Supported preset and policy
 
-- SDR H.264, 8-bit YUV420P, target video bitrate 12 Mbps, with optional AAC stereo at 48 kHz / 192 kbps. Variable presentation timing is preserved through source encoder time bases rather than forced constant frame rate.
+- SDR H.264, 8-bit YUV420P, target video bitrate scaled by canvas area from 12 Mbps at 1080p to 48 Mbps at UHD (bounded between 12 and 48 Mbps), with optional AAC stereo at 48 kHz / 192 kbps. Variable presentation timing is preserved through source encoder time bases rather than forced constant frame rate.
+- Choose a 1080p, UHD 4K landscape/portrait, or supported source-resolution canvas in the editor. Source-resolution choices account for pixel aspect and source rotation, with even dimensions inside the existing 4096-edge/16-megapixel limits. Ultra-wide 3840×1080 is distinct from UHD 3840×2160; fit adds borders and fill crops rather than stretching. A larger canvas does not add captured detail.
 - Use the saved project canvas, or limit it to 1920 by 1080 (landscape) / 1080 by 1920 (portrait), preserving a smaller canvas. Source rotation is applied before project crop/rotate/flip. Fit/fill and audio gain use the same graph as edited preview; preview only reduces the canvas and video bitrate.
 - Audio is removed when muted or absent. Otherwise use the first source audio track as stereo; multiple source tracks require explicit confirmation. Zero gain retains a silent AAC track. Subtitles, extra audio, chapters, and source metadata are intentionally omitted. The export summary discloses this before choosing a destination.
 - Detected HDR is rejected. This release does not promise HDR tone mapping, source metadata preservation, or color-managed mastering.

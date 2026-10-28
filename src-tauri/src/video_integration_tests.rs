@@ -1524,3 +1524,181 @@ fn packet_timing_fallback_handles_matroska_without_stream_duration() {
     assert!((video.end - 1.0).abs() < 0.05);
     assert!((audio.unwrap().end - 1.0).abs() < 0.05);
 }
+
+#[test]
+fn uhd_exports_preserve_landscape_portrait_and_1080p_limit() {
+    use crate::{
+        video_export::{self, Request},
+        video_project,
+        video_render::{target_bitrate, ExportSize},
+    };
+    let fixture = Fixture::new();
+    let source = fixture.0.join("uhd.mp4");
+    ffmpeg(
+        &[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=3840x2160:rate=15:duration=1",
+            "-c:v",
+            "libopenh264",
+        ],
+        &source,
+    );
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    let mut p = video_project::new_project(fixture.0.to_str().unwrap(), &source, info).unwrap();
+    for (name, width, height, turn, size, expected, bitrate) in [
+        (
+            "landscape",
+            3840,
+            2160,
+            0,
+            ExportSize::Project,
+            (3840, 2160),
+            48_000_000,
+        ),
+        (
+            "limited",
+            3840,
+            2160,
+            0,
+            ExportSize::Hd1080,
+            (1920, 1080),
+            12_000_000,
+        ),
+        (
+            "portrait",
+            2160,
+            3840,
+            1,
+            ExportSize::Project,
+            (2160, 3840),
+            48_000_000,
+        ),
+    ] {
+        p.output.width = width;
+        p.output.height = height;
+        p.clips[0].edits.quarter_turns = turn;
+        assert_eq!(target_bitrate(&p, size), bitrate);
+        let report = video_export::export_file(
+            Request {
+                engine: &engine(),
+                root: fixture.0.to_str().unwrap(),
+                project: &p,
+                destination: &fixture.0.join(format!("{name}.mp4")),
+                size,
+                acknowledge_first_audio: false,
+            },
+            std::sync::Arc::new(ExportControl::default()),
+        )
+        .unwrap();
+        assert_eq!((report.width, report.height), expected);
+    }
+}
+
+#[cfg(windows)]
+#[test]
+#[ignore = "real media acceptance: use scripts/accept-video.ps1 -Source"]
+fn video_real_media_acceptance() {
+    use crate::{
+        video_export::{self, Control, Request, Stage},
+        video_project::{self, VideoTime},
+        video_render::ExportSize,
+    };
+    use std::{io::Write, sync::Arc, time::Instant};
+    if cfg!(debug_assertions) {
+        panic!("Real-media acceptance requires an optimized release build");
+    }
+    struct RealControl;
+    impl Control for RealControl {
+        fn cancelled(&self) -> bool {
+            false
+        }
+        fn update(&self, _: Stage, _: Option<f64>, _: u64) {}
+        fn begin_publish(&self) -> Result<(), String> {
+            Ok(())
+        }
+    }
+    let source =
+        fs::canonicalize(std::env::var_os("OPENPHOTO_REAL_SOURCE").expect("Choose a real source"))
+            .unwrap();
+    let report_path = PathBuf::from(
+        std::env::var_os("OPENPHOTO_ACCEPTANCE_OUTPUT").expect("Choose a report path"),
+    );
+    let output_root = report_path.parent().unwrap();
+    let root = source.parent().unwrap().to_str().unwrap();
+    let before = video_project::fingerprint(&source, || false).unwrap();
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    assert!(!info.hdr, "This acceptance preset requires SDR footage");
+    assert!(
+        info.duration_seconds >= 4.61,
+        "Choose a clip at least 4.61 seconds long"
+    );
+    let mut p = video_project::new_project(root, &source, info.clone()).unwrap();
+    let base = info.time_base.as_deref().unwrap();
+    p.clips[0].source_in = VideoTime::from_seconds(0.37, base).unwrap();
+    p.clips[0].source_out = VideoTime::from_seconds(4.61, base).unwrap();
+    p.clips[0].edits.gain_percent = 75;
+    let (a, b) = info
+        .sample_aspect_ratio
+        .as_deref()
+        .unwrap_or("1:1")
+        .split_once(':')
+        .unwrap();
+    let sar = a.parse::<f64>().unwrap() / b.parse::<f64>().unwrap();
+    let mut native = (
+        (f64::from(info.width) * sar / 2.0).floor() as u32 * 2,
+        info.height / 2 * 2,
+    );
+    if (info.rotation_degrees / 90.0).round() as i64 % 2 != 0 {
+        native = (native.1, native.0);
+    }
+    let mut outputs = vec![];
+    for (name, width, height) in [
+        ("source-resolution", native.0, native.1),
+        ("uhd-4k-canvas", 3840, 2160),
+    ] {
+        p.output.width = width;
+        p.output.height = height;
+        let output = output_root.join(format!("{name}.mp4"));
+        video_engine::reset_native_peak();
+        let started = Instant::now();
+        let result = video_export::export_file(
+            Request {
+                engine: &engine(),
+                root,
+                project: &p,
+                destination: &output,
+                size: ExportSize::Project,
+                acknowledge_first_audio: info.audio.len() > 1,
+            },
+            Arc::new(RealControl),
+        )
+        .unwrap();
+        let elapsed = started.elapsed().as_secs_f64();
+        assert_eq!((result.width, result.height), (width, height));
+        assert!((result.duration_seconds - 4.24).abs() < 0.1);
+        assert_eq!(
+            video_project::fingerprint(&source, || false).unwrap(),
+            before
+        );
+        video_project::write_copy(
+            &p,
+            &output_root.join(format!("{name}.openphoto-video.json")),
+        )
+        .unwrap();
+        outputs.push(serde_json::json!({"name":name,"width":width,"height":height,"output_seconds":result.duration_seconds,"bytes":result.bytes,"export_wall_seconds":elapsed,"maximum_individual_native_child_peak_working_set_bytes":video_engine::native_peak(),"source_unchanged":true,"stream_validation":true,"full_decode":true,"publication":true}));
+    }
+    assert_no_export_temporaries(output_root);
+    let document = serde_json::json!({"schema_version":1,"app_version":env!("CARGO_PKG_VERSION"),"engine_version":video_engine::VERSION,"scope":"Real-footage native exports; excludes GUI and whole-app memory. UHD canvas may letterbox or upscale the source; it does not add captured detail.","source_filename":source.file_name().unwrap().to_string_lossy(),"source_info":info,"trim_seconds":[0.37,4.61],"gain_percent":75,"outputs":outputs,"source_sha256":before.1,"source_bytes":before.0});
+    let mut file = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(report_path)
+        .unwrap();
+    file.write_all(&serde_json::to_vec_pretty(&document).unwrap())
+        .unwrap();
+    file.sync_all().unwrap();
+}

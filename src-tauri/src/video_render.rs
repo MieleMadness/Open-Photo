@@ -20,6 +20,29 @@ pub enum ExportSize {
     Hd1080,
 }
 pub const MAX_EXPORT_BYTES: u64 = 16 * 1024 * 1024 * 1024;
+fn output_canvas(p: &Project, size: ExportSize) -> Project {
+    let mut canvas = p.clone();
+    if size == ExportSize::Hd1080 {
+        let (w, h) = if canvas.output.height > canvas.output.width {
+            (1080.0, 1920.0)
+        } else {
+            (1920.0, 1080.0)
+        };
+        let factor = (w / f64::from(canvas.output.width))
+            .min(h / f64::from(canvas.output.height))
+            .min(1.0);
+        canvas.output.width =
+            ((f64::from(canvas.output.width) * factor / 2.0).floor() as u32 * 2).max(16);
+        canvas.output.height =
+            ((f64::from(canvas.output.height) * factor / 2.0).floor() as u32 * 2).max(16);
+    }
+    canvas
+}
+pub fn target_bitrate(p: &Project, size: ExportSize) -> u64 {
+    let canvas = output_canvas(p, size);
+    (12_000_000 * u64::from(canvas.output.width) * u64::from(canvas.output.height) / (1920 * 1080))
+        .clamp(12_000_000, 48_000_000)
+}
 pub struct Plan {
     pub info: VideoInfo,
     pub width: u32,
@@ -76,21 +99,7 @@ pub fn plan(
     let duration = clip.source_out.seconds()? - start;
     let (video_span, audio_span) =
         video_timing::source_spans(engine, &source, &info, start, duration, &cancel)?;
-    let mut canvas = p.clone();
-    if !preview && size == ExportSize::Hd1080 {
-        let (w, h) = if canvas.output.height > canvas.output.width {
-            (1080.0, 1920.0)
-        } else {
-            (1920.0, 1080.0)
-        };
-        let factor = (w / f64::from(canvas.output.width))
-            .min(h / f64::from(canvas.output.height))
-            .min(1.0);
-        canvas.output.width =
-            ((f64::from(canvas.output.width) * factor / 2.0).floor() as u32 * 2).max(16);
-        canvas.output.height =
-            ((f64::from(canvas.output.height) * factor / 2.0).floor() as u32 * 2).max(16);
-    }
+    let canvas = output_canvas(p, if preview { ExportSize::Project } else { size });
     let (filter, width, height) = video_project::filters(&canvas, preview)?;
     let max_bytes = if preview {
         512 * 1024 * 1024
@@ -140,6 +149,14 @@ pub fn plan(
             ]);
         }
     }
+    args.extend([
+        "-b:v".into(),
+        if preview {
+            "2000000".into()
+        } else {
+            target_bitrate(p, size).to_string().into()
+        },
+    ]);
     args.extend(
         [
             "-fps_mode",
@@ -149,8 +166,6 @@ pub fn plan(
             info.time_base.as_deref().unwrap_or("1/1000000"),
             "-c:v",
             "libopenh264",
-            "-b:v",
-            if preview { "2000k" } else { "12000k" },
             "-pix_fmt",
             "yuv420p",
             "-c:a",

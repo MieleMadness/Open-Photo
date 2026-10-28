@@ -492,7 +492,7 @@ pub async fn write_video_project_copy(project: Project, destination: String) -> 
         .await
         .map_err(|e| e.to_string())?
 }
-fn write_copy(project: &Project, destination: &Path) -> Result<(), String> {
+pub(crate) fn write_copy(project: &Project, destination: &Path) -> Result<(), String> {
     validate(project)?;
     let bytes = serde_json::to_vec_pretty(project).map_err(|e| e.to_string())?;
     let mut staged = crate::safe_output::StagedOutput::new(destination)?;

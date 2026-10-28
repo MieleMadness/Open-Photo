@@ -1,3 +1,12 @@
+# 0.54.7 — UHD and source-resolution video export
+
+- Add explicit UHD landscape (3840×2160), UHD portrait (2160×3840), and supported source-resolution canvas choices. Preserve ultra-wide source geometry, square-pixel aspect, and source rotation when choosing source resolution; retain imported canvases.
+- Scale the target video bitrate from 12 Mbps at 1080p to 48 Mbps at UHD, bounded to that range. Use the same resolution policy for conservative destination-space estimates. Keep the 1080p export limit and smaller-preview policy intact.
+- Add actual UHD landscape/portrait/1080p-limit export tests and editor/source-canvas coverage.
+- Add opt-in real-footage export acceptance, with source hashes, full decode, publication, separate source-resolution/UHD test files, portable project copies, and local reports. A UHD canvas does not add detail to lower-resolution footage.
+- Pin the workflow run name to the source release version so a stale PR title cannot mislabel a build.
+- Installed-app/real-media playback, hour-scale synchronization, actual drive failures, and whole-app performance remain acceptance gates.
+
 # 0.54.6 — Repeatable release video acceptance
 
 - Add an opt-in optimized-build acceptance test using an eight-second 1080p/audio fixture, non-frame-grid trimming, crop, rotation, gain, and the real export/publication pipeline.

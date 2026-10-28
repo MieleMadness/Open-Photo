@@ -6,6 +6,14 @@ export type Edits={crop:Crop;quarter_turns:number;flip_horizontal:boolean;flip_v
 export type VideoProject={schema_version:1;id:string;title:string;asset:{id:string;relative_path:string;sha256:string;bytes:number;info:VideoInfo};clips:{id:string;asset_id:string;source_in:VideoTime;source_out:VideoTime;edits:Edits}[];output:{width:number;height:number;fit:"fit"|"fill"}};
 export type LoadedProject={project:VideoProject;revision:number;source_path:string|null;source_status:string};
 export const defaultEdits=():Edits=>({crop:{x:0,y:0,width:10000,height:10000},quarter_turns:0,flip_horizontal:false,flip_vertical:false,muted:false,gain_percent:100});
+export function sourceCanvas(info:VideoInfo):VideoProject["output"]|null{
+  const [a,b]=(info.sample_aspect_ratio||"1:1").split(":").map(Number);
+  const sar=Number.isFinite(a/b)&&a/b>0?a/b:1;
+  let width=Math.floor(info.width*sar/2)*2,height=Math.floor(info.height/2)*2;
+  if(Math.abs(Math.round(info.rotation_degrees/90))%2)[width,height]=[height,width];
+  if(!Number.isFinite(width)||!Number.isFinite(height)||width<16||height<16||width>4096||height>4096||width*height>16000000||Math.max(width/height,height/width)>32)return null;
+  return {width,height,fit:"fit"};
+}
 export function defaultOutput(info:VideoInfo):VideoProject["output"]{
   const portrait=(info.height>info.width)!==(Math.abs(Math.round(info.rotation_degrees/90))%2===1);
   return {width:portrait?1080:1920,height:portrait?1920:1080,fit:"fit"};

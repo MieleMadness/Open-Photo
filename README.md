@@ -1,4 +1,4 @@
-> Development update: **0.54.6** adds a repeatable optimized 1080p export acceptance test with timing and native-process memory reports, run locally and in GitHub Actions. Phase 6 still needs installed-app acceptance with real footage and whole-app performance measurements. See [video acceptance](docs/VIDEO_ACCEPTANCE.md), [video export](docs/VIDEO_EXPORT.md), and the [Phase 6/7 roadmap](docs/VIDEO_ROADMAP.md).
+> Development update: **0.54.7** exposes UHD 4K and source-resolution video canvases, including ultra-wide recordings. Export bitrate and disk-space estimates scale with output resolution. Repeatable synthetic and opt-in real-footage checks produce reports and separate test edits. Phase 6 still needs installed-app and whole-app performance acceptance. See [video export](docs/VIDEO_EXPORT.md), [video acceptance](docs/VIDEO_ACCEPTANCE.md), and the [roadmap](docs/VIDEO_ROADMAP.md).
 
 # Open-Photo
 

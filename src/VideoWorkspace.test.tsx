@@ -97,3 +97,20 @@ it("requires an explicit first-track choice for multiple audio tracks unless aud
   const button=screen.getByText("Export video MP4…") as HTMLButtonElement;expect(button.disabled).toBe(true);fireEvent.click(screen.getByLabelText("Confirm first audio track only"));expect(button.disabled).toBe(false);
   fireEvent.click(screen.getByLabelText("Confirm first audio track only"));expect(button.disabled).toBe(true);fireEvent.click(screen.getByLabelText("Mute video audio"));expect(button.disabled).toBe(false);
 });
+
+it("autosaves 4K and source-resolution canvas choices without changing the source",async()=>{
+  const loaded=value();loaded.project.asset.info={...info,width:3840,height:1080};
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{
+    if(command==="create_video_project")return loaded;
+    if(command==="recent_video_projects")return [];
+    if(command==="inspect_video")return loaded.project.asset.info;
+    if(command==="save_video_project")return (args as {expectedRevision:number}).expectedRevision+1;
+  });
+  render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);
+  fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
+  fireEvent.change(screen.getByLabelText("Video canvas"),{target:{value:"3840x2160"}});
+  await waitFor(()=>expect(invoke).toHaveBeenCalledWith("save_video_project",expect.objectContaining({project:expect.objectContaining({output:{width:3840,height:2160,fit:"fit"}})})));
+  fireEvent.change(screen.getByLabelText("Video canvas"),{target:{value:"3840x1080"}});
+  await waitFor(()=>expect(invoke).toHaveBeenCalledWith("save_video_project",expect.objectContaining({project:expect.objectContaining({output:{width:3840,height:1080,fit:"fit"}})})));
+  expect(loaded.project.asset.info.width).toBe(3840);expect(loaded.project.output.width).toBe(1920);
+});

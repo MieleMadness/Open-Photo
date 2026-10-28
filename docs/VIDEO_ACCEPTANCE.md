@@ -1,4 +1,4 @@
-# Repeatable video acceptance (0.54.6)
+# Repeatable video acceptance (0.54.7)
 
 Phase 6 has an automated native export baseline. It is a measurement and correctness check, not completion of installed-app acceptance.
 
@@ -36,3 +36,15 @@ Use the packaged app on a named Windows reference PC and record results for:
 - App startup and seek latency, export speed, and whole-app/GPU memory under realistic library and media sizes. Record machine specifications, workload, measurements, and then choose explicit performance budgets.
 
 HDR tone mapping and waveform UI remain deferred. Phase 7's basic sequential multi-video editor remains planned in [the roadmap](VIDEO_ROADMAP.md).
+
+## Opt-in real footage
+
+Use a source file explicitly chosen for testing. Outputs go into a fresh separate directory; the source is fingerprinted and left unchanged:
+
+```powershell
+./scripts/accept-video.ps1 -Source 'C:/test-media/gameplay.mp4' -OutputDirectory 'C:/reports/new-real-run' -MachineLabel 'Reference desktop'
+```
+
+This runs the exact ignored optimized real-media test instead of the synthetic baseline. It requires an SDR clip at least 4.61 seconds long with a supported source canvas. It exports 0.37–4.61 seconds at 75% audio gain to separate source-resolution and 3840×2160 fit canvases. Each export uses the real validation, full-decode, source-reverification, and publication pipeline. Project JSON copies reference the selected source relative to its containing library folder; open them with that folder selected in the app. This does not test GUI interaction or establish perceptual quality.
+
+The real report includes the chosen filename, source properties/hash, and per-export results. Keep it and its media local unless you intentionally choose to share them. CI runs only synthetic media and does not upload this local footage. A 3840×1080 recording can retain its ultra-wide source resolution or be fitted into UHD with borders; it is not native 3840×2160 footage.

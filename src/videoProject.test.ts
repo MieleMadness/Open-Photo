@@ -1,6 +1,6 @@
 import {afterEach,expect,it,vi} from "vitest";
 import {invoke} from "@tauri-apps/api/core";
-import {cropForAspect,defaultEdits,ProjectSession,hasUnsavedProjects,flushProjects,discardProjectSaves,type VideoProject} from "./videoProject";
+import {cropForAspect,sourceCanvas,defaultEdits,ProjectSession,hasUnsavedProjects,flushProjects,discardProjectSaves,type VideoProject} from "./videoProject";
 vi.mock("@tauri-apps/api/core",()=>({invoke:vi.fn()}));
 function project():VideoProject{return {schema_version:1,id:"p",title:"Saved project",asset:{id:"asset",relative_path:"source.mp4",sha256:"0".repeat(64),bytes:123,info:{duration_seconds:10,codec:"h264",width:1920,height:1080,time_base:"1/90000",frame_rate:"30/1",nominal_frame_rate:"30/1",sample_aspect_ratio:"1:1",rotation_degrees:0,color_transfer:null,hdr:false,audio:[],warnings:[]}},clips:[{id:"clip",asset_id:"asset",source_in:{ticks:"0",time_base:"1/90000"},source_out:{ticks:"900000",time_base:"1/90000"},edits:defaultEdits()}],output:{width:1920,height:1080,fit:"fit"}};}
 afterEach(()=>{discardProjectSaves();vi.resetAllMocks();});
@@ -26,4 +26,13 @@ it("validates trim/crop changes before mutating history and preserves the origin
   const bad=structuredClone(p);bad.clips[0].source_out.ticks="0";expect(()=>s.commit(bad)).toThrow();expect(s.history.present).toBe(p);expect(invoke).not.toHaveBeenCalled();
   const square=cropForAspect(p.asset.info,1);expect(square).toEqual({x:2187,y:0,width:5625,height:10000});
   expect(cropForAspect({...p.asset.info,rotation_degrees:90},1).height).toBe(5625);
+});
+
+it("keeps source canvas geometry for UHD, portrait, ultra-wide and anamorphic clips",()=>{
+  const info=project().asset.info;
+  expect(sourceCanvas({...info,width:3840,height:2160})).toEqual({width:3840,height:2160,fit:"fit"});
+  expect(sourceCanvas({...info,width:3840,height:2160,rotation_degrees:90})).toEqual({width:2160,height:3840,fit:"fit"});
+  expect(sourceCanvas({...info,width:3840,height:1080})).toEqual({width:3840,height:1080,fit:"fit"});
+  expect(sourceCanvas({...info,width:1440,height:1080,sample_aspect_ratio:"4:3"})).toEqual({width:1920,height:1080,fit:"fit"});
+  expect(sourceCanvas({...info,width:7680,height:4320})).toBeNull();
 });
