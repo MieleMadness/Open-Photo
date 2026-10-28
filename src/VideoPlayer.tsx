@@ -7,13 +7,14 @@ type Assets={source:string;proxy:boolean;info:VideoInfo;filmstrip:{seconds:numbe
 type Status={state:"queued"|"running"|"complete"|"failed";result:Assets|null;error:string|null};
 
 export type VideoSelection={start:VideoTime;end:VideoTime;onChange:(start:VideoTime,end:VideoTime)=>void};
-export function VideoPlayer({root,path,onOpenExternal,selection}:{root:string;path:string;onOpenExternal:()=>void;selection?:VideoSelection}) {
+export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false}:{root:string;path:string;onOpenExternal:()=>void;selection?:VideoSelection;autoLoad?:boolean}) {
   const video=useRef<HTMLVideoElement>(null);
   const current=useRef(0);
   const restore=useRef(0);
   const rangePlaying=useRef(false);
   const cancelJob=useRef(()=>{});
-  const [requested,setRequested]=useState(false);
+  const [requested,setRequested]=useState(autoLoad);
+  const [playIntent,setPlayIntent]=useState(!autoLoad);
   const [mode,setMode]=useState<"original"|"proxy">("original");
   const [revision,setRevision]=useState(0);
   const [src,setSrc]=useState("");
@@ -111,11 +112,11 @@ export function VideoPlayer({root,path,onOpenExternal,selection}:{root:string;pa
     <VideoDetails root={root} path={path} onInfo={setInfo}/>
     {!src&&poster&&<button className="video-poster" disabled={busy} aria-label={requested?"Retry video preview":"Play selected video"} onClick={()=>requested?setRevision(v=>v+1):setRequested(true)}><img src={poster} alt="Selected video preview"/></button>}
     {!requested&&<button className="secondary-button" onClick={()=>setRequested(true)}>Play Live Photo / video</button>}
-    {src&&<><video ref={video} src={src} poster={poster||assets?.filmstrip[0]?.image} autoPlay controls playsInline preload="metadata" aria-label="Selected video"
+    {src&&<><video ref={video} src={src} poster={poster||assets?.filmstrip[0]?.image} autoPlay={playIntent} controls playsInline preload="metadata" aria-label="Selected video"
       onLoadedMetadata={()=>{const element=video.current;if(!element)return;if(Number.isFinite(element.duration))setDuration(element.duration);element.currentTime=Math.min(restore.current,element.duration||0);setPosition(element.currentTime);current.current=element.currentTime;}}
       onDurationChange={()=>{if(video.current&&Number.isFinite(video.current.duration))setDuration(video.current.duration);}}
       onTimeUpdate={()=>{if(video.current){current.current=video.current.currentTime;if(rangePlaying.current&&current.current>=(outMark?markSeconds(outMark):duration)){video.current.pause();video.current.currentTime=outMark?markSeconds(outMark):duration;current.current=video.current.currentTime;rangePlaying.current=false;}setPosition(current.current);}}}
-      onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)}
+      onPlay={()=>{setPlaying(true);setPlayIntent(true);}} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)}
       onError={event=>playbackFailure(event.currentTarget.error?.code||0,event.currentTarget.error?.message||"")}/>
       <div className="video-transport">
         <button className="secondary-button" onClick={toggle}>{playing?"Pause":"Play"}</button>
@@ -150,8 +151,8 @@ export function VideoPlayer({root,path,onOpenExternal,selection}:{root:string;pa
     {notice&&busy&&<p role="status">{notice}</p>}
     {assets?.warnings.map(warning=><p key={warning}>{warning}</p>)}
     {requested&&<div className="video-transport">
-      <button className="secondary-button" disabled={busy||!!info?.hdr} onClick={()=>{setMode("proxy");setRevision(v=>v+1);}}>Create compatible preview</button>
-      {mode==="proxy"&&<button className="secondary-button" onClick={()=>{setMode("original");setRevision(v=>v+1);}}>Use original video</button>}
+      <button className="secondary-button" disabled={busy||!!info?.hdr} onClick={()=>{setPlayIntent(playing);setMode("proxy");setRevision(v=>v+1);}}>Create compatible preview</button>
+      {mode==="proxy"&&<button className="secondary-button" onClick={()=>{setPlayIntent(playing);setMode("original");setRevision(v=>v+1);}}>Use original video</button>}
       {mode==="original"&&!busy&&!assets&&<button className="secondary-button" onClick={()=>setRevision(v=>v+1)}>Retry filmstrip</button>}
       <button className="secondary-button" onClick={onOpenExternal}>Open in Windows player</button>
     </div>}

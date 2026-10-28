@@ -14,7 +14,7 @@ function NumberField({label,value,min,max,step=1,onCommit}:{label:string;value:n
   useEffect(()=>setDraft(String(value)),[value]);
   return <label>{label}<input aria-label={label} type="number" value={draft} min={min} max={max} step={step} onChange={event=>setDraft(event.target.value)} onBlur={()=>{const number=Number(draft);if(draft.trim()&&Number.isFinite(number)&&number>=min&&number<=max)onCommit(number);setDraft(String(value));}} onKeyDown={event=>{if(event.key==="Enter")event.currentTarget.blur();}}/></label>;
 }
-export function VideoWorkspace({root,path,onOpenExternal}:{root:string;path:string;onOpenExternal:()=>void}){
+export function VideoWorkspace({root,path,onOpenExternal,autoLoad=false}:{root:string;path:string;onOpenExternal:()=>void;autoLoad?:boolean}){
   const [session,setSession]=useState<ProjectSession|null>(null);
   const sessionRef=useRef<ProjectSession|null>(null);
   const [loaded,setLoaded]=useState<LoadedProject|null>(null);
@@ -107,7 +107,7 @@ export function VideoWorkspace({root,path,onOpenExternal}:{root:string;path:stri
     await startVideoExport(root,structuredClone(owner.history.present),{destination,size:exportSize,acknowledge_first_audio:acknowledgeAudio});
   }
   return <div className="video-workspace">
-    {!previewBusy&&!previewSrc&&(!project||loaded?.source_path)&&<VideoPlayer key={loaded?.source_path||path} root={root} path={loaded?.source_path||path} onOpenExternal={project?()=>{void invoke("open_video",{root,path:loaded?.source_path}).catch(cause=>setError(String(cause)));}:onOpenExternal}
+    {!previewBusy&&!previewSrc&&(!project||loaded?.source_path)&&<VideoPlayer key={loaded?.source_path||path} autoLoad={autoLoad} root={root} path={loaded?.source_path||path} onOpenExternal={project?()=>{void invoke("open_video",{root,path:loaded?.source_path}).catch(cause=>setError(String(cause)));}:onOpenExternal}
       selection={c?{start:c.source_in,end:c.source_out,onChange:(start,end)=>change(p=>{p.clips[0].source_in=start;p.clips[0].source_out=end;})}:undefined}/>}
     {(previewBusy||previewSrc)&&<section aria-label="Edited video preview" className="video-edit-preview">
       {previewBusy?<p role="status">Rendering saved edits… <button className="secondary-button" onClick={stopPreview}>Cancel edit preview</button></p>:<video key={previewSrc} src={previewSrc} controls playsInline aria-label="Edited video" onError={()=>setError("Windows could not play the edited preview. Original playback remains available.")}/>}

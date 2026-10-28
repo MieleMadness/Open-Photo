@@ -1,4 +1,4 @@
-> Development update: **0.54.11** fixes video library posters and adds a visible still before playback. Videos use the bundled video decoder rather than the photo decoder, including large files. Unsupported original playback automatically tries a compatible preview once; streaming and preview failures show media error details. Saved brightness/contrast, previous-save recovery, and UHD export remain available. See [video projects](docs/VIDEO_PROJECTS.md), [acceptance](docs/VIDEO_ACCEPTANCE.md), and the [roadmap](docs/VIDEO_ROADMAP.md).
+> Development update: **0.54.11** fixes video library posters and loads the player automatically when a video is opened, with a visible still before playback. Videos use the bundled video decoder rather than the photo decoder, including large files. Unsupported original playback automatically tries a compatible preview once; streaming and preview failures show media error details. Saved brightness/contrast, previous-save recovery, and UHD export remain available. See [video projects](docs/VIDEO_PROJECTS.md), [acceptance](docs/VIDEO_ACCEPTANCE.md), and the [roadmap](docs/VIDEO_ROADMAP.md).
 
 # Open-Photo
 

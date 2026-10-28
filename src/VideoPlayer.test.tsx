@@ -17,6 +17,14 @@ beforeEach(()=>{
   });
 });
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.resetAllMocks()});
+it("loads a selected standalone video without another click and leaves audio playback to the controls",async()=>{
+  render(<IPhoneMotion autoLoad root="library" path="one.mp4" onOpenExternal={()=>{}}/>);
+  const video=await screen.findByLabelText("Selected video") as HTMLVideoElement;
+  expect(video.src).toBe("asset:original.mp4");expect(video.autoplay).toBe(false);
+  expect(screen.queryByText("Play Live Photo / video")).toBeNull();
+  expect(invoke).toHaveBeenCalledWith("start_video_preview",{root:"library",path:"one.mp4",proxy:false});
+  fireEvent.play(video);expect(video.autoplay).toBe(true);
+});
 it("shows a video poster before playback and keeps it on the player",async()=>{
   render(<IPhoneMotion root="library" path="one.mp4" onOpenExternal={()=>{}}/>);
   expect((await screen.findByAltText("Selected video preview") as HTMLImageElement).src).toBe("data:image/png;base64,poster");

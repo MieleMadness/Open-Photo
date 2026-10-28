@@ -44,6 +44,6 @@ export function IPhonePicture({ root, path, name }: { root: string; path: string
 }
 
 /** A new media identity resets all transient player state. */
-export function IPhoneMotion(props: {root:string;path:string;onOpenExternal:()=>void}) {
+export function IPhoneMotion(props: {root:string;path:string;onOpenExternal:()=>void;autoLoad?:boolean}) {
   return <VideoWorkspace key={`${props.root}\0${props.path}`} {...props}/>;
 }

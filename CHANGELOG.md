@@ -1,5 +1,6 @@
 # 0.54.11 — Video posters and playback fallback
 
+- Automatically load the player when opening a standalone video, without another Play click. Show its poster and controls without starting audio automatically; retain manual Live Photo motion and remember playback intent through codec fallback.
 - Route video library thumbnails through a dedicated bundled-video decoder instead of the photo decoder and its 75 MB input limit. Generate bounded, cached PNG posters with source identity checks, library authorization, fixed decoder limits, and separate library/player work slots.
 - Show a still before playback and retain it as the player's poster. Allow starting or retrying preview from the still rather than leaving an unexplained blank area.
 - Make the explicit Play action request playback after loading, rather than only fetching metadata. Keep native controls available if browser autoplay policy requires another user gesture.
