@@ -1040,7 +1040,6 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
     Ok(result)
 }
 
-
 #[derive(Serialize)]
 struct UpdaterChannelStatus {
     enabled: bool,
