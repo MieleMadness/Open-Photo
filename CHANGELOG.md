@@ -1,3 +1,14 @@
+# 0.55.1 — Final interface rhythm and interaction polish
+
+- Tighten the global spacing rhythm and normalize control heights across buttons, icon buttons, form fields, toolbars, settings, editor controls, and video controls.
+- Refine typography hierarchy and readable line lengths while keeping dense metadata and secondary copy visually subordinate.
+- Add a restrained active-navigation indicator, clearer keyboard focus treatment, sticky bulk-selection actions, and more consistent selected/hover states.
+- Polish gallery tiles, folder rows, chips, settings diagnostics, media details, video transport controls, filmstrips, editor fieldsets, and export status so newer features match the core Library design language.
+- Add a subtle page-settle transition, preserve the existing reduced-motion behavior, and keep motion short enough to support navigation rather than decorate it.
+- Improve narrow-window behavior for video time controls and action groups.
+- Normalize app version metadata to 0.55.1, including the lockfile that had remained on 0.54.12.
+- Presentation and interaction only; photo, video, AI, metadata, and project behavior are unchanged.
+
 # 0.55.0 — Interface polish and cohesive design system
 
 - Standardized buttons, selects, inputs, cards, panels, grids, list rows, and navigation around one spacing/radius/control-height system.
