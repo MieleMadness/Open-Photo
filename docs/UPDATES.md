@@ -1,0 +1,50 @@
+# Open-Photo stable updater
+
+Open-Photo uses Tauri's signed updater for deliberately published major releases.
+
+## Release policy
+
+The installed app accepts only a newer `N.0.0` release.
+
+- `1.0.0`, `2.0.0`, `3.0.0`, and later major releases are valid.
+- `0.56.0`, `1.1.0`, `1.0.1`, prereleases, PR builds, and branch builds are not valid stable updater releases.
+- A stable update must be built from `main` by the manual **Publish major stable update** workflow.
+- The rule is enforced twice: the release workflow rejects non-major versions, and the Rust updater comparator rejects any remote release that is not a newer `N.0.0`.
+
+## One-time signing setup
+
+Tauri requires updater signatures and does not allow signature verification to be disabled. Generate the updater key pair on a trusted machine:
+
+```powershell
+npm run tauri signer generate -- -w "$HOME/.tauri/open-photo.key"
+```
+
+Store the private key securely outside the repository. Losing it prevents existing installations from trusting future updates.
+
+Add these GitHub Actions secrets before the first public stable release:
+
+- `OPENPHOTO_UPDATER_PUBLIC_KEY`
+- `TAURI_SIGNING_PRIVATE_KEY`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if the key uses a password
+
+Normal PR and development builds do not receive these values, so the stable updater is disabled in those builds.
+
+## Publishing 1.0.0, 2.0.0, etc.
+
+1. Finish testing the release candidate.
+2. Merge the tested code to `main`.
+3. Set the repository version files to the intended major release, for example `1.0.0`, and let normal CI pass on `main`.
+4. Open GitHub Actions and run **Publish major stable update** from `main`.
+5. Enter the exact version and release notes.
+6. The workflow repeats tests, builds the signed NSIS updater, verifies the installed app, creates `latest.json`, and publishes the GitHub Release.
+7. Existing signed public installs discover the release on startup or when the user chooses **Check for updates**.
+
+Do not create a newer GitHub Release for a minor or patch build. Even if one is created accidentally, the app comparator rejects it.
+
+## Manifest
+
+Signed public builds check:
+
+`https://github.com/MieleMadness/Open-Photo/releases/latest/download/latest.json`
+
+The manifest contains the release version, notes, Windows installer URL, and exact Tauri signature. Signed-version verification requires the signature to match the version announced by the manifest.
