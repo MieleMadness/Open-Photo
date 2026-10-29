@@ -1,3 +1,15 @@
+# 0.56.4 — Feedback pass: navigation, folders, viewer, and video controls
+
+- Remove the redundant top breadcrumb bar so page content begins with the page heading; move light/dark controls into the left navigation.
+- Move workspace selection and source-folder management to the Folders page. Photo Library now links to Manage folders and focuses on media browsing.
+- Reorder the Folders page so its page header appears before all management content and add workspace creation to the workspace selector.
+- Add previous/next controls and a compact file summary to the details viewer, widen the standard detail panel, and improve spacing.
+- Move technical video details below playback, replace one-second skipping with five-second transport controls, remove Go to time, and rename marker controls to saved trim controls.
+- Use compact undo/redo icons in the video project editor and shorten Dismiss export to Dismiss.
+- Increase filename/filmstrip bottom spacing and refine folder-management layout.
+- Prevent Leaflet world copies and gray over-pan areas by constraining the photo map to one world.
+- Add docs/FEEDBACK_ROADMAP.md to separate direct UI work, Codex-scale tasks, and existing Phase 7 scope.
+
 # 0.56.3 — Phase 7 multi-video project media bin
 
 - Add Video projects with folder-scoped multi-video drafts, multi-file import, a selectable media bin, original-source previews, and duplicate detection by verified content hash.
