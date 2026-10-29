@@ -31,6 +31,13 @@ beforeEach(()=>{
 afterEach(async()=>{cleanup();await act(async()=>{});vi.resetAllMocks();vi.restoreAllMocks();vi.unstubAllGlobals();});
 function openFolders(){fireEvent.click(screen.getByRole("button",{name:"Folders"}));}
 function createWorkspaceFromFolders(name:string){openFolders();fireEvent.change(screen.getByRole("combobox",{name:"Active workspace"}),{target:{value:"__new__"}});fireEvent.change(screen.getByLabelText("Workspace name"),{target:{value:name}});fireEvent.click(screen.getByRole("button",{name:"Create"}));}
+it("resets both the viewport and virtual rows when sorting a scrolled library",async()=>{
+  vi.mocked(invoke).mockImplementation((command,args)=>command==="scan_indexed_with_changes"?Promise.resolve(scan((args as {root:string}).root,60)):fallback(command,args));
+  const {container}=render(<App/>);await screen.findByText("alpha-0.jpg");const grid=container.querySelector<HTMLElement>(".photo-grid")!;
+  grid.scrollTop=2000;fireEvent.scroll(grid);expect(screen.queryByText("alpha-0.jpg")).toBeNull();
+  fireEvent.change(screen.getByRole("combobox",{name:"Sort media"}),{target:{value:"name"}});
+  expect(grid.scrollTop).toBe(0);expect(screen.getByText("alpha-0.jpg")).toBeTruthy();
+});
 it("restores saved folders and their contents once on startup under StrictMode",async()=>{
   render(<StrictMode><App/></StrictMode>);
   await screen.findByText("alpha-0.jpg");expect(screen.getByText("beta-0.jpg")).toBeTruthy();

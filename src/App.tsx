@@ -838,7 +838,7 @@ export default function App() {
       }
     });
   }, [result, query, sortBy, folderFilter, mediaType, smartFilter, smartRules, selectedSmartRule, activeWorkspace, organizeFilter, photoRatings, currentCollection, hiddenLiveVideos, timelineMonth, memoryYear, selectedTag, managedTags]);
-  useEffect(() => setScrollTop(0), [query, sortBy, photoView, tileSize, root, folderFilter, mediaType, organizeFilter, smartFilter, timelineMonth, memoryYear, selectedTag]);
+  useLayoutEffect(() => {if(gridHost)gridHost.scrollTop=0;setScrollTop(0);}, [gridHost,query,sortBy,photoView,tileSize,root,folderFilter,mediaType,organizeFilter,smartFilter,timelineMonth,memoryYear,selectedTag]);
   const gridGap = 14;
   const columns = Math.max(1, Math.floor((gridWidth - 48 + gridGap) / (tileSize + gridGap)));
   const rowHeight = Math.max(tileSize, (gridWidth - 48) / columns - gridGap) + TILE_CAPTION_HEIGHT + TILE_ROW_GAP;
