@@ -1,3 +1,10 @@
+# 0.56.1 — Dedicated major-release updater channel
+
+- Move in-app update checks from GitHub's generic latest-release alias to a dedicated `stable-channel` release asset.
+- Keep the signed installer on its versioned major release while replacing only `stable-channel/latest.json` when a tested `N.0.0` release is deliberately published from main.
+- Prevent unrelated minor, patch, preview, or manual GitHub Releases from disrupting the updater endpoint.
+- Preserve the independent app-side major-only comparator and cryptographic signature verification as defense in depth.
+
 # 0.56.0 — Signed major-release in-app updater
 
 - Add the Tauri updater foundation with automatic update checks, download progress, a Settings update card, and a lightweight update-available notification.
