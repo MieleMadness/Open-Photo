@@ -27,7 +27,7 @@ it("saves brightness and contrast together, supports undo, and resets only those
   fireEvent.click(screen.getByText("Reset brightness and contrast"));
   expect((brightness as HTMLInputElement).value).toBe("0");expect((contrast as HTMLInputElement).value).toBe("0");
   expect((screen.getByLabelText("Video rotation") as HTMLSelectElement).value).toBe("1");
-  fireEvent.click(screen.getByText("Undo video edit"));
+  fireEvent.click(screen.getByLabelText("Undo video edit"));
   expect((brightness as HTMLInputElement).value).toBe("20");expect((contrast as HTMLInputElement).value).toBe("-30");
 });
 it("autosaves a transform, supports durable undo/redo, and reopens a recent draft",async()=>{
@@ -35,8 +35,8 @@ it("autosaves a transform, supports durable undo/redo, and reopens a recent draf
   fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
   fireEvent.change(screen.getByLabelText("Video rotation"),{target:{value:"1"}});
   await waitFor(()=>expect(invoke).toHaveBeenCalledWith("save_video_project",expect.objectContaining({project:expect.objectContaining({clips:[expect.objectContaining({edits:expect.objectContaining({quarter_turns:1})})]})})));
-  fireEvent.click(screen.getByText("Undo video edit"));await waitFor(()=>expect((screen.getByLabelText("Video rotation") as HTMLSelectElement).value).toBe("0"));
-  fireEvent.click(screen.getByText("Redo video edit"));await waitFor(()=>expect((screen.getByLabelText("Video rotation") as HTMLSelectElement).value).toBe("1"));
+  fireEvent.click(screen.getByLabelText("Undo video edit"));await waitFor(()=>expect((screen.getByLabelText("Video rotation") as HTMLSelectElement).value).toBe("0"));
+  fireEvent.click(screen.getByLabelText("Redo video edit"));await waitFor(()=>expect((screen.getByLabelText("Video rotation") as HTMLSelectElement).value).toBe("1"));
   await screen.findByText("All project changes saved locally.");fireEvent.change(screen.getByLabelText("Recent video projects"),{target:{value:"p"}});
   await waitFor(()=>expect(invoke).toHaveBeenCalledWith("load_video_project",{root:"library",id:"p"}));
 });
