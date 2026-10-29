@@ -39,12 +39,12 @@ Normal PR and development builds do not receive these values, so the stable upda
 6. The workflow repeats tests, builds the signed NSIS updater, verifies the installed app, creates `latest.json`, and publishes the GitHub Release.
 7. Existing signed public installs discover the release on startup or when the user chooses **Check for updates**.
 
-Do not create a newer GitHub Release for a minor or patch build. Even if one is created accidentally, the app comparator rejects it.
+Minor and patch GitHub Releases may exist for testing or manual distribution, but they must never be uploaded to the `stable-channel` release. The app also independently rejects any manifest whose version is not `N.0.0`.
 
 ## Manifest
 
 Signed public builds check:
 
-`https://github.com/MieleMadness/Open-Photo/releases/latest/download/latest.json`
+`https://github.com/MieleMadness/Open-Photo/releases/download/stable-channel/latest.json`
 
-The manifest contains the release version, notes, Windows installer URL, and exact Tauri signature. Signed-version verification requires the signature to match the version announced by the manifest.
+The `stable-channel` release is a fixed machine-readable channel whose `latest.json` asset is replaced only by the major-release workflow. This keeps ordinary GitHub Releases from changing the updater endpoint. The manifest contains the release version, notes, Windows installer URL, and exact Tauri signature. Signed-version verification requires the signature to match the version announced by the manifest.
