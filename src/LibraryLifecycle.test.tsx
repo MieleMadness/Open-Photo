@@ -29,12 +29,14 @@ beforeEach(()=>{
   vi.mocked(invoke).mockImplementation(fallback);
 });
 afterEach(async()=>{cleanup();await act(async()=>{});vi.resetAllMocks();vi.restoreAllMocks();vi.unstubAllGlobals();});
+function openFolders(){fireEvent.click(screen.getByRole("button",{name:"Folders"}));}
+function createWorkspaceFromFolders(){openFolders();fireEvent.change(screen.getByRole("combobox",{name:"Active workspace"}),{target:{value:"__new__"}});}
 it("restores saved folders and their contents once on startup under StrictMode",async()=>{
   render(<StrictMode><App/></StrictMode>);
   await screen.findByText("alpha-0.jpg");expect(screen.getByText("beta-0.jpg")).toBeTruthy();
   const scans=vi.mocked(invoke).mock.calls.filter(([command])=>command==="scan_indexed_with_changes");
   expect(scans.map(([,args])=>(args as {root:string}).root).sort()).toEqual([A,B].sort());
-  expect(screen.getByRole("button",{name:`Remove ${A} from library`})).toBeTruthy();
+  openFolders();expect(screen.getByRole("button",{name:`Remove ${A} from library`})).toBeTruthy();
   expect(await screen.findByText("v0.56.2 preview")).toBeTruthy();
 });
 it("clears scan status when creating an empty workspace and rejects the previous workspace's pending scan",async()=>{
@@ -42,7 +44,7 @@ it("clears scan status when creating an empty workspace and rejects the previous
   vi.mocked(invoke).mockImplementation((command,args)=>command==="scan_indexed_with_changes"&&(args as {root:string}).root===B?new Promise(resolve=>{finish=resolve}):fallback(command,args));
   vi.spyOn(window,"prompt").mockReturnValue("Video acceptance");
   render(<App/>);await waitFor(()=>expect(invoke).toHaveBeenCalledWith("scan_indexed_with_changes",{root:B}));
-  fireEvent.click(screen.getByRole("button",{name:"+ New workspace"}));
+  createWorkspaceFromFolders();
   await act(async()=>finish(scan(B)));
   expect(screen.getByRole("combobox",{name:"Active workspace"}).textContent).toContain("Video acceptance");
   expect(screen.queryByText("alpha-0.jpg")).toBeNull();expect(screen.queryByText("beta-0.jpg")).toBeNull();
@@ -51,8 +53,8 @@ it("clears scan status when creating an empty workspace and rejects the previous
 });
 it("does not carry a completed scan's counts or timestamp into a new empty workspace",async()=>{
   vi.spyOn(window,"prompt").mockReturnValue("Empty workspace");render(<App/>);
-  await screen.findByText("alpha-0.jpg");expect(screen.getByText(/Last indexed:/)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button",{name:"+ New workspace"}));
+  await screen.findByText("alpha-0.jpg");openFolders();expect(screen.getByText(/Last indexed:/)).toBeTruthy();
+  fireEvent.change(screen.getByRole("combobox",{name:"Active workspace"}),{target:{value:"__new__"}});
   expect(screen.queryByText(/Last indexed:/)).toBeNull();expect(screen.queryByText(/Changes:/)).toBeNull();
 });
 it("removes a folder during scanning, rejects the stale result, and does not resurrect removed roots",async()=>{
@@ -60,15 +62,14 @@ it("removes a folder during scanning, rejects the stale result, and does not res
   vi.mocked(invoke).mockImplementation((command,args)=>command==="scan_indexed_with_changes"&&(args as {root:string}).root===B?new Promise(resolve=>{finish=resolve}):fallback(command,args));
   const view=render(<App/>);
   await waitFor(()=>expect(invoke).toHaveBeenCalledWith("scan_indexed_with_changes",{root:B}));
-  fireEvent.click(screen.getByRole("button",{name:`Remove ${B} from library`}));
-  await screen.findByText("alpha-0.jpg");
-  await act(async()=>finish(scan(B)));expect(screen.queryByText("beta-0.jpg")).toBeNull();
-  fireEvent.click(screen.getByRole("button",{name:`Remove ${A} from library`}));
+  openFolders();fireEvent.click(screen.getByRole("button",{name:`Remove ${B} from library`}));
+  await act(async()=>finish(scan(B)));fireEvent.click(screen.getByRole("button",{name:"Library"}));await screen.findByText("alpha-0.jpg");expect(screen.queryByText("beta-0.jpg")).toBeNull();
+  openFolders();fireEvent.click(screen.getByRole("button",{name:`Remove ${A} from library`}));
   expect(await screen.findByText(/No folders added/)).toBeTruthy();
   await waitFor(()=>expect(JSON.parse(localStorage.getItem("openphoto.workspaces")!)[0].roots).toEqual([]));
-  view.unmount();render(<App/>);expect(await screen.findByText(/No folders added/)).toBeTruthy();
+  view.unmount();render(<App/>);openFolders();expect(await screen.findByText(/No folders added/)).toBeTruthy();
   vi.mocked(open).mockResolvedValue(C);fireEvent.click(screen.getByRole("button",{name:"+ Add folder"}));
-  await screen.findByText("gamma-0.jpg");expect(screen.queryByText("alpha-0.jpg")).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:"Library"}));await screen.findByText("gamma-0.jpg");expect(screen.queryByText("alpha-0.jpg")).toBeNull();
   expect(JSON.parse(localStorage.getItem("openphoto.workspaces")!)[0].roots).toEqual([C]);
 });
 it("stops scheduling AI batches when the switch is turned off and retains that preference",async()=>{
