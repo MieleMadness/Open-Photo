@@ -28,6 +28,13 @@ jobs:
           toolchain: '1.99.1'
       - name: Update JavaScript dependency lock
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Install resolved JavaScript dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Prepare bundled resources required by Tauri
+        shell: pwsh
+        run: |
+          npm run prepare:models
+          npm run prepare:video
       - name: Resolve Rust dependency lock
         shell: pwsh
         run: cargo check --manifest-path src-tauri/Cargo.toml
