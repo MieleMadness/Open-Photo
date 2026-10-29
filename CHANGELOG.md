@@ -1,3 +1,14 @@
+# 0.55.0 — Interface polish and cohesive design system
+
+- Standardized buttons, selects, inputs, cards, panels, grids, list rows, and navigation around one spacing/radius/control-height system.
+- Refined typography hierarchy so page titles, section titles, supporting copy, metadata, and microcopy read consistently across Library, Settings, AI, and video editing.
+- Added subtle hover elevation, selected states, press feedback, smoother drawer/export-panel transitions, and polished focus states without introducing distracting motion.
+- Added Windows/OS reduced-motion support so animations and smooth scrolling collapse to near-instant transitions when requested.
+- Unified newer video/project/AI surfaces with the established Library visual language, including fieldsets, transport controls, folders, export status, and settings cards.
+- Improved mobile/narrow-window behavior for action buttons and settings cards.
+- Fixed the video player keyboard focus ring to use the shared accent token instead of an undefined style variable.
+- This milestone changes presentation and interaction styling only; media, metadata, project, and AI behavior are unchanged.
+
 # 0.54.12 — Library restoration, folder management, and bundled AI
 
 - Restore the saved active workspace and scan its folders on startup, including legacy single-root workspaces. Show a clear source-folder list with Remove from library. Invalidate older scans and AI work when membership changes; removing a folder never deletes its media or saved edits.
