@@ -7,6 +7,11 @@ export type Edits={crop:Crop;quarter_turns:number;flip_horizontal:boolean;flip_v
 export type VideoProject={schema_version:1;id:string;title:string;asset:{id:string;relative_path:string;sha256:string;bytes:number;info:VideoInfo};clips:{id:string;asset_id:string;source_in:VideoTime;source_out:VideoTime;edits:Edits}[];output:{width:number;height:number;fit:"fit"|"fill"}};
 export type LoadedProject={project:VideoProject;revision:number;source_path:string|null;source_status:string};
 export const defaultEdits=():Edits=>({crop:{x:0,y:0,width:10000,height:10000},quarter_turns:0,flip_horizontal:false,flip_vertical:false,muted:false,gain_percent:100,brightness:0,contrast:0});
+export function sourceEndLimit(info:VideoInfo):number{
+  const [a,b]=(info.time_base||"1/1000000").split("/").map(Number);
+  // Container duration can be rounded slightly below the final rational source tick.
+  return info.duration_seconds+a/b/2+0.000001;
+}
 export function sourceCanvas(info:VideoInfo):VideoProject["output"]|null{
   const [a,b]=(info.sample_aspect_ratio||"1:1").split(":").map(Number);
   const sar=Number.isFinite(a/b)&&a/b>0?a/b:1;
@@ -30,9 +35,8 @@ export function cropForAspect(info:VideoInfo,aspect:number):Crop{
 export function validProject(project:VideoProject):string {
   const clip=project.clips[0];if(!clip)return "A project needs one clip.";
   const start=markSeconds(clip.source_in),end=markSeconds(clip.source_out),crop=clip.edits.crop;
-  const [a,b]=(project.asset.info.time_base||"1/1000000").split("/").map(Number);
   if(!project.title.trim()||project.title.length>200)return "Enter a project name of up to 200 characters.";
-  if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end-start<0.04||end>project.asset.info.duration_seconds+a/b/2+0.000001)return "Keep at least 0.04 seconds, within the original duration.";
+  if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end-start<0.04||end>sourceEndLimit(project.asset.info))return "Keep at least 0.04 seconds, within the original duration.";
   if(![crop.x,crop.y,crop.width,crop.height].every(Number.isInteger)||crop.x<0||crop.y<0||crop.width<100||crop.height<100||crop.x+crop.width>10000||crop.y+crop.height>10000)return "The crop must fit inside the video and keep at least 1% of each dimension.";
   if(clip.edits.gain_percent<0||clip.edits.gain_percent>200||!Number.isInteger(clip.edits.gain_percent))return "Audio volume must be between 0 and 200%.";
   if(![clip.edits.brightness,clip.edits.contrast].every(value=>Number.isInteger(value)&&value>=-100&&value<=100))return "Brightness and contrast must be whole numbers from -100 to 100.";

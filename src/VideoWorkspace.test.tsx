@@ -16,6 +16,14 @@ beforeEach(()=>{vi.mocked(invoke).mockImplementation(async(command,args)=>{
   if(command==="save_video_project")return (args as {expectedRevision:number}).expectedRevision+1;
 });});
 afterEach(async()=>{cleanup();discardProjectSaves();vi.mocked(invoke).mockResolvedValue(null);await refreshVideoExport();vi.resetAllMocks();});
+it("accepts an exact source endpoint between milliseconds without blocking export",async()=>{
+  const loaded=value();loaded.project.asset.info.duration_seconds=Number((900901/90000).toFixed(6));loaded.project.clips[0].source_out={ticks:"900901",time_base:"1/90000"};
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{if(command==="create_video_project")return loaded;if(command==="inspect_video")return loaded.project.asset.info;if(command==="save_video_project")return (args as {expectedRevision:number}).expectedRevision+1;return [];});
+  vi.mocked(save).mockResolvedValue(null);
+  render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
+  const end=screen.getByLabelText("Trim end (seconds)") as HTMLInputElement;fireEvent.blur(end);expect(end.validity.valid).toBe(true);expect(end.getAttribute("aria-invalid")).toBe("false");
+  fireEvent.click(screen.getByText("Export video MP4…"));await waitFor(()=>expect(save).toHaveBeenCalledOnce());expect(loaded.project.clips[0].source_out.ticks).toBe("900901");
+});
 it("keeps invalid numeric drafts visible and prevents exporting a stale saved value",async()=>{
   render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);
   fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");

@@ -4,7 +4,7 @@
 - Remove generic sticky-toolbar behavior that covered adjacent controls. Give the gallery its remaining working space and observe width changes when resizing the app.
 - Separate full-screen viewing and video editing from the inspector layout. Keep source/edited-preview labels explicit and group numeric edits by task without changing project documents or export settings.
 - Use native modal dialogs with keyboard focus containment/restoration and recoverable workspace, collection, smart-rule, and person-name forms.
-- Preserve invalid video numeric drafts, explain valid ranges, and block export until invalid fields are corrected.
+- Preserve invalid video numeric drafts, explain valid ranges, and block export until invalid fields are corrected. Accept exact rational trim endpoints, including container durations rounded slightly below the final source tick.
 - Separate accent/on-accent and success-text theme colors, consolidate tokens, repair compact navigation branding, distinguish date navigation, and reserve thumbnail captions in shared virtual-row geometry.
 - Add reusable error/retry surfaces and styled startup recovery; dock save/export notices so they do not cover library/editor controls. Respect reduced motion per component.
 - Add regression coverage for focus, form validation, stale numeric export prevention, and the new workspace-creation flow. Validate layouts with short sample projects, both themes, and normal/minimum window sizes.
