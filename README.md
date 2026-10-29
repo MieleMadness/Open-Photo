@@ -8,6 +8,17 @@ It is designed to work directly with folders you already own, keep original medi
 
 > **Development status:** Open-Photo is actively developed as a 0.x project. Many library-management features are working today, while People/face grouping, OCR, GPU validation, full RAW support, and Immich synchronization are still unfinished. Do not use Open-Photo as the only copy of important photos or metadata.
 
+## Interface polish
+
+Open-Photo uses one shared visual system across the photo library, settings, local AI, metadata tools, and video editing:
+
+- Consistent control heights, spacing, corner radii, focus states, and typography hierarchy.
+- Primary actions use the filled accent treatment; secondary actions use the same neutral bordered treatment throughout the app.
+- Cards, grids, list rows, tags, editor panels, and export surfaces share the same spacing and elevation rules.
+- Hover and selected states are intentionally subtle so large photo/video libraries remain easy to scan.
+- Drawers and floating panels use short transitions; users who enable **Reduce motion** in Windows receive near-instant transitions.
+- Keyboard focus uses the same visible accent ring across photo, video, form, and navigation controls.
+
 ## What works today
 
 | Area | Status | Notes |
