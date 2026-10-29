@@ -2107,7 +2107,7 @@ struct FrameWindow {
     frames: Vec<f64>,
     complete: bool,
     first_seen: Option<f64>,
-    time_base: Option<f64>,
+    time_base: Option<(u32, u32)>,
 }
 impl FrameWindow {
     fn new(start: f64, end: f64) -> Self {
@@ -2140,7 +2140,7 @@ impl FrameWindow {
             if a == 0 || b == 0 {
                 return Err("Invalid decoded-frame time base".into());
             }
-            self.time_base = Some(f64::from(a) / f64::from(b));
+            self.time_base = Some((a, b));
             return Ok(false);
         }
         if text.is_empty() || text.starts_with('#') {
@@ -2151,10 +2151,13 @@ impl FrameWindow {
             return Err("Invalid decoded-frame record".into());
         }
         let ticks = fields[2].parse::<i64>().map_err(|e| e.to_string())?;
-        let time = ticks as f64
-            * self
-                .time_base
-                .ok_or("Decoded-frame record before time base")?;
+        let (numerator, denominator) = self
+            .time_base
+            .ok_or("Decoded-frame record before time base")?;
+        // Keep the rational denominator until the final division. Multiplying by
+        // a rounded reciprocal can move an exact boundary frame one ULP earlier
+        // (for example 29743104 / 15360 at 1936.4 seconds).
+        let time = ticks as f64 * f64::from(numerator) / f64::from(denominator);
         self.first_seen.get_or_insert(time);
         if time >= self.end {
             self.complete = true;
@@ -2270,6 +2273,21 @@ fn completed_frame_windows_ignore_buffered_and_partial_probe_output() {
     assert_eq!(window.frames.len(), 2);
     assert!((window.frames[0] - 0.383333).abs() < 0.000001);
     assert!((window.frames[1] - 1.6).abs() < 0.000001);
+}
+#[test]
+fn decoded_frame_windows_include_exact_rational_boundaries_at_hour_scale() {
+    let mut window = FrameWindow::new(1936.4, 1936.45);
+    window.consume(b"#tb 0: 1/15360\n").unwrap();
+    for ticks in [29742848, 29743104, 29743360, 29743616, 29743872] {
+        window
+            .consume(format!("0, {ticks}, {ticks}, 256, 4608, 0x12345678\n").as_bytes())
+            .unwrap();
+    }
+    assert_eq!(
+        window.frames,
+        vec![1936.4, 1936.4166666666667, 1936.4333333333334]
+    );
+    assert!(window.complete);
 }
 #[test]
 fn decoded_frame_records_require_valid_time_bases_and_complete_records() {
