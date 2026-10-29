@@ -35,6 +35,7 @@ jobs:
         run: |
           npm run prepare:models
           npm run prepare:video
+          npm run tauri icon assets/app-icon.svg
       - name: Resolve Rust dependency lock
         shell: pwsh
         run: cargo check --manifest-path src-tauri/Cargo.toml
