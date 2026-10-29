@@ -11,11 +11,11 @@ import {exportFilename,startVideoExport,useVideoExport,type ExportSize} from "./
 const CANVASES=[{value:"1920x1080",label:"1080p landscape (1920 × 1080)"},{value:"1080x1920",label:"1080p portrait (1080 × 1920)"},{value:"1080x1080",label:"Square (1080 × 1080)"},{value:"3840x2160",label:"4K landscape (3840 × 2160)"},{value:"2160x3840",label:"4K portrait (2160 × 3840)"}];
 type PreviousSave={id:string;revision:number|null;saved_at:number|null;title:string;start_seconds:number;end_seconds:number;width:number;height:number};
 type SavedHistory={revision:number;entries:PreviousSave[];localRevision:number};
-function NumberField({label,value,min,max,step=1,onCommit}:{label:string;value:number;min:number;max:number;step?:number|"any";onCommit:(value:number)=>void}){
+function NumberField({label,value,min,max,step=1,onCommit}:{label:string;value:number;min:number;max:number;step?:number|"any";onCommit:(value:number)=>string|void}){
   const [draft,setDraft]=useState(String(value)),[error,setError]=useState("");const id=useId();
   useEffect(()=>{setDraft(String(value));setError("");},[value]);
-  function commit(){const number=Number(draft);if(!draft.trim()||!Number.isFinite(number)||number<min||number>max||(typeof step==="number"&&Math.abs((number-min)/step-Math.round((number-min)/step))>0.00001)){setError(`Enter a value from ${min} to ${max}${step==="any"?"":`, in steps of ${step}`}.`);return;}setError("");onCommit(number);}
-  return <label htmlFor={id}>{label}<input id={id} aria-label={label} aria-invalid={!!error} aria-describedby={error?`${id}-error`:undefined} type="number" value={draft} min={min} max={max} step={step} onChange={event=>{setDraft(event.target.value);setError("");}} onBlur={commit} onKeyDown={event=>{if(event.key==="Enter")event.currentTarget.blur();}}/>{error&&<span id={`${id}-error`} className="field-error" role="alert">{error}</span>}</label>;
+  function commit(){const number=Number(draft);if(!draft.trim()||!Number.isFinite(number)||number<min||number>max||(typeof step==="number"&&Math.abs((number-min)/step-Math.round((number-min)/step))>0.00001)){setError(`Enter a value from ${min} to ${max}${step==="any"?"":`, in steps of ${step}`}.`);return;}setError(onCommit(number)||"");}
+  return <label htmlFor={id}>{label}<input id={id} aria-label={label} aria-invalid={!!error} aria-describedby={error?`${id}-error`:undefined} type="number" required value={draft} min={min} max={max} step={step} onChange={event=>{setDraft(event.target.value);setError("");}} onBlur={commit} onKeyDown={event=>{if(event.key==="Enter")event.currentTarget.blur();}}/>{error&&<span id={`${id}-error`} className="field-error" role="alert">{error}</span>}</label>;
 }
 export function VideoWorkspace({root,path,onOpenExternal,autoLoad=false}:{root:string;path:string;onOpenExternal:()=>void;autoLoad?:boolean}){
   const host=useRef<HTMLDivElement>(null);
@@ -58,10 +58,10 @@ export function VideoWorkspace({root,path,onOpenExternal,autoLoad=false}:{root:s
   async function flush(){await sessionRef.current?.flush();}
   function change(mutator:(copy:VideoProject)=>void){
     if(!session)return;
-    if(recovering){setError("Wait for project recovery to finish.");return;}
-    try{const next=structuredClone(session.history.present);mutator(next);session.commit(next);setError("");}catch(cause){setError(String(cause));}
+    if(recovering){const message="Wait for project recovery to finish.";setError(message);return message;}
+    try{const next=structuredClone(session.history.present);mutator(next);session.commit(next);setError("");}catch(cause){const message=String(cause);setError(message);return message;}
   }
-  function edits(mutator:(edit:Edits)=>void){change(p=>mutator(p.clips[0].edits));}
+  function edits(mutator:(edit:Edits)=>void){return change(p=>mutator(p.clips[0].edits));}
   function history(command:"undo"|"redo"){try{session?.commit(command);}catch(cause){setError(String(cause));}}
   async function loadPreviousSaves(){
     const owner=sessionRef.current;if(!owner)return;await owner.flush();

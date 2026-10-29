@@ -16,6 +16,12 @@ beforeEach(()=>{vi.mocked(invoke).mockImplementation(async(command,args)=>{
   if(command==="save_video_project")return (args as {expectedRevision:number}).expectedRevision+1;
 });});
 afterEach(async()=>{cleanup();discardProjectSaves();vi.mocked(invoke).mockResolvedValue(null);await refreshVideoExport();vi.resetAllMocks();});
+it("marks an invalid trim interval inline and cannot export the previous saved interval",async()=>{
+  render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
+  const start=screen.getByLabelText("Trim start (seconds)"),end=screen.getByLabelText("Trim end (seconds)");fireEvent.change(start,{target:{value:"5"}});fireEvent.blur(start);
+  fireEvent.change(end,{target:{value:"1"}});fireEvent.blur(end);expect(end.getAttribute("aria-invalid")).toBe("true");expect((end as HTMLInputElement).value).toBe("1");
+  fireEvent.click(screen.getByText("Export video MP4…"));await screen.findByText(/Correct the highlighted field before exporting/);expect(save).not.toHaveBeenCalled();
+});
 it("accepts an exact source endpoint between milliseconds without blocking export",async()=>{
   const loaded=value();loaded.project.asset.info.duration_seconds=Number((900901/90000).toFixed(6));loaded.project.clips[0].source_out={ticks:"900901",time_base:"1/90000"};
   vi.mocked(invoke).mockImplementation(async(command,args)=>{if(command==="create_video_project")return loaded;if(command==="inspect_video")return loaded.project.asset.info;if(command==="save_video_project")return (args as {expectedRevision:number}).expectedRevision+1;return [];});
@@ -24,11 +30,11 @@ it("accepts an exact source endpoint between milliseconds without blocking expor
   const end=screen.getByLabelText("Trim end (seconds)") as HTMLInputElement;fireEvent.blur(end);expect(end.validity.valid).toBe(true);expect(end.getAttribute("aria-invalid")).toBe("false");
   fireEvent.click(screen.getByText("Export video MP4…"));await waitFor(()=>expect(save).toHaveBeenCalledOnce());expect(loaded.project.clips[0].source_out.ticks).toBe("900901");
 });
-it("keeps invalid numeric drafts visible and prevents exporting a stale saved value",async()=>{
+it.each(["999",""])("keeps invalid numeric draft %s visible and prevents exporting a stale saved value",async draft=>{
   render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);
   fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
-  const volume=screen.getByLabelText("Audio volume (%)");fireEvent.change(volume,{target:{value:"999"}});fireEvent.blur(volume);
-  expect((volume as HTMLInputElement).value).toBe("999");expect(volume.getAttribute("aria-invalid")).toBe("true");expect(screen.getByText("Enter a value from 0 to 200, in steps of 1.")).toBeTruthy();
+  const volume=screen.getByLabelText("Audio volume (%)");fireEvent.change(volume,{target:{value:draft}});fireEvent.blur(volume);
+  expect((volume as HTMLInputElement).value).toBe(draft);expect(volume.getAttribute("aria-invalid")).toBe("true");expect(screen.getByText("Enter a value from 0 to 200, in steps of 1.")).toBeTruthy();
   fireEvent.click(screen.getByText("Export video MP4…"));await screen.findByText(/Correct the highlighted field before exporting/);expect(save).not.toHaveBeenCalled();
   fireEvent.change(volume,{target:{value:"75"}});fireEvent.blur(volume);await waitFor(()=>expect(vi.mocked(invoke).mock.calls.some(([cmd,args])=>cmd==="save_video_project"&&(args as {project:{clips:{edits:{gain_percent:number}}[]}}).project.clips[0].edits.gain_percent===75)).toBe(true));
 });
