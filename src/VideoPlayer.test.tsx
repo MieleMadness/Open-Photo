@@ -64,26 +64,26 @@ async function open(){
   await screen.findByRole("button",{name:"Seek to 00:00:05.000"});
   return {view,video};
 }
-it("seeks, validates in/out markers, and keeps preview selections when changing to a proxy",async()=>{
+it("seeks in five-second steps and keeps playback position when changing to a proxy",async()=>{
   const {video}=await open();
   fireEvent.change(screen.getByLabelText("Seek video"),{target:{value:"5"}});
-  fireEvent.click(screen.getByText("Mark in"));fireEvent.click(screen.getByText("Mark out"));
-  expect(screen.getByText("The out marker must be after the in marker.")).toBeTruthy();
-  fireEvent.change(screen.getByLabelText("Seek video"),{target:{value:"10"}});fireEvent.click(screen.getByText("Mark out"));
+  fireEvent.click(screen.getByLabelText("Forward 5 seconds"));
+  expect((screen.getByLabelText("Seek video") as HTMLInputElement).value).toBe("10");
+  fireEvent.click(screen.getByLabelText("Back 5 seconds"));
+  expect((screen.getByLabelText("Seek video") as HTMLInputElement).value).toBe("5");
   fireEvent.click(screen.getByText("Create compatible preview"));
   await screen.findByText(/Playing a smaller compatible preview/);
-  expect(screen.getByText("In: 00:00:05.000 · Out: 00:00:10.000")).toBeTruthy();
   const proxy=screen.getByLabelText("Selected video") as HTMLVideoElement;
   Object.defineProperty(proxy,"duration",{configurable:true,value:20});fireEvent.loadedMetadata(proxy);
-  expect(proxy.currentTime).toBe(10);
+  expect(proxy.currentTime).toBe(5);
   expect(video).toBeTruthy();
 });
 it("limits keyboard shortcuts to the player and resets state when selecting another clip",async()=>{
   const {view}=await open();
+  fireEvent.keyDown(screen.getByLabelText("Video playback"),{key:"ArrowRight"});
+  expect((screen.getByLabelText("Seek video") as HTMLInputElement).value).toBe("5");
   fireEvent.keyDown(screen.getByLabelText("Video playback"),{key:"ArrowRight",shiftKey:true});
-  expect((screen.getByLabelText("Seek video") as HTMLInputElement).value).toBe("10");
-  fireEvent.keyDown(screen.getByText("Mark in"),{key:"ArrowRight"});
-  expect((screen.getByLabelText("Seek video") as HTMLInputElement).value).toBe("10");
+  expect((screen.getByLabelText("Seek video") as HTMLInputElement).value).toBe("15");
   view.rerender(<IPhoneMotion root="library" path="two.mp4" onOpenExternal={()=>{}}/>);
   expect(screen.queryByLabelText("Selected video")).toBeNull();
   expect(invoke).toHaveBeenCalledWith("cancel_video_preview",{id:"job-1"});
@@ -113,14 +113,11 @@ it("keeps original playback available when derivative generation fails",async()=
   expect(await screen.findByText(/Disk full/)).toBeTruthy();
   expect((screen.getByLabelText("Selected video") as HTMLVideoElement).src).toBe("asset:original.mp4");
 });
-it("plays the marked interval and stops at its out marker",async()=>{
-  const play=vi.spyOn(HTMLMediaElement.prototype,"play").mockResolvedValue();
-  const pause=vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(()=>{});
-  const {video}=await open();
-  fireEvent.change(screen.getByLabelText("Seek video"),{target:{value:"3"}});fireEvent.click(screen.getByText("Mark in"));
-  fireEvent.change(screen.getByLabelText("Seek video"),{target:{value:"8"}});fireEvent.click(screen.getByText("Mark out"));
-  fireEvent.click(screen.getByText("Play marked range"));expect(video.currentTime).toBe(3);expect(play).toHaveBeenCalled();
-  video.currentTime=8.2;fireEvent.timeUpdate(video);expect(pause).toHaveBeenCalled();expect(video.currentTime).toBe(8);
+it("does not expose standalone trim controls without an editing project",async()=>{
+  await open();
+  expect(screen.queryByText("Set trim start")).toBeNull();
+  expect(screen.queryByText("Set trim end")).toBeNull();
+  expect(screen.queryByText("Preview trim")).toBeNull();
 });
 it("cancels active generation and ignores a late completed status",async()=>{
   let finish:(value:unknown)=>void=()=>{};
@@ -139,11 +136,10 @@ it("cancels active generation and ignores a late completed status",async()=>{
   expect((screen.getByLabelText("Selected video") as HTMLVideoElement).src).toBe("asset:original.mp4");
 });
 
-it("jumps to a typed timestamp in a long video and rejects invalid or out-of-range input",async()=>{
-  const {video}=await open();Object.defineProperty(video,"duration",{configurable:true,value:3872.8});fireEvent.durationChange(video);
-  const input=screen.getByLabelText("Video seek time");
-  fireEvent.change(input,{target:{value:"01:04:28.125"}});fireEvent.click(screen.getByRole("button",{name:"Go to time"}));expect(video.currentTime).toBe(3868.125);
-  fireEvent.change(input,{target:{value:"1:99"}});fireEvent.click(screen.getByRole("button",{name:"Go to time"}));expect(screen.getByText(/Enter seconds or a time/)).toBeTruthy();expect(video.currentTime).toBe(3868.125);
-  fireEvent.change(input,{target:{value:"02:00:00"}});fireEvent.click(screen.getByRole("button",{name:"Go to time"}));expect(screen.getByText(/Choose a time from/)).toBeTruthy();expect(video.currentTime).toBe(3868.125);
-  fireEvent.change(input,{target:{value:"10.125"}});fireEvent.submit(input.closest("form")!);expect(video.currentTime).toBe(10.125);
+it("removes the typed timestamp form in favor of scrubber and skip controls",async()=>{
+  await open();
+  expect(screen.queryByLabelText("Video seek time")).toBeNull();
+  expect(screen.queryByRole("button",{name:"Go to time"})).toBeNull();
+  expect(screen.getByLabelText("Back 5 seconds")).toBeTruthy();
+  expect(screen.getByLabelText("Forward 5 seconds")).toBeTruthy();
 });
