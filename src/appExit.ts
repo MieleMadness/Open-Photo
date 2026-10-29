@@ -10,6 +10,8 @@ export async function withAppExitProtection(action:()=>Promise<unknown>,discardU
   if(exiting)throw Error("A close or restart is already in progress.");
   exiting=true;setAppClosing(true);
   try{
+    // Capture registration already in flight before awaiting a possibly older status.
+    if(hasStartingVideoExport())throw new ActiveVideoExportError();
     const status=await refreshVideoExport();
     if(status?.active||hasStartingVideoExport())throw new ActiveVideoExportError();
     if(discardUnsaved)discardProjectSaves();

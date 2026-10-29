@@ -28,6 +28,13 @@ it("blocks close while an export start is awaiting native registration",async()=
   vi.mocked(hasStartingVideoExport).mockReturnValue(true);
   const {close,request}=await setup();await act(async()=>request());expect(close).not.toHaveBeenCalled();expect(screen.getByText(/An export is still running or starting/)).toBeTruthy();
 });
+it("does not close when export registration finishes while an older idle status is returning",async()=>{
+  let registering=true;
+  vi.mocked(hasStartingVideoExport).mockImplementation(()=>registering);
+  vi.mocked(refreshVideoExport).mockImplementation(async()=>{registering=false;return null;});
+  const {close,request}=await setup();await act(async()=>request());
+  expect(close).not.toHaveBeenCalled();expect(screen.getByText(/An export is still running or starting/)).toBeTruthy();
+});
 it("keeps the window open when saving fails and allows an explicit retry",async()=>{
   vi.mocked(flushProjects).mockRejectedValueOnce(Error("Disk full")).mockResolvedValueOnce(undefined);
   const {close,request}=await setup();await act(async()=>request());expect(close).not.toHaveBeenCalled();expect(screen.getByRole("alert").textContent).toContain("Disk full");
