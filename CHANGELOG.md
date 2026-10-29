@@ -6,6 +6,7 @@
 - Add opt-in full-recording acceptance for one continuous hour-scale SDR export, full output decode, independent stream validation, source preservation, and beginning/middle/end decoded timestamp checks against that single output. Keep the existing short-window test distinct.
 - Exercise the continuous-export assertions on a short synthetic VFR/audio fixture in regular native tests. Keep real footage and reports local.
 - Run the optimized video export gate in the deliberate signed-release workflow before publishing, matching the normal Windows installer checks.
+- Fix new/changed workspace activation so previous scans and AI results cannot populate an empty workspace; clear old scan counts/timestamps and display the actual installed version in the sidebar.
 - Retain the newer interface and major-only signed updater channel. Align development versioning guidance with the owner's patch-per-update instruction.
 
 # 0.56.1 — Dedicated major-release updater channel

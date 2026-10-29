@@ -636,12 +636,21 @@ export default function App() {
       if(debounce!==undefined)window.clearTimeout(debounce);
     };
   },[autoSync,activeWorkspace,workspaces]);
-  const openWorkspace=async(id:string)=>{
-    const item=workspaces.find(w=>w.id===id);if(!item)return;
+  const activateWorkspace=async(item:Workspace)=>{
     syncGeneration.current+=1;
-    setActiveWorkspace(id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter("");setSelectedTag("");setPeopleGroups([]);setCollectionFilter("");setSelectedSmartRule("");setPeopleStatus(null);
-    const folders=item.roots?.length?item.roots:item.root?[item.root]:[];
-    if(folders.length)await syncFolders(folders);
+    aiCancelRequested.current=true;aiEpoch.current+=1;
+    setActiveWorkspace(item.id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter("");setSelectedTag("");setPeopleGroups([]);setCollectionFilter("");setSelectedSmartRule("");setPeopleStatus(null);
+    setAiTextMatches([]);setAiSimilar([]);setOcrMatches([]);setDuplicates([]);setLastSync("");setSyncChanges(null);setError("");
+    const folders=workspaceFolders(item);
+    if(folders.length)await syncFolders(folders);else setBusy(false);
+  };
+  const openWorkspace=async(id:string)=>{
+    const item=workspaces.find(w=>w.id===id);if(item)await activateWorkspace(item);
+  };
+  function createWorkspace(){
+    const name=window.prompt("Name this workspace");if(!name?.trim())return;
+    const item:Workspace={id:crypto.randomUUID(),name:name.trim(),root:"",roots:[]};
+    setWorkspaces(old=>[...old,item]);setView("library");void activateWorkspace(item);
   };
   const restoredLibrary=useRef(false);
   useEffect(()=>{
@@ -654,6 +663,7 @@ export default function App() {
     const remaining=roots.filter(folder=>folder!==path);
     syncGeneration.current+=1;
     aiCancelRequested.current=true;aiEpoch.current+=1;
+    setLastSync("");setSyncChanges(null);
     setWorkspaces(old=>old.map(item=>item.id===activeWorkspace?{...item,root:remaining[0]||"",roots:remaining}:item));
     setRoot(remaining[0]||"");setResult(null);setSelection([]);setSelected(null);setFolderFilter("");setSelectedTag("");setCollectionFilter("");setSelectedSmartRule("");setPeopleGroups([]);setPeopleStatus(null);setAiTextMatches([]);setAiSimilar([]);setOcrMatches([]);setDuplicates([]);
     if(remaining.length)void syncFolders(remaining);else setBusy(false);
@@ -861,11 +871,11 @@ export default function App() {
       <div className="brand"><div className="brand-mark"><Images size={23}/></div><div><strong>Open-Photo</strong><small>YOUR PHOTO LIBRARY</small></div></div>
       <div className="sidebar-label">WORKSPACE</div>
       <select className="workspace-select" aria-label="Active workspace" value={activeWorkspace} onChange={e=>openWorkspace(e.target.value)}><option value="">Select a workspace</option>{workspaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>
-      <button className="workspace-create" onClick={()=>{const name=window.prompt("Name this workspace");if(!name?.trim())return;const id=crypto.randomUUID();setWorkspaces(old=>[...old,{id,name:name.trim(),root:""}]);setActiveWorkspace(id);setRoot("");setResult(null);setSelection([]);setView("library")}}>+ New workspace</button>
+      <button className="workspace-create" onClick={createWorkspace}>+ New workspace</button>
       <nav aria-label="Main navigation">{NAV.map(({ id, title, icon: Icon }) => <button key={id} className={view === id ? "nav-button active" : "nav-button"} onClick={() => setView(id)} aria-current={view === id ? "page" : undefined}><Icon size={18}/>{title}{view === id && <ChevronRight size={15} className="nav-chevron"/>}</button>)}</nav>
       <div className="sidebar-spacer"/>
 
-      <div className="sidebar-footer">Open-Photo <span>v0.56.0 preview</span></div>
+      <div className="sidebar-footer">Open-Photo <span>{appUpdater.currentVersion?`v${appUpdater.currentVersion} preview`:"Development preview"}</span></div>
     </aside>
 
     <div className="main">

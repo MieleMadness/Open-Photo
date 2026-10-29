@@ -6,6 +6,7 @@ import {invoke} from "@tauri-apps/api/core";
 import {open} from "@tauri-apps/plugin-dialog";
 import App from "./App";
 vi.mock("@tauri-apps/api/core",()=>({invoke:vi.fn(),convertFileSrc:(path:string)=>path}));
+vi.mock("@tauri-apps/api/app",()=>({getVersion:async()=>"0.56.2"}));
 vi.mock("@tauri-apps/plugin-dialog",()=>({open:vi.fn(),save:vi.fn()}));
 vi.mock("@tauri-apps/api/event",()=>({listen:vi.fn(async()=>()=>{})}));
 vi.mock("./PhotoMap",()=>({default:()=>null}));
@@ -27,13 +28,32 @@ beforeEach(()=>{
   vi.stubGlobal("matchMedia",()=>({matches:false,addEventListener:()=>{},removeEventListener:()=>{}}));
   vi.mocked(invoke).mockImplementation(fallback);
 });
-afterEach(async()=>{cleanup();await act(async()=>{});vi.resetAllMocks();vi.unstubAllGlobals();});
+afterEach(async()=>{cleanup();await act(async()=>{});vi.resetAllMocks();vi.restoreAllMocks();vi.unstubAllGlobals();});
 it("restores saved folders and their contents once on startup under StrictMode",async()=>{
   render(<StrictMode><App/></StrictMode>);
   await screen.findByText("alpha-0.jpg");expect(screen.getByText("beta-0.jpg")).toBeTruthy();
   const scans=vi.mocked(invoke).mock.calls.filter(([command])=>command==="scan_indexed_with_changes");
   expect(scans.map(([,args])=>(args as {root:string}).root).sort()).toEqual([A,B].sort());
   expect(screen.getByRole("button",{name:`Remove ${A} from library`})).toBeTruthy();
+  expect(await screen.findByText("v0.56.2 preview")).toBeTruthy();
+});
+it("clears scan status when creating an empty workspace and rejects the previous workspace's pending scan",async()=>{
+  let finish:(value:ReturnType<typeof scan>)=>void=()=>{};
+  vi.mocked(invoke).mockImplementation((command,args)=>command==="scan_indexed_with_changes"&&(args as {root:string}).root===B?new Promise(resolve=>{finish=resolve}):fallback(command,args));
+  vi.spyOn(window,"prompt").mockReturnValue("Video acceptance");
+  render(<App/>);await waitFor(()=>expect(invoke).toHaveBeenCalledWith("scan_indexed_with_changes",{root:B}));
+  fireEvent.click(screen.getByRole("button",{name:"+ New workspace"}));
+  await act(async()=>finish(scan(B)));
+  expect(screen.getByRole("combobox",{name:"Active workspace"}).textContent).toContain("Video acceptance");
+  expect(screen.queryByText("alpha-0.jpg")).toBeNull();expect(screen.queryByText("beta-0.jpg")).toBeNull();
+  expect(screen.queryByText(/Last indexed:/)).toBeNull();expect(screen.queryByText(/Changes:/)).toBeNull();
+  expect(screen.getByText("No folders added. Choose Add folder to start.")).toBeTruthy();
+});
+it("does not carry a completed scan's counts or timestamp into a new empty workspace",async()=>{
+  vi.spyOn(window,"prompt").mockReturnValue("Empty workspace");render(<App/>);
+  await screen.findByText("alpha-0.jpg");expect(screen.getByText(/Last indexed:/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button",{name:"+ New workspace"}));
+  expect(screen.queryByText(/Last indexed:/)).toBeNull();expect(screen.queryByText(/Changes:/)).toBeNull();
 });
 it("removes a folder during scanning, rejects the stale result, and does not resurrect removed roots",async()=>{
   let finish:(value:ReturnType<typeof scan>)=>void=()=>{};

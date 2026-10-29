@@ -538,3 +538,5 @@ The Windows installer includes the linked DirectML and Microsoft C++ runtime fil
 ### Video release checks in 0.56.2
 
 Updater installation now waits for project saves and refuses to interrupt an active or starting video export. Phase 6 also has a separate full-recording acceptance mode for one continuous hour-scale export, rather than only distant short windows. See [video acceptance](docs/VIDEO_ACCEPTANCE.md) and [update protection](docs/UPDATES.md). These development changes do not publish a public signed updater release.
+
+Workspace activation now clears the prior library’s scan summary and invalidates its pending scan/AI results. The sidebar reads the actual installed version instead of a hard-coded preview label.
