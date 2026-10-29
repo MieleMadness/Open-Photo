@@ -31,6 +31,27 @@ beforeEach(()=>{
 afterEach(async()=>{cleanup();await act(async()=>{});vi.resetAllMocks();vi.restoreAllMocks();vi.unstubAllGlobals();});
 function openFolders(){fireEvent.click(screen.getByRole("button",{name:"Folders"}));}
 function createWorkspaceFromFolders(name:string){openFolders();fireEvent.change(screen.getByRole("combobox",{name:"Active workspace"}),{target:{value:"__new__"}});fireEvent.change(screen.getByLabelText("Workspace name"),{target:{value:name}});fireEvent.click(screen.getByRole("button",{name:"Create"}));}
+it("keeps workspace selection at the top of the sidebar and opens editing from the Library",async()=>{
+  const {container}=render(<App/>);await screen.findByText("alpha-0.jpg");
+  const selector=screen.getByRole("combobox",{name:"Active workspace"});expect(selector.closest(".sidebar")).toBeTruthy();
+  expect(screen.queryByRole("button",{name:"Video projects"})).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:"Open video editor…"}));
+  expect(screen.getByRole("heading",{name:"Video editor"})).toBeTruthy();
+  expect(container.querySelector('.sidebar select')).toBe(selector);
+  fireEvent.click(screen.getByRole("button",{name:"Back to Library"}));expect(screen.getByRole("heading",{name:"Media library"})).toBeTruthy();
+});
+it("creates one timeline project from multiple selected Library videos",async()=>{
+  localStorage.setItem("openphoto.workspaces",JSON.stringify(workspace([A])));
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{
+    if(command==="scan_indexed_with_changes"){const value=scan(A,2);value.scan.photos=value.scan.photos.map(p=>({...p,path:p.path.replace(".jpg",".mp4"),name:p.name.replace(".jpg",".mp4"),extension:"mp4"}));return value;}
+    if(command==="create_video_sequence")return new Promise(()=>{});
+    return fallback(command,args);
+  });
+  render(<App/>);await screen.findByText("alpha-0.mp4");fireEvent.click(screen.getByRole("button",{name:"Select matching"}));
+  fireEvent.click(screen.getByRole("button",{name:"Create video from selection…"}));
+  await waitFor(()=>expect(invoke).toHaveBeenCalledWith("create_video_sequence",{root:A,paths:[`${A}\\photo-0.mp4`,`${A}\\photo-1.mp4`]}));
+  expect(vi.mocked(invoke).mock.calls.filter(([command])=>command==="create_video_sequence")).toHaveLength(1);
+});
 it("resets both the viewport and virtual rows when sorting a scrolled library",async()=>{
   vi.mocked(invoke).mockImplementation((command,args)=>command==="scan_indexed_with_changes"?Promise.resolve(scan((args as {root:string}).root,60)):fallback(command,args));
   const {container}=render(<App/>);await screen.findByText("alpha-0.jpg");const grid=container.querySelector<HTMLElement>(".photo-grid")!;

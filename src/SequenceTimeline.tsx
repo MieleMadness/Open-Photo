@@ -1,0 +1,66 @@
+import {useRef,useState} from "react";
+import {NumberField} from "./EditorFields";
+import {sourceEndLimit} from "./videoProject";
+import {clockTime,markSeconds} from "./videoTime";
+import {editTimeline,projectDuration,timelineEntries,type TimelineCommand} from "./timelineCommands";
+import {type SequenceSession} from "./videoSequence";
+
+/** Placement is derived from clip order, never rounded or stored as duplicate timing. */
+export function SequenceTimeline({session,disabled,assetId,onSelectAsset}:{session:SequenceSession;disabled:boolean;assetId:string;onSelectAsset:(id:string)=>void}){
+  const project=session.history.present,entries=timelineEntries(project),duration=projectDuration(project);
+  const [selected,setSelected]=useState(project.clips[0]?.id||""),[position,setPosition]=useState(0),[zoom,setZoom]=useState(1),[error,setError]=useState("");
+  const dragging=useRef("");
+  const entry=entries.find(e=>e.clip.id===selected),clip=entry?.clip,asset=project.assets.find(a=>a.id===clip?.asset_id);
+  const playhead=Math.min(position,duration),index=entries.findIndex(e=>e.clip.id===selected);
+  function choose(id:string){setSelected(id);const item=entries.find(e=>e.clip.id===id);if(item){onSelectAsset(item.clip.asset_id);setPosition(item.start);}}
+  function command(action:TimelineCommand){
+    try{
+      const next=editTimeline(session.history.present,action);session.commit(next);setError("");
+      if(action.type==="append")setSelected(action.newId);
+      else if(action.type==="delete")setSelected(next.clips[Math.min(index,next.clips.length-1)]?.id||"");
+      return "";
+    }catch(cause){const message=String(cause);setError(message);return message;}
+  }
+  return <section aria-label="Project timeline" className="sequence-timeline">
+    <div className="timeline-heading"><h2>Timeline</h2><p>{entries.length} {entries.length===1?"clip":"clips"} · Project duration <output aria-label="Project duration">{clockTime(duration)}</output></p></div>
+    <fieldset disabled={disabled}>
+      <div className="video-transport">
+        <button className="secondary-button" disabled={!session.history.past.length} onClick={()=>session.commit("undo")}>Undo timeline edit</button>
+        <button className="secondary-button" disabled={!session.history.future.length} onClick={()=>session.commit("redo")}>Redo timeline edit</button>
+        <button className="secondary-button" onClick={()=>command({type:"append",assetId,newId:crypto.randomUUID()})}>Append selected video</button>
+        <label>Timeline zoom<select value={zoom} onChange={e=>setZoom(Number(e.target.value))}><option value={1}>Fit timeline</option><option value={2}>2×</option><option value={4}>4×</option><option value={8}>8×</option></select></label>
+      </div>
+      <div className="timeline-scroll" tabIndex={0} aria-label="Scrollable timeline">
+        <div className="timeline-track" style={{width:`${zoom*100}%`}}>
+          <label className="timeline-scrubber">Project playhead <output>{clockTime(playhead)}</output><input aria-label="Project playhead" type="range" min={0} max={duration||1} step="any" value={playhead} disabled={!entries.length} onChange={e=>setPosition(Number(e.target.value))}/></label>
+          <ol className="timeline-clips">{entries.map((item,i)=>{
+            const source=project.assets.find(a=>a.id===item.clip.asset_id)!;
+            return <li key={item.clip.id} style={{flexGrow:item.duration}} onDragOver={e=>{if(dragging.current&&!disabled)e.preventDefault();}} onDrop={e=>{e.preventDefault();if(dragging.current&&!disabled)command({type:"move",clipId:dragging.current,index:i});dragging.current="";}}>
+              <button type="button" draggable={!disabled} className="timeline-clip" aria-label={`Clip ${i+1}: ${source.relative_path.split("/").at(-1)}`} aria-pressed={selected===item.clip.id} onClick={()=>choose(item.clip.id)} onDragStart={e=>{dragging.current=item.clip.id;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",item.clip.id);}} onDragEnd={()=>{dragging.current="";}}>
+                <strong>{i+1}. {source.relative_path.split("/").at(-1)}</strong><span>{clockTime(item.duration)}</span><small>{item.clip.edits.muted?"Audio muted":source.info.audio.length?"Linked original audio":"Silent source"}</small>
+              </button>
+            </li>;
+          })}</ol>
+          {!!duration&&<span className="timeline-playhead" aria-hidden="true" style={{left:`${playhead/duration*100}%`}}/>}
+          {!entries.length&&<p className="timeline-empty">The timeline is empty. Choose a video in the media bin and append it, or undo the deletion.</p>}
+        </div>
+      </div>
+      {clip&&asset&&entry&&<div className="timeline-inspector" key={clip.id}>
+        <p><strong>Selected clip {index+1}</strong> · Source duration {clockTime(asset.info.duration_seconds)} · Project position {clockTime(entry.start)}–{clockTime(entry.end)}</p>
+        <div className="timeline-trim-fields">
+          <NumberField label="Clip start in source (seconds)" value={markSeconds(clip.source_in)} min={0} max={sourceEndLimit(asset.info)} step="any" onCommit={start=>command({type:"trim",clipId:clip.id,start,end:markSeconds(clip.source_out)})}/>
+          <NumberField label="Clip end in source (seconds)" value={markSeconds(clip.source_out)} min={0} max={sourceEndLimit(asset.info)} step="any" onCommit={end=>command({type:"trim",clipId:clip.id,start:markSeconds(clip.source_in),end})}/>
+        </div>
+        <div className="video-transport">
+          <button className="secondary-button" disabled={index===0} onClick={()=>command({type:"move",clipId:clip.id,index:index-1})}>Move earlier</button>
+          <button className="secondary-button" disabled={index===entries.length-1} onClick={()=>command({type:"move",clipId:clip.id,index:index+1})}>Move later</button>
+          <button className="secondary-button" disabled={playhead<=entry.start||playhead>=entry.end} onClick={()=>command({type:"split",clipId:clip.id,at:playhead,newId:crypto.randomUUID()})}>Split at playhead</button>
+          <button className="secondary-button" onClick={()=>command({type:"delete",clipId:clip.id})}>Ripple delete clip</button>
+        </div>
+      </div>}
+    </fieldset>
+    {error&&<p role="alert" className="field-error">{error}</p>}
+    <p className="timeline-help">Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap; its source stays in the media bin. The player above previews the original source. Assembled playback and export are the next step.</p>
+  </section>;
+}
+

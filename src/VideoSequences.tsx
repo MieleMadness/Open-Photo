@@ -5,15 +5,16 @@ import {ErrorNotice} from "./Ui";
 import {VideoPlayer} from "./VideoPlayer";
 import {SequenceSession,type LoadedSequence} from "./videoSequence";
 import {exportFilename} from "./videoExport";
+import {SequenceTimeline} from "./SequenceTimeline";
 
 const videoFilters=[{name:"Videos",extensions:["mp4","mov","m4v","mkv","webm","avi"]}];
-export function VideoSequences({roots,workspaceId}:{roots:string[];workspaceId:string}){
-  const [chosen,setChosen]=useState("");const root=roots.includes(chosen)?chosen:roots[0]||"";
+export function VideoSequences({roots,workspaceId,initial}:{roots:string[];workspaceId:string;initial?:{root:string;value:LoadedSequence}|null}){
+  const [chosen,setChosen]=useState(initial?.root||"");const root=roots.includes(chosen)?chosen:roots[0]||"";
   return <>
-    {!roots.length?<p>Add a folder to your library to start a video project.</p>:<><label className="sequence-root">Source folder<select aria-label="Video project folder" value={root} onChange={e=>setChosen(e.target.value)}>{roots.map(r=><option key={r} value={r}>{r}</option>)}</select></label><SequenceFolder key={`${workspaceId}:${root}`} root={root}/></>}
+    {!roots.length?<p>Add a folder to your library to start a video project.</p>:<><label className="sequence-root">Source folder<select aria-label="Video project folder" value={root} onChange={e=>setChosen(e.target.value)}>{roots.map(r=><option key={r} value={r}>{r}</option>)}</select></label><SequenceFolder key={`${workspaceId}:${root}`} root={root} initial={initial?.root===root?initial.value:undefined}/></>}
   </>;
 }
-function SequenceFolder({root}:{root:string}){
+function SequenceFolder({root,initial}:{root:string;initial?:LoadedSequence}){
   const [session,setSession]=useState<SequenceSession|null>(null),[loaded,setLoaded]=useState<LoadedSequence|null>(null);
   const owner=useRef<SequenceSession|null>(null),generation=useRef(0),working=useRef(false);
   const [recent,setRecent]=useState<{id:string;title:string}[]>([]),[selected,setSelected]=useState("");
@@ -21,6 +22,7 @@ function SequenceFolder({root}:{root:string}){
   const project=session?.history.present;
   useEffect(()=>{const token=++generation.current;void invoke<unknown>("recent_video_sequences",{root}).then(rows=>{if(token===generation.current)setRecent(Array.isArray(rows)?rows:[]);}).catch(e=>{if(token===generation.current)setError(String(e));});return()=>{generation.current++;owner.current?.release();};},[root]);
   useEffect(()=>session?.subscribe(()=>refresh(n=>n+1)),[session]);
+  useEffect(()=>{if(initial){const token=generation.current;adopt(initial,()=>token===generation.current);}},[initial,root]);
   async function run(task:(current:()=>boolean)=>Promise<void>,flush=true){
     if(working.current)return;working.current=true;setBusy(true);setError("");setMessage("");const token=generation.current,current=()=>token===generation.current;
     try{if(flush)await owner.current?.flush();if(current())await task(current);}catch(e){if(current())setError(String(e));}finally{working.current=false;if(current())setBusy(false);}
@@ -32,9 +34,9 @@ function SequenceFolder({root}:{root:string}){
   }
   async function chooseVideos(current:()=>boolean){const files=await open({multiple:true,defaultPath:root,filters:videoFilters});return current()?(Array.isArray(files)?files:typeof files==="string"?[files]:[]):[];}
   const asset=project?.assets.find(a=>a.id===selected),source=loaded?.sources.find(s=>s.asset_id===selected);
-  return <section aria-label="Multi-video projects" className="sequence-workspace">
+  return <section aria-label="Video editing project" className="sequence-workspace">
     <details className="project-file-actions" open={!project}><summary>{project?"Switch or create project":"Open a video project"}</summary><div className="video-transport">
-      <button className="primary-button" disabled={busy} onClick={()=>void run(async current=>{const paths=await chooseVideos(current);if(paths.length)adopt(await invoke<LoadedSequence>("create_video_sequence",{root,paths}),current);})}>New multi-video project…</button>
+      <button className="primary-button" disabled={busy} onClick={()=>void run(async current=>{const paths=await chooseVideos(current);if(paths.length)adopt(await invoke<LoadedSequence>("create_video_sequence",{root,paths}),current);})}>New video project…</button>
       <button className="secondary-button" disabled={busy} onClick={()=>void run(async current=>{const path=await open({multiple:false,filters:[{name:"Open-Photo video project",extensions:["json"]}]});if(typeof path==="string"&&current()){adopt(await invoke<LoadedSequence>("import_video_sequence",{root,path}),current);if(current())setMessage("Opened a new project copy. Existing single-video drafts remain available in the Library.");}})}>Open project file…</button>
       {!!recent.length&&<label>Saved projects<select aria-label="Saved multi-video projects" disabled={busy} value="" onChange={e=>{const id=e.target.value;if(id)void run(async current=>adopt(await invoke<LoadedSequence>("load_video_sequence",{root,id}),current));}}><option value="">Choose a project…</option>{recent.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></label>}
     </div></details>
@@ -57,6 +59,7 @@ function SequenceFolder({root}:{root:string}){
           <div className="video-transport"><button className="secondary-button" disabled={busy} onClick={()=>void run(async current=>{const path=await open({multiple:false,defaultPath:root,filters:videoFilters});if(typeof path==="string"&&current())adopt(await invoke<LoadedSequence>("relink_sequence_video",{root,id:project.id,assetId:asset.id,path,expectedRevision:session.revision}),current);})}>Relink original video…</button>
             <button className="secondary-button" disabled={busy||project.assets.length===1} onClick={()=>void run(async current=>adopt(await invoke<LoadedSequence>("remove_sequence_video",{root,id:project.id,assetId:asset.id,expectedRevision:session.revision}),current))}>Remove from project</button></div><small>Removing a video from this project keeps its original file unchanged.</small>
         </>}</section></div>
+      <SequenceTimeline key={project.id} session={session} disabled={busy} assetId={selected} onSelectAsset={setSelected}/>
     </>}
   </section>;
 }

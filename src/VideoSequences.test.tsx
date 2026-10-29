@@ -1,4 +1,4 @@
-import {act,cleanup,fireEvent,render,screen,waitFor} from "@testing-library/react";
+import {act,cleanup,fireEvent,render,screen,waitFor,within} from "@testing-library/react";
 import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {invoke} from "@tauri-apps/api/core";
 import {open,save} from "@tauri-apps/plugin-dialog";
@@ -19,11 +19,39 @@ beforeEach(()=>{vi.mocked(invoke).mockImplementation(async(command,args)=>{
 afterEach(()=>{cleanup();discardProjectSaves();vi.resetAllMocks();});
 it("imports several short videos, previews a selected source, and autosaves the project name",async()=>{
   vi.mocked(open).mockResolvedValue(["/library/one.mp4","/library/two.mp4"]);
-  render(<VideoSequences roots={["/library"]} workspaceId="w"/>);fireEvent.click(screen.getByText("New multi-video project…"));
+  render(<VideoSequences roots={["/library"]} workspaceId="w"/>);fireEvent.click(screen.getByText("New video project…"));
   await screen.findByDisplayValue("Two short videos");expect(invoke).toHaveBeenCalledWith("create_video_sequence",{root:"/library",paths:["/library/one.mp4","/library/two.mp4"]});
-  fireEvent.click(screen.getByRole("button",{name:/two.mp4/}));expect(screen.getByText("Preview: /library/two.mp4")).toBeTruthy();
+  fireEvent.click(within(screen.getByRole("region",{name:"Video media bin"})).getByRole("button",{name:/two.mp4/}));expect(screen.getByText("Preview: /library/two.mp4")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Multi-video project name"),{target:{value:"Saved assembly"}});
   await waitFor(()=>expect(invoke).toHaveBeenCalledWith("save_video_sequence",expect.objectContaining({root:"/library",expectedRevision:1,project:expect.objectContaining({title:"Saved assembly"})})));
+});
+it("splits, reorders, trims and undoes timeline edits through revision-safe autosave",async()=>{
+  render(<VideoSequences roots={["/library"]} workspaceId="w"/>);await screen.findByLabelText("Saved multi-video projects");
+  fireEvent.change(screen.getByLabelText("Saved multi-video projects"),{target:{value:"p"}});await screen.findByDisplayValue("Two short videos");
+  fireEvent.change(screen.getByRole("slider",{name:"Project playhead"}),{target:{value:"1"}});
+  fireEvent.click(screen.getByRole("button",{name:"Split at playhead"}));
+  expect(screen.getByRole("button",{name:"Clip 3: two.mp4"})).toBeTruthy();
+  fireEvent.click(screen.getByRole("button",{name:"Move later"}));
+  expect(screen.getByRole("button",{name:"Clip 2: one.mp4"}).getAttribute("aria-pressed")).toBe("true");
+  const start=screen.getByRole("spinbutton",{name:"Clip start in source (seconds)"});fireEvent.change(start,{target:{value:"0.25"}});fireEvent.blur(start);
+  expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.750");
+  fireEvent.click(screen.getByRole("button",{name:"Ripple delete clip"}));
+  expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.000");
+  fireEvent.click(screen.getByRole("button",{name:"Undo timeline edit"}));
+  expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.750");
+  await act(async()=>flushProjects());
+  const calls=vi.mocked(invoke).mock.calls.filter(([name])=>name==="save_video_sequence");
+  const last=calls.at(-1)![1] as {project:LoadedSequence["project"];expectedRevision:number};
+  expect(last.project.clips).toHaveLength(3);expect(last.project.clips[1].source_in.ticks).toBe("22500");
+  expect(last.expectedRevision).toBeGreaterThan(1);
+});
+it("keeps source assets after deleting every clip and can append the same video again",async()=>{
+  render(<VideoSequences roots={["/library"]} workspaceId="w"/>);await screen.findByLabelText("Saved multi-video projects");
+  fireEvent.change(screen.getByLabelText("Saved multi-video projects"),{target:{value:"p"}});await screen.findByDisplayValue("Two short videos");
+  fireEvent.click(screen.getByRole("button",{name:"Ripple delete clip"}));fireEvent.click(screen.getByRole("button",{name:"Ripple delete clip"}));
+  expect(screen.getByText(/The timeline is empty/)).toBeTruthy();expect(screen.getByText(/2 \/ 50 videos/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button",{name:"Append selected video"}));expect(screen.getByRole("button",{name:"Clip 1: one.mp4"})).toBeTruthy();
+  await act(async()=>flushProjects());
 });
 it("uses the verified backend result when duplicate imports are skipped",async()=>{
   render(<VideoSequences roots={["/library"]} workspaceId="w"/>);await screen.findByLabelText("Saved multi-video projects");fireEvent.change(screen.getByLabelText("Saved multi-video projects"),{target:{value:"p"}});await screen.findByDisplayValue("Two short videos");

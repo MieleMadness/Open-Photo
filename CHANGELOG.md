@@ -1,3 +1,12 @@
+# 0.56.6 — First hard-cut timeline and restored workspace navigation
+
+- Document the current design system, remaining inconsistencies, product model, and ordered development phases before further UI work.
+- Restore the active workspace dropdown above the left navigation. Remove the separate Video Projects tab; open saved projects or create one from selected Library videos.
+- Add an ordered timeline with selected clips, drag reorder and accessible Move earlier/later controls, source-time trims, split at the project playhead, gap-closing deletion, repeated source instances, project/source durations, and horizontal zoom.
+- Store each timeline command as one undoable edit in the existing revision-safe autosave queue. Keep linked audio edits and exact shared split ticks. Allow saving an empty timeline without discarding its source bin.
+- Share numeric-field validation with the existing editor and preserve invalid drafts when delayed effects run; retain non-destructive source checks in native storage.
+- This is an incremental Phase 7 milestone: the player still previews original sources. Shared single/multi editing, workspace ownership, assembled preview/export, photo clips, and extended recovery UI remain upcoming. Long-form work stays deferred to 1.x.
+
 # 0.56.5 — Design audit fixes and editing workspace
 
 - Put media ahead of statistics and maintenance controls. Show tagging after selection, disclose search/index/duplicate tools together, add clear-filter recovery, and use accurate media/count/size/safety wording.

@@ -66,11 +66,12 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
     }
     if p.assets.is_empty()
         || p.assets.len() > MAX_ASSETS
-        || p.clips.is_empty()
         || p.clips.len() > MAX_CLIPS
         || !matches!(p.frame_rate, 30 | 60)
     {
-        return Err("A project needs 1–50 videos, 1–200 clips, and a 30 or 60 fps canvas".into());
+        return Err(
+            "A project needs 1–50 videos, at most 200 clips, and a 30 or 60 fps canvas".into(),
+        );
     }
     let mut asset_ids = HashSet::new();
     let mut identities = HashSet::new();
@@ -555,6 +556,28 @@ mod tests {
         assert_eq!(restored, p);
         assert_eq!(serde_json::to_vec(&legacy).unwrap(), bytes);
         assert!(source(root.to_str().unwrap(), &restored, &restored.assets[0]).is_ok());
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn empty_timeline_roundtrips_without_discarding_or_bypassing_source_validation() {
+        let (root, mut p) = fixture();
+        let original = p.clone();
+        let db = Connection::open_in_memory().unwrap();
+        initialize(&db).unwrap();
+        let key = root.to_str().unwrap();
+        store(&db, key, &p, None).unwrap();
+        p.clips.clear();
+        store(&db, key, &p, Some(1)).unwrap();
+        assert_eq!(read(&db, key, &p.id).unwrap().0, p);
+        assert_eq!(parse(&serde_json::to_vec(&p).unwrap()).unwrap(), p);
+        assert_eq!(p.assets, original.assets);
+        assert_eq!(
+            fs::read(root.join("source.mp4")).unwrap(),
+            b"unchanged original"
+        );
+        p.assets[0].relative_path = "../escape.mp4".into();
+        assert!(validate(&p).is_err());
+        drop(db);
         fs::remove_dir_all(root).unwrap();
     }
     #[test]

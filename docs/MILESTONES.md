@@ -1,6 +1,6 @@
 # Milestones and validation status
 
-## Current branch — 0.56.4
+## Current branch — 0.56.6
 
 The development branch contains a Windows Tauri photo library with workspaces, local indexing, previews, nondestructive photo-copy export, managed XMP keywords, maps, and opt-in local semantic/People/OCR features. Source-media originals remain read-only. CI success and installed-app acceptance are separate requirements.
 
@@ -30,6 +30,8 @@ Version 0.56.2 adds protected updater installation and a separate full-recording
 Physical source/destination drive removal, actual disk-full/quota/write failure, installed-package GUI playback, and whole-app performance measurements remain required before v1.0. The owner deferred physical drive-failure testing on 2026-10-29. Further long-form development/testing is deferred to 1.x; the successful 0.56.2 long-recording evidence is retained, and current development uses short clips.
 
 ## Phase 7 — Basic multi-video editing
+
+0.56.6 adds pure, validated timeline commands and an accessible timeline surface: trim, split, reorder, ripple deletion, repeat instances, durations/zoom, undo/redo, and revision-safe autosave. The Library opens the editor; the workspace selector remains at top left. Empty timelines preserve the media bin. This does not complete the assembled playback/export or shared editor/ownership migrations. See [DESIGN_SYSTEM_AUDIT.md](DESIGN_SYSTEM_AUDIT.md) and [DEVELOPMENT_PHASES.md](DEVELOPMENT_PHASES.md).
 
 0.56.4 begins the feedback-driven UI cleanup alongside Phase 7: navigation/folder management, viewer navigation, video transport/trim wording, map wrapping, and a documented roadmap. These presentation changes do not replace the Phase 7 timeline work below.
 

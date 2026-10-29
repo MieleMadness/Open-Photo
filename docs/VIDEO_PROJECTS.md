@@ -1,3 +1,5 @@
+> **0.56.6:** Open the editor from the Library. Select several videos from one source folder to create one ordered project. Timeline clips can be selected, trimmed, split at the playhead, reordered by dragging or Move earlier/later, deleted with the gap closed, and appended again from the bin. Undo/redo and autosave apply to these commands. Empty timelines keep their assets. The player currently shows an original source; assembled playback/export and unified workspace-owned editing are next. Photos are planned as clips in this same project, not separate projects. Long-form work is deferred to 1.x.
+
 # Single-video editing projects (0.54.4)
 
 Open a video and choose **New project from selected video**. The original player then uses the project's saved in/out points. Set trim values or use I/O markers; edit crop, quarter-turn rotation, flips, audio gain/mute, and canvas placement. Crop coordinates refer to the displayed, oriented source before additional project rotation. Free crops and centered square/landscape/portrait presets are available. Fit adds black borders; fill crops centrally. The default canvas accounts for source rotation.

@@ -10,6 +10,7 @@ import {readMetadataBatches} from "./metadataBatches";
 import {saveSetting,retrySettings} from "./userData";
 import PhotoMap, {type PhotoLocation} from "./PhotoMap";
 import {VideoSequences} from "./VideoSequences";
+import type {LoadedSequence} from "./videoSequence";
 import {VideoExportPanel} from "./VideoExportPanel";
 import {ProjectSaveGuard} from "./ProjectSaveGuard";
 import {Modal,TaskForm,ErrorNotice,NoticeTarget,NoticeSurface,NoticeHostSetter} from "./Ui";
@@ -17,7 +18,7 @@ import { IPhonePicture, IPhoneMotion } from "./IPhoneMedia";
 import {UpdateSettingsCard,UpdateToast,useAppUpdater} from "./appUpdater";
 import { Images, FolderOpen, Users, Tags, Settings2, Search, Moon, Sun, Monitor, ShieldCheck, ImageOff, HardDrive, ListFilter, ChevronRight, X, LayoutGrid, List, ZoomIn, ZoomOut, ArrowUpDown, MapPin, CalendarDays, Heart, Clapperboard, Library } from "lucide-react";
 
-type View = "videoProjects" | "library" | "folders" | "collections" | "timeline" | "memories" | "map" | "people" | "tags" | "settings";
+type View = "editor" | "library" | "folders" | "collections" | "timeline" | "memories" | "map" | "people" | "tags" | "settings";
 type Collection = {id:string;workspaceId:string;name:string;paths:string[]};
 type SmartRule = {id:string;workspaceId:string;name:string;minRating:number;type:"all"|"photo"|"video";minMB:number};
 
@@ -36,7 +37,6 @@ type AiBundleReadiness = {ready:boolean;missing:string[];incompatible:string[]};
 type AiValidationReport = {semantic:AiBundleReadiness;people:AiBundleReadiness;ocr:AiBundleReadiness;directml_available:boolean;cpu_fallback:boolean;core_implementation_complete:boolean;real_world_validation_required:boolean};
 const NAV: {id: View; title: string; icon: typeof Images}[] = [
   { id: "library", title: "Library", icon: Images },
-  { id: "videoProjects", title: "Video projects", icon: Clapperboard },
   { id: "folders", title: "Folders", icon: FolderOpen },
   { id: "map", title: "Map", icon: MapPin },
   { id: "collections", title: "Collections", icon: Library },
@@ -84,6 +84,9 @@ function photoDateSource(photo:Photo):"EXIF metadata"|"QuickTime metadata"|"File
 
 export default function App() {
   const [view, setView] = useState<View>("library");
+  const [editorInitial,setEditorInitial]=useState<{root:string;value:LoadedSequence}|null>(null);
+  const [editorBusy,setEditorBusy]=useState(false),[editorError,setEditorError]=useState("");
+  const editorWorkspace=useRef("");
   const mainPane=useRef<HTMLDivElement>(null);
   useLayoutEffect(()=>{if(mainPane.current)mainPane.current.scrollTop=0;},[view]);
   const [noticeHost,setNoticeHost]=useState<HTMLDivElement|null>(null);
@@ -358,6 +361,7 @@ export default function App() {
       setSimilarGroups(matches);
     }catch(e){setError(String(e))}finally{setDuplicateBusy(false)}
   };
+  editorWorkspace.current=activeWorkspace;
   const workspace = workspaces.find(w=>w.id===activeWorkspace);
   const roots = workspaceFolders(workspace);
   const indexAiPhotos=async(photos:Photo[],label:string)=>{
@@ -658,7 +662,7 @@ export default function App() {
   const activateWorkspace=async(item:Workspace)=>{
     syncGeneration.current+=1;
     aiCancelRequested.current=true;aiEpoch.current+=1;
-    setActiveWorkspace(item.id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter("");setSelectedTag("");setPeopleGroups([]);setCollectionFilter("");setSelectedSmartRule("");setPeopleStatus(null);
+    setEditorInitial(null);setEditorError("");setView("library");setActiveWorkspace(item.id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter("");setSelectedTag("");setPeopleGroups([]);setCollectionFilter("");setSelectedSmartRule("");setPeopleStatus(null);
     setAiTextMatches([]);setAiSimilar([]);setOcrMatches([]);setDuplicates([]);setLastSync("");setSyncChanges(null);setError("");
     const folders=workspaceFolders(item);
     if(folders.length)await syncFolders(folders);else setBusy(false);
@@ -884,12 +888,25 @@ export default function App() {
   const bytes = result?.photos.reduce((n, p) => n + p.bytes, 0) || 0;
   const selectedBytes=result?.photos.filter(photo=>selection.includes(photo.path)).reduce((n,photo)=>n+photo.bytes,0)||0;
   function clearLibraryFilters(){setQuery("");setFolderFilter("");setCollectionFilter("");setMediaType("all");setOrganizeFilter("all");setSmartFilter("");setSelectedSmartRule("");setTimelineMonth("");setMemoryYear(null);setSelectedTag("");}
+  async function openSequenceEditor(){
+    setEditorError("");
+    if(!selection.length){setEditorInitial(null);setView("editor");return;}
+    const media=(result?.photos||[]).filter(p=>selection.includes(p.path));
+    if(media.some(p=>!["mp4","mov","m4v","mkv","webm","avi"].includes(p.extension.toLowerCase()))){setEditorError("Photo clips are planned for the shared timeline. For this first timeline update, select videos only.");return;}
+    const sourceRoots=new Set(media.map(p=>p.libraryRoot||root));
+    if(sourceRoots.size!==1){setEditorError("This timeline update accepts videos from one source folder. Workspace-wide projects are the next migration.");return;}
+    const sourceRoot=[...sourceRoots][0],workspaceAtStart=activeWorkspace;setEditorBusy(true);
+    try{const value=await invoke<LoadedSequence>("create_video_sequence",{root:sourceRoot,paths:media.map(p=>p.path)});if(editorWorkspace.current===workspaceAtStart){setEditorInitial({root:sourceRoot,value});setView("editor");}}
+    catch(cause){if(editorWorkspace.current===workspaceAtStart)setEditorError(String(cause));}
+    finally{setEditorBusy(false);}
+  }
   return <NoticeHostSetter.Provider value={setNoticeHost}><NoticeTarget.Provider value={noticeHost}><div className="app-frame"><div className="app-notices"><ProjectSaveGuard/><VideoExportPanel/><UpdateToast updater={appUpdater} onOpenSettings={()=>setView("settings")}/>
     {storageError&&<NoticeSurface><ErrorNotice title="Your latest changes could not be saved" error={storageError}><button className="secondary-button" onClick={()=>void retrySettings().then(()=>setStorageError("")).catch(e=>setStorageError(String(e)))}>Retry saving</button></ErrorNotice></NoticeSurface>}
     </div><div className="app-shell">
 
     <aside className="sidebar">
       <div className="brand" aria-label="Open-Photo"><div className="brand-mark"><Images size={23}/></div><div><strong>Open-Photo</strong><small>YOUR PHOTO LIBRARY</small></div></div>
+      <div className="sidebar-workspace"><label>Workspace<select className="workspace-select" aria-label="Active workspace" value={activeWorkspace} onChange={e=>{if(e.target.value==="__new__"){createWorkspace();return;}openWorkspace(e.target.value)}}><option value="">Select a workspace</option>{workspaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}<option value="__new__">+ Add new workspace…</option></select></label></div>
       <nav aria-label="Main navigation">{NAV.map(({ id, title, icon: Icon }) => <button key={id} className={view === id ? "nav-button active" : "nav-button"} onClick={() => setView(id)} title={title} aria-label={title} aria-current={view === id ? "page" : undefined}><Icon size={18}/>{title}{view === id && <ChevronRight size={15} className="nav-chevron"/>}</button>)}</nav>
       <div className="sidebar-spacer"/>
       <div className="sidebar-theme" aria-label="Appearance">
@@ -906,7 +923,8 @@ export default function App() {
           <p className="library-summary">{result?`${result.photos.length.toLocaleString()} media files · ${formatBytes(bytes)}`:"Add a folder to begin"}<span><ShieldCheck size={14}/> Originals protected</span></p>
           <section className="library-panel">
             <div className="panel-toolbar"><div><h2>All media</h2>{folderFilter&&<button className="secondary-button" onClick={()=>setFolderFilter("")}>Clear folder: {folderFilter}</button>}<p className="library-path" title={root}>{root || "Select a folder to begin browsing"}</p></div><div className="search-box"><Search size={17}/><input aria-label="Filter media by filename" placeholder="Search filenames..." value={query} onChange={e => setQuery(e.target.value)} disabled={!result}/><ListFilter size={16}/></div></div>
-            <div className="view-toolbar">
+            {editorError&&<ErrorNotice title="The editor needs attention" error={editorError}/>}
+            <div className="view-toolbar"><button className="secondary-button" disabled={!roots.length||editorBusy} onClick={()=>void openSequenceEditor()}><Clapperboard size={18}/>{editorBusy?"Opening project…":selection.length?"Create video from selection…":"Open video editor…"}</button>
               <div className="view-switch" role="group" aria-label="Media view">
                 <button className={photoView === "grid" ? "active" : ""} title="Icon grid" aria-label="Icon grid" aria-pressed={photoView === "grid"} onClick={()=>setPhotoView("grid")}><LayoutGrid size={18}/></button>
                 <button className={photoView === "list" ? "active" : ""} title="List view" aria-label="List view" aria-pressed={photoView === "list"} onClick={()=>setPhotoView("list")}><List size={18}/></button>
@@ -934,8 +952,8 @@ export default function App() {
             </div>{visible.length === 0 && <div className="empty"><h3>No matching media</h3><p>Try another search or clear the active filters.</p><button className="secondary-button" onClick={clearLibraryFilters}>Clear filters</button></div>}</>}
           </section>
         </>}
-        {view === "videoProjects" && <><div className="page-heading"><div><h1>Video Projects</h1><p>Keep source videos together in a saved project. Combined editing and export are coming next.</p></div></div><VideoSequences roots={roots} workspaceId={activeWorkspace}/></>}
-        {view === "folders" && <><div className="page-heading"><div><h1>Folders & Workspaces</h1><p>Choose a workspace, manage its source folders, and review indexing status in one place.</p></div></div><section className="folder-management-card"><label>Workspace<select className="workspace-select" aria-label="Active workspace" value={activeWorkspace} onChange={e=>{if(e.target.value==="__new__"){createWorkspace();return;}openWorkspace(e.target.value)}}><option value="">Select a workspace</option>{workspaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}<option value="__new__">+ Add new workspace…</option></select></label><div className="sync-toolbar"><strong>{roots.length} source folder{roots.length===1?"":"s"}</strong><button className="primary-button" onClick={chooseFolder} disabled={busy}>{busy?"Scanning…":"+ Add folder"}</button><button className="secondary-button" disabled={!roots.length||busy} onClick={()=>syncFolders(roots)}>{busy?"Scanning…":"Sync now"}</button><label><input type="checkbox" checked={autoSync} onChange={e=>setAutoSync(e.target.checked)}/> Auto-sync every 2 minutes</label>{lastSync&&<small>Last indexed: {lastSync}</small>}{syncChanges&&<small>{`Changes: +${syncChanges.added} added, ${syncChanges.updated} updated, ${syncChanges.unchanged} unchanged, ${syncChanges.removed} removed${syncChanges.incomplete?" (partial scan)":""}`}</small>}</div><LibraryFolders roots={roots} onRemove={removeLibraryFolder}/></section><h2>Browse folders</h2><p>Choose a folder to filter the Media library without moving any files.</p><div className="folder-list">{folders.map(folder=><button key={folder} className="folder-item" onClick={()=>{setFolderFilter(folder==="(root)"?"":folder);setView("library")}}><FolderOpen size={20}/>{folder}<ChevronRight size={16}/></button>)}{folders.length===0&&<p>Open a workspace folder to browse its subfolders.</p>}</div></>}
+        {view === "editor" && <><div className="page-heading"><div><h1>Video editor</h1><p>Arrange clips into one continuous video project.</p></div><button className="secondary-button" onClick={()=>setView("library")}>Back to Library</button></div><VideoSequences roots={roots} workspaceId={activeWorkspace} initial={editorInitial}/></>}
+        {view === "folders" && <><div className="page-heading"><div><h1>Folders & Workspaces</h1><p>Choose a workspace, manage its source folders, and review indexing status in one place.</p></div></div><section className="folder-management-card"><div className="sync-toolbar"><strong>{roots.length} source folder{roots.length===1?"":"s"}</strong><button className="primary-button" onClick={chooseFolder} disabled={busy}>{busy?"Scanning…":"+ Add folder"}</button><button className="secondary-button" disabled={!roots.length||busy} onClick={()=>syncFolders(roots)}>{busy?"Scanning…":"Sync now"}</button><label><input type="checkbox" checked={autoSync} onChange={e=>setAutoSync(e.target.checked)}/> Auto-sync every 2 minutes</label>{lastSync&&<small>Last indexed: {lastSync}</small>}{syncChanges&&<small>{`Changes: +${syncChanges.added} added, ${syncChanges.updated} updated, ${syncChanges.unchanged} unchanged, ${syncChanges.removed} removed${syncChanges.incomplete?" (partial scan)":""}`}</small>}</div><LibraryFolders roots={roots} onRemove={removeLibraryFolder}/></section><h2>Browse folders</h2><p>Choose a folder to filter the Media library without moving any files.</p><div className="folder-list">{folders.map(folder=><button key={folder} className="folder-item" onClick={()=>{setFolderFilter(folder==="(root)"?"":folder);setView("library")}}><FolderOpen size={20}/>{folder}<ChevronRight size={16}/></button>)}{folders.length===0&&<p>Open a workspace folder to browse its subfolders.</p>}</div></>}
         {view === "map" && <><h1>Map</h1>{error&&<div role="alert" className="error">{error}</div>}<p>Zoom and explore GPS-tagged photos from your current workspace. Select a marker to preview its photo.</p>{geoBusy?<p>Reading embedded GPS locations…</p>:<p>{geoPoints.length} photo locations found. Currently supports GPS from JPEG and TIFF; HEIC/MOV location metadata is planned.</p>}{root&&result?<PhotoMap points={geoPoints} onChoose={path=>{const photo=result.photos.find(p=>p.path===path);if(photo)setSelected(photo)}}/>:<div className="placeholder-panel"><p>Open a workspace and scan a photo folder first.</p></div>}</>}
         {view === "collections" && <div className="page-heading"><div><h1>Collections</h1><p>Group and filter media without moving or duplicating the original files.</p></div></div>}
         {view === "collections" && <><h2>Smart collections</h2><p>Dynamic, read-only views prefer embedded capture dates when available and fall back to file modified dates. Nothing is moved or duplicated.</p><div className="folder-list">{([{id:"recent",name:"Captured in the last 30 days"},{id:"thisDay",name:"On this day in previous years"},{id:"large",name:"Large media (50 MB or more)"},{id:"unrated",name:"Media not yet rated"},{id:"thisMonth",name:"This month in previous years"}] as const).map(item=><button className="folder-item" key={item.id} onClick={()=>{setSelectedTag("");setMemoryYear(null);setTimelineMonth("");setSmartFilter(item.id);setSelectedSmartRule("");setCollectionFilter("");setQuery("");setView("library")}}><Images size={18}/>{item.name}<ChevronRight size={16}/></button>)}</div></>}

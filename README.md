@@ -1,4 +1,4 @@
-> Development update: **0.56.5** applies the design audit: a media-first Library, accessible dialogs and forms, restored full-screen viewing, readable theme colors, unclipped thumbnails, and a dedicated single-video editing layout. Phase 7 multi-video projects remain available; timeline assembly and combined export are next.
+> Development update: **0.56.6** adds the first hard-cut timeline controls: reorder, source trims, split, ripple delete, append, undo/redo, and revision-safe autosave. Workspace selection is back at the top left; open the editor from the Library instead of a separate Video Projects tab. Combined sequence preview/export, workspace-owned projects, shared single/multi editing, and photo clips remain in progress.
 
 
 
@@ -24,6 +24,7 @@ Open-Photo uses one shared visual system across the photo library, settings, loc
 ### Browsing and editing
 
 - The **Media library** opens with thumbnails. Expand **Search and library tools** for duplicate review, organization filters, semantic search, text search, and AI indexing.
+- Select videos and choose **Create video from selection…** to place them in one ordered project. **Open video editor…** reopens saved projects. This milestone accepts videos from one source folder, uses original-source previews, and does not yet render the assembled sequence. Photo clips will use this same timeline in the later mixed-media milestone.
 - Select media to reveal tagging actions. Folder management remains under **Folders**; **By date** browses capture months.
 - **Full-screen viewer** gives media the available window. When viewing a video, choose **Open video editor** to keep the preview beside grouped Trim and transform, Audio, Adjustments, and Export controls.
 - Workspace, collection, rule, and person naming use labeled forms with cancellation and validation. Invalid video numeric input remains visible and must be corrected before export.
