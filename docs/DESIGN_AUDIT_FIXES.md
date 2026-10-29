@@ -8,7 +8,7 @@ This update implements the recommendations from the 29 October 2026 audit of 0.5
 | F02: overlapping sticky toolbars | Remove sticky positioning from the generic toolbar class. |
 | F03: constrained full-screen viewer | Give the viewer a specific full-window variant, hide editing/metadata controls during viewing, and reset the panel scroll on layout changes. |
 | F04: dialog keyboard focus | Reuse a native modal dialog with focus containment, visible initial focus, Escape, and restoration to the invoker or current navigation fallback. |
-| F05: theme contrast | Add on-accent and success-text roles instead of pairing white text with the lighter dark-theme purple. |
+| F05: theme contrast | Add accent-text, on-accent, and success-text roles instead of pairing white text with the lighter dark-theme purple. |
 | F06: clipped captions | Reserve a caption track; use shared caption/gap values in virtual row sizing and respond to window-width changes. |
 | F07: compact navigation | Hide brand text explicitly, use distinct destination icons, and supply labels/tooltips. |
 | F08: sustained editing in a narrow drawer | Open a wide video-editor variant, separate preview/control scrolling, and group Trim and transform, Audio, Adjustments, and Export. |

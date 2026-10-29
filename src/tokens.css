@@ -9,7 +9,7 @@
   --surface: #fff;
   --surface-muted: #f3eff8;
   --text: #251b30;
-  --muted: #746b80;
+  --muted: #6e6378;
   --line: #e9e3ef;
   --line-strong: #d9cfe4;
   --primary: #6727ad;
@@ -38,6 +38,7 @@
   --space-7: 32px;
   --content-readable: 720px;
   --on-primary: #fff;
+  --accent-text: #6727ad;
   --success-text: #17613f;
   --font-ui: "Segoe UI",system-ui,sans-serif;
   --type-body: .875rem;
@@ -61,5 +62,6 @@
   --shadow: 0 8px 30px rgba(0,0,0,.16);
   --shadow-hover: 0 14px 38px rgba(0,0,0,.24);
   --on-primary: #20102e;
+  --accent-text: #d8b7ff;
   --success-text: #43d79b
 }

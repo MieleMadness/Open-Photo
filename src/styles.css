@@ -111,7 +111,7 @@ p {
   color: var(--muted)
 }
 .sidebar-label,.eyebrow {
-  color: var(--primary);
+  color: var(--accent-text);
   font-size: 10px;
   letter-spacing: 1.8px;
   font-weight: 800
@@ -146,7 +146,7 @@ nav {
 }
 .nav-button.active {
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--accent-text);
   border-color: color-mix(in srgb,var(--primary) 18%,transparent)
 }
 .nav-button:active {
@@ -302,7 +302,7 @@ nav {
 .secondary-button:hover:not(:disabled) {
   background: var(--primary-soft);
   border-color: color-mix(in srgb,var(--primary) 28%,var(--line));
-  color: var(--primary);
+  color: var(--accent-text);
   transform: translateY(-1px)
 }
 .primary-button:active:not(:disabled),.secondary-button:active:not(:disabled) {
@@ -336,7 +336,7 @@ nav {
   height: 46px;
   border-radius: 12px;
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--accent-text);
   display: grid;
   place-items: center;
   flex-shrink: 0
@@ -419,7 +419,7 @@ nav {
   display: grid;
   place-items: center;
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--accent-text);
   border-radius: 21px;
   margin-bottom: 5px
 }
@@ -457,7 +457,7 @@ nav {
   place-items: center;
   border-radius: 9px;
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--accent-text);
   overflow: hidden
 }
 .file-name {
@@ -533,8 +533,8 @@ nav {
 }
 .theme-option.selected {
   background: var(--primary-soft);
-  color: var(--primary);
-  border-color: var(--primary)
+  color: var(--accent-text);
+  border-color: var(--accent-text)
 }
 .modal-backdrop {
   position: fixed;
@@ -695,7 +695,7 @@ dd {
 }
 .view-switch button.active {
   background: var(--surface);
-  color: var(--primary);
+  color: var(--accent-text);
   box-shadow: var(--shadow)
 }
 .sort-control,.zoom-control {
@@ -717,7 +717,7 @@ dd {
 }
 .zoom-control input {
   width: 130px;
-  accent-color: var(--primary)
+  accent-color: var(--accent-text)
 }
 .zoom-control span {
   min-width: 42px;
@@ -848,13 +848,13 @@ dd {
   left: 19px;
   width: 18px;
   height: 18px;
-  accent-color: var(--primary);
+  accent-color: var(--accent-text);
   cursor: pointer
 }
 .photo-tile.is-selected {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-  border-color: var(--primary);
+  border-color: var(--accent-text);
   box-shadow: 0 0 0 4px color-mix(in srgb,var(--primary) 10%,transparent),var(--shadow)
 }
 .selectable-row {
@@ -866,7 +866,7 @@ dd {
   transition: background var(--motion-fast)
 }
 .selectable-row>input {
-  accent-color: var(--primary);
+  accent-color: var(--accent-text);
   width: 17px;
   height: 17px
 }
@@ -925,7 +925,7 @@ dd {
   border: 1px dashed var(--line-strong);
   border-radius: 10px;
   padding: var(--space-2) 10px;
-  color: var(--primary);
+  color: var(--accent-text);
   background: var(--surface);
   margin-bottom: 18px;
   font-size: 12px;
@@ -934,7 +934,7 @@ dd {
 }
 .workspace-create:hover {
   background: var(--primary-soft);
-  border-color: var(--primary)
+  border-color: var(--accent-text)
 }
 .workspace-create:active {
   transform: translateY(1px)
@@ -1138,7 +1138,7 @@ dd {
 }
 .edit-controls-grid input[type="range"] {
   width: 100%;
-  accent-color: var(--primary)
+  accent-color: var(--accent-text)
 }
 .edit-resize-row {
   display: grid;
@@ -1171,7 +1171,7 @@ dd {
   bottom: 12px;
   border: 1px solid var(--line);
   background: var(--surface);
-  color: var(--primary);
+  color: var(--accent-text);
   border-radius: 999px;
   padding: 7px 11px;
   font-size: 10px;
@@ -1195,7 +1195,7 @@ dd {
 }
 .edit-quality-control input {
   width: 100%;
-  accent-color: var(--primary)
+  accent-color: var(--accent-text)
 }
 .edit-toggle-control {
   display: flex;
@@ -1207,7 +1207,7 @@ dd {
 }
 .edit-toggle-control>input {
   margin-top: 3px;
-  accent-color: var(--primary)
+  accent-color: var(--accent-text)
 }
 .edit-toggle-control span {
   display: grid;
@@ -1314,7 +1314,7 @@ dd {
 .video-scrubber {
   width: 100%;
   margin: 0;
-  accent-color: var(--primary)
+  accent-color: var(--accent-text)
 }
 .video-player small {
   display: block;
@@ -1522,7 +1522,7 @@ dd {
 .video-export-panel progress {
   width: 100%;
   margin: 10px 0;
-  accent-color: var(--primary);
+  accent-color: var(--accent-text);
   height: 8px
 }
 .video-export-panel p {
@@ -1548,7 +1548,7 @@ select:hover,input[type="text"]:hover,input[type="search"]:hover,input[type="num
   border-color: var(--line-strong)
 }
 select:focus,input[type="text"]:focus,input[type="search"]:focus,input[type="number"]:focus,textarea:focus {
-  border-color: var(--primary);
+  border-color: var(--accent-text);
   box-shadow: 0 0 0 3px color-mix(in srgb,var(--primary) 12%,transparent);
 }
 small {
@@ -1581,7 +1581,7 @@ small {
   transform: translateY(1px)
 }
 .search-box:focus-within {
-  border-color: var(--primary);
+  border-color: var(--accent-text);
   background: var(--surface);
   box-shadow: 0 0 0 3px color-mix(in srgb,var(--primary) 10%,transparent)
 }
@@ -1621,7 +1621,7 @@ small {
   border-radius: var(--radius-md)
 }
 .video-filmstrip button:hover {
-  border-color: var(--primary);
+  border-color: var(--accent-text);
   background: var(--primary-soft);
   transform: translateY(-1px)
 }
@@ -1726,7 +1726,7 @@ select {
 }
 .folder-chip button:hover {
   background: var(--primary-soft);
-  color: var(--primary)
+  color: var(--accent-text)
 }
 .video-player>video,.video-player>.video-poster {
   margin: 0
@@ -1822,7 +1822,7 @@ select {
   width: 100%;
   height: 8px;
   margin-top: 10px;
-  accent-color: var(--primary)
+  accent-color: var(--accent-text)
 }
 .update-toast small {
   display: block;
@@ -1869,7 +1869,7 @@ select {
 .update-progress progress {
   width: 100%;
   height: 8px;
-  accent-color: var(--primary)
+  accent-color: var(--accent-text)
 }
 @media(max-width:620px) {
   .update-toast {
@@ -1954,7 +1954,7 @@ select {
   overflow-wrap: anywhere
 }
 .sequence-asset.selected {
-  border-color: var(--primary);
+  border-color: var(--accent-text);
   background: color-mix(in srgb,var(--primary) 12%,transparent)
 }
 .sequence-asset small,.sequence-bin h2 small {
@@ -2336,7 +2336,7 @@ select {
   padding: 10px var(--space-5);
   font-size: var(--type-caption);
   font-weight: 600;
-  color: var(--primary)
+  color: var(--accent-text)
 }
 .library-tools-content {
   padding: var(--space-3) var(--space-5);
@@ -2488,7 +2488,7 @@ select {
 .project-file-actions>summary {
   cursor: pointer;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--accent-text);
   padding: var(--space-2) 0
 }
 .project-file-actions[open]>.video-transport {
