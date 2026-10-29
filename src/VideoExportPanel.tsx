@@ -20,7 +20,7 @@ export function VideoExportPanel(){
       <div className="video-transport">
         {status.active?<button className="secondary-button" disabled={!status.can_cancel} onClick={()=>void action(()=>cancelVideoExport(status.id))}>Cancel video export</button>:<>
           {status.result&&<button className="secondary-button" onClick={()=>void action(()=>invoke("open_video_export",{id:status.id}))}>Open exported video</button>}
-          <button className="secondary-button" onClick={()=>void action(()=>dismissVideoExport(status.id))}>Dismiss export</button>
+          <button className="secondary-button" onClick={()=>void action(()=>dismissVideoExport(status.id))}>Dismiss</button>
         </>}
       </div>
     </>}
