@@ -1,3 +1,7 @@
+# Current development test policy
+
+As requested on 2026-10-29, use short video fixtures and excerpts for Phase 7. Do not run the opt-in hour-scale source, distant-window, or continuous-export gates routinely. Further long-form testing and optimization are deferred to 1.x. The prior 0.56.2 continuous-export and sampled listening results remain recorded locally. Physical drive-removal and real disk-full tests are deferred to the pre-v1.0 release checklist. Existing short timestamp, audio, keyframe, cancellation, and source-integrity regressions remain active.
+
 # Repeatable video acceptance (0.56.2)
 
 Phase 6 has an automated native export baseline. It is a measurement and correctness check, not completion of installed-app acceptance.

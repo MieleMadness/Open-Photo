@@ -368,7 +368,7 @@ fn initialize(db: &Connection) -> Result<(), String> {
     }
     tx.commit().map_err(|e| e.to_string())
 }
-fn database() -> Result<Connection, String> {
+pub(crate) fn database() -> Result<Connection, String> {
     let dir = dirs::data_local_dir()
         .ok_or("Local project storage unavailable")?
         .join("Open-Photo");

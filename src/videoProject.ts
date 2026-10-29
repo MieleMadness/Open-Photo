@@ -1,4 +1,5 @@
-import {invoke} from "@tauri-apps/api/core";
+import {DurableProjectSession} from "./projectSession";
+export {editHistory,subscribeProjectSaves,projectSaveError,hasUnsavedProjects,flushProjects,discardProjectSaves} from "./projectSession";
 import {markSeconds,type VideoTime} from "./videoTime";
 import type {VideoInfo} from "./VideoDetails";
 export type Crop={x:number;y:number;width:number;height:number};
@@ -37,45 +38,6 @@ export function validProject(project:VideoProject):string {
   if(![clip.edits.brightness,clip.edits.contrast].every(value=>Number.isInteger(value)&&value>=-100&&value<=100))return "Brightness and contrast must be whole numbers from -100 to 100.";
   return "";
 }
-type History={past:VideoProject[];present:VideoProject;future:VideoProject[]};
-export function editHistory(history:History,next:VideoProject|"undo"|"redo"):History {
-  if(next==="undo")return history.past.length?{past:history.past.slice(0,-1),present:history.past.at(-1)!,future:[history.present,...history.future].slice(0,100)}:history;
-  if(next==="redo")return history.future.length?{past:[...history.past,history.present].slice(-100),present:history.future[0],future:history.future.slice(1)}:history;
-  if(JSON.stringify(next)===JSON.stringify(history.present))return history;
-  return {past:[...history.past,history.present].slice(-100),present:next,future:[]};
+export class ProjectSession extends DurableProjectSession<VideoProject> {
+  constructor(root:string,loaded:LoadedProject){super(root,loaded,"save_video_project",validProject);}
 }
-
-const sessions=new Set<ProjectSession>();
-const saveListeners=new Set<()=>void>();
-export function subscribeProjectSaves(listener:()=>void){saveListeners.add(listener);return()=>{saveListeners.delete(listener);};}
-export function projectSaveError(){return [...sessions].map(s=>s.error).find(Boolean)||"";}
-// The queue outlives a player unmount. Each write uses the revision returned by its predecessor.
-export class ProjectSession {
-  history:History;status:"saved"|"saving"|"error"="saved";error="";revision:number;
-  private queued:VideoProject|null=null;private running=false;private tail:Promise<void>=Promise.resolve();private released=false;
-  private listeners=new Set<()=>void>();
-  constructor(readonly root:string,loaded:LoadedProject){this.history={past:[],present:loaded.project,future:[]};this.revision=loaded.revision;sessions.add(this);}
-  subscribe=(listener:()=>void)=>{this.listeners.add(listener);return()=>{this.listeners.delete(listener);};};
-  private notify(){this.listeners.forEach(listener=>listener());if(this.released&&this.status==="saved")sessions.delete(this);saveListeners.forEach(listener=>listener());}
-  commit(next:VideoProject|"undo"|"redo"){
-    const history=editHistory(this.history,next);if(history===this.history)return;
-    const error=validProject(history.present);if(error)throw Error(error);
-    sessions.add(this);this.history=history;this.queued=history.present;this.pump();this.notify();
-  }
-  private pump(){
-    if(this.running||this.error||!this.queued)return;
-    const project=this.queued;this.queued=null;this.running=true;this.status="saving";
-    this.tail=(async()=>{
-      try{this.revision=await invoke<number>("save_video_project",{root:this.root,project,expectedRevision:this.revision});}
-      catch(error){this.error=String(error);this.queued=this.history.present;}
-      finally{this.running=false;this.status=this.error?"error":this.queued?"saving":"saved";this.notify();if(!this.error)this.pump();}
-    })();
-  }
-  async flush(){while(this.running){await this.tail;}if(this.error)throw Error(this.error);if(this.queued){this.pump();await this.flush();}}
-  retry(){this.error="";this.pump();this.notify();}
-  release(){this.released=true;if(this.status==="saved")sessions.delete(this);}
-  discard(){this.queued=null;this.error="";this.status="saved";sessions.delete(this);saveListeners.forEach(listener=>listener());}
-}
-export function hasUnsavedProjects(){return [...sessions].some(s=>s.status!=="saved");}
-export async function flushProjects(retry=false){const active=[...sessions];if(retry)active.forEach(s=>s.retry());await Promise.all(active.map(s=>s.flush()));}
-export function discardProjectSaves(){sessions.forEach(s=>s.discard());}

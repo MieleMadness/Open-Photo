@@ -27,6 +27,7 @@ mod video_preview;
 mod video_probe;
 mod video_project;
 mod video_render;
+mod video_sequence;
 mod video_timing;
 mod watch;
 mod xmp;
@@ -1190,6 +1191,15 @@ pub fn run() {
             video_preview::video_preview_status,
             video_preview::cancel_video_preview,
             video_preview::start_video_project_preview,
+            video_sequence::create_video_sequence,
+            video_sequence::add_sequence_videos,
+            video_sequence::save_video_sequence,
+            video_sequence::load_video_sequence,
+            video_sequence::recent_video_sequences,
+            video_sequence::import_video_sequence,
+            video_sequence::write_video_sequence_copy,
+            video_sequence::remove_sequence_video,
+            video_sequence::relink_sequence_video,
             video_project::create_video_project,
             video_project::save_video_project,
             video_project::load_video_project,

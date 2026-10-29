@@ -1,3 +1,13 @@
+# 0.56.3 — Phase 7 multi-video project media bin
+
+- Add Video projects with folder-scoped multi-video drafts, multi-file import, a selectable media bin, original-source previews, and duplicate detection by verified content hash.
+- Add a version-2 document with stable asset/clip identities, rational source times, a shared canvas, and explicit project frame rate. Validate bounds, identities, references, and every source using existing single-video rules.
+- Import single-video project files as separate multi-video drafts without changing their original files or saved Phase 6 drafts; retain trims, transforms, audio settings, and canvas.
+- Save/reopen projects with revision checks and bounded previous-save storage. Save portable project copies without overwriting existing files; relink each video only to identical original contents; remove project references without deleting media.
+- Share the durable save queue and app-close/updater protection across both document types, including save-error retry and unsaved-copy recovery.
+- Keep assembled timeline editing/preview and combined export for subsequent Phase 7 updates. This first milestone supports videos inside one selected library folder, including subfolders.
+- Use short media for development acceptance. Keep hour-scale regression execution opt-in and defer further long-form work to 1.x. Keep physical drive and disk-full acceptance on the pre-v1.0 checklist.
+
 # 0.56.2 — Protected update installation and continuous-recording acceptance
 
 - Fix automatic update checks being cancelled during channel initialization and React StrictMode replay. Mark the session check only when its timer starts the request; close late update resources and serialize check/download/install operations.

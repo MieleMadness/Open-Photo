@@ -1,6 +1,6 @@
 # Milestones and validation status
 
-## Current branch — 0.56.2
+## Current branch — 0.56.3
 
 The development branch contains a Windows Tauri photo library with workspaces, local indexing, previews, nondestructive photo-copy export, managed XMP keywords, maps, and opt-in local semantic/People/OCR features. Source-media originals remain read-only. CI success and installed-app acceptance are separate requirements.
 
@@ -25,7 +25,13 @@ Phases 6.1/6.2 supply inspection, local streaming, playback controls, filmstrips
 
 Version 0.56.2 adds protected updater installation and a separate full-recording native acceptance mode with continuous-export decode and distant timestamp comparisons. Real execution evidence, packaged playback, perceptual A/V synchronization, drive failures, and whole-app performance remain separate gates. The newer interface and major-only signed updater foundation are retained.
 
+## Pre-v1.0 release checklist
+
+Physical source/destination drive removal, actual disk-full/quota/write failure, installed-package GUI playback, and whole-app performance measurements remain required before v1.0. The owner deferred physical drive-failure testing on 2026-10-29. Further long-form development/testing is deferred to 1.x; the successful 0.56.2 long-recording evidence is retained, and current development uses short clips.
+
 ## Phase 7 — Basic multi-video editing
+
+0.56.3 delivers the project/media-bin foundation: bounded schema-v2 multi-asset documents, explicit v1 project-file migration into new drafts, multi-file import and content deduplication, selected-source previews, revision-checked saving/reopening, portable copies, and per-asset relinking. Phase 6 editing/export remains unchanged. Sources currently belong to one selected library folder and its subfolders. Timeline assembly and combined export remain next, not completed.
 
 Multiple assets on one sequential timeline, split/trim/reorder/ripple-delete, linked audio, mixed-media normalization, save/relink/recovery, and continuous export. Start with hard cuts. See [VIDEO_ROADMAP.md](VIDEO_ROADMAP.md).
 

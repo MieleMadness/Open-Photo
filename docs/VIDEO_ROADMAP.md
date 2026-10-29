@@ -1,6 +1,6 @@
 # Video editing roadmap
 
-Status: Phase 6 core single-source features are implemented through version 0.56.2: inspection, video posters, streaming/proxies with codec-error fallback, saved edits/projects, undo/redo/autosave/relink, previous-save recovery, brightness/contrast, and validated new-file MP4 export. Native checks include real high-frame-rate gameplay and beginning/middle/end windows in a 64-minute recording. Phase 6 completion still requires packaged-Windows GUI/playback acceptance, complete long-export/perceptual synchronization, actual drive/disk failures, and whole-app performance/hardware measurements. HDR tone mapping and waveforms are deferred. Version 0.56.2 adds a distinct opt-in continuous full-recording gate and protects video work during updater installation. Completion claims still depend on recorded evidence; adding a gate alone does not complete it. Phase 7 remains planned. See [VIDEO_ACCEPTANCE.md](VIDEO_ACCEPTANCE.md), [VIDEO_EXPORT.md](VIDEO_EXPORT.md), and [VIDEO_PROJECTS.md](VIDEO_PROJECTS.md).
+Status: Phase 6 core features remain available. Version 0.56.2 passed continuous 64-minute native export, full decode, source preservation, distant frame/timestamp checks, and sampled listening checks. Phase 7 starts in 0.56.3 with multi-video project documents and a durable media bin; timeline assembly/preview and combined export follow. Short clips are the development test baseline. Further long-form testing and optimization are deferred to 1.x at the owner's request. Installed-package GUI/playback and whole-app performance acceptance remain open; physical drive/disk failures are explicitly deferred to the pre-v1.0 release checklist. HDR tone mapping and waveforms remain deferred. See [VIDEO_ACCEPTANCE.md](VIDEO_ACCEPTANCE.md).
 
 ## Phase 6 — Single-source video editing
 
@@ -46,7 +46,7 @@ An automated optimized 1080p export baseline now runs in CI and produces timing/
 
 ### Phase 6 completion gate
 
-All current CI gates plus real packaged-Windows tests pass. Cover silent/audio clips, portrait rotation, variable frame rates, codec fallback, long paths, source removal, cancellation, disk-full failure, reopen/relink, and output frame checks. Record startup, seek latency, export speed, and peak memory on a named reference PC. Choose numeric performance budgets after the initial baseline rather than promise unmeasured responsiveness.
+Before v1.0, all current CI gates plus real packaged-Windows tests must pass. Physical drive-removal and actual disk-full acceptance are deferred to that pre-v1.0 checklist. Long-form content work resumes in 1.x; use short clips for current development. Cover silent/audio clips, portrait rotation, variable frame rates, codec fallback, long paths, source removal, cancellation, disk-full failure, reopen/relink, and output frame checks. Record startup, seek latency, export speed, and peak memory on a named reference PC. Choose numeric performance budgets after the initial baseline rather than promise unmeasured responsiveness.
 
 Deferred: multiple source assets, transitions, titles, background music, overlays, speed ramps, keyframes, auto captions, and AI video effects.
 
@@ -55,6 +55,11 @@ Deferred: multiple source assets, transitions, titles, background music, overlay
 Goal: assemble several videos into one coherent output with familiar drag, split, trim, reorder, and export interactions. The first delivery needs a single sequential video track with linked source audio, not a full compositing editor.
 
 ### 7.1 — Multi-asset projects and migration
+
+Implemented first increment (0.56.3): a separate Video projects page, schema v2, 1–50 verified source assets, stable clip references, import of v1 files into new drafts, revision-checked autosave/reopen, project copies, per-video source status and relinking, and duplicate import detection. Source files and existing v1 drafts remain unchanged. Projects currently use one selected library folder and its subfolders; sources across unrelated roots, assembled preview, and combined export are not included yet.
+
+Next increments, in order: (1) timeline ordering/split/trim/ripple delete and undo; (2) continuous mixed-media preview; (3) combined export; (4) recovery/relink/keyboard polish and short-content release acceptance.
+
 
 - Migrate Phase 6 projects into a multi-asset schema without losing edits.
 - Each clip instance has an immutable ID, asset reference, source in/out, timeline placement or sequence order, transforms, and audio settings. One asset can appear repeatedly.

@@ -1,4 +1,5 @@
-> Development update: **0.54.12** restores saved folders on startup, adds a clear folder list with Remove from library, and connects uninstall cleanup to the Delete application data checkbox (off by default). AI models now ship with the installer: enable Local AI with one switch, with no separate model downloads. See [application data](docs/APPLICATION_DATA.md) and [bundled AI](docs/AI_MODEL_BUNDLE.md).
+> Development update: **0.56.3** starts Phase 7 with **Video projects**: a saved multi-video media bin, source previews, duplicate detection, project-file import/copy, and per-video relinking. Existing single-video editing/export remains available in the Library. Timeline assembly and combined export are the next milestones.
+
 
 # Open-Photo
 
@@ -542,3 +543,13 @@ Updater installation now waits for project saves and refuses to interrupt an act
 Workspace activation now clears the prior library’s scan summary and invalidates its pending scan/AI results. The sidebar reads the actual installed version instead of a hard-coded preview label.
 
 Generated video exports and compatible previews now include regular H.264 keyframes so long recordings can seek without decoding from the beginning. Original source files remain unchanged.
+
+### Multi-video project media bin in 0.56.3
+
+Open **Video projects**, choose a library folder, then **New multi-video project…** and select short videos inside that folder. Add up to 50 distinct source videos, select a source to preview it, rename/autosave the project, reopen a saved project, save a portable project copy, or relink an original with identical contents. Removing a video from a project keeps the source file unchanged. Files from subfolders are supported; sources from unrelated library roots are not combined in this first milestone.
+
+Opening an existing single-video project JSON creates a new multi-video draft preserving source identity, rational trims, transforms, audio settings, and canvas. The original file and single-video draft remain unchanged. Project copies reference source videos rather than embedding them. Missing videos are reported individually.
+
+This milestone prepares and saves the media bin. It does not yet provide an assembled timeline preview or combined multi-video export. The Library's existing single-video editor/export continues to work. Next: sequence ordering, split/trim/ripple delete and undo, continuous preview, then combined export and recovery polish.
+
+Development tests now use short media. Hour-scale stress checks remain available only when explicitly requested; further long-form work is deferred to 1.x. Physical drive-removal and actual disk-full checks remain on the pre-v1.0 release checklist.

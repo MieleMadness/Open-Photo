@@ -2479,6 +2479,7 @@ fn verify_long_windows(source: &Path, output_root: &Path) -> serde_json::Value {
     serde_json::json!({"app_version":env!("CARGO_PKG_VERSION"),"engine_version":video_engine::VERSION,"scope":"Beginning/middle/end short-window native exports from an hour-scale recording; does not establish complete hour-long export or perceptual A/V synchronization or GUI playback","source_filename":source.file_name().unwrap().to_string_lossy(),"source_duration_seconds":info.duration_seconds,"source_bytes":identity.0,"source_sha256":identity.1,"source_unchanged":true,"windows":results})
 }
 #[test]
+#[ignore = "Long-form stress acceptance deferred to 1.x; run explicitly when requested"]
 fn hour_scale_source_seeks_keep_decoded_timestamps_at_three_positions() {
     let fixture = Fixture::new();
     let source = fixture.0.join("hour.mp4");

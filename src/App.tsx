@@ -9,13 +9,14 @@ import {useManagedTags} from "./useManagedTags";
 import {readMetadataBatches} from "./metadataBatches";
 import {saveSetting,retrySettings} from "./userData";
 import PhotoMap, {type PhotoLocation} from "./PhotoMap";
+import {VideoSequences} from "./VideoSequences";
 import {VideoExportPanel} from "./VideoExportPanel";
 import {ProjectSaveGuard} from "./ProjectSaveGuard";
 import { IPhonePicture, IPhoneMotion } from "./IPhoneMedia";
 import {UpdateSettingsCard,UpdateToast,useAppUpdater} from "./appUpdater";
 import { Images, FolderOpen, Users, Tags, Settings2, Search, Moon, Sun, Monitor, ShieldCheck, ImageOff, HardDrive, ListFilter, ChevronRight, X, LayoutGrid, List, ZoomIn, ZoomOut, ArrowUpDown } from "lucide-react";
 
-type View = "library" | "folders" | "collections" | "timeline" | "memories" | "map" | "people" | "tags" | "settings";
+type View = "videoProjects" | "library" | "folders" | "collections" | "timeline" | "memories" | "map" | "people" | "tags" | "settings";
 type Collection = {id:string;workspaceId:string;name:string;paths:string[]};
 type SmartRule = {id:string;workspaceId:string;name:string;minRating:number;type:"all"|"photo"|"video";minMB:number};
 
@@ -34,6 +35,7 @@ type AiBundleReadiness = {ready:boolean;missing:string[];incompatible:string[]};
 type AiValidationReport = {semantic:AiBundleReadiness;people:AiBundleReadiness;ocr:AiBundleReadiness;directml_available:boolean;cpu_fallback:boolean;core_implementation_complete:boolean;real_world_validation_required:boolean};
 const NAV: {id: View; title: string; icon: typeof Images}[] = [
   { id: "library", title: "Library", icon: Images },
+  { id: "videoProjects", title: "Video projects", icon: Monitor },
   { id: "folders", title: "Folders", icon: FolderOpen },
   { id: "map", title: "Map", icon: Monitor },
   { id: "collections", title: "Collections", icon: Images },
@@ -913,6 +915,7 @@ export default function App() {
             </div>{visible.length === 0 && <div className="empty"><p>No supported photos matched this search.</p></div>}</>}
           </section>
         </>}
+        {view === "videoProjects" && <VideoSequences roots={roots} workspaceId={activeWorkspace}/>}
         {view === "folders" && <><LibraryFolders roots={roots} onRemove={removeLibraryFolder}/><span className="eyebrow">LIBRARY ORGANIZATION</span><h1>Folders</h1><p>Browse the folder structure from your selected workspace.</p><div className="folder-list">{folders.map(folder=><button key={folder} className="folder-item" onClick={()=>{setFolderFilter(folder==="(root)"?"":folder);setView("library")}}><FolderOpen size={20}/>{folder}<ChevronRight size={16}/></button>)}{folders.length===0&&<p>Open a workspace folder to browse its subfolders.</p>}</div></>}
         {view === "map" && <><span className="eyebrow">PHOTO LOCATIONS</span><h1>Map</h1>{error&&<div role="alert" className="error">{error}</div>}<p>Zoom and explore GPS-tagged photos from your current workspace. Select a marker to preview its photo.</p>{geoBusy?<p>Reading embedded GPS locations…</p>:<p>{geoPoints.length} photo locations found. Currently supports GPS from JPEG and TIFF; HEIC/MOV location metadata is planned.</p>}{root&&result?<PhotoMap points={geoPoints} onChoose={path=>{const photo=result.photos.find(p=>p.path===path);if(photo)setSelected(photo)}}/>:<div className="placeholder-panel"><p>Open a workspace and scan a photo folder first.</p></div>}</>}
         {view === "collections" && <><span className="eyebrow">AUTOMATIC COLLECTIONS</span><h2>Smart collections</h2><p>Dynamic, read-only views prefer embedded capture dates when available and fall back to file modified dates. Nothing is moved or duplicated.</p><div className="folder-list">{([{id:"recent",name:"Captured in the last 30 days"},{id:"thisDay",name:"On this day in previous years"},{id:"large",name:"Large media (50 MB or more)"},{id:"unrated",name:"Photos not yet rated"},{id:"thisMonth",name:"This month in previous years"}] as const).map(item=><button className="folder-item" key={item.id} onClick={()=>{setSelectedTag("");setMemoryYear(null);setTimelineMonth("");setSmartFilter(item.id);setSelectedSmartRule("");setCollectionFilter("");setQuery("");setView("library")}}><Images size={18}/>{item.name}<ChevronRight size={16}/></button>)}</div></>}
