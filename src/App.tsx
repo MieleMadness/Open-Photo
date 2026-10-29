@@ -865,7 +865,6 @@ export default function App() {
     } catch(e) { setTagMessage(String(e)); } finally {setApplying(false);}
   };
   const bytes = result?.photos.reduce((n, p) => n + p.bytes, 0) || 0;
-  const title = NAV.find(x => x.id === view)?.title || "Library";
   return <div className="app-shell"><ProjectSaveGuard/><VideoExportPanel/><UpdateToast updater={appUpdater} onOpenSettings={()=>setView("settings")}/>
     {storageError&&<div role="alert" className="storage-error">Changes could not be saved: {storageError} <button onClick={()=>void retrySettings().then(()=>setStorageError("")).catch(e=>setStorageError(String(e)))}>Retry saving</button></div>}
 
