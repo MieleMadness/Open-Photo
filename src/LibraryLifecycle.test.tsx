@@ -30,7 +30,7 @@ beforeEach(()=>{
 });
 afterEach(async()=>{cleanup();await act(async()=>{});vi.resetAllMocks();vi.restoreAllMocks();vi.unstubAllGlobals();});
 function openFolders(){fireEvent.click(screen.getByRole("button",{name:"Folders"}));}
-function createWorkspaceFromFolders(){openFolders();fireEvent.change(screen.getByRole("combobox",{name:"Active workspace"}),{target:{value:"__new__"}});}
+function createWorkspaceFromFolders(name:string){openFolders();fireEvent.change(screen.getByRole("combobox",{name:"Active workspace"}),{target:{value:"__new__"}});fireEvent.change(screen.getByLabelText("Workspace name"),{target:{value:name}});fireEvent.click(screen.getByRole("button",{name:"Create"}));}
 it("restores saved folders and their contents once on startup under StrictMode",async()=>{
   render(<StrictMode><App/></StrictMode>);
   await screen.findByText("alpha-0.jpg");expect(screen.getByText("beta-0.jpg")).toBeTruthy();
@@ -42,9 +42,8 @@ it("restores saved folders and their contents once on startup under StrictMode",
 it("clears scan status when creating an empty workspace and rejects the previous workspace's pending scan",async()=>{
   let finish:(value:ReturnType<typeof scan>)=>void=()=>{};
   vi.mocked(invoke).mockImplementation((command,args)=>command==="scan_indexed_with_changes"&&(args as {root:string}).root===B?new Promise(resolve=>{finish=resolve}):fallback(command,args));
-  vi.spyOn(window,"prompt").mockReturnValue("Video acceptance");
   render(<App/>);await waitFor(()=>expect(invoke).toHaveBeenCalledWith("scan_indexed_with_changes",{root:B}));
-  createWorkspaceFromFolders();
+  createWorkspaceFromFolders("Video acceptance");
   await act(async()=>finish(scan(B)));
   openFolders();expect(screen.getByRole("combobox",{name:"Active workspace"}).textContent).toContain("Video acceptance");
   expect(screen.queryByText("alpha-0.jpg")).toBeNull();expect(screen.queryByText("beta-0.jpg")).toBeNull();
@@ -52,9 +51,10 @@ it("clears scan status when creating an empty workspace and rejects the previous
   expect(screen.getByText("No folders added. Choose Add folder to start.")).toBeTruthy();
 });
 it("does not carry a completed scan's counts or timestamp into a new empty workspace",async()=>{
-  vi.spyOn(window,"prompt").mockReturnValue("Empty workspace");render(<App/>);
+  render(<App/>);
   await screen.findByText("alpha-0.jpg");openFolders();expect(screen.getByText(/Last indexed:/)).toBeTruthy();
   fireEvent.change(screen.getByRole("combobox",{name:"Active workspace"}),{target:{value:"__new__"}});
+  fireEvent.change(screen.getByLabelText("Workspace name"),{target:{value:"Empty workspace"}});fireEvent.click(screen.getByRole("button",{name:"Create"}));
   expect(screen.queryByText(/Last indexed:/)).toBeNull();expect(screen.queryByText(/Changes:/)).toBeNull();
 });
 it("removes a folder during scanning, rejects the stale result, and does not resurrect removed roots",async()=>{

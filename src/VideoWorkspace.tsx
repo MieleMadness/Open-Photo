@@ -1,7 +1,8 @@
-import {useCallback,useEffect,useRef,useState} from "react";
+import {useCallback,useEffect,useId,useRef,useState} from "react";
 import {Redo2,Undo2} from "lucide-react";
 import {convertFileSrc,invoke} from "@tauri-apps/api/core";
 import {open,save} from "@tauri-apps/plugin-dialog";
+import {ErrorNotice} from "./Ui";
 import {VideoPlayer} from "./VideoPlayer";
 import {ProjectSession,defaultEdits,defaultOutput,cropForAspect,sourceCanvas,type LoadedProject,type VideoProject,type Edits} from "./videoProject";
 import {clockTime,markSeconds,markTime} from "./videoTime";
@@ -11,11 +12,13 @@ const CANVASES=[{value:"1920x1080",label:"1080p landscape (1920 × 1080)"},{valu
 type PreviousSave={id:string;revision:number|null;saved_at:number|null;title:string;start_seconds:number;end_seconds:number;width:number;height:number};
 type SavedHistory={revision:number;entries:PreviousSave[];localRevision:number};
 function NumberField({label,value,min,max,step=1,onCommit}:{label:string;value:number;min:number;max:number;step?:number;onCommit:(value:number)=>void}){
-  const [draft,setDraft]=useState(String(value));
-  useEffect(()=>setDraft(String(value)),[value]);
-  return <label>{label}<input aria-label={label} type="number" value={draft} min={min} max={max} step={step} onChange={event=>setDraft(event.target.value)} onBlur={()=>{const number=Number(draft);if(draft.trim()&&Number.isFinite(number)&&number>=min&&number<=max)onCommit(number);setDraft(String(value));}} onKeyDown={event=>{if(event.key==="Enter")event.currentTarget.blur();}}/></label>;
+  const [draft,setDraft]=useState(String(value)),[error,setError]=useState("");const id=useId();
+  useEffect(()=>{setDraft(String(value));setError("");},[value]);
+  function commit(){const number=Number(draft);if(!draft.trim()||!Number.isFinite(number)||number<min||number>max||Math.abs((number-min)/step-Math.round((number-min)/step))>0.00001){setError(`Enter a value from ${min} to ${max}, in steps of ${step}.`);return;}setError("");onCommit(number);}
+  return <label htmlFor={id}>{label}<input id={id} aria-label={label} aria-invalid={!!error} aria-describedby={error?`${id}-error`:undefined} type="number" value={draft} min={min} max={max} step={step} onChange={event=>{setDraft(event.target.value);setError("");}} onBlur={commit} onKeyDown={event=>{if(event.key==="Enter")event.currentTarget.blur();}}/>{error&&<span id={`${id}-error`} className="field-error" role="alert">{error}</span>}</label>;
 }
 export function VideoWorkspace({root,path,onOpenExternal,autoLoad=false}:{root:string;path:string;onOpenExternal:()=>void;autoLoad?:boolean}){
+  const host=useRef<HTMLDivElement>(null);
   const [session,setSession]=useState<ProjectSession|null>(null);
   const sessionRef=useRef<ProjectSession|null>(null);
   const [loaded,setLoaded]=useState<LoadedProject|null>(null);
@@ -100,6 +103,7 @@ export function VideoWorkspace({root,path,onOpenExternal,autoLoad=false}:{root:s
   }
   const c=project?.clips[0],e=c?.edits;
   async function exportVideo(){
+    const invalid=host.current?.querySelector<HTMLInputElement>("input:invalid,[aria-invalid=true]");if(invalid){invalid.focus();invalid.reportValidity();throw Error("Correct the highlighted field before exporting.");}
     const owner=sessionRef.current;if(!owner||!loaded?.source_path)return;
     await owner.flush();
     const destination=await save({defaultPath:exportFilename(owner.history.present.title),filters:[{name:"MP4 video",extensions:["mp4"]}]});
@@ -107,7 +111,8 @@ export function VideoWorkspace({root,path,onOpenExternal,autoLoad=false}:{root:s
     await owner.flush();if(!alive.current||owner!==sessionRef.current)return;
     await startVideoExport(root,structuredClone(owner.history.present),{destination,size:exportSize,acknowledge_first_audio:acknowledgeAudio});
   }
-  return <div className="video-workspace">
+  return <div className="video-workspace" ref={host}>
+    <section className="video-stage" aria-label="Video preview stage"><div className="video-preview-label"><span>{previewBusy||previewSrc?"Edited preview":"Original source"}</span><small>{project?project.title:"Selected video"}</small></div>
     {!previewBusy&&!previewSrc&&(!project||loaded?.source_path)&&<VideoPlayer key={loaded?.source_path||path} autoLoad={autoLoad} root={root} path={loaded?.source_path||path} onOpenExternal={project?()=>{void invoke("open_video",{root,path:loaded?.source_path}).catch(cause=>setError(String(cause)));}:onOpenExternal}
       selection={c?{start:c.source_in,end:c.source_out,onChange:(start,end)=>change(p=>{p.clips[0].source_in=start;p.clips[0].source_out=end;})}:undefined}/>}
     {(previewBusy||previewSrc)&&<section aria-label="Edited video preview" className="video-edit-preview">
@@ -116,6 +121,7 @@ export function VideoWorkspace({root,path,onOpenExternal,autoLoad=false}:{root:s
       {previewWarnings.map(warning=><p key={warning}>{warning}</p>)}
       <button className="secondary-button" onClick={stopPreview}>Back to source</button>
     </section>}
+    </section>
     <section className="video-project" aria-label="Video editing project">
       <h3>Video project</h3>
       <div className="video-transport">
@@ -125,7 +131,7 @@ export function VideoWorkspace({root,path,onOpenExternal,autoLoad=false}:{root:s
       {!!recent.length&&<label>Recent projects<select aria-label="Recent video projects" value="" disabled={busy} onChange={event=>{const id=event.target.value;if(id)void action(async()=>{await flush();adopt(await invoke<LoadedProject>("load_video_project",{root,id}));});}}><option value="">Choose a saved draft…</option>{recent.map(item=><option key={item.id} value={item.id}>{item.title}</option>)}</select></label>}
       {busy&&<p role="status">Verifying project and source…</p>}
       {project&&c&&e&&<fieldset disabled={recovering} aria-label="Video project editor" style={{border:0,padding:0,margin:0,minWidth:0}}>
-        <label>Project name<input aria-label="Video project name" value={project.title} maxLength={200} onChange={event=>change(p=>{p.title=event.target.value;})}/></label>
+        <label>Project name<input type="text" aria-label="Video project name" value={project.title} maxLength={200} onChange={event=>change(p=>{p.title=event.target.value;})}/></label>
         {previousDraft&&<p>Recovered from {previousDraft.title}. <button className="secondary-button" disabled={busy} onClick={()=>void action(async()=>{await flush();adopt(await invoke<LoadedProject>("load_video_project",{root,id:previousDraft.id}));})}>Return to previous draft</button></p>}
         <p className="results-note" role="status">{session.status==="saved"?"All project changes saved locally.":session.status==="saving"?"Saving project changes…":"Project changes have not been saved."}</p>
         {session.error&&<div role="alert">{session.error}<button className="secondary-button" onClick={()=>session.retry()}>Retry project save</button>
@@ -149,22 +155,24 @@ export function VideoWorkspace({root,path,onOpenExternal,autoLoad=false}:{root:s
           </>}
           <button className="secondary-button" disabled={busy} onClick={()=>void action(loadPreviousSaves)}>Refresh previous saves</button>
         </section>}
-        <div className="video-edit-fields">
+        <fieldset className="editor-section"><legend>Trim and transform</legend><div className="video-edit-fields">
           <NumberField label="Trim start (seconds)" value={markSeconds(c.source_in)} min={0} max={project.asset.info.duration_seconds} step={0.001} onCommit={value=>change(p=>{p.clips[0].source_in=markTime(value,p.asset.info.time_base);})}/>
           <NumberField label="Trim end (seconds)" value={markSeconds(c.source_out)} min={0} max={project.asset.info.duration_seconds} step={0.001} onCommit={value=>change(p=>{p.clips[0].source_out=markTime(value,p.asset.info.time_base);})}/>
           <label>Rotation<select aria-label="Video rotation" value={e.quarter_turns} onChange={event=>edits(edit=>{edit.quarter_turns=Number(event.target.value);})}>{[0,1,2,3].map(turn=><option key={turn} value={turn}>{turn*90}° clockwise</option>)}</select></label>
           <label><input type="checkbox" checked={e.flip_horizontal} onChange={event=>edits(edit=>{edit.flip_horizontal=event.target.checked;})}/>Flip horizontally</label>
           <label><input type="checkbox" checked={e.flip_vertical} onChange={event=>edits(edit=>{edit.flip_vertical=event.target.checked;})}/>Flip vertically</label>
-          <label><input type="checkbox" checked={e.muted} onChange={event=>edits(edit=>{edit.muted=event.target.checked;})}/>Mute video audio</label>
-          <NumberField label="Audio volume (%)" value={e.gain_percent} min={0} max={200} onCommit={value=>edits(edit=>{edit.gain_percent=value;})}/>
-          <NumberField label="Video brightness" value={e.brightness} min={-100} max={100} onCommit={value=>edits(edit=>{edit.brightness=value;})}/>
-          <NumberField label="Video contrast" value={e.contrast} min={-100} max={100} onCommit={value=>edits(edit=>{edit.contrast=value;})}/>
-          <button className="secondary-button" onClick={()=>edits(edit=>{edit.brightness=0;edit.contrast=0;})}>Reset brightness and contrast</button>
-          <small>Zero keeps the original appearance. Choose Preview edits to see saved brightness and contrast; source playback shows the original.</small>
           <label>Canvas<select aria-label="Video canvas" value={`${project.output.width}x${project.output.height}`} onChange={event=>change(p=>{const [width,height]=event.target.value.split("x").map(Number);p.output.width=width;p.output.height=height;})}>{canvases.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}{!canvases.some(c=>c.value===`${project.output.width}x${project.output.height}`)&&<option value={`${project.output.width}x${project.output.height}`}>Imported canvas ({project.output.width} × {project.output.height})</option>}</select></label>
           <p>Choose the source resolution to keep an ultra-wide frame. A larger canvas cannot add detail to lower-resolution footage.</p>
           <label>Canvas placement<select aria-label="Video canvas placement" value={project.output.fit} onChange={event=>change(p=>{p.output.fit=event.target.value as "fit"|"fill";})}><option value="fit">Fit, with black borders</option><option value="fill">Fill, with centered crop</option></select></label>
-        </div>
+        </div></fieldset>
+        <fieldset className="editor-section"><legend>Audio</legend><div className="video-edit-fields">          <label><input type="checkbox" checked={e.muted} onChange={event=>edits(edit=>{edit.muted=event.target.checked;})}/>Mute video audio</label>
+          <NumberField label="Audio volume (%)" value={e.gain_percent} min={0} max={200} onCommit={value=>edits(edit=>{edit.gain_percent=value;})}/>
+</div></fieldset>
+        <fieldset className="editor-section"><legend>Adjustments</legend><div className="video-edit-fields">          <NumberField label="Video brightness" value={e.brightness} min={-100} max={100} onCommit={value=>edits(edit=>{edit.brightness=value;})}/>
+          <NumberField label="Video contrast" value={e.contrast} min={-100} max={100} onCommit={value=>edits(edit=>{edit.contrast=value;})}/>
+          <button className="secondary-button" onClick={()=>edits(edit=>{edit.brightness=0;edit.contrast=0;})}>Reset brightness and contrast</button>
+          <small>Zero keeps the original appearance. Choose Preview edits to see saved brightness and contrast; source playback shows the original.</small>
+</div></fieldset>
         <fieldset><legend>Crop before rotation (% of displayed source)</legend>
           <div className="video-edit-fields">{(["x","y","width","height"] as const).map(field=><NumberField key={field} label={`Crop ${field} (%)`} value={e.crop[field]/100} min={field==="width"||field==="height"?1:0} max={100} step={0.01} onCommit={value=>edits(edit=>{edit.crop[field]=Math.round(value*100);})}/>)}</div>
           <div className="video-transport">{[["Full source",10000,10000],["Center half",5000,5000]] .map(([label,width,height])=><button className="secondary-button" key={label} onClick={()=>edits(edit=>{edit.crop={x:(10000-Number(width))/2,y:(10000-Number(height))/2,width:Number(width),height:Number(height)};})}>{label}</button>)}</div>
@@ -183,7 +191,7 @@ export function VideoWorkspace({root,path,onOpenExternal,autoLoad=false}:{root:s
         </fieldset>
         <small>Edits autosave locally and leave the original unchanged. Open a recent draft to resume after restart. Project files reference video relative to the selected library; relink moved originals using the same file contents. Export writes a separate validated video.</small>
       </fieldset>}
-      {error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
+      {error&&<ErrorNotice title="The video action could not finish" error={error}/>}{message&&<p role="status">{message}</p>}
     </section>
   </div>;
 }

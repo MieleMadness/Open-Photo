@@ -16,6 +16,14 @@ beforeEach(()=>{vi.mocked(invoke).mockImplementation(async(command,args)=>{
   if(command==="save_video_project")return (args as {expectedRevision:number}).expectedRevision+1;
 });});
 afterEach(async()=>{cleanup();discardProjectSaves();vi.mocked(invoke).mockResolvedValue(null);await refreshVideoExport();vi.resetAllMocks();});
+it("keeps invalid numeric drafts visible and prevents exporting a stale saved value",async()=>{
+  render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);
+  fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");
+  const volume=screen.getByLabelText("Audio volume (%)");fireEvent.change(volume,{target:{value:"999"}});fireEvent.blur(volume);
+  expect((volume as HTMLInputElement).value).toBe("999");expect(volume.getAttribute("aria-invalid")).toBe("true");expect(screen.getByText("Enter a value from 0 to 200, in steps of 1.")).toBeTruthy();
+  fireEvent.click(screen.getByText("Export video MP4…"));await screen.findByText(/Correct the highlighted field before exporting/);expect(save).not.toHaveBeenCalled();
+  fireEvent.change(volume,{target:{value:"75"}});fireEvent.blur(volume);await waitFor(()=>expect(vi.mocked(invoke).mock.calls.some(([cmd,args])=>cmd==="save_video_project"&&(args as {project:{clips:{edits:{gain_percent:number}}[]}}).project.clips[0].edits.gain_percent===75)).toBe(true));
+});
 it("saves brightness and contrast together, supports undo, and resets only those adjustments",async()=>{
   render(<VideoWorkspace root="library" path="source.mp4" onOpenExternal={()=>{}}/>);
   fireEvent.click(screen.getByText("New project from selected video"));await screen.findByDisplayValue("My edit");

@@ -1,3 +1,4 @@
+import {NoticeSurface} from "./Ui";
 import {useEffect,useState} from "react";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {ActiveVideoExportError,withAppExitProtection} from "./appExit";
@@ -19,10 +20,10 @@ export function ProjectSaveGuard(){
     }).then(stop=>{if(disposed)stop();else unlisten=stop;}).catch(cause=>setError(`Could not protect unsaved video projects: ${String(cause)}`));
     return()=>{disposed=true;unlisten?.();};
   },[]);
-  return <>{exportBlocked&&<div className="storage-error" role="alert">An export is still running or starting. Wait for it to finish or cancel it in the export panel before closing.
+  return <NoticeSurface>{exportBlocked&&<div className="storage-error" role="alert">An export is still running or starting. Wait for it to finish or cancel it in the export panel before closing.
     <button onClick={()=>setExportBlocked(false)}>Keep app open</button></div>}
   {(error||saveError)&&<div className="storage-error" role="alert">Video project changes need attention: {saveError||error}
     <button onClick={()=>{void flushProjects(true).then(()=>setError("")).catch(cause=>setError(String(cause)));}}>Retry project saves</button>
     <button onClick={()=>{void withAppExitProtection(()=>getCurrentWindow().destroy(),true).catch(cause=>{if(cause instanceof ActiveVideoExportError)setExportBlocked(true);else setError(String(cause));});}}>Close without saving unsaved changes</button>
-  </div>}</>;
+  </div>}</NoticeSurface>;
 }

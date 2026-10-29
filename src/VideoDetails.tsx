@@ -16,8 +16,8 @@ export function VideoDetails({root,path,onInfo}:{root:string;path:string;onInfo?
       .finally(()=>{if(active)setBusy(false)});
     return()=>{active=false};
   },[root,path,refresh,onInfo]);
-  return <section className="video-details" aria-label="Video details">
-    <h3>Video details</h3>
+  return <details className="video-details" aria-label="Video details">
+    <summary>Video details</summary>
     {busy&&<p role="status">Reading video information…</p>}
     {error&&<div role="alert"><p>{error}</p><button className="secondary-button" onClick={()=>setRefresh(value=>value+1)}>Retry video inspection</button></div>}
     {info&&<><dl>
@@ -29,7 +29,7 @@ export function VideoDetails({root,path,onInfo}:{root:string;path:string;onInfo?
       <dt>Color range</dt><dd>{info.hdr?"HDR":"SDR / unspecified"}{info.color_transfer?` · ${info.color_transfer}`:""}</dd>
       <dt>Audio</dt><dd>{info.audio.length?info.audio.map(track=>`${track.codec.toUpperCase()}${track.channels?` · ${track.channels} channels`:""}`).join("; "):"No audio track"}</dd>
     </dl>{info.warnings.map(warning=><p className="results-note" key={warning}>{warning}</p>)}</>}
-  </section>;
+  </details>;
 }
 
 function rate(value:string){const[numerator,denominator]=value.split("/").map(Number);return (numerator/denominator).toFixed(3);}

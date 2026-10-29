@@ -1,6 +1,7 @@
 import {useEffect,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
 import {cancelVideoExport,dismissVideoExport,refreshVideoExport,useVideoExport} from "./videoExport";
+import {ErrorNotice,NoticeSurface} from "./Ui";
 import {clockTime} from "./videoTime";
 const labels={queued:"Waiting for the video engine",verifying_source:"Verifying original video",encoding:"Encoding MP4",checking_output:"Checking output properties",decoding_output:"Checking every output frame",publishing:"Publishing completed file",cancelling:"Cancelling export",completed:"Export complete",cancelled:"Export cancelled",failed:"Export failed"};
 export function VideoExportPanel(){
@@ -9,7 +10,7 @@ export function VideoExportPanel(){
   useEffect(()=>{if(!status?.active)return;let active=true;const timer=setInterval(()=>{void refreshVideoExport().then(()=>{if(active)setError("");}).catch(cause=>{if(active)setError(String(cause));});},700);return()=>{active=false;clearInterval(timer);};},[status?.active]);
   async function action(task:()=>Promise<unknown>){try{await task();setError("");}catch(cause){setError(String(cause));}}
   if(!status&&!error)return null;
-  return <aside className="video-export-panel" aria-label="Video export">
+  return <NoticeSurface><aside className="video-export-panel" aria-label="Video export">
     <strong role="status">{status?labels[status.stage]:"Export status unavailable"}</strong>
     {status&&<><p>{status.title}</p><p className="break-anywhere">{status.destination}</p>
       <progress aria-label="Video export progress" max={1} value={status.fraction??undefined}/>
@@ -24,6 +25,6 @@ export function VideoExportPanel(){
         </>}
       </div>
     </>}
-    {error&&<div role="alert">{error}<button className="secondary-button" onClick={()=>void action(refreshVideoExport)}>Retry export status</button></div>}
-  </aside>;
+    {error&&<ErrorNotice title="Export status could not be checked" error={error}><button className="secondary-button" onClick={()=>void action(refreshVideoExport)}>Retry export status</button></ErrorNotice>}
+  </aside></NoticeSurface>;
 }

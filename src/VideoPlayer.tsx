@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState,type KeyboardEvent} from "react";
 import {FastForward,Rewind} from "lucide-react";
 import {convertFileSrc,invoke} from "@tauri-apps/api/core";
+import {ErrorNotice} from "./Ui";
 import {VideoDetails,type VideoInfo} from "./VideoDetails";
 import {clockTime,markSeconds,markTime,type VideoTime} from "./videoTime";
 
@@ -132,7 +133,7 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false}:
     {!!assets?.filmstrip.length&&<div className="video-filmstrip" aria-label="Video filmstrip">{assets.filmstrip.map(frame=><button key={frame.seconds} aria-label={`Seek to ${clockTime(frame.seconds)}`} onClick={()=>seek(frame.seconds)}><img src={frame.image} alt=""/><span>{clockTime(frame.seconds)}</span></button>)}</div>}
     <VideoDetails root={root} path={path} onInfo={setInfo}/>
     {busy&&<p role="status">{mode==="proxy"?"Creating compatible preview…":"Creating filmstrip…"} <button className="secondary-button" onClick={()=>{cancelJob.current();setBusy(false);}}>Cancel</button></p>}
-    {error&&<p role="alert">{error}</p>}
+    {error&&<ErrorNotice title="This video preview could not play" error={error}><button className="secondary-button" onClick={()=>setRevision(v=>v+1)}>Retry preview</button></ErrorNotice>}
     {notice&&busy&&<p role="status">{notice}</p>}
     {assets?.warnings.map(warning=><p key={warning}>{warning}</p>)}
     {requested&&<div className="video-transport">

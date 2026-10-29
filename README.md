@@ -1,4 +1,5 @@
-> Development update: **0.56.3** starts Phase 7 with **Video projects**: a saved multi-video media bin, source previews, duplicate detection, project-file import/copy, and per-video relinking. Existing single-video editing/export remains available in the Library. Timeline assembly and combined export are the next milestones.
+> Development update: **0.56.5** applies the design audit: a media-first Library, accessible dialogs and forms, restored full-screen viewing, readable theme colors, unclipped thumbnails, and a dedicated single-video editing layout. Phase 7 multi-video projects remain available; timeline assembly and combined export are next.
+
 
 
 # Open-Photo
@@ -17,8 +18,17 @@ Open-Photo uses one shared visual system across the photo library, settings, loc
 - Primary actions use the filled accent treatment; secondary actions use the same neutral bordered treatment throughout the app.
 - Cards, grids, list rows, tags, editor panels, and export surfaces share the same spacing and elevation rules.
 - Hover and selected states are intentionally subtle so large photo/video libraries remain easy to scan.
-- Drawers and floating panels use short transitions; users who enable **Reduce motion** in Windows receive near-instant transitions.
+- Drawers and floating panels use short transitions; users who enable **Reduce motion** in Windows receive explicit reduced-motion behavior.
 - Keyboard focus uses the same visible accent ring across photo, video, form, and navigation controls.
+
+### Browsing and editing
+
+- The **Media library** opens with thumbnails. Expand **Search and library tools** for duplicate review, organization filters, semantic search, text search, and AI indexing.
+- Select media to reveal tagging actions. Folder management remains under **Folders**; **By date** browses capture months.
+- **Full-screen viewer** gives media the available window. When viewing a video, choose **Open video editor** to keep the preview beside grouped Trim and transform, Audio, Adjustments, and Export controls.
+- Workspace, collection, rule, and person naming use labeled forms with cancellation and validation. Invalid video numeric input remains visible and must be corrected before export.
+- Dialogs contain keyboard focus and restore it on close. Export/save notices occupy their own area instead of covering the working surface.
+- See [DESIGN.md](DESIGN.md) for the shared visual and interaction contract and [design verification](docs/DESIGN_AUDIT_FIXES.md) for coverage and limits.
 
 ## What works today
 

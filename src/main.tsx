@@ -2,18 +2,17 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import {hydrateSettings} from "./userData";
 import App from "./App";
+import {ErrorNotice} from "./Ui";
 import "./styles.css";
 
 const host=document.getElementById("root")!;
+const root=createRoot(host);
 async function start(){
   try{
     await hydrateSettings();
-    createRoot(host).render(<React.StrictMode><App /></React.StrictMode>);
+    root.render(<React.StrictMode><App /></React.StrictMode>);
   }catch(error){
-    const message=document.createElement("p");
-    message.textContent=`Open-Photo could not load your saved data. Your data has not been replaced. ${String(error)}`;
-    const retry=document.createElement("button");retry.textContent="Retry opening";retry.onclick=()=>{host.replaceChildren();void start()};
-    host.replaceChildren(message,retry);
+    root.render(<main className="startup-recovery"><h1>Open-Photo</h1><ErrorNotice title="Your saved library could not be opened" error={error}><button className="primary-button" onClick={()=>void start()}>Retry opening</button></ErrorNotice><p>Your saved data has not been replaced.</p></main>);
   }
 }
 void start();
