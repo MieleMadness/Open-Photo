@@ -84,3 +84,13 @@ it("does not contact the public updater from a development build",async()=>{
   const hook=await setup();await act(async()=>{await vi.advanceTimersByTimeAsync(5000);await hook.result.current.checkNow();});
   expect(check).not.toHaveBeenCalled();expect(hook.result.current.phase).toBe("disabled");
 });
+it("releases downloaded bytes that arrive after hook cleanup already closed the update",async()=>{
+  const candidate=update();let finish:()=>void=()=>{};let bytesRetained=false;
+  vi.mocked(candidate.download).mockImplementation(()=>new Promise<void>(resolve=>{finish=()=>{bytesRetained=true;resolve();};}));
+  vi.mocked(candidate.close).mockImplementation(async()=>{bytesRetained=false;});
+  vi.mocked(check).mockResolvedValue(candidate);const hook=await setup();
+  await act(async()=>{await vi.advanceTimersByTimeAsync(1200);});
+  let downloading=Promise.resolve();await act(async()=>{downloading=hook.result.current.download();await Promise.resolve();});
+  hook.unmount();expect(candidate.close).toHaveBeenCalledOnce();
+  await act(async()=>{finish();await downloading;});expect(bytesRetained).toBe(false);
+});

@@ -103,7 +103,12 @@ export function useAppUpdater(desktop:boolean):AppUpdater {
       });
       if(scope===lifetime.current)setPhase("ready");
     }catch(error){ if(scope===lifetime.current){setPhase("error"); setMessage(String(error));} }
-    finally{if(operation.current===task)operation.current=null;}
+    finally{
+      // Downloaded bytes get their own native resource only after download resolves.
+      // Cleanup may already have closed the update while that request was pending.
+      if(scope!==lifetime.current)await update.close().catch(()=>undefined);
+      if(operation.current===task)operation.current=null;
+    }
   },[phase]);
 
   const install=useCallback(async()=>{

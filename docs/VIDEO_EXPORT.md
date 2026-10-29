@@ -31,3 +31,7 @@ Generated fixtures compare source/export frame timestamps within 1 ms, sample de
 Phase 6 remains in progress until real installed-Windows media/hardware, hour-scale synchronization, drive/disk failures, installer independence from system FFmpeg, and measured performance/memory pass. Browser marker placement is approximate; generated timing tests do not establish frame-accurate user seeking on every codec. HDR tone mapping and waveform UI remain deferred; Phase 7 multi-video editing is not part of this release.
 
 The optimized synthetic export baseline is documented in [video acceptance](VIDEO_ACCEPTANCE.md). GitHub Actions publishes its JSON measurements separately from the installer; these do not establish GUI, real-media, or whole-app performance acceptance.
+
+## Random-access frames (0.56.2)
+
+Exports and compatible previews request an H.264 access point about every two seconds using presentation-time scheduling, preserving variable frame timing. Encoder defaults previously left a real 64-minute export with only three access points; middle seeking then required decoding from the start. A flat-scene native regression inspects output and proxy keyframe packet gaps independently. The full-recording gate checks access-point spacing before comparing distant decoded windows. Long gaps in source media are not repaired or rewritten; this policy applies only to generated derivatives.

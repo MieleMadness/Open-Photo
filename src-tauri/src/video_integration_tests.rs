@@ -1912,6 +1912,113 @@ fn video_real_media_acceptance() {
     file.sync_all().unwrap();
 }
 
+// Inspect random-access packets independently of the render graph, retaining only
+// their timestamps. Flat scenes must still get periodic decoder entry points.
+fn random_access_gap(path: &Path) -> f64 {
+    use std::sync::{Arc, Mutex};
+    let keys = Arc::new(Mutex::new(Vec::<f64>::new()));
+    let copy = keys.clone();
+    video_engine::run_lines(
+        &video_engine::tool(&engine(), "ffprobe").unwrap(),
+        &[
+            "-v".as_ref(),
+            "error".as_ref(),
+            "-select_streams".as_ref(),
+            "v:0".as_ref(),
+            "-show_packets".as_ref(),
+            "-show_entries".as_ref(),
+            "packet=pts_time,flags".as_ref(),
+            "-of".as_ref(),
+            "compact=p=0:nk=0".as_ref(),
+            path.as_os_str(),
+        ],
+        Duration::from_secs(180),
+        || false,
+        move |line| {
+            let text = String::from_utf8_lossy(line);
+            let mut pts = None;
+            let mut key = false;
+            for field in text.trim().split('|') {
+                if let Some((name, value)) = field.split_once('=') {
+                    match name {
+                        "pts_time" => pts = crate::video_timing::number(Some(value)),
+                        "flags" => key = value.contains('K'),
+                        _ => {}
+                    }
+                }
+            }
+            if key {
+                let mut keys = copy.lock().map_err(|e| e.to_string())?;
+                if keys.len() >= 100_000 {
+                    return Err("Too many random-access points in acceptance media".into());
+                }
+                keys.push(pts.ok_or("Random-access packet has no timestamp")?);
+            }
+            Ok(())
+        },
+    )
+    .unwrap();
+    let keys = Arc::try_unwrap(keys).unwrap().into_inner().unwrap();
+    assert!(!keys.is_empty(), "Output has no random-access packets");
+    let info = video_probe::probe(&engine(), path, || false).unwrap();
+    let start = crate::video_timing::number(info.start_time.as_deref()).unwrap_or(0.0);
+    let end = start + info.video_duration_seconds.unwrap_or(info.duration_seconds);
+    let gap = keys
+        .windows(2)
+        .map(|pair| pair[1] - pair[0])
+        .chain([keys[0] - start, end - keys[keys.len() - 1]])
+        .fold(0.0, f64::max);
+    assert!(
+        gap <= 2.25,
+        "Output requires too much decoding before a seek: {gap:.3}s gap between access points"
+    );
+    gap
+}
+#[test]
+fn previews_and_exports_keep_regular_access_points_even_without_scene_changes() {
+    let fixture = Fixture::new();
+    let source = fixture.0.join("flat.mp4");
+    ffmpeg(
+        &[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=navy:size=96x64:rate=24:duration=14",
+            "-c:v",
+            "libopenh264",
+        ],
+        &source,
+    );
+    let identity = fingerprint(&source);
+    let info = video_probe::probe(&engine(), &source, || false).unwrap();
+    let mut project =
+        crate::video_project::new_project(fixture.0.to_str().unwrap(), &source, info).unwrap();
+    project.output.width = 96;
+    project.output.height = 64;
+    let output = fixture.0.join("flat-export.mp4");
+    crate::video_export::export_file(
+        crate::video_export::Request {
+            engine: &engine(),
+            root: fixture.0.to_str().unwrap(),
+            project: &project,
+            destination: &output,
+            size: crate::video_render::ExportSize::Project,
+            acknowledge_first_audio: false,
+        },
+        std::sync::Arc::new(ExportControl::default()),
+    )
+    .unwrap();
+    random_access_gap(&output);
+    let previews = fixture.0.join("proxy");
+    fs::create_dir(&previews).unwrap();
+    let proxy =
+        crate::video_preview::build_assets(&engine(), &source, &previews, true, || false).unwrap();
+    random_access_gap(Path::new(&proxy.source));
+    assert_eq!(fingerprint(&source), identity);
+}
+
 // Seek between two earlier random-access points so either neighboring keyframe
 // selected by the demuxer precedes the range. Exact-boundary seeks can jump forward.
 fn preroll_seek(path: &Path, stream: usize, start: f64) -> Option<f64> {
@@ -2306,6 +2413,7 @@ fn verify_long_windows(source: &Path, output_root: &Path) -> serde_json::Value {
         project.clips[0].source_out = VideoTime::from_seconds(start + 4.24, base).unwrap();
         let actual_start = project.clips[0].source_in.seconds().unwrap();
         let actual_end = project.clips[0].source_out.seconds().unwrap();
+        eprintln!("Continuous export: verifying {name} decoded window");
         let expected = range_frame_times(
             source,
             info.video_stream,
@@ -2530,6 +2638,7 @@ fn verify_full_recording(source: &Path, report_path: &Path, minimum_duration: f6
     )
     .unwrap();
     let export_seconds = control.started.elapsed().as_secs_f64();
+    let maximum_random_access_gap_seconds = random_access_gap(&destination);
     let origin = crate::video_timing::number(info.format_start_time.as_deref()).unwrap_or(0.0);
     let mut windows = vec![];
     for (name, at) in [
@@ -2583,7 +2692,7 @@ fn verify_full_recording(source: &Path, report_path: &Path, minimum_duration: f6
     ] {
         assert!(stages.iter().any(|(stage, _)| *stage == required));
     }
-    let document = serde_json::json!({"schema_version":1,"app_version":env!("CARGO_PKG_VERSION"),"engine_version":video_engine::VERSION,"scope":"One continuous hour-scale native export with full output decode and beginning/middle/end decoded frame timing; excludes GUI, perceptual A/V assessment, and whole-app memory","source_filename":source.file_name().unwrap().to_string_lossy(),"source_bytes":identity.0,"source_sha256":identity.1,"source_unchanged":true,"source_duration_seconds":info.duration_seconds,"trim_seconds":[start,start+duration],"output_seconds":report.duration_seconds,"width":report.width,"height":report.height,"bytes":report.bytes,"export_wall_seconds":export_seconds,"media_seconds_per_wall_second":duration/export_seconds,"maximum_individual_native_child_peak_working_set_bytes":video_engine::native_peak(),"stages":*stages,"windows":windows,"full_output_decoded":true,"independent_audio_video_stream_validation":true,"output_published":true});
+    let document = serde_json::json!({"schema_version":1,"app_version":env!("CARGO_PKG_VERSION"),"engine_version":video_engine::VERSION,"scope":"One continuous hour-scale native export with full output decode and beginning/middle/end decoded frame timing; excludes GUI, perceptual A/V assessment, and whole-app memory","source_filename":source.file_name().unwrap().to_string_lossy(),"source_bytes":identity.0,"source_sha256":identity.1,"source_unchanged":true,"source_duration_seconds":info.duration_seconds,"trim_seconds":[start,start+duration],"output_seconds":report.duration_seconds,"width":report.width,"height":report.height,"bytes":report.bytes,"export_wall_seconds":export_seconds,"media_seconds_per_wall_second":duration/export_seconds,"maximum_individual_native_child_peak_working_set_bytes":video_engine::native_peak(),"stages":*stages,"windows":windows,"full_output_decoded":true,"maximum_random_access_gap_seconds":maximum_random_access_gap_seconds,"independent_audio_video_stream_validation":true,"output_published":true});
     let mut file = fs::OpenOptions::new()
         .create_new(true)
         .write(true)

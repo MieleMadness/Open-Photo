@@ -206,7 +206,7 @@ pub(crate) fn build_assets(
         if let Some(audio) = info.audio.first() {
             args.extend(["-map".into(), format!("0:{}", audio.stream).into()]);
         }
-        args.extend(["-vf", "scale=w='min(960,iw*sar)':h='min(540,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1", "-fps_mode", "vfr", "-enc_time_base:v", info.time_base.as_deref().unwrap_or("1/1000000"), "-c:v", "libopenh264", "-b:v", "2000k", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-map_metadata", "-1", "-movflags", "+faststart", "-movie_timescale", "90000", "-fs", "536870912"].into_iter().map(Into::into));
+        args.extend(["-vf", "scale=w='min(960,iw*sar)':h='min(540,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1", "-fps_mode", "vfr", "-enc_time_base:v", info.time_base.as_deref().unwrap_or("1/1000000"), "-c:v", "libopenh264", "-force_key_frames:v", video_engine::H264_KEYFRAME_EXPRESSION, "-b:v", "2000k", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-map_metadata", "-1", "-movflags", "+faststart", "-movie_timescale", "90000", "-fs", "536870912"].into_iter().map(Into::into));
         args.push(destination.clone().into());
         call(engine, args, Duration::from_secs(1800), &cancel)?;
         let output = video_probe::probe(engine, &destination, &cancel)?;

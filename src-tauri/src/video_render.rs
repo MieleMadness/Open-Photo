@@ -166,6 +166,8 @@ pub fn plan(
             info.time_base.as_deref().unwrap_or("1/1000000"),
             "-c:v",
             "libopenh264",
+            "-force_key_frames:v",
+            video_engine::H264_KEYFRAME_EXPRESSION,
             "-pix_fmt",
             "yuv420p",
             "-c:a",

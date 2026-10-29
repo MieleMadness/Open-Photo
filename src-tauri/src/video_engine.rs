@@ -14,6 +14,8 @@ use std::{
 use tauri::Manager;
 
 pub(crate) const VERSION: &str = "n8.1.3-24-g92611900bb";
+// Timestamp-based access points remain useful with variable frame rates too.
+pub(crate) const H264_KEYFRAME_EXPRESSION: &str = "expr:gte(t,n_forced*2)";
 pub(crate) const ARCHIVE_SHA256: &str =
     "6c6167da57decb941a0466b60d95f7f51e4edd6b2d79c24dc4860c1c15701292";
 
