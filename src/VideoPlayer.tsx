@@ -102,8 +102,6 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false}:
     else if(event.key==="ArrowLeft"||event.key==="ArrowRight"){event.preventDefault();seek(current.current+(event.key==="ArrowLeft"?-1:1)*(event.shiftKey?10:5));}
     else if(event.key==="Home"){event.preventDefault();seek(0);}
     else if(event.key==="End"){event.preventDefault();seek(duration);}
-    else if(event.key.toLowerCase()==="i"){event.preventDefault();mark("in");}
-    else if(event.key.toLowerCase()==="o"){event.preventDefault();mark("out");}
   }
   return <section className="video-player" aria-label="Video playback" tabIndex={0} onKeyDown={keyboard}>
     {!src&&poster&&<button className="video-poster" disabled={busy} aria-label={requested?"Retry video preview":"Play selected video"} onClick={()=>requested?setRevision(v=>v+1):setRequested(true)}><img src={poster} alt="Selected video preview"/></button>}
