@@ -1049,9 +1049,64 @@ struct UpdaterChannelStatus {
 #[tauri::command]
 fn updater_channel_status() -> UpdaterChannelStatus {
     UpdaterChannelStatus {
-        enabled: option_env!("OPENPHOTO_UPDATER_PUBLIC_KEY").is_some(),
+        enabled: option_env!("OPENPHOTO_UPDATER_PUBLIC_KEY")
+            .is_some_and(|key| !key.trim().is_empty()),
         policy: "major-only",
     }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppUpdateMetadata {
+    rid: tauri::ResourceId,
+    current_version: String,
+    version: String,
+    date: Option<String>,
+    body: Option<String>,
+    raw_json: serde_json::Value,
+}
+
+#[tauri::command]
+async fn check_app_update(webview: tauri::Webview) -> Result<Option<AppUpdateMetadata>, String> {
+    use std::time::Duration;
+    use tauri::Manager;
+    use tauri_plugin_updater::UpdaterExt;
+    if !updater_channel_status().enabled {
+        return Ok(None);
+    }
+    let updater = webview
+        .updater_builder()
+        .timeout(Duration::from_secs(15))
+        .configure_client(|client| {
+            client
+                .connect_timeout(Duration::from_secs(15))
+                .read_timeout(Duration::from_secs(30))
+        })
+        .build()
+        .map_err(|e| e.to_string())?;
+    let Some(mut update) = updater.check().await.map_err(|e| e.to_string())? else {
+        return Ok(None);
+    };
+    // Large signed installers may need many minutes; stop stalled reads instead
+    // of imposing an overall deadline on a download that is still progressing.
+    update.timeout = None;
+    let metadata = AppUpdateMetadata {
+        rid: 0,
+        current_version: update.current_version.clone(),
+        version: update.version.clone(),
+        date: update
+            .raw_json
+            .get("pub_date")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
+        body: update.body.clone(),
+        raw_json: update.raw_json.clone(),
+    };
+    // Update implements Tauri's Resource; the stock SDK owns and closes it.
+    Ok(Some(AppUpdateMetadata {
+        rid: webview.resources_table().add(update),
+        ..metadata
+    }))
 }
 
 /// Open a selected video with the user's configured operating-system media player.
@@ -1159,6 +1214,7 @@ pub fn run() {
             edit_export::preview_edited_photo,
             open_video,
             updater_channel_status,
+            check_app_update,
             geo::gps_for_photos,
             index::scan_indexed,
             index::scan_indexed_with_changes,

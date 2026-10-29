@@ -1,3 +1,13 @@
+# 0.56.2 — Protected update installation and continuous-recording acceptance
+
+- Fix automatic update checks being cancelled during channel initialization and React StrictMode replay. Mark the session check only when its timer starts the request; close late update resources and serialize check/download/install operations.
+- Configure updater HTTP requests with a 15-second connection timeout and 30-second stalled-read timeout; remove the two-minute total download deadline that could cut off a progressing bundled-AI installer. Preserve Tauri resource ownership and signature verification.
+- Route updater installation and normal window closure through one protection boundary: block running or starting video exports, flush pending project saves, and keep a downloaded update ready if installation is blocked or saving fails. Do not discard edits to install an update.
+- Add opt-in full-recording acceptance for one continuous hour-scale SDR export, full output decode, independent stream validation, source preservation, and beginning/middle/end decoded timestamp checks against that single output. Keep the existing short-window test distinct.
+- Exercise the continuous-export assertions on a short synthetic VFR/audio fixture in regular native tests. Keep real footage and reports local.
+- Run the optimized video export gate in the deliberate signed-release workflow before publishing, matching the normal Windows installer checks.
+- Retain the newer interface and major-only signed updater channel. Align development versioning guidance with the owner's patch-per-update instruction.
+
 # 0.56.1 — Dedicated major-release updater channel
 
 - Move in-app update checks from GitHub's generic latest-release alias to a dedicated `stable-channel` release asset.

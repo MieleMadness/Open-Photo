@@ -1,7 +1,7 @@
 import {useEffect,useState} from "react";
 import {getCurrentWindow} from "@tauri-apps/api/window";
-import {refreshVideoExport,hasStartingVideoExport,setAppClosing} from "./videoExport";
-import {discardProjectSaves,flushProjects,hasUnsavedProjects,projectSaveError,subscribeProjectSaves} from "./videoProject";
+import {ActiveVideoExportError,withAppExitProtection} from "./appExit";
+import {flushProjects,projectSaveError,subscribeProjectSaves} from "./videoProject";
 export function ProjectSaveGuard(){
   const [error,setError]=useState("");
   const [saveError,setSaveError]=useState(projectSaveError);
@@ -12,12 +12,10 @@ export function ProjectSaveGuard(){
     let disposed=false;let unlisten:(()=>void)|undefined;
     void getCurrentWindow().onCloseRequested(async event=>{
       event.preventDefault();
-      setAppClosing(true);
       try{
-        const status=await refreshVideoExport();if(status?.active||hasStartingVideoExport()){setAppClosing(false);setExportBlocked(true);return;}
-        if(hasUnsavedProjects())await flushProjects();await getCurrentWindow().destroy();
+        await withAppExitProtection(()=>getCurrentWindow().destroy());
       }
-      catch(cause){setAppClosing(false);setError(String(cause));}
+      catch(cause){if(cause instanceof ActiveVideoExportError)setExportBlocked(true);else setError(String(cause));}
     }).then(stop=>{if(disposed)stop();else unlisten=stop;}).catch(cause=>setError(`Could not protect unsaved video projects: ${String(cause)}`));
     return()=>{disposed=true;unlisten?.();};
   },[]);
@@ -25,6 +23,6 @@ export function ProjectSaveGuard(){
     <button onClick={()=>setExportBlocked(false)}>Keep app open</button></div>}
   {(error||saveError)&&<div className="storage-error" role="alert">Video project changes need attention: {saveError||error}
     <button onClick={()=>{void flushProjects(true).then(()=>setError("")).catch(cause=>setError(String(cause)));}}>Retry project saves</button>
-    <button onClick={()=>{setAppClosing(true);void refreshVideoExport().then(async status=>{if(status?.active||hasStartingVideoExport()){setAppClosing(false);setExportBlocked(true);return;}discardProjectSaves();await getCurrentWindow().destroy();}).catch(cause=>{setAppClosing(false);setError(String(cause));});}}>Close without saving unsaved changes</button>
+    <button onClick={()=>{void withAppExitProtection(()=>getCurrentWindow().destroy(),true).catch(cause=>{if(cause instanceof ActiveVideoExportError)setExportBlocked(true);else setError(String(cause));});}}>Close without saving unsaved changes</button>
   </div>}</>;
 }

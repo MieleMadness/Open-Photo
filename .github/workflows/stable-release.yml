@@ -100,6 +100,10 @@ jobs:
       - name: Build signed Windows updater
         run: npm run tauri build -- -- --locked
 
+      - name: Verify optimized video export
+        shell: pwsh
+        run: ./scripts/accept-video.ps1 -OutputDirectory "$env:RUNNER_TEMP/openphoto-stable-video" -MachineLabel "GitHub Windows 2022 stable runner"
+
       - name: Verify installed app lifecycle
         shell: pwsh
         run: |
@@ -152,5 +156,7 @@ jobs:
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: open-photo-stable-validation-${{ github.run_number }}
-          path: ${{ runner.temp }}/openphoto-stable-installed/*.json
+          path: |
+            ${{ runner.temp }}/openphoto-stable-installed/*.json
+            ${{ runner.temp }}/openphoto-stable-video/*.json
           if-no-files-found: error

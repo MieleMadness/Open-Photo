@@ -534,3 +534,7 @@ Third-party dependencies and AI model assets retain their own licenses and usage
 - [Changelog](CHANGELOG.md)
 
 The Windows installer includes the linked DirectML and Microsoft C++ runtime files beside the app, avoiding a separate runtime setup step. See [bundled AI packaging](docs/AI_MODEL_BUNDLE.md).
+
+### Video release checks in 0.56.2
+
+Updater installation now waits for project saves and refuses to interrupt an active or starting video export. Phase 6 also has a separate full-recording acceptance mode for one continuous hour-scale export, rather than only distant short windows. See [video acceptance](docs/VIDEO_ACCEPTANCE.md) and [update protection](docs/UPDATES.md). These development changes do not publish a public signed updater release.

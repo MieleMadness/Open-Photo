@@ -2,11 +2,14 @@ param(
     [string]$OutputDirectory,
     [string]$MachineLabel='Local Windows build environment',
     [string]$Source,
-    [switch]$LongRecording
+    [switch]$LongRecording,
+    [switch]$FullRecording
 )
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot
 if ($LongRecording -and !$Source) {throw 'Choose a source file for long-recording acceptance.'}
+if ($FullRecording -and !$Source) {throw 'Choose a source file for full-recording acceptance.'}
+if ($LongRecording -and $FullRecording) {throw 'Choose either short windows or one full-recording export.'}
 if ($Source) {
     $sourceFile=Get-Item -LiteralPath $Source
     if ($sourceFile.PSIsContainer) {throw 'Source must be a video file.'}
@@ -22,7 +25,7 @@ Push-Location $projectRoot
 try {
     $env:OPENPHOTO_ACCEPTANCE_OUTPUT=Join-Path $OutputDirectory 'video-export.json'
     $env:OPENPHOTO_REAL_SOURCE=$Source
-    $testName=if ($LongRecording) {'video_integration_tests::video_long_recording_acceptance'} elseif ($Source) {'video_integration_tests::video_real_media_acceptance'} else {'video_integration_tests::video_release_acceptance'}
+    $testName=if ($FullRecording) {'video_integration_tests::video_full_recording_acceptance'} elseif ($LongRecording) {'video_integration_tests::video_long_recording_acceptance'} elseif ($Source) {'video_integration_tests::video_real_media_acceptance'} else {'video_integration_tests::video_release_acceptance'}
     & cargo test --release --manifest-path src-tauri/Cargo.toml --locked $testName -- --exact --ignored --nocapture --test-threads=1
     if ($LASTEXITCODE -ne 0) {throw 'Release video acceptance failed; no successful report is claimed.'}
     if (!(Test-Path -LiteralPath $env:OPENPHOTO_ACCEPTANCE_OUTPUT)) {throw 'Acceptance did not produce its report.'}

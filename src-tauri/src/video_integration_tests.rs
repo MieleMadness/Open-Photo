@@ -2401,3 +2401,195 @@ fn video_long_recording_acceptance() {
         .unwrap();
     file.sync_all().unwrap();
 }
+
+/// Run explicitly in release mode, on user-selected footage at least one hour long.
+#[cfg(windows)]
+#[test]
+#[ignore = "full-recording real media acceptance: scripts/accept-video.ps1 -Source -FullRecording"]
+fn video_full_recording_acceptance() {
+    if cfg!(debug_assertions) {
+        panic!("Use an optimized release build");
+    }
+    let source = fs::canonicalize(
+        std::env::var_os("OPENPHOTO_REAL_SOURCE").expect("Choose a real recording"),
+    )
+    .unwrap();
+    let report_path = PathBuf::from(
+        std::env::var_os("OPENPHOTO_ACCEPTANCE_OUTPUT").expect("Choose a report path"),
+    );
+    verify_full_recording(&source, &report_path, 3600.0);
+}
+#[cfg(windows)]
+#[test]
+fn continuous_export_keeps_decoded_timestamps_across_full_sequence() {
+    let fixture = Fixture::new();
+    let source = fixture.0.join("continuous-vfr.mp4");
+    ffmpeg(
+        &[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=96x64:rate=30:duration=12",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=sample_rate=48000:duration=12",
+            "-vf",
+            "settb=1/1000000,setpts=PTS+3000*sin(N),select='not(mod(n,3))+not(mod(n,7))'",
+            "-fps_mode",
+            "vfr",
+            "-enc_time_base:v",
+            "1/1000000",
+            "-movie_timescale",
+            "1000000",
+            "-c:v",
+            "libopenh264",
+            "-c:a",
+            "aac",
+        ],
+        &source,
+    );
+    verify_full_recording(&source, &fixture.0.join("acceptance.json"), 8.0);
+}
+#[cfg(windows)]
+fn verify_full_recording(source: &Path, report_path: &Path, minimum_duration: f64) {
+    use crate::{
+        video_export::{self, Control, Request, Stage},
+        video_project::{self, VideoTime},
+        video_render::ExportSize,
+    };
+    use std::{
+        io::Write,
+        sync::{Arc, Mutex},
+        time::Instant,
+    };
+    struct RecordingControl {
+        started: Instant,
+        stages: Mutex<Vec<(Stage, f64)>>,
+    }
+    impl Control for RecordingControl {
+        fn cancelled(&self) -> bool {
+            false
+        }
+        fn update(&self, stage: Stage, _: Option<f64>, _: u64) {
+            let mut stages = self.stages.lock().unwrap();
+            if stages.last().is_none_or(|(previous, _)| *previous != stage) {
+                eprintln!(
+                    "Full recording: {stage:?} ({:.1}s)",
+                    self.started.elapsed().as_secs_f64()
+                );
+                stages.push((stage, self.started.elapsed().as_secs_f64()));
+            }
+        }
+        fn begin_publish(&self) -> Result<(), String> {
+            self.update(Stage::Publishing, None, 0);
+            Ok(())
+        }
+    }
+    let output_root = report_path.parent().unwrap();
+    assert!(!report_path.exists(), "Do not overwrite an earlier report");
+    let info = video_probe::probe(&engine(), source, || false).unwrap();
+    assert!(
+        info.duration_seconds >= minimum_duration,
+        "The recording is shorter than the acceptance minimum"
+    );
+    assert!(!info.hdr, "Full-recording acceptance requires SDR footage");
+    assert_eq!(info.sample_aspect_ratio.as_deref(), Some("1:1"));
+    let root = source.parent().unwrap().to_str().unwrap();
+    let mut project = video_project::new_project(root, source, info.clone()).unwrap();
+    let identity = (project.asset.bytes, project.asset.sha256.clone());
+    project.output.width = info.width / 2 * 2;
+    project.output.height = info.height / 2 * 2;
+    if (info.rotation_degrees / 90.0).round() as i64 % 2 != 0 {
+        std::mem::swap(&mut project.output.width, &mut project.output.height);
+    }
+    let base = info.time_base.as_deref().unwrap();
+    project.clips[0].source_in = VideoTime::from_seconds(0.37, base).unwrap();
+    project.clips[0].source_out =
+        VideoTime::from_seconds(info.duration_seconds - 0.37, base).unwrap();
+    let start = project.clips[0].source_in.seconds().unwrap();
+    let duration = project.clips[0].source_out.seconds().unwrap() - start;
+    let destination = output_root.join("full-recording.mp4");
+    video_engine::reset_native_peak();
+    let control = Arc::new(RecordingControl {
+        started: Instant::now(),
+        stages: Mutex::new(vec![]),
+    });
+    let report = video_export::export_file(
+        Request {
+            engine: &engine(),
+            root,
+            project: &project,
+            destination: &destination,
+            size: ExportSize::Hd1080,
+            acknowledge_first_audio: info.audio.len() > 1,
+        },
+        control.clone(),
+    )
+    .unwrap();
+    let export_seconds = control.started.elapsed().as_secs_f64();
+    let origin = crate::video_timing::number(info.format_start_time.as_deref()).unwrap_or(0.0);
+    let mut windows = vec![];
+    for (name, at) in [
+        ("beginning", 0.37),
+        ("middle", duration / 2.0),
+        ("end", duration - 4.61),
+    ] {
+        let expected = range_frame_times(
+            source,
+            info.video_stream,
+            origin + start + at,
+            origin + start + at + 4.24,
+        );
+        let actual = range_frame_times(&destination, 0, at, at + 4.24);
+        assert!(!expected.is_empty(), "Empty reference window: {name}");
+        assert_eq!(
+            expected.len(),
+            actual.len(),
+            "Frame loss in continuous export at {name}"
+        );
+        let max_error = expected
+            .iter()
+            .zip(&actual)
+            .map(|(a, b)| (a - origin - start - b).abs())
+            .fold(0.0, f64::max);
+        assert!(
+            max_error < 0.001,
+            "Continuous-export timestamp drift at {name}: {max_error}"
+        );
+        windows.push(serde_json::json!({"position":name,"output_start_seconds":at,"decoded_frames":actual.len(),"max_frame_timestamp_error_seconds":max_error}));
+    }
+    assert_eq!(
+        video_project::fingerprint(source, || false).unwrap(),
+        identity
+    );
+    assert_no_export_temporaries(output_root);
+    project.output.width = report.width;
+    project.output.height = report.height;
+    video_project::write_copy(
+        &project,
+        &output_root.join("full-recording.openphoto-video.json"),
+    )
+    .unwrap();
+    let stages = control.stages.lock().unwrap();
+    for required in [
+        Stage::VerifyingSource,
+        Stage::Encoding,
+        Stage::CheckingOutput,
+        Stage::DecodingOutput,
+        Stage::Publishing,
+    ] {
+        assert!(stages.iter().any(|(stage, _)| *stage == required));
+    }
+    let document = serde_json::json!({"schema_version":1,"app_version":env!("CARGO_PKG_VERSION"),"engine_version":video_engine::VERSION,"scope":"One continuous hour-scale native export with full output decode and beginning/middle/end decoded frame timing; excludes GUI, perceptual A/V assessment, and whole-app memory","source_filename":source.file_name().unwrap().to_string_lossy(),"source_bytes":identity.0,"source_sha256":identity.1,"source_unchanged":true,"source_duration_seconds":info.duration_seconds,"trim_seconds":[start,start+duration],"output_seconds":report.duration_seconds,"width":report.width,"height":report.height,"bytes":report.bytes,"export_wall_seconds":export_seconds,"media_seconds_per_wall_second":duration/export_seconds,"maximum_individual_native_child_peak_working_set_bytes":video_engine::native_peak(),"stages":*stages,"windows":windows,"full_output_decoded":true,"independent_audio_video_stream_validation":true,"output_published":true});
+    let mut file = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(report_path)
+        .unwrap();
+    file.write_all(&serde_json::to_vec_pretty(&document).unwrap())
+        .unwrap();
+    file.sync_all().unwrap();
+}

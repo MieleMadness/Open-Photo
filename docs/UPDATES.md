@@ -48,3 +48,11 @@ Signed public builds check:
 `https://github.com/MieleMadness/Open-Photo/releases/download/stable-channel/latest.json`
 
 The `stable-channel` release is a fixed machine-readable channel whose `latest.json` asset is replaced only by the major-release workflow. This keeps ordinary GitHub Releases from changing the updater endpoint. The manifest contains the release version, notes, Windows installer URL, and exact Tauri signature. Signed-version verification requires the signature to match the version announced by the manifest.
+
+## Active-work protection (0.56.2)
+
+Startup checking waits for the installed version and enabled channel, schedules one check per app session/version, and does not consume that check if React cancels the pending timer. Pending replies after unmount close their update resource. Checks, downloads, and installation cannot overlap.
+
+Restart & install uses the same protection boundary as normal window closure. It blocks an active or starting video export and saves all pending project revisions before invoking the native installer. A failed save or blocked export leaves the downloaded update ready to retry. Signature verification and the major-only release policy remain unchanged. Hook tests use mocked updater events; a genuinely signed public release still requires release-channel acceptance.
+
+The native check configures 15-second connection and 30-second stalled-read deadlines. Downloads have no fixed total transfer deadline, allowing the bundled-AI installer to complete on slower links while stalled connections fail. The check itself retains a 15-second total deadline. The native check returns Tauri update-resource metadata; the stock JavaScript SDK still downloads, verifies signatures, installs, and releases resources. The deliberate signed-release workflow now also runs optimized video export acceptance before publication.

@@ -1,4 +1,4 @@
-# Repeatable video acceptance (0.54.10)
+# Repeatable video acceptance (0.56.2)
 
 Phase 6 has an automated native export baseline. It is a measurement and correctness check, not completion of installed-app acceptance.
 
@@ -64,3 +64,15 @@ The ordinary native suite includes the same three-window check using generated h
 These checks establish short-window seeking and timing at distant source positions. They do not establish complete hour-long encoding, perceptual A/V synchronization, GUI seeking latency, or installed-app playback.
 
 The player now supports Go to time using seconds (3868.125), minutes:seconds (64:28.125), or hours:minutes:seconds (01:04:28.125). Invalid or out-of-range entries show an error and preserve the current position. Browser seeking remains approximate; saved trim positions continue to use rational source ticks.
+
+## One continuous full-recording export
+
+```powershell
+./scripts/accept-video.ps1 -Source 'C:/test-media/hour-recording.mp4' -FullRecording -OutputDirectory 'C:/reports/new-full-recording'
+```
+
+This separate opt-in mode requires an SDR, square-pixel recording at least one hour long with a supported canvas. It keeps everything except 0.37 seconds at each end and exports one continuous file through the production pipeline using the 1080p limit, preserving aspect ratio and portrait orientation. The real disk-space check runs before staging; choose a destination with enough free space and allow substantial encoding time. `-LongRecording` and `-FullRecording` are mutually exclusive.
+
+The production validator checks independent video/audio stream bounds and fully decodes the entire output before publication. After publication, the gate compares decoded source/output frame counts and presentation timestamps in beginning, middle, and end windows of that same output (less than 1 ms timestamp error). It verifies the original fingerprint and temporary-file cleanup, saves a project copy with the exported canvas, and records duration, size, stage timings, export speed, and maximum individual native-child memory. Reports and edited footage remain local; ordinary CI exercises the same assertions with a short synthetic VFR/audio source.
+
+This establishes continuous-export execution plus the stated decoded/timing checks. It does not establish perceptual A/V synchronization, recognition of every intermediate frame, packaged GUI behavior, disk-failure handling, or whole-app/GPU performance. Keep those acceptance items open.
