@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from "react";
+import {Redo2,Undo2} from "lucide-react";
 import {convertFileSrc,invoke} from "@tauri-apps/api/core";
 import {open,save} from "@tauri-apps/plugin-dialog";
 import {VideoPlayer} from "./VideoPlayer";
@@ -134,8 +135,8 @@ export function VideoWorkspace({root,path,onOpenExternal,autoLoad=false}:{root:s
         {!loaded?.source_path&&<p role="alert">Source needs relinking: {loaded?.source_status}</p>}
         <div className="video-transport">
           <button className="secondary-button" disabled={busy} onClick={()=>void action(loadPreviousSaves)}>Previous saves</button>
-          <button className="secondary-button" disabled={!session.history.past.length||busy} onClick={()=>history("undo")}>Undo video edit</button>
-          <button className="secondary-button" disabled={!session.history.future.length||busy} onClick={()=>history("redo")}>Redo video edit</button>
+          <button className="icon-button" title="Undo video edit" aria-label="Undo video edit" disabled={!session.history.past.length||busy} onClick={()=>history("undo")}><Undo2 size={18}/></button>
+          <button className="icon-button" title="Redo video edit" aria-label="Redo video edit" disabled={!session.history.future.length||busy} onClick={()=>history("redo")}><Redo2 size={18}/></button>
           <button className="secondary-button" disabled={busy} onClick={()=>change(p=>{p.clips[0].edits=defaultEdits();p.output=defaultOutput(p.asset.info);p.clips[0].source_in=markTime(0,p.asset.info.time_base);p.clips[0].source_out=markTime(p.asset.info.duration_seconds,p.asset.info.time_base);})}>Reset video edits</button>
           <button className="secondary-button" disabled={busy||previewBusy||!loaded?.source_path||!!project.asset.info.hdr} onClick={()=>void action(preview)}>Preview edits</button>
         </div>
