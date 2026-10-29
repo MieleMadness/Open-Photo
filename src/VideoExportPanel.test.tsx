@@ -17,7 +17,7 @@ it("offers completed output only after publication and dismisses without deletin
   const current={...status(),active:false,can_cancel:false,stage:"completed",fraction:1,result:{path:"/output/new.mp4",bytes:123,width:1920,height:1080,duration_seconds:3,warnings:[]}} as ExportStatus;
   let dismissed=false;vi.mocked(invoke).mockImplementation(async(command)=>{if(command==="dismiss_video_export")dismissed=true;return command==="video_export_status"&&!dismissed?current:null;});
   render(<VideoExportPanel/>);await screen.findByText("Export complete");fireEvent.click(screen.getByText("Open exported video"));await waitFor(()=>expect(invoke).toHaveBeenCalledWith("open_video_export",{id:"job"}));
-  fireEvent.click(screen.getByText("Dismiss export"));await waitFor(()=>expect(screen.queryByLabelText("Video export")).toBeNull());
+  fireEvent.click(screen.getByText("Dismiss"));await waitFor(()=>expect(screen.queryByLabelText("Video export")).toBeNull());
 });
 it("does not offer a finished file when export fails",async()=>{
   vi.mocked(invoke).mockResolvedValue({...status(),active:false,stage:"failed",error:"Not enough free space",result:null});
