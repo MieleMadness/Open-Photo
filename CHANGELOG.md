@@ -1,3 +1,13 @@
+# 0.56.0 — Signed major-release in-app updater
+
+- Add the Tauri updater foundation with automatic update checks, download progress, a Settings update card, and a lightweight update-available notification.
+- Restrict the stable updater channel to newer major releases only: the app accepts N.0.0 releases and rejects minor/patch releases even if a manifest is published accidentally.
+- Keep development, pull-request, preview, and maintenance builds off the stable updater channel. The updater is enabled only in signed public builds compiled with the release public key.
+- Require signed-version verification and disallow updater downgrades.
+- Add a separate manual stable-release workflow that runs only from main, validates an N.0.0 version, runs the full test/build gates, creates signed updater artifacts, generates latest.json, and publishes the GitHub Release.
+- Keep normal CI installers unchanged; updater artifacts are generated only by the deliberate stable-release workflow.
+- Add release documentation for the one-time signing-key setup. The private updater key is never committed to the repository.
+
 # 0.55.1 — Final interface rhythm and interaction polish
 
 - Tighten the global spacing rhythm and normalize control heights across buttons, icon buttons, form fields, toolbars, settings, editor controls, and video controls.
