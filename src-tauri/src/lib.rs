@@ -1040,6 +1040,21 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
     Ok(result)
 }
 
+
+#[derive(Serialize)]
+struct UpdaterChannelStatus {
+    enabled: bool,
+    policy: &'static str,
+}
+
+#[tauri::command]
+fn updater_channel_status() -> UpdaterChannelStatus {
+    UpdaterChannelStatus {
+        enabled: option_env!("OPENPHOTO_UPDATER_PUBLIC_KEY").is_some(),
+        policy: "major-only",
+    }
+}
+
 /// Open a selected video with the user's configured operating-system media player.
 #[tauri::command]
 fn open_video(root: String, path: String) -> Result<(), String> {
@@ -1060,7 +1075,18 @@ fn open_video(root: String, path: String) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let updater = tauri_plugin_updater::Builder::new()
+        .pubkey(option_env!("OPENPHOTO_UPDATER_PUBLIC_KEY").unwrap_or(""))
+        .default_version_comparator(|current, release| {
+            release.version.major > current.major
+                && release.version.minor == 0
+                && release.version.patch == 0
+                && release.version.pre.is_empty()
+        })
+        .build();
+
     tauri::Builder::default()
+        .plugin(updater)
         .setup(|app| {
             use tauri::Manager;
             let directory = if cfg!(debug_assertions) {
@@ -1133,6 +1159,7 @@ pub fn run() {
             edit_export::export_edited_copy,
             edit_export::preview_edited_photo,
             open_video,
+            updater_channel_status,
             geo::gps_for_photos,
             index::scan_indexed,
             index::scan_indexed_with_changes,
