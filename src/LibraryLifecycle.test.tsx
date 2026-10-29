@@ -46,7 +46,7 @@ it("clears scan status when creating an empty workspace and rejects the previous
   render(<App/>);await waitFor(()=>expect(invoke).toHaveBeenCalledWith("scan_indexed_with_changes",{root:B}));
   createWorkspaceFromFolders();
   await act(async()=>finish(scan(B)));
-  expect(screen.getByRole("combobox",{name:"Active workspace"}).textContent).toContain("Video acceptance");
+  openFolders();expect(screen.getByRole("combobox",{name:"Active workspace"}).textContent).toContain("Video acceptance");
   expect(screen.queryByText("alpha-0.jpg")).toBeNull();expect(screen.queryByText("beta-0.jpg")).toBeNull();
   expect(screen.queryByText(/Last indexed:/)).toBeNull();expect(screen.queryByText(/Changes:/)).toBeNull();
   expect(screen.getByText("No folders added. Choose Add folder to start.")).toBeTruthy();
