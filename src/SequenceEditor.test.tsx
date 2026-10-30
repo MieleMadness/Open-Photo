@@ -27,10 +27,12 @@ it("uses the same timeline and controller for one source and added sources",asyn
   fireEvent.click(screen.getByRole("button",{name:"Undo timeline edit"}));expect((screen.getByRole("button",{name:"Export project MP4…"}) as HTMLButtonElement).disabled).toBe(false);
   await act(async()=>flushProjects());
 });
-it("preserves invalid trim drafts and blocks rendering/export of the old interval",async()=>{
-  editor();await screen.findByDisplayValue("My edit");const start=screen.getByLabelText("Clip start in source (seconds)"),end=screen.getByLabelText("Clip end in source (seconds)");
-  fireEvent.change(start,{target:{value:"5"}});fireEvent.blur(start);fireEvent.change(end,{target:{value:"1"}});fireEvent.blur(end);
-  expect(end.getAttribute("aria-invalid")).toBe("true");expect((end as HTMLInputElement).value).toBe("1");fireEvent.click(screen.getByRole("button",{name:"Export project MP4…"}));await screen.findByText(/Correct the highlighted field/);expect(save).not.toHaveBeenCalled();
+it("keeps source trimming on the timeline handles instead of duplicate inspector fields",async()=>{
+  editor();await screen.findByDisplayValue("My edit");
+  expect(screen.queryByLabelText("Clip start in source (seconds)")).toBeNull();
+  expect(screen.queryByLabelText("Clip end in source (seconds)")).toBeNull();
+  expect(screen.getByRole("slider",{name:"Trim start of clip 1"})).toBeTruthy();
+  expect(screen.getByRole("slider",{name:"Trim end of clip 1"})).toBeTruthy();
 });
 it.each(["999",""])("preserves invalid volume %s and blocks stale export",async draft=>{
   editor();await screen.findByDisplayValue("My edit");const volume=screen.getByLabelText("Audio volume (%)");fireEvent.change(volume,{target:{value:draft}});fireEvent.blur(volume);
