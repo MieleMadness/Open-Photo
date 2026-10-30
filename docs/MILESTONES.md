@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current branch — 0.56.13
+## Current branch — 0.56.14
+
+0.56.14 adds bounded adaptive ruler labels, clip posters/audio labels and before/after reordering with no-op history protection. The shared project/renderer schema is unchanged. Real filmstrips, drag trim handles and photos remain pending.
 
 0.56.13 establishes the desktop editor frame: searchable thumbnail media, large preview, clip inspector and persistent timeline. Shared session/history and output ownership are retained. Panel toggles preserve drafts; invalid hidden edits block output. Browser checks cover light/dark, normal/wide/minimum windows, preview seeking and shared commands. Timeline filmstrips/trim handles, mixed photo clips, audio waveforms and social tools remain pending. See [EDITOR_LAYOUT.md](EDITOR_LAYOUT.md). Local validation passed: 131 frontend tests, TypeScript/production build, native formatting/clippy and 140 Rust tests (6 ignored acceptance modes). The existing bundle-size warning remains; pushed-commit CI and installed visual acceptance are separate checks.
 

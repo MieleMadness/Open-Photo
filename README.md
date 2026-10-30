@@ -1,4 +1,4 @@
-> Development update: **0.56.13** introduces the desktop video-editor layout: media on the left, preview in the center, clip controls on the right, and a persistent timeline below. Workspace selection and the collapsible application menu stay available.
+> Development update: **0.56.14** adds an adaptive timeline ruler, clip thumbnails, linked-audio labels and clearer before/after drag reordering. The desktop editing layout and safe shared project workflow are retained.
 
 
 
@@ -590,3 +590,7 @@ Use the two panel buttons near **Export** to show/hide media and clip controls. 
 **Source preview** shows the original. **Preview project edits** builds the continuous edited sequence in the same stage. Editing invalidates an older compiled preview. Extra source-player tools remain under expandable sections. **Export** creates a new MP4 using the canvas/export settings in the inspector; invalid drafts are revealed and must be corrected first.
 
 This patch establishes the layout. Timeline filmstrips/trim handles, photo clips, audio waveforms and later social tools remain follow-up work. See [the editor layout guide](docs/EDITOR_LAYOUT.md).
+
+### Timeline navigation — 0.56.14
+
+Drag the time ruler to seek, or focus it and use the arrow keys. Labels adapt to timeline zoom. Clip thumbnails identify original sources; they are poster images, not frame-by-frame filmstrips. Each clip labels linked, muted or silent original audio. Drag onto the left/right half of another clip to insert before/after it; a marker shows the destination. Unchanged drops do not create undo steps. Move earlier/later and numeric trims remain available in the inspector.

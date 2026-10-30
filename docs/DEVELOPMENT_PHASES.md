@@ -1,6 +1,6 @@
 # Development phases
 
-Baseline: 0.56.13. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.14. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -78,3 +78,7 @@ Restore compact sidebar rows and green section labels, add persisted menu collap
 ## 0.56.13 — Desktop editor frame
 
 The approved Clipchamp-inspired layout is implemented over the shared editing model: project bar, searchable media, preview, side inspector and persistent timeline. Follow-up sequence: timeline filmstrips/drag trimming, photo clips, full mixed-media acceptance, then audio/text/transitions according to the existing gates. No additional provider or codec is exposed.
+
+## 0.56.14 — Focused timeline navigation
+
+Adaptive ruler labels, source poster thumbnails, linked-audio labels and explicit before/after reordering are implemented. Real filmstrips, drag trim handles, adjustable pane splits and photos remain follow-up work.

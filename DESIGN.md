@@ -58,3 +58,7 @@ The supplied Clipchamp composition and approved plan guide this editor: compact 
 Keep one `SequenceSession` and one output controller. `SequenceOutput` exposes render slots so the shell can position preview/export controls without duplicating native jobs or state. `SequenceClipInspector` and `SequenceTimeline` call the same timeline command helper. Hiding a panel does not unmount its fields or discard drafts. Output validation reveals the inspector and native disclosures before focusing an invalid field. Source versus compiled project preview stays explicit.
 
 Use immediate panel/selection feedback and no animated editor width or timeline scrubbing. Controls have accessible names and tooltips. The Project disclosure supports Escape, outside click and keyboard focus departure. Poster work is lazy and bounded; failed thumbnails never block editing or relinking. Future filmstrips and audio lanes must share the same timing and viewport rather than introducing another editor.
+
+## Timeline navigation — 0.56.14
+
+Use a native range for ruler seeking so pointer and keyboard behavior stay shared. Tick labels are decorative, adaptive and bounded to 201 entries. Reuse bounded source posters for clip identity; never imply these are sampled filmstrips. Audio bands describe linked/muted/silent source audio without invented waveforms. Drag insertion maps a before/after boundary into the final order after removing the dragged clip; no-op drops must not enter history.

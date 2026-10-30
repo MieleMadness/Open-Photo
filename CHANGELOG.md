@@ -1,3 +1,11 @@
+# 0.56.14 — Clearer timeline navigation
+
+- Add zoom-aware ruler labels and native pointer/keyboard seeking, with bounded tick generation.
+- Add clip poster thumbnails using the existing lazy bounded cache, plus linked/muted/silent audio labels. These are source posters, not filmstrips or waveforms.
+- Show before/after reorder markers, support dropping after the last clip and skip no-op reorder history entries. Keep keyboard/button alternatives.
+- Preserve full timeline visibility at minimum window size. Keep project-copy controls disabled during source operations.
+- Add ruler-boundary and drag-order/undo regression tests. Photo clips, true filmstrips and drag trim handles remain follow-ups.
+
 # 0.56.13 — Desktop video-editor layout
 
 - Arrange the existing shared editor into media, preview, clip-inspector and persistent-timeline regions inspired by the supplied Clipchamp layout.

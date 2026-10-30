@@ -1,4 +1,4 @@
-import {act,cleanup,fireEvent,render,screen,waitFor,within} from "@testing-library/react";
+import {act,cleanup,createEvent,fireEvent,render,screen,waitFor,within} from "@testing-library/react";
 import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {invoke} from "@tauri-apps/api/core";
 import {open,save} from "@tauri-apps/plugin-dialog";
@@ -44,6 +44,21 @@ it("fills the timeline proportionally even when the whole edit is shorter than o
   const value=loaded();value.project.clips[0].source_out={ticks:"18000",time_base:"1/90000"};value.project.clips[1].source_out={ticks:"27000",time_base:"1/90000"};
   render(<VideoSequences roots={["/library"]} workspaceId="w" initial={value}/>);const first=await screen.findByRole("button",{name:"Clip 1: one.mp4"}),second=screen.getByRole("button",{name:"Clip 2: two.mp4"});
   expect(first.parentElement!.style.flexGrow).toBe("0.4");expect(second.parentElement!.style.flexGrow).toBe("0.6");
+});
+it("drops after the last clip, ignores adjacent no-op drops and undoes one reorder",async()=>{
+  render(<VideoSequences roots={["/library"]} workspaceId="w" initial={loaded()}/>);
+  const first=await screen.findByRole("button",{name:"Clip 1: one.mp4"});
+  const target=screen.getByRole("button",{name:"Clip 2: two.mp4"}).parentElement!;
+  vi.spyOn(target,"getBoundingClientRect").mockReturnValue({left:100,width:100} as DOMRect);
+  const dataTransfer={setData:vi.fn(),effectAllowed:""};
+  const drag=(type:"dragOver"|"drop",clientX:number)=>{const event=createEvent[type](target);Object.defineProperty(event,"clientX",{value:clientX});fireEvent(target,event);};
+  fireEvent.dragStart(first,{dataTransfer});drag("drop",110);
+  expect((screen.getByRole("button",{name:"Undo timeline edit"}) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.dragStart(first,{dataTransfer});drag("dragOver",190);
+  expect(target.getAttribute("data-drop")).toBe("after");drag("drop",190);
+  expect(screen.getByRole("button",{name:"Clip 2: one.mp4"})).toBeTruthy();
+  fireEvent.click(screen.getByRole("button",{name:"Undo timeline edit"}));
+  expect(screen.getByRole("button",{name:"Clip 1: one.mp4"})).toBeTruthy();
 });
 it("splits, reorders, trims and undoes timeline edits through revision-safe autosave",async()=>{
   render(<VideoSequences roots={["/library"]} workspaceId="w"/>);await screen.findByLabelText("Saved editing projects");

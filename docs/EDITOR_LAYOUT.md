@@ -18,7 +18,7 @@ Panel hiding preserves fields and drafts. Export validation opens hidden control
 
 ## Follow-up patches
 
-1. Timeline filmstrips, clearer drag insertion, trim handles, time ruler and adjustable preview/timeline split. Retain numeric trim and move buttons as alternatives.
+1. Timeline filmstrips, trim handles and adjustable preview/timeline split. The adaptive time ruler, clip posters and before/after insertion markers shipped in 0.56.14. Retain numeric trim and move buttons as alternatives.
 2. Photos as duration-based clips in the same project, with verified source decoding and joined preview/export. Reconcile the preserved mixed-media work against the current branch before integration.
 3. Short mixed-media acceptance: two videos plus one photo, trim/split/reorder, save/reopen, joined audio/video export and unchanged originals.
 4. Local audio import and waveforms, then text and a small tested transition set under the existing roadmap gates.

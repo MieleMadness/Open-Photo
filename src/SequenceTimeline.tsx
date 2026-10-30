@@ -1,5 +1,8 @@
-import {useId,useRef,useState} from "react";
+import {useEffect,useId,useRef,useState} from "react";
 import {ArrowLeft,ArrowRight,Plus,RotateCcw,Scissors,Trash2,Undo2,Redo2} from "lucide-react";
+import {EditorPoster} from "./EditorPoster";
+import {timelineTicks,clipDropIndex} from "./timelineGeometry";
+import type {LoadedSequence} from "./videoSequence";
 import {NumberField} from "./EditorFields";
 import {ClipEdits} from "./ClipEdits";
 import {sourceEndLimit} from "./videoProject";
@@ -9,10 +12,19 @@ import {useTimelineActions} from "./useTimelineActions";
 import {type SequenceSession} from "./videoSequence";
 
 /** Placement is derived from clip order, never rounded or stored as duplicate timing. */
-export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selected,onSelected,position,onPosition}:{session:SequenceSession;disabled:boolean;assetId:string;onSelectAsset:(id:string)=>void;selected:string;onSelected:(id:string)=>void;position:number;onPosition:(seconds:number)=>void}){
+export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selected,onSelected,position,onPosition,sources=[]}:{sources?:LoadedSequence["sources"];session:SequenceSession;disabled:boolean;assetId:string;onSelectAsset:(id:string)=>void;selected:string;onSelected:(id:string)=>void;position:number;onPosition:(seconds:number)=>void}){
   const project=session.history.present,entries=timelineEntries(project),duration=projectDuration(project);
   const [zoom,setZoom]=useState(1);
   const dragging=useRef("");
+  const viewport=useRef<HTMLDivElement>(null);
+  const [width,setWidth]=useState(800),[drop,setDrop]=useState<{id:string;after:boolean}|null>(null);
+  useEffect(()=>{
+    const measure=()=>{if(viewport.current?.clientWidth)setWidth(viewport.current.clientWidth);};measure();
+    const observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(measure):null;
+    if(viewport.current)observer?.observe(viewport.current);
+    return()=>observer?.disconnect();
+  },[]);
+  const ticks=timelineTicks(duration,width*zoom);
   const playheadId=useId();
 
   const playhead=Math.min(position,duration);
@@ -27,14 +39,27 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
         <button className="secondary-button" aria-label="Append selected video" title="Add selected media to the end of the timeline" onClick={()=>command({type:"append",assetId,newId:crypto.randomUUID()})}><Plus size={16}/>Add clip</button>
         <label>Timeline zoom<select value={zoom} onChange={e=>setZoom(Number(e.target.value))}><option value={1}>Fit timeline</option><option value={2}>2×</option><option value={4}>4×</option><option value={8}>8×</option></select></label>
       </div>
-      <div className="timeline-scroll" tabIndex={0} aria-label="Scrollable timeline">
+      <div ref={viewport} className="timeline-scroll" tabIndex={0} aria-label="Scrollable timeline">
         <div className="timeline-track" style={{width:`${zoom*100}%`}}>
-          <div className="timeline-scrubber"><label htmlFor={playheadId}>Project playhead</label><output aria-label="Project playhead time">{clockTime(playhead)}</output><input id={playheadId} aria-label="Project playhead" type="range" min={0} max={duration||1} step="any" value={playhead} disabled={!entries.length} onChange={e=>onPosition(Number(e.target.value))}/></div>
+          <div className="timeline-scrubber"><label htmlFor={playheadId}>Project playhead</label><output aria-label="Project playhead time">{clockTime(playhead)}</output><div className="timeline-ruler"><div className="timeline-ticks" aria-hidden="true">{ticks.map(tick=><span key={tick.seconds} data-end={tick.left>95} style={{left:`${tick.left}%`}}>{tick.label}</span>)}</div><input id={playheadId} aria-label="Project playhead" title="Drag the ruler or use arrow keys to seek" type="range" min={0} max={duration||1} step="any" value={playhead} disabled={!entries.length} onChange={e=>onPosition(Number(e.target.value))}/><span className="timeline-ruler-head" aria-hidden="true" style={{left:`${duration?playhead/duration*100:0}%`}}/></div></div>
           <ol className="timeline-clips">{entries.map((item,i)=>{
             const source=project.assets.find(a=>a.id===item.clip.asset_id)!;
-            return <li key={item.clip.id} style={{flexGrow:item.duration/duration}} onDragOver={e=>{if(dragging.current&&!disabled)e.preventDefault();}} onDrop={e=>{e.preventDefault();if(dragging.current&&!disabled)command({type:"move",clipId:dragging.current,index:i});dragging.current="";}}>
-              <button type="button" draggable={!disabled} className="timeline-clip" aria-label={`Clip ${i+1}: ${source.relative_path.split("/").at(-1)}`} aria-pressed={selected===item.clip.id} onClick={()=>choose(item.clip.id)} onDragStart={e=>{dragging.current=item.clip.id;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",item.clip.id);}} onDragEnd={()=>{dragging.current="";}}>
-                <strong>{i+1}. {source.relative_path.split("/").at(-1)}</strong><span>{clockTime(item.duration)}</span><small>{item.clip.edits.muted?"Audio muted":source.info.audio.length?"Linked original audio":"Silent source"}</small>
+            const binding=sources.find(value=>value.asset_id===source.id);
+            return <li key={item.clip.id} style={{flexGrow:item.duration/duration}} data-drop={drop?.id===item.clip.id?(drop.after?"after":"before"):undefined} onDragOver={e=>{
+              if(!dragging.current||disabled)return;e.preventDefault();
+              const bounds=e.currentTarget.getBoundingClientRect(),after=e.clientX>=bounds.left+bounds.width/2;
+              const from=entries.findIndex(value=>value.clip.id===dragging.current),index=clipDropIndex(from,i,after);
+              setDrop(previous=>index===from?null:previous?.id===item.clip.id&&previous.after===after?previous:{id:item.clip.id,after});
+            }} onDrop={e=>{
+              e.preventDefault();if(dragging.current&&!disabled){
+                const from=entries.findIndex(value=>value.clip.id===dragging.current),bounds=e.currentTarget.getBoundingClientRect();
+                const index=clipDropIndex(from,i,e.clientX>=bounds.left+bounds.width/2);
+                if(from>=0&&index!==from)command({type:"move",clipId:dragging.current,index});
+              }
+              dragging.current="";setDrop(null);
+            }}>
+              <button type="button" draggable={!disabled} className="timeline-clip" aria-label={`Clip ${i+1}: ${source.relative_path.split("/").at(-1)}`} aria-pressed={selected===item.clip.id} onClick={()=>choose(item.clip.id)} onDragStart={e=>{dragging.current=item.clip.id;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",item.clip.id);}} onDragEnd={()=>{dragging.current="";setDrop(null);}}>
+                <strong title={source.relative_path}>{i+1}. {source.relative_path.split("/").at(-1)}</strong><EditorPoster root={binding?.root||undefined} path={binding?.path||undefined} identity={source.sha256}/><span className="timeline-clip-duration">{clockTime(item.duration)}</span><small className="timeline-linked-audio" data-muted={item.clip.edits.muted||!source.info.audio.length}>{item.clip.edits.muted?"Audio muted":source.info.audio.length?"Linked original audio":"Silent source"}</small>
               </button>
             </li>;
           })}</ol>
