@@ -1,3 +1,15 @@
+# 0.56.18 — Timeline-first trimming and editor resizing
+
+- Remove duplicate source trim controls from the editor preview; trimming now lives on the timeline's left/right clip handles.
+- Remove the editor-only custom Play, ±5 second, scrubber, source-details, and playback-options UI while retaining native video playback controls.
+- Keep compatibility preview access as a small editor action instead of a separate playback-options section.
+- Fix the preview/timeline divider so ResizeObserver updates no longer cancel an active drag and make the divider snap back.
+- Let the source preview grow and shrink with the divider instead of being capped at 35vh, and allow a smaller timeline minimum for more preview space.
+- Replace the timeline zoom dropdown with direct Zoom out, Fit, and Zoom in controls with a visible zoom level.
+- Show filmstrip-style thumbnail bands inside timeline clips using the existing bounded poster cache; true sampled-frame filmstrips remain a later native enhancement.
+- Make crop and image-adjustment controls visible by default in the Clip inspector; saved crop remains nondestructive.
+- Keep project schema, rendering, export, source safety, and native media behavior unchanged.
+
 # 0.56.17 — Clearer clip and output controls
 
 - Separate Clip and Canvas & export inspector tasks with accessible tabs and keyboard navigation.
