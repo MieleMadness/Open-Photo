@@ -1,6 +1,6 @@
 # Development phases
 
-Baseline: 0.56.10. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.11. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -8,7 +8,7 @@ Baseline: 0.56.10. This supersedes conflicting future direction in the older fee
 | B | Hard-cut timeline: selection, reorder, trim, split, delete/ripple, playhead/zoom, durations, transactional undo/autosave | Implemented for video clips; installed GUI acceptance remains |
 | C | One workspace-owned project model/editor for one or many assets; legacy migration/recovery/relink | Shared editor, workspace storage/migration/recovery implemented in 0.56.7 |
 | D | Assembled preview and validated combined MP4/H.264 export, then project-independent export presets | Continuous output/presets implemented in 0.56.8; installed GUI acceptance remains |
-| E | Ranked unified discovery with match reasons and media/timestamp identity | Planned — Codex/native indexing work |
+| E | Ranked unified discovery with match reasons and media/timestamp identity | Implemented in 0.56.11; installed GUI/AI quality acceptance remains |
 | F | Bounded local video frame sampling, deduplication, embeddings, matching timestamps | Planned — Codex/native AI work |
 | G | Virtualized/lazy results, bounded thumbnail work, stale-work cancellation, scroll/memory checks | Planned |
 | H | Clustered map discovery, counts/empty states, safe phone-media GPS extraction | Planned |
@@ -55,6 +55,18 @@ Short native fixtures cover mixed frame rates/shapes, order/trim, repeated asset
 
 Validation before push: 111 frontend tests in 21 files; TypeScript and production build; native formatting, warnings-as-errors lint, and 131 Rust tests (6 explicit acceptance modes ignored). Existing build chunk-size warnings remain. Real native-produced H.264/AAC preview played and sought in Edge through the assembled stage, with one video element, source restoration/cancellation, light/dark and 1220×780 / 800×580 no-overflow checks. Rendered review also corrected sub-second timeline sizing; StrictMode regression coverage protects ref reattachment from decoder cleanup. The changed-UI detector returned no findings. Pushed GitHub Actions must be verified for the exact commit separately.
 
-## 0.56.10 accessibility checkpoint\n\n0.56.10 completes a small presentation/accessibility follow-up: removal actions for smart collections, manual collections, and library-folder references now use the shared destructive treatment; the details close control has a tooltip; local AI progress is announced as status. These changes do not alter media files, project state, rendering, indexing, or export behavior.\n\n## 0.56.9 UI polish checkpoint
+## 0.56.10 accessibility checkpoint
+
+0.56.10 completes a small presentation/accessibility follow-up: removal actions for smart collections, manual collections, and library-folder references now use the shared destructive treatment; the details close control has a tooltip; local AI progress is announced as status. These changes do not alter media files, project state, rendering, indexing, or export behavior.
+
+## 0.56.9 UI polish checkpoint
 
 This patch continues the documented design-system cleanup without changing timeline storage, rendering, search indexes, or native media behavior. Remaining main destinations use the shared page-heading structure; timeline commands keep their existing semantics while gaining consistent iconography, clearer selected/empty states, and a dedicated destructive treatment for ripple deletion. Original media remains untouched when a timeline clip is removed. Deeper ranked search, video semantic indexing, large-library optimization, and map metadata work remain separate Codex/native phases.
+
+## 0.56.11 — Phase E unified search
+
+Reviewed the newest 0.56.10 base before implementation; its page/timeline/accessibility polish is preserved. One Library query now combines metadata and native cached evidence through a shared ranked result model. Native providers are workspace-scoped and intersect current media metadata before limits. One query vector serves all roots for an explicitly submitted meaning search. Matches retain source/type/score/reasons and the future video timestamp contract. Request ownership prevents stale results and obsolete cancellation from changing newer work.
+
+See [UNIFIED_SEARCH.md](UNIFIED_SEARCH.md) for user instructions, scoring, limits, local-only behavior and Phase F boundaries; [CODE_REVIEW_0_56_10.md](CODE_REVIEW_0_56_10.md) records the review findings. The earlier local mixed-photo/video follow-up is preserved separately while this requested Phase E increment is completed.
+
+Local validation before push: 123 frontend tests in 23 files passed; TypeScript and production build passed with the existing bundle-size warnings. Native formatting, warnings-as-errors lint and 140 Rust tests passed, with 6 explicit acceptance modes ignored. Tests cover provider root/model/current-media scope, read-only Unicode/URI-safe SQLite attachment, cancellation ownership, stale responses, multi-field ranking, facets, match reasons, failure fallback and sort restoration. Rendered Edge fixtures passed combined tag/OCR/meaning results, named People, favorites/ratings, provider failure, and light/dark 1220×780 / 800×580 layouts without horizontal overflow. Changed-UI detection returned no findings. Pushed GitHub Actions and installed WebView2/AI-quality acceptance remain separate gates.

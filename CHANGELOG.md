@@ -1,3 +1,13 @@
+# 0.56.11 — Phase E unified ranked search
+
+- Replace disconnected filename/OCR/semantic text searches with one Library search and result model. Combine names, paths, managed XMP keywords, ratings/favorites and optional indexed text, named People and image-content evidence.
+- Add relevance ordering, visible match reasons, quoted values and explicit tag/person/path/rating/favorite/type filters. Keep normal Library filters/sort controls and restore the browsing sort after clearing a relevance search.
+- Run cached content lookup as you type; run meaning inference only on Search/Enter, with one query vector across workspace roots. Keep current cached matches visible while it runs. Preserve AI opt-in, pinned model verification, local-only operation and explicit indexing.
+- Scope native providers to durable workspace roots and join current media metadata before caps so deleted, changed or other-workspace rows cannot crowd out current candidates. Open the attached media index read-only. Reject stale responses and protect new work from obsolete cancellation.
+- Fix the legacy OCR query's scope-before-limit behavior and literal backslash/wildcard escaping. Disclose unavailable or bounded providers without hiding valid metadata matches.
+- Retain the 0.56.9/0.56.10 UI polish, synchronize workflow naming with all manifests, and repair escaped-newline milestone text. Document the review and architecture. Phase F video frame embeddings remain next; this patch does not claim video semantic indexing.
+- Validation: 123 frontend tests, TypeScript/build, native formatting/lint and 140 Rust tests passed (6 acceptance modes ignored). Rendered search fixtures passed light/dark and minimum-window checks. Existing bundle-size warnings remain. Pushed CI and installed-app/AI-quality checks are separate gates.
+
 # 0.56.10 — Accessibility and destructive-action semantics
 
 - Add the missing tooltip to the File Details close control.

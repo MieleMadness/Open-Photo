@@ -11,7 +11,7 @@ pub struct EmbeddingStatus {
     model_sha256: String,
 }
 
-fn database() -> Result<Connection, String> {
+pub(crate) fn database() -> Result<Connection, String> {
     let directory = dirs::data_local_dir()
         .ok_or("Windows local data directory unavailable")?
         .join("Open-Photo");
@@ -213,7 +213,7 @@ pub async fn ai_index_semantic_batch(
         .map_err(|e| format!("AI indexing worker failed: {e}"))?
 }
 
-fn decode_f32(bytes: &[u8]) -> Result<Vec<f32>, String> {
+pub(crate) fn decode_f32(bytes: &[u8]) -> Result<Vec<f32>, String> {
     if !bytes.len().is_multiple_of(4) {
         return Err("Stored embedding is corrupt".into());
     }
@@ -225,7 +225,7 @@ fn decode_f32(bytes: &[u8]) -> Result<Vec<f32>, String> {
         .collect())
 }
 
-fn cosine_similarity(left: &[f32], right: &[f32]) -> Result<f32, String> {
+pub(crate) fn cosine_similarity(left: &[f32], right: &[f32]) -> Result<f32, String> {
     if left.len() != right.len() || left.is_empty() {
         return Err("Embedding dimensions do not match".into());
     }

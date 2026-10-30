@@ -66,6 +66,19 @@ it("opens a selected video through the shared workspace project route",async()=>
   await waitFor(()=>expect(invoke).toHaveBeenCalledWith("edit_workspace_video_project",{workspaceId:"library",action:{type:"open_source",path:`${A}\\photo-0.mp4`}}));
   expect(vi.mocked(invoke).mock.calls.some(([c])=>c==="create_video_project")).toBe(false);
 });
+it("uses the Library search for tags and favorites, shows match reasons and keeps filters out of the index commands",async()=>{
+  localStorage.setItem("openphoto.workspaces",JSON.stringify(workspace([A])));localStorage.setItem("openphoto.ratings",JSON.stringify({[`${A}\\photo-1.jpg`]:5}));
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{
+    if(command==="scan_indexed_with_changes")return scan(A,2);
+    if(command==="read_managed_tags")return [{path:`${A}\\photo-1.jpg`,tags:["food/burger"]}];return fallback(command,args);
+  });
+  render(<App/>);await screen.findByText("alpha-0.jpg");fireEvent.change(screen.getByLabelText("Sort media"),{target:{value:"largest"}});const search=screen.getByRole("textbox",{name:"Search library"});fireEvent.change(search,{target:{value:"burger"}});
+  await screen.findByText("Tag: food/burger");expect(screen.queryByText("alpha-0.jpg")).toBeNull();expect(screen.getByText("alpha-1.jpg")).toBeTruthy();expect((screen.getByLabelText("Sort media") as HTMLSelectElement).value).toBe("relevance");
+  fireEvent.change(search,{target:{value:"is:favorite"}});await screen.findByText("Favorite · 5 stars");expect(screen.queryByText("alpha-0.jpg")).toBeNull();
+  fireEvent.change(search,{target:{value:"rating:6"}});expect(screen.getByText(/Use type:photo/)).toBeTruthy();expect(vi.mocked(invoke).mock.calls.some(([command])=>command==="search_workspace_evidence")).toBe(false);
+  expect(screen.queryByLabelText("Semantic photo search")).toBeNull();expect(screen.queryByLabelText("OCR photo search")).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:"Clear filters"}));expect((screen.getByLabelText("Sort media") as HTMLSelectElement).value).toBe("largest");expect(screen.getByText("alpha-0.jpg")).toBeTruthy();
+});
 it("resets both the viewport and virtual rows when sorting a scrolled library",async()=>{
   vi.mocked(invoke).mockImplementation((command,args)=>command==="scan_indexed_with_changes"?Promise.resolve(scan((args as {root:string}).root,60)):fallback(command,args));
   const {container}=render(<App/>);await screen.findByText("alpha-0.jpg");const grid=container.querySelector<HTMLElement>(".photo-grid")!;

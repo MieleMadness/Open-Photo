@@ -15,6 +15,8 @@ mod index;
 mod media_jobs;
 mod media_stream;
 mod safe_output;
+mod search;
+mod search_providers;
 mod similar;
 mod user_data;
 mod video_edit_preview;
@@ -1162,7 +1164,10 @@ pub fn run() {
         .manage(video_preview::PreviewJobs::default())
         .manage(video_poster::PosterJobs::default())
         .manage(video_export::ExportJobs::default())
+        .manage(search::SearchState::default())
         .invoke_handler(tauri::generate_handler![
+            search::search_workspace_evidence,
+            search::cancel_workspace_search,
             ai_embeddings::ai_embedding_status,
             ai_embeddings::ai_find_similar_by_photo,
             ai_embeddings::ai_index_semantic_batch,

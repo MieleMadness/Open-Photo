@@ -78,7 +78,7 @@ struct FaceRecord {
     embedding: Vec<f32>,
 }
 
-fn database() -> Result<Connection, String> {
+pub(crate) fn database() -> Result<Connection, String> {
     let directory = dirs::data_local_dir()
         .ok_or("Windows local data directory unavailable")?
         .join("Open-Photo");
@@ -785,7 +785,7 @@ fn stable_group_id(group: &WorkingGroup) -> String {
     format!("person-{}", &digest[..12])
 }
 
-fn face_key(model: &str, vector: &[u8]) -> String {
+pub(crate) fn face_key(model: &str, vector: &[u8]) -> String {
     let mut hash = Sha256::new();
     hash.update(model.as_bytes());
     hash.update([0]);

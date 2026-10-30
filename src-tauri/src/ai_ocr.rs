@@ -51,7 +51,7 @@ pub struct OcrSearchMatch {
     text: String,
 }
 
-fn database() -> Result<Connection, String> {
+pub(crate) fn database() -> Result<Connection, String> {
     let directory = dirs::data_local_dir()
         .ok_or("Windows local data directory unavailable")?
         .join("Open-Photo");
@@ -558,19 +558,39 @@ pub fn ai_search_ocr(
     }
     let (_, recognizer_key) = crate::ai_models::validate_supported_ocr_bundle()?;
     let db = database()?;
-    let pattern = format!("%{}%", query.replace('%', "\\%").replace('_', "\\_"));
+    search_index(&db, &roots, query, &recognizer_key, limit)
+}
+fn search_index(
+    db: &Connection,
+    roots: &[String],
+    query: &str,
+    recognizer_key: &str,
+    limit: usize,
+) -> Result<Vec<OcrSearchMatch>, String> {
+    let pattern = format!(
+        "%{}%",
+        query
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_")
+    );
     let mut statement = db
         .prepare(
             "SELECT root,path,text FROM ocr_index
-             WHERE recognizer_key=?1 AND text LIKE ?2 ESCAPE '\\'
+             WHERE recognizer_key=?1 AND text LIKE ?2 ESCAPE '\\' AND root IN (SELECT value FROM json_each(?4))
              ORDER BY modified_unix DESC
              LIMIT ?3",
         )
         .map_err(|e| e.to_string())?;
-    let allowed: std::collections::HashSet<String> = roots.into_iter().collect();
+    let allowed: std::collections::HashSet<String> = roots.iter().cloned().collect();
     let rows = statement
         .query_map(
-            params![recognizer_key, pattern, limit.clamp(1, 100) as i64],
+            params![
+                recognizer_key,
+                pattern,
+                limit.clamp(1, 100) as i64,
+                serde_json::to_string(&roots).map_err(|e| e.to_string())?
+            ],
             |row| {
                 Ok(OcrSearchMatch {
                     root: row.get(0)?,
@@ -593,6 +613,40 @@ pub fn ai_search_ocr(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn search_scopes_before_limit_and_treats_wildcards_and_backslashes_literally() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE ocr_index(root TEXT,path TEXT,text TEXT,recognizer_key TEXT,modified_unix INTEGER);").unwrap();
+        for index in 0..110 {
+            db.execute(
+                "INSERT INTO ocr_index VALUES('other',?1,'invoice','key',1000)",
+                [index.to_string()],
+            )
+            .unwrap();
+        }
+        db.execute(
+            "INSERT INTO ocr_index VALUES('current','one','invoice C:\\_100%','key',1)",
+            [],
+        )
+        .unwrap();
+        let roots = vec!["current".into()];
+        assert_eq!(
+            search_index(&db, &roots, "invoice", "key", 1)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            search_index(&db, &roots, "C:\\_100%", "key", 10)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(search_index(&db, &roots, "C:\\_101%", "key", 10)
+            .unwrap()
+            .is_empty());
+    }
 
     #[test]
     fn english_dictionary_contract_is_stable() {

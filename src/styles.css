@@ -399,6 +399,16 @@ nav {
   border: 0;
   box-shadow: none
 }
+.library-search { flex: 1 1 22rem; max-width: 34rem; min-width: min(100%,18rem); padding: 3px 4px 3px 10px; }
+.library-search>svg,.library-search>button { flex-shrink: 0; }
+.library-search>button { min-height: calc(var(--control-height) - 6px); padding-block: 4px; }
+.search-status { margin-block: var(--space-3); padding-inline: var(--space-5); font-size: var(--type-caption); }
+.search-status>p { margin-block: var(--space-2); }
+.search-help { color: var(--muted); }
+.search-status details { margin-block: var(--space-2); }
+.search-status summary { cursor: pointer; width: fit-content; }
+.search-match-details { padding: var(--space-3); border-block: 1px solid var(--line); overflow-wrap: anywhere; }
+@media (max-width: 900px) { .library-search { width: 100%; max-width: none; } }
 .empty {
   min-height: 305px;
   display: flex;

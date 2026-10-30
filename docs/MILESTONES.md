@@ -1,8 +1,14 @@
 # Milestones and validation status
 
-## Current branch — 0.56.10
+## Current branch — 0.56.11
 
-0.56.10 adds a small accessibility and destructive-action semantics pass on top of the 0.56.9 design-system cleanup. Original media behavior is unchanged.\n\nThe development branch contains a Windows Tauri photo library with workspaces, local indexing, previews, nondestructive photo-copy export, managed XMP keywords, maps, and opt-in local semantic/People/OCR features. Source-media originals remain read-only. CI success and installed-app acceptance are separate requirements.
+Phase E adds one ranked Library search over metadata and optional cached OCR/People/image-content evidence. Results explain why they matched, honor workspace/library filters, and retain metadata matches when a provider fails. Explicit Search/Enter adds meaning inference; typing does not repeatedly run the model. Workspace/current-index scope is applied before provider caps. See [UNIFIED_SEARCH.md](UNIFIED_SEARCH.md). Phase F must still implement video representative-frame indexing and matching timestamps.
+
+0.56.11 local checks: 123 frontend tests, TypeScript/build, native formatting/lint and 140 Rust tests passed (6 ignored acceptance modes). Edge fixtures verified ranked search/reasons, source failures, facets and light/dark/minimum-window layout. Existing bundle-size warnings remain. The exact pushed GitHub Actions result and installed WebView2/hardware acceptance must be verified separately.
+
+0.56.10 adds a small accessibility and destructive-action semantics pass on top of the 0.56.9 design-system cleanup. Original media behavior is unchanged.
+
+The development branch contains a Windows Tauri photo library with workspaces, local indexing, previews, nondestructive photo-copy export, managed XMP keywords, maps, and opt-in local semantic/People/OCR features. Source-media originals remain read-only. CI success and installed-app acceptance are separate requirements.
 
 ### Integrity work implemented
 
@@ -31,7 +37,9 @@ Physical source/destination drive removal, actual disk-full/quota/write failure,
 
 ## Phase 7 — Basic multi-video editing
 
-0.56.9 retains the 0.56.8 continuous assembled preview/export and adds a presentation-only design-system completion pass across page headers and timeline controls. No project schema, renderer, indexing, or native media behavior changes.\n\n0.56.8 adds continuous assembled preview/export, linked original audio and independent resolution presets to the shared timeline. One source decoder runs at a time. Output is validated and decoded before no-overwrite publication; originals are reverified. Short tests cover mixed clips, sound/silence/gain/offsets, repeat/trim/order, 4K and canvas shapes, preview agreement and failure safety. 111 frontend and 131 Rust tests passed (6 ignored acceptance modes), with formatting and warnings-as-errors native lint. Installed GUI acceptance remains open. See [rendering architecture](VIDEO_SEQUENCE_RENDERING.md).
+0.56.9 retains the 0.56.8 continuous assembled preview/export and adds a presentation-only design-system completion pass across page headers and timeline controls. No project schema, renderer, indexing, or native media behavior changes.
+
+0.56.8 adds continuous assembled preview/export, linked original audio and independent resolution presets to the shared timeline. One source decoder runs at a time. Output is validated and decoded before no-overwrite publication; originals are reverified. Short tests cover mixed clips, sound/silence/gain/offsets, repeat/trim/order, 4K and canvas shapes, preview agreement and failure safety. 111 frontend and 131 Rust tests passed (6 ignored acceptance modes), with formatting and warnings-as-errors native lint. Installed GUI acceptance remains open. See [rendering architecture](VIDEO_SEQUENCE_RENDERING.md).
 
 
 0.56.7 moves project ownership to saved workspaces, supports sources from multiple registered folders, preserves older drafts through one-time transactional copies, and exposes bounded history/recovery. Projects remain editable when source folders are unavailable. Source bindings stay local; imported references and relinks are fingerprint-checked within registered workspace folders. One-video and multi-video editing now share the timeline/session/inspector/output controls; the old single-video controller is removed. One-clip rendering/export retains the tested pipeline through a saved-revision adapter. The assembled renderer remains next.

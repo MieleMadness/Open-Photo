@@ -1,4 +1,5 @@
-> Development update: **0.56.10** keeps the 0.56.9 design-system cleanup and adds a small accessibility/semantics pass: destructive removal actions are visually distinct, the details close control has a tooltip, and AI progress is announced as status. Select videos in the Library and choose **Create video from selection…**. Trim, split, reorder and adjust clips, then use **Preview project edits** or **Export project MP4…**. Workspace selection stays at the top left; there is no separate Video Projects tab. Photo clips will join this same editor in the later mixed-media extension.
+> Development update: **0.56.11** implements Phase E: one ranked Library search for filenames, paths, managed XMP tags, ratings/favorites and optional local OCR/People/image-content matches. Match reasons explain results. Type to filter; press **Search** or **Enter** to add image-content matches. The workspace dropdown remains at the top left, and the latest design/accessibility polish is retained.
+
 
 
 
@@ -24,7 +25,7 @@ Open-Photo uses one shared visual system across the photo library, settings, loc
 
 ### Browsing and editing
 
-- The **Media library** opens with thumbnails. Expand **Search and library tools** for duplicate review, organization filters, semantic search, text search, and AI indexing.
+- The **Media library** opens with thumbnails. Use **Search library** for ranked discovery. Expand **Search and library tools** for duplicate review, organization filters and local indexing controls.
 - Select videos and choose **Create video from selection…** to place them in one ordered project. **Open video editor…** reopens saved projects. Projects accept videos across the current workspace’s folders and can preview/export the assembled sequence as one continuous MP4. **Previous saves and recovery** creates a new copy from a retained revision, keeping the current project. Photo clips will use this same timeline in the later mixed-media milestone.
 - Select media to reveal tagging actions. Folder management remains under **Folders**; **By date** browses capture months.
 - **Full-screen viewer** gives media the available window. When viewing a video, choose **Open video editor** to resume a workspace-owned project in the shared timeline. Trim, transform, audio, brightness/contrast, crop, canvas, and one-clip preview/export remain available there.
@@ -42,7 +43,7 @@ Open-Photo uses one shared visual system across the photo library, settings, loc
 | Persistent media index | ✅ Working | SQLite index under local app data |
 | Incremental folder updates | ✅ Working | Native watcher plus safe full-scan fallback |
 | Manual and periodic sync | ✅ Working | Manual Sync Now and optional 2-minute auto-sync |
-| Grid/list library views | ✅ Working | Filename search, media filters, sorting, thumbnail-size control |
+| Grid/list library views | ✅ Working | Unified ranked search, media filters, sorting, thumbnail-size control |
 | Local thumbnail cache | ✅ Working | Bounded disk cache; originals are not changed |
 | Ratings and favorites | ✅ Working | 1–5 stars stored as local Open-Photo state; 5 stars acts as Favorite |
 | Virtual collections | ✅ Working | Workspace-scoped collections without moving files |
@@ -62,7 +63,7 @@ Open-Photo uses one shared visual system across the photo library, settings, loc
 | Persistent semantic image embeddings | ✅ Working | Stored locally in SQLite and model/pipeline-versioned |
 | Incremental AI indexing | ✅ Working foundation | Selected or full-library indexing; already-current embeddings are skipped |
 | AI photo-to-photo similarity | ✅ Working | Cosine similarity over locally stored embeddings |
-| Natural-language semantic search | 🧪 Experimental | 0.25.x code path; requires the exact supported OpenCLIP bundle and further end-to-end runtime validation |
+| Natural-language semantic search | 🧪 Experimental | Included in the unified Library search with the exact supported OpenCLIP bundle; AI accuracy and installed hardware acceptance remain experimental |
 | Face recognition / People | 🧪 Experimental | YuNet detection + SFace embeddings + local suggested groups; manual naming is local-only |
 | OCR | 🧪 Experimental | English-first PP-OCR detector + recognizer, local text index and photo-text search |
 | GPU acceleration | 🧪 Windows foundation | Automatic mode prefers DirectML when available and safely falls back to CPU |
@@ -128,7 +129,7 @@ QuickTime MOV/MP4/M4V files now read the movie-header creation timestamp from th
 The Library view supports:
 
 - Grid and list views
-- Filename search
+- Ranked Library search across names, paths, managed XMP tags and ratings, with optional indexed OCR/People/image-content evidence
 - Photo / video filtering
 - Newest, oldest, name, largest and smallest sorting
 - Adjustable thumbnail size
@@ -315,6 +316,12 @@ The Windows installer includes the verified image/text search, People, and Engli
 Choose an indexing action when ready. Turning AI off stops subsequent batches and retains existing indexes and person names; a batch in progress may finish. Diagnostics and the optional CPU setting are under the collapsed AI diagnostics section. See [bundled AI assets and validation](docs/AI_MODEL_BUNDLE.md).
 
 The model contracts below document the assets shipped by the installer. AI results remain experimental until accuracy and GPU behavior have been evaluated on representative libraries.
+
+### Unified search — 0.56.11
+
+Use **Search library** for one ranked result list. Filenames, paths and managed XMP tags filter live. With **Local AI** on, existing OCR text and named People are also searched; press **Search** or **Enter** to add image-content results. Indexing remains a separate explicit action under **Search and library tools**. Results show their strongest reason; File Details shows all reasons. Partial provider failures retain metadata matches and explain unavailable sources.
+
+Examples: `is:favorite`, `rating:>=4`, `type:video`, `tag:family`, `person:"Alex Lee"`, or `path:"C:\Media\Holiday"`. Existing media/folder/collection filters still apply. Relevance is selected when starting a query; clearing it restores the browsing sort. Model inference and all indexes remain local. Video-content sampling and matching timestamps are Phase F, not implemented by this update. See [unified search architecture and limits](docs/UNIFIED_SEARCH.md).
 
 ### Supported OCR model bundle
 

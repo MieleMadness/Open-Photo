@@ -10,13 +10,15 @@ use std::{
 
 use crate::{scan_library, ScanResult};
 
-fn database() -> Result<Connection, String> {
+pub(crate) fn database_path() -> Result<PathBuf, String> {
     let directory = dirs::data_local_dir()
         .ok_or("Windows local data directory unavailable")?
         .join("Open-Photo");
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-    let connection =
-        Connection::open(directory.join("media-index.sqlite")).map_err(|e| e.to_string())?;
+    Ok(directory.join("media-index.sqlite"))
+}
+fn database() -> Result<Connection, String> {
+    let connection = Connection::open(database_path()?).map_err(|e| e.to_string())?;
     connection
         .execute_batch(
             "CREATE TABLE IF NOT EXISTS media (
