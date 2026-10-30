@@ -31,6 +31,27 @@ beforeEach(()=>{vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(
 afterEach(async()=>{cleanup();await act(async()=>{});vi.resetAllMocks();vi.restoreAllMocks();vi.unstubAllGlobals();});
 function openFolders(){fireEvent.click(screen.getByRole("button",{name:"Folders"}));}
 function createWorkspaceFromFolders(name:string){openFolders();fireEvent.change(screen.getByRole("combobox",{name:"Active workspace"}),{target:{value:"__new__"}});fireEvent.change(screen.getByLabelText("Workspace name"),{target:{value:name}});fireEvent.click(screen.getByRole("button",{name:"Create"}));}
+it("persists a stock accent choice from Settings",async()=>{
+  render(<App/>);await screen.findByText("alpha-0.jpg");fireEvent.click(screen.getByRole("button",{name:"Settings"}));
+  fireEvent.click(screen.getByRole("button",{name:"Blue accent"}));
+  await waitFor(()=>expect(localStorage.getItem("openphoto.accent")).toBe("blue"));
+  expect(document.documentElement.dataset.accent).toBe("blue");
+  expect(screen.getByRole("button",{name:"Blue accent"}).getAttribute("aria-pressed")).toBe("true");
+});
+it("loads video motion only after hovering a Library video tile",async()=>{
+  localStorage.setItem("openphoto.workspaces",JSON.stringify(workspace([A])));
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{
+    if(command==="scan_indexed_with_changes"){const value=scan(A);value.scan.photos=value.scan.photos.map(p=>({...p,path:p.path.replace(".jpg",".mp4"),name:p.name.replace(".jpg",".mp4"),extension:"mp4"}));return value;}
+    if(command==="video_poster")return "data:image/png;base64,poster";
+    if(command==="video_source")return "/hover.mp4";
+    return fallback(command,args);
+  });
+  const {container}=render(<App/>);await screen.findByText("alpha-0.mp4");
+  expect(vi.mocked(invoke).mock.calls.some(([command])=>command==="video_source")).toBe(false);
+  fireEvent.pointerEnter(container.querySelector(".library-hover-preview")!);
+  expect(await screen.findByLabelText("Preview alpha-0.mp4")).toBeTruthy();
+  expect(invoke).toHaveBeenCalledWith("video_source",{root:A,path:`${A}\\photo-0.mp4`});
+});
 it("keeps section labels consistent while navigating the main pages",async()=>{
   const {container}=render(<App/>);await screen.findByText("alpha-0.jpg");
   for(const [page,label] of [["Library","YOUR COLLECTION"],["Folders","LIBRARY ORGANIZATION"],["Map","PHOTO LOCATIONS"],["Collections","VIRTUAL ORGANIZATION"],["By date","BY CAPTURE DATE"],["Memories","ON THIS DAY"],["People","LOCAL PEOPLE INDEX"],["Tags","PORTABLE METADATA"],["Settings","PREFERENCES"]]){
