@@ -971,9 +971,10 @@ function Placeholder({title,subtitle,icon:Icon,description}:{title:string;subtit
 }
 function formatBytes(n:number){if(n<1024)return n+" B";const u=["KB","MB","GB","TB"];let i=-1;do{n/=1024;i++}while(n>=1024&&i<u.length-1);return n.toFixed(n<10?1:0)+" "+u[i];}
 
-function PhotoThumb({root,photo,maxEdge}:{root:string;photo:Photo;maxEdge:number}) {
+function PhotoThumb({root,photo,maxEdge,hoverVideoPath}:{root:string;photo:Photo;maxEdge:number;hoverVideoPath?:string}) {
   const [src,setSrc] = useState("");
   const [failed,setFailed] = useState(false);
+  const [hovering,setHovering]=useState(false),[hoverSrc,setHoverSrc]=useState("");
   useEffect(() => {
     let active = true;
     setSrc(""); setFailed(false);
@@ -983,6 +984,13 @@ function PhotoThumb({root,photo,maxEdge}:{root:string;photo:Photo;maxEdge:number
       .catch(()=>{if(active)setFailed(true);});
     return ()=>{active=false;};
   },[root,photo.path,maxEdge]);
-  if (["heic","heif"].includes(photo.extension)) return <IPhonePicture root={root} path={photo.path} name={photo.name}/>;
-  return src ? <img className="photo-image" src={src} alt={photo.name} loading="lazy"/> : <div className="photo-fallback"><Images size={28}/><small>{failed ? "Preview unavailable" : "Loading preview…"}</small></div>;
+  useEffect(()=>{
+    let active=true;
+    if(!hovering||!hoverVideoPath||!isDesktop||!root){setHoverSrc("");return()=>{active=false};}
+    void invoke<string>("video_source",{root,path:hoverVideoPath}).then(path=>{if(active)setHoverSrc(convertFileSrc(path));}).catch(()=>{if(active)setHoverSrc("");});
+    return()=>{active=false};
+  },[hovering,hoverVideoPath,root]);
+  const still=["heic","heif"].includes(photo.extension)?<IPhonePicture root={root} path={photo.path} name={photo.name}/>:src?<img className="photo-image" src={src} alt={photo.name} loading="lazy"/>:<div className="photo-fallback"><Images size={28}/><small>{failed ? "Preview unavailable" : "Loading preview…"}</small></div>;
+  if(!hoverVideoPath)return still;
+  return <span className="library-hover-preview" onPointerEnter={()=>setHovering(true)} onPointerLeave={()=>setHovering(false)}>{still}{hovering&&hoverSrc&&<video className="library-hover-video" src={hoverSrc} muted loop autoPlay playsInline preload="metadata" aria-label={"Preview "+photo.name}/>}</span>;
 }
