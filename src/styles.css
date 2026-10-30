@@ -193,34 +193,10 @@ nav {
   min-height: 0;
   overflow-y: auto
 }
-.topbar {
-  height: 68px;
-  border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb,var(--surface) 94%,transparent);
-  backdrop-filter: blur(12px);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 36px;
-  position: sticky;
-  top: 0;
-  z-index: 8
-}
-.breadcrumb,.top-actions {
+.top-actions {
   display: flex;
   align-items: center;
   gap: var(--space-3)
-}
-.breadcrumb {
-  color: var(--muted);
-  font-size: 12px;
-  min-width: 0
-}
-.breadcrumb strong {
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap
 }
 .readonly-chip,.safety-pill {
   background: var(--green-soft);
@@ -659,9 +635,6 @@ dd {
   .nav-button svg {
     flex-shrink: 0
   }
-  .topbar {
-    padding: 0 22px
-  }
   .page {
     padding: 26px 22px
   }
@@ -943,26 +916,6 @@ dd {
 .workspace-select:hover {
   border-color: var(--line-strong)
 }
-.workspace-create {
-  width: 100%;
-  min-height: 38px;
-  border: 1px dashed var(--line-strong);
-  border-radius: 10px;
-  padding: var(--space-2) 10px;
-  color: var(--accent-text);
-  background: var(--surface);
-  margin-bottom: 18px;
-  font-size: 12px;
-  font-weight: 650;
-  transition: background var(--motion-fast),border-color var(--motion-fast),transform var(--motion-fast)
-}
-.workspace-create:hover {
-  background: var(--primary-soft);
-  border-color: var(--accent-text)
-}
-.workspace-create:active {
-  transform: translateY(1px)
-}
 .folder-list {
   margin-top: var(--space-6);
   border: 1px solid var(--line);
@@ -994,10 +947,6 @@ dd {
 @media(max-width:900px) {
   .workspace-select {
     font-size: 10px
-  }
-  .workspace-create {
-    font-size: 10px;
-    padding: var(--space-2) 3px
   }
 }
 .photo-location-map {
@@ -1578,7 +1527,7 @@ select:focus,input[type="text"]:focus,input[type="search"]:focus,input[type="num
 small {
   line-height: 1.5
 }
-.sidebar svg,.topbar svg,.primary-button svg,.secondary-button svg,.folder-item svg,.nav-button svg {
+.sidebar svg,.primary-button svg,.secondary-button svg,.folder-item svg,.nav-button svg {
   flex-shrink: 0
 }
 .settings-card>div:first-child {
@@ -1699,7 +1648,7 @@ p,small {
 button svg {
   pointer-events: none
 }
-.primary-button,.secondary-button,.theme-option,.workspace-create,.icon-button {
+.primary-button,.secondary-button,.theme-option,.icon-button {
   min-height: var(--control-height);
 }
 textarea {
@@ -1786,7 +1735,7 @@ select {
   color: var(--text)
 }
 @media(hover:hover) {
-  .icon-button:hover,.theme-option:hover,.workspace-create:hover,.folder-item:hover,.file-row:hover,.photo-tile:hover,.video-filmstrip button:hover {
+  .icon-button:hover,.theme-option:hover,.folder-item:hover,.file-row:hover,.photo-tile:hover,.video-filmstrip button:hover {
     will-change: transform;
   }
 }
@@ -1798,9 +1747,6 @@ select {
 @media(max-width:620px) {
   .page {
     padding-top: 22px
-  }
-  .topbar {
-    height: 62px
   }
   .panel-toolbar,.view-toolbar,.selection-toolbar {
     padding-left: var(--space-4);
