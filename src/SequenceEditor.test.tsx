@@ -41,7 +41,8 @@ it.each(["999",""])("preserves invalid volume %s and blocks stale export",async 
 });
 it("accepts rational source endpoints between milliseconds without blocking export",async()=>{
   const loaded=value();loaded.project.assets[0].info.duration_seconds=Number((900901/90000).toFixed(6));loaded.project.clips[0].source_out.ticks="900901";
-  vi.mocked(save).mockResolvedValue(null);editor(loaded);await screen.findByDisplayValue("My edit");const end=screen.getByLabelText("Clip end in source (seconds)") as HTMLInputElement;fireEvent.blur(end);expect(end.validity.valid).toBe(true);
+  vi.mocked(save).mockResolvedValue(null);editor(loaded);await screen.findByDisplayValue("My edit");
+  expect(screen.getByRole("slider",{name:"Trim end of clip 1"}).getAttribute("aria-valuenow")).toBe(String(900901/90000));
   fireEvent.click(screen.getByRole("button",{name:"Export project MP4…"}));await waitFor(()=>expect(save).toHaveBeenCalledOnce());expect(loaded.project.clips[0].source_out.ticks).toBe("900901");
 });
 it("retains transforms, adjustments, crop and linked audio through shared undo/autosave",async()=>{
