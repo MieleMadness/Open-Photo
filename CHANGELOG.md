@@ -1,3 +1,11 @@
+# 0.56.20 — CI alignment for timeline-only trimming
+
+- Update remaining frontend regression tests that still expected removed numeric/player trim controls.
+- Validate rational trim endpoints through timeline handle state instead of deleted spinboxes.
+- Validate selected-clip trimming through timeline slider/handle interactions and undo/autosave.
+- Keep 0.56.19 global volume, Library hover previews, and accent palettes unchanged.
+- No runtime feature, renderer, export, AI, or source-media behavior changes.
+
 # 0.56.19 — Remembered video volume, hover motion previews, and accent colors
 
 - Remember the last video-player volume globally and restore it when switching videos, reopening details, or using the assembled project preview.
