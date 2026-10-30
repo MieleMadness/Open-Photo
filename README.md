@@ -1,4 +1,4 @@
-> Development update: **0.56.19** separates clip controls from canvas/export settings with keyboard-accessible inspector tabs and a direct Canvas button. Unfinished edits stay intact when switching tabs.
+> Development update: **0.56.20** separates clip controls from canvas/export settings with keyboard-accessible inspector tabs and a direct Canvas button. Unfinished edits stay intact when switching tabs.
 
 
 
@@ -605,6 +605,6 @@ Focus a handle and use Left/Right for small adjustments, Shift+Left/Right for te
 
 Drag the horizontal divider above the timeline upward for more timeline space, or downward for a larger preview. Your preference is saved and adapts to the available window space. Focus the divider and use Up/Down (Shift for larger changes), Home/End for limits, or double-click to reset. Escape cancels an active drag. Window changes and notices keep the areas within the available space. Resizing changes the layout only; it does not modify project edits or undo history.
 
-### Inspector tasks — 0.56.19
+### Inspector tasks — 0.56.20
 
 Use **Clip** for the selected timeline clip and **Canvas & export** for project shape, fit, frame rate and export resolution. The top **Canvas** button opens and focuses those settings directly. Left/Right and Home/End navigate the tabs. Selecting a timeline clip returns to Clip controls. Switching tabs or hiding controls preserves unfinished numeric entries. Export reveals the Clip tab and focuses any invalid clip entry before proceeding.
