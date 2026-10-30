@@ -1,6 +1,12 @@
 # Milestones and validation status
 
-## Current branch — 0.56.17
+## Current branch — 0.56.20
+0.56.20 aligns the remaining frontend trim tests with the timeline-only workflow; runtime behavior is unchanged.
+
+0.56.19 adds global remembered video volume, lazy muted Library hover previews for videos and Live Photos, and five persisted accent palettes.
+
+0.56.18 moves trimming fully to timeline handles, fixes preview/timeline divider snap-back, adds direct timeline zoom controls, and introduces filmstrip-style clip previews using the bounded poster cache.
+
 
 0.56.17 separates Clip and Canvas & export inspector tasks, with direct Canvas access, keyboard navigation and draft-preserving panels. Invalid clip drafts are revealed before output. Filmstrips and photo clips remain pending.
 
