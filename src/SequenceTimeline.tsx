@@ -1,4 +1,5 @@
 import {useId,useRef,useState} from "react";
+import {ArrowLeft,ArrowRight,Plus,RotateCcw,Scissors,Trash2,Undo2,Redo2} from "lucide-react";
 import {NumberField} from "./EditorFields";
 import {ClipEdits} from "./ClipEdits";
 import {sourceEndLimit} from "./videoProject";
@@ -27,10 +28,10 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
   return <section aria-label="Project timeline" className="sequence-timeline">
     <div className="timeline-heading"><h2>Timeline</h2><p>{entries.length} {entries.length===1?"clip":"clips"} · Project duration <output aria-label="Project duration">{clockTime(duration)}</output></p></div>
     <fieldset disabled={disabled}>
-      <div className="video-transport">
-        <button className="secondary-button" disabled={!session.history.past.length} onClick={()=>history("undo")}>Undo timeline edit</button>
-        <button className="secondary-button" disabled={!session.history.future.length} onClick={()=>history("redo")}>Redo timeline edit</button>
-        <button className="secondary-button" onClick={()=>command({type:"append",assetId,newId:crypto.randomUUID()})}>Append selected video</button>
+      <div className="video-transport timeline-actions">
+        <button className="secondary-button" disabled={!session.history.past.length} onClick={()=>history("undo")}><Undo2 size={16}/>Undo timeline edit</button>
+        <button className="secondary-button" disabled={!session.history.future.length} onClick={()=>history("redo")}><Redo2 size={16}/>Redo timeline edit</button>
+        <button className="secondary-button" onClick={()=>command({type:"append",assetId,newId:crypto.randomUUID()})}><Plus size={16}/>Append selected video</button>
         <label>Timeline zoom<select value={zoom} onChange={e=>setZoom(Number(e.target.value))}><option value={1}>Fit timeline</option><option value={2}>2×</option><option value={4}>4×</option><option value={8}>8×</option></select></label>
       </div>
       <div className="timeline-scroll" tabIndex={0} aria-label="Scrollable timeline">
@@ -54,12 +55,12 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
           <NumberField label="Clip start in source (seconds)" value={markSeconds(clip.source_in)} min={0} max={sourceEndLimit(asset.info)} step="any" onCommit={start=>command({type:"trim",clipId:clip.id,start,end:markSeconds(clip.source_out)})}/>
           <NumberField label="Clip end in source (seconds)" value={markSeconds(clip.source_out)} min={0} max={sourceEndLimit(asset.info)} step="any" onCommit={end=>command({type:"trim",clipId:clip.id,start:markSeconds(clip.source_in),end})}/>
         </div>
-        <div className="video-transport">
-          <button className="secondary-button" disabled={index===0} onClick={()=>command({type:"move",clipId:clip.id,index:index-1})}>Move earlier</button>
-          <button className="secondary-button" disabled={index===entries.length-1} onClick={()=>command({type:"move",clipId:clip.id,index:index+1})}>Move later</button>
-          <button className="secondary-button" disabled={playhead<=entry.start||playhead>=entry.end} onClick={()=>command({type:"split",clipId:clip.id,at:playhead,newId:crypto.randomUUID()})}>Split at playhead</button>
-          <button className="secondary-button" onClick={()=>command({type:"delete",clipId:clip.id})}>Ripple delete clip</button>
-          <button className="secondary-button" onClick={()=>command({type:"reset",clipId:clip.id})}>Reset selected clip</button>
+        <div className="video-transport timeline-clip-actions">
+          <button className="secondary-button" disabled={index===0} onClick={()=>command({type:"move",clipId:clip.id,index:index-1})}><ArrowLeft size={16}/>Move earlier</button>
+          <button className="secondary-button" disabled={index===entries.length-1} onClick={()=>command({type:"move",clipId:clip.id,index:index+1})}>Move later<ArrowRight size={16}/></button>
+          <button className="secondary-button" disabled={playhead<=entry.start||playhead>=entry.end} onClick={()=>command({type:"split",clipId:clip.id,at:playhead,newId:crypto.randomUUID()})}><Scissors size={16}/>Split at playhead</button>
+          <button className="destructive-button" onClick={()=>command({type:"delete",clipId:clip.id})}><Trash2 size={16}/>Ripple delete clip</button>
+          <button className="secondary-button" onClick={()=>command({type:"reset",clipId:clip.id})}><RotateCcw size={16}/>Reset selected clip</button>
         </div>
         <ClipEdits edits={clip.edits} info={asset.info} onChange={mutate=>{const edits=structuredClone(clip.edits);mutate(edits);return command({type:"edits",clipId:clip.id,edits});}}/>
       </div>}
