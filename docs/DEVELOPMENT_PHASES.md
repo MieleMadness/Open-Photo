@@ -6,7 +6,7 @@ Baseline: 0.56.5. This supersedes conflicting future direction in the older feed
 | --- | --- | --- |
 | A | Design-system audit and conventions | Documented in DESIGN_SYSTEM_AUDIT.md and DESIGN.md |
 | B | Hard-cut timeline: selection, reorder, trim, split, delete/ripple, playhead/zoom, durations, transactional undo/autosave | In progress |
-| C | One workspace-owned project model/editor for one or many assets; legacy migration/recovery/relink | Next |
+| C | One workspace-owned project model/editor for one or many assets; legacy migration/recovery/relink | Shared editor, workspace storage/migration/recovery implemented in 0.56.7 |
 | D | Assembled preview and validated combined MP4/H.264 export, then project-independent export presets | Planned |
 | E | Ranked unified discovery with match reasons and media/timestamp identity | Planned |
 | F | Bounded local video frame sampling, deduplication, embeddings, matching timestamps | Planned |
@@ -36,3 +36,13 @@ The first timeline increment implements ordered clips, rational trims/splits, dr
 The workspace dropdown belongs at the top left. There is no separate Video Projects navigation tab. Library selection should create one continuous editing project; one clip and many clips ultimately enter the same workflow.
 
 Validation for 0.56.6 before push: 97 frontend tests passed; TypeScript and production build passed (existing bundle-size warnings remain); native formatting, warnings-as-errors lint, and 115 Rust tests passed, with 6 explicitly ignored acceptance modes. Rendered fixtures passed light/dark and 1220×780 / 800×580 checks, actual drag reorder, button reorder, undo, and persistent top-left workspace geometry. The timeline detector returned no findings. These checks do not claim assembled preview/export or mixed-photo playback. GitHub Actions must be checked against the pushed commit separately.
+
+## 0.56.7 implementation checkpoint
+
+Project ownership is now the workspace ID. The schema-v2 portable edit document is retained, while each asset’s verified source-folder binding is local metadata. Keeping ownership and local path resolution outside the portable document lets a project move without granting arbitrary file access. Native project actions read the registered roots from durable workspace settings. Missing roots affect source readiness, not project identity or edit availability.
+
+Legacy v1/v2 drafts are copied once in one transaction, with migration provenance. Old documents and revisions remain unchanged. Unreadable drafts produce warnings rather than hiding valid projects. Autosave updates use optimistic revisions and backup the prior document/bindings together. Recovery creates a new project, keeps the current draft, and checks workspace/project/history/revision identity. The old single-video controller is removed. Both entry paths now use the same timeline, session, selected-clip inspector and output controls. One-clip preview/export uses an internal compatibility adapter to the proven rendering pipeline, reading the saved workspace revision and authorized source binding. This adapter stores no second draft and owns no editor state. Continuous multi-clip rendering is the next milestone.
+
+Legacy migration also copies up to 20 previous saves per draft. Older revisions with no recorded date or revision keep that information unavailable; no historical dates are invented. Player trim markers update the selected timeline instance, and source-changing operations lock those markers until verification finishes. Reset selected clip restores its source interval/edits; Reset project canvas separately restores the default canvas.
+
+Validation for 0.56.7 before push: 103 frontend tests passed; TypeScript and production build passed with the existing bundle-size warnings; native formatting, warnings-as-errors lint, and 122 Rust tests passed, with 6 explicitly ignored acceptance modes. Native cases include cross-folder short-video import/dedup/rollback, source fingerprints and workspace boundaries, legacy draft/history migration, revision-safe recovery, and resuming/relinking a matching one-source project. Browser fixtures passed shared-editor entry, multi-clip editing, recovery disclosure, light/dark, normal/minimum window geometry, drag/button reorder, and undo. The changed-UI detector returned no findings. GitHub Actions must be verified for this pushed commit separately. Multi-clip output remains gated.

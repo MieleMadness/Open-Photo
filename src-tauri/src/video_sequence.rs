@@ -40,7 +40,7 @@ pub struct Loaded {
     pub sources: Vec<SourceStatus>,
 }
 
-fn default_clip(asset: &Asset) -> Result<Clip, String> {
+pub(crate) fn default_clip(asset: &Asset) -> Result<Clip, String> {
     let base = asset.info.time_base.as_deref().unwrap_or("1/1000000");
     Ok(Clip {
         id: video_project::id(),
@@ -50,7 +50,7 @@ fn default_clip(asset: &Asset) -> Result<Clip, String> {
         edits: Default::default(),
     })
 }
-fn single(sequence: &Sequence, asset: &Asset, clip: Clip) -> Project {
+pub(crate) fn single(sequence: &Sequence, asset: &Asset, clip: Clip) -> Project {
     Project {
         schema_version: 1,
         id: sequence.id.clone(),
@@ -119,7 +119,7 @@ pub(crate) fn migrate(p: Project) -> Result<Sequence, String> {
     validate(&next)?;
     Ok(next)
 }
-fn parse(bytes: &[u8]) -> Result<Sequence, String> {
+pub(crate) fn parse(bytes: &[u8]) -> Result<Sequence, String> {
     if bytes.len() > MAX_DOCUMENT {
         return Err("Project file too large".into());
     }
@@ -138,7 +138,7 @@ fn root_key(root: &str) -> Result<String, String> {
         .to_string_lossy()
         .into_owned())
 }
-fn initialize(db: &Connection) -> Result<(), String> {
+pub(crate) fn initialize(db: &Connection) -> Result<(), String> {
     db.execute_batch("CREATE TABLE IF NOT EXISTS video_sequences(id TEXT PRIMARY KEY,root TEXT NOT NULL,title TEXT NOT NULL,revision INTEGER NOT NULL,data TEXT NOT NULL,updated INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS video_sequence_history(id INTEGER PRIMARY KEY,project_id TEXT NOT NULL,revision INTEGER NOT NULL,data TEXT NOT NULL); CREATE TRIGGER IF NOT EXISTS sequence_backup BEFORE UPDATE ON video_sequences BEGIN INSERT INTO video_sequence_history(project_id,revision,data) VALUES(old.id,old.revision,old.data); DELETE FROM video_sequence_history WHERE project_id=old.id AND id NOT IN (SELECT id FROM video_sequence_history WHERE project_id=old.id ORDER BY id DESC LIMIT 20); END;").map_err(|e|e.to_string())
 }
 fn database() -> Result<Connection, String> {

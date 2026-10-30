@@ -9,6 +9,8 @@ export type TimelineCommand=
   |{type:"trim";clipId:string;start:number;end:number}
   |{type:"split";clipId:string;at:number;newId:string}
   |{type:"delete";clipId:string}
+  |{type:"edits";clipId:string;edits:TimelineClip["edits"]}
+  |{type:"reset";clipId:string}
   |{type:"append";assetId:string;newId:string};
 
 /** Sequence order owns placement. Linked source audio is part of each clip's edits. */
@@ -36,6 +38,10 @@ export function editTimeline(project:SequenceProject,command:TimelineCommand):Se
       if(!Number.isFinite(command.start)||!Number.isFinite(command.end))throw Error("Enter valid trim times.");
       clip.source_in=markTime(command.start,asset.info.time_base);clip.source_out=markTime(command.end,asset.info.time_base);
       if(command.start<0||command.end<=command.start)throw Error("Trim end must be after trim start.");
+    }else if(command.type==="edits"){
+      clip.edits=structuredClone(command.edits);
+    }else if(command.type==="reset"){
+      clip.edits=defaultEdits();clip.source_in=markTime(0,asset.info.time_base);clip.source_out=markTime(asset.info.duration_seconds,asset.info.time_base);
     }else{
       const entry=timelineEntries(project)[index];
       if(!Number.isFinite(command.at)||command.at<=entry.start||command.at>=entry.end)throw Error("Place the playhead inside the selected clip to split it.");

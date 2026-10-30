@@ -1,23 +1,25 @@
 import {useRef,useState} from "react";
 import {NumberField} from "./EditorFields";
+import {ClipEdits} from "./ClipEdits";
 import {sourceEndLimit} from "./videoProject";
 import {clockTime,markSeconds} from "./videoTime";
 import {editTimeline,projectDuration,timelineEntries,type TimelineCommand} from "./timelineCommands";
 import {type SequenceSession} from "./videoSequence";
 
 /** Placement is derived from clip order, never rounded or stored as duplicate timing. */
-export function SequenceTimeline({session,disabled,assetId,onSelectAsset}:{session:SequenceSession;disabled:boolean;assetId:string;onSelectAsset:(id:string)=>void}){
+export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selected,onSelected}:{session:SequenceSession;disabled:boolean;assetId:string;onSelectAsset:(id:string)=>void;selected:string;onSelected:(id:string)=>void}){
   const project=session.history.present,entries=timelineEntries(project),duration=projectDuration(project);
-  const [selected,setSelected]=useState(project.clips[0]?.id||""),[position,setPosition]=useState(0),[zoom,setZoom]=useState(1),[error,setError]=useState("");
+  const [position,setPosition]=useState(0),[zoom,setZoom]=useState(1),[error,setError]=useState("");
   const dragging=useRef("");
   const entry=entries.find(e=>e.clip.id===selected),clip=entry?.clip,asset=project.assets.find(a=>a.id===clip?.asset_id);
   const playhead=Math.min(position,duration),index=entries.findIndex(e=>e.clip.id===selected);
-  function choose(id:string){setSelected(id);const item=entries.find(e=>e.clip.id===id);if(item){onSelectAsset(item.clip.asset_id);setPosition(item.start);}}
+  function choose(id:string){onSelected(id);const item=entries.find(e=>e.clip.id===id);if(item){onSelectAsset(item.clip.asset_id);setPosition(item.start);}}
+  function history(action:"undo"|"redo"){session.commit(action);const clips=session.history.present.clips;onSelected(clips.find(c=>c.id===selected)?.id||clips[0]?.id||"");}
   function command(action:TimelineCommand){
     try{
       const next=editTimeline(session.history.present,action);session.commit(next);setError("");
-      if(action.type==="append")setSelected(action.newId);
-      else if(action.type==="delete")setSelected(next.clips[Math.min(index,next.clips.length-1)]?.id||"");
+      if(action.type==="append")onSelected(action.newId);
+      else if(action.type==="delete")onSelected(next.clips[Math.min(index,next.clips.length-1)]?.id||"");
       return "";
     }catch(cause){const message=String(cause);setError(message);return message;}
   }
@@ -25,8 +27,8 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset}:{sessi
     <div className="timeline-heading"><h2>Timeline</h2><p>{entries.length} {entries.length===1?"clip":"clips"} · Project duration <output aria-label="Project duration">{clockTime(duration)}</output></p></div>
     <fieldset disabled={disabled}>
       <div className="video-transport">
-        <button className="secondary-button" disabled={!session.history.past.length} onClick={()=>session.commit("undo")}>Undo timeline edit</button>
-        <button className="secondary-button" disabled={!session.history.future.length} onClick={()=>session.commit("redo")}>Redo timeline edit</button>
+        <button className="secondary-button" disabled={!session.history.past.length} onClick={()=>history("undo")}>Undo timeline edit</button>
+        <button className="secondary-button" disabled={!session.history.future.length} onClick={()=>history("redo")}>Redo timeline edit</button>
         <button className="secondary-button" onClick={()=>command({type:"append",assetId,newId:crypto.randomUUID()})}>Append selected video</button>
         <label>Timeline zoom<select value={zoom} onChange={e=>setZoom(Number(e.target.value))}><option value={1}>Fit timeline</option><option value={2}>2×</option><option value={4}>4×</option><option value={8}>8×</option></select></label>
       </div>
@@ -56,11 +58,13 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset}:{sessi
           <button className="secondary-button" disabled={index===entries.length-1} onClick={()=>command({type:"move",clipId:clip.id,index:index+1})}>Move later</button>
           <button className="secondary-button" disabled={playhead<=entry.start||playhead>=entry.end} onClick={()=>command({type:"split",clipId:clip.id,at:playhead,newId:crypto.randomUUID()})}>Split at playhead</button>
           <button className="secondary-button" onClick={()=>command({type:"delete",clipId:clip.id})}>Ripple delete clip</button>
+          <button className="secondary-button" onClick={()=>command({type:"reset",clipId:clip.id})}>Reset selected clip</button>
         </div>
+        <ClipEdits edits={clip.edits} info={asset.info} onChange={mutate=>{const edits=structuredClone(clip.edits);mutate(edits);return command({type:"edits",clipId:clip.id,edits});}}/>
       </div>}
     </fieldset>
     {error&&<p role="alert" className="field-error">{error}</p>}
-    <p className="timeline-help">Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap; its source stays in the media bin. The player above previews the original source. Assembled playback and export are the next step.</p>
+    <p className="timeline-help">Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap; its source stays in the media bin. The player above previews the original source. Multi-clip assembled playback and export are the next step.</p>
   </section>;
 }
 

@@ -14,12 +14,18 @@ function update(value:ExportStatus|null){snapshot=value;listeners.forEach(listen
 export const useVideoExport=()=>useSyncExternalStore(subscribe,()=>snapshot,()=>null);
 export async function refreshVideoExport(){const generation=epoch,request=++issued;const status=await invoke<ExportStatus|null>("video_export_status");if(generation===epoch&&request>applied){applied=request;update(status||null);}return snapshot;}
 export async function startVideoExport(root:string,project:VideoProject,options:{destination:string;size:ExportSize;acknowledge_first_audio:boolean}){
+  return startExport("start_video_export",{root,project,options},project.title,options.destination);
+}
+export async function startWorkspaceVideoExport(workspaceId:string,id:string,expectedRevision:number,title:string,options:{destination:string;size:ExportSize;acknowledge_first_audio:boolean}){
+  return startExport("start_workspace_video_export",{workspaceId,id,expectedRevision,options},title,options.destination);
+}
+async function startExport(command:string,args:Record<string,unknown>,title:string,destination:string){
   if(appClosing)throw Error("The app is closing; start export after keeping it open.");
   starting++;
   try{
-    const id=await invoke<string>("start_video_export",{root,project,options});
+    const id=await invoke<string>(command,args);
     epoch++;
-    update({id,title:project.title,destination:options.destination,active:true,can_cancel:true,stage:"queued",fraction:null,bytes:0,elapsed_seconds:0,error:null,result:null});
+    update({id,title,destination,active:true,can_cancel:true,stage:"queued",fraction:null,bytes:0,elapsed_seconds:0,error:null,result:null});
     void refreshVideoExport().catch(()=>{});return id;
   }finally{starting--;}
 }

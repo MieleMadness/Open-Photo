@@ -22,6 +22,43 @@ fn database() -> Result<Connection, String> {
     Ok(db)
 }
 
+/// Project ownership follows saved workspaces; imported project files cannot grant file access.
+pub(crate) fn workspace_roots(id: &str) -> Result<Vec<String>, String> {
+    workspace_roots_from(&database()?, id)
+}
+fn workspace_roots_from(db: &Connection, id: &str) -> Result<Vec<String>, String> {
+    #[derive(serde::Deserialize)]
+    struct Workspace {
+        id: String,
+        #[serde(default)]
+        root: String,
+        #[serde(default)]
+        roots: Vec<String>,
+    }
+    let value: String = db
+        .query_row(
+            "SELECT value FROM user_data WHERE key='openphoto.workspaces'",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|_| "Save a workspace before opening its projects")?;
+    let workspaces: Vec<Workspace> =
+        serde_json::from_str(&value).map_err(|_| "Saved workspace settings need repair")?;
+    let workspace = workspaces
+        .into_iter()
+        .find(|w| w.id == id)
+        .ok_or("Workspace is no longer available")?;
+    let roots = if workspace.roots.is_empty() && !workspace.root.is_empty() {
+        vec![workspace.root]
+    } else {
+        workspace.roots
+    };
+    if roots.len() > 1000 || roots.iter().any(|r| r.len() > 4096 || r.contains('\0')) {
+        return Err("Workspace folder references are invalid".into());
+    }
+    Ok(roots.into_iter().filter(|r| !r.is_empty()).collect())
+}
+
 fn validate(key: &str, value: &str) -> Result<(), String> {
     if !key.starts_with("openphoto.") || key.len() > 100 || value.len() > 16 * 1024 * 1024 {
         return Err("Invalid Open-Photo setting or setting too large".into());
@@ -88,6 +125,21 @@ pub fn export_user_data(destination: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn project_access_uses_only_the_named_saved_workspace_and_retains_offline_roots() {
+        let mut db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE user_data(key TEXT PRIMARY KEY,value TEXT NOT NULL)")
+            .unwrap();
+        let values = BTreeMap::from([("openphoto.workspaces".into(), r#"[{"id":"one","root":"offline-a","roots":["offline-a","offline-b"]},{"id":"two","root":"other"}]"#.into())]);
+        migrate(&mut db, values).unwrap();
+        assert_eq!(
+            workspace_roots_from(&db, "one").unwrap(),
+            vec!["offline-a", "offline-b"]
+        );
+        assert_eq!(workspace_roots_from(&db, "two").unwrap(), vec!["other"]);
+        assert!(workspace_roots_from(&db, "missing").is_err());
+    }
 
     #[test]
     fn migration_never_overwrites_existing_user_metadata() {

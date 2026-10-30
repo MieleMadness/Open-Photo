@@ -18,7 +18,7 @@ export class DurableProjectSession<P extends object> {
   history:History<P>;status:"saved"|"saving"|"error"="saved";error="";revision:number;
   private queued:P|null=null;private running=false;private tail:Promise<void>=Promise.resolve();private released=false;
   private observers=new Set<()=>void>();
-  constructor(readonly root:string,loaded:{project:P;revision:number},private command:string,private validate:(p:P)=>string){this.history={past:[],present:loaded.project,future:[]};this.revision=loaded.revision;sessions.add(this);}
+  constructor(readonly root:string,loaded:{project:P;revision:number},private command:string,private validate:(p:P)=>string,private scope?:Record<string,unknown>){this.history={past:[],present:loaded.project,future:[]};this.revision=loaded.revision;sessions.add(this);}
   subscribe=(listener:()=>void)=>{this.observers.add(listener);return()=>{this.observers.delete(listener);};};
   private notify(){this.observers.forEach(listener=>listener());if(this.released&&this.status==="saved")sessions.delete(this);listeners.forEach(listener=>listener());}
   commit(next:P|"undo"|"redo"){
@@ -30,7 +30,7 @@ export class DurableProjectSession<P extends object> {
     if(this.running||this.error||!this.queued)return;
     const project=this.queued;this.queued=null;this.running=true;this.status="saving";
     this.tail=(async()=>{
-      try{this.revision=await invoke<number>(this.command,{root:this.root,project,expectedRevision:this.revision});}
+      try{this.revision=await invoke<number>(this.command,{...(this.scope||{root:this.root}),project,expectedRevision:this.revision});}
       catch(error){this.error=String(error);this.queued=this.history.present;}
       finally{this.running=false;this.status=this.error?"error":this.queued?"saving":"saved";this.notify();if(!this.error)this.pump();}
     })();

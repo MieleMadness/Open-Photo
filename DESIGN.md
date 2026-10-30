@@ -32,3 +32,7 @@ Open-Photo is an offline-first Windows media organizer and basic editor. Its wor
 Check 1220 × 780 and 800 × 580, light/dark, empty and populated libraries, long filenames, ratings, multiple thumbnail sizes, keyboard-only dialogs, invalid forms, missing sources, and save/export recovery. Use short media fixtures; long-form work is deferred to 1.x. Native playback/export and OS accessibility checks remain distinct from browser fixtures.
 
 The audit fixes do not implement Phase 7 clip sequencing or combined export. Keep those capability claims accurate until they ship.
+
+## Shared editing workflow — 0.56.7
+
+The workspace selector stays at the top left; only the navigation list scrolls on smaller windows. There is no Video Projects navigation tab. The Library opens one workspace-owned editor for one or many videos. The media bin chooses original sources, the timeline owns clip selection/placement, the selected-clip inspector owns edit controls, and the output section owns canvas and rendering actions. Keep source versus edited output explicit. One-clip native output is retained; continuous output is gated until validated.

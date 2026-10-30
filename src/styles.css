@@ -2585,6 +2585,14 @@ select {
 .timeline-trim-fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: var(--space-3); margin: var(--space-3) 0; }
 .timeline-trim-fields label { display: flex; flex-direction: column; gap: var(--space-1); }
 .timeline-trim-fields input { width: 100%; }
+.clip-edits { margin-top: var(--space-4); }
+.clip-edits details { border-top: 1px solid var(--line); padding: var(--space-3) 0; }
+.clip-edits .video-edit-fields>label,.sequence-output .video-edit-fields>label { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.clip-edits .video-edit-fields>label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; gap: var(--space-2); }
+.clip-edits .video-edit-fields>label input[type="checkbox"] { align-self: center; }
+.sequence-output { border-top: 1px solid var(--line-strong); padding-top: var(--space-4); }
+.sequence-output fieldset { min-width: 0; border: 0; margin: 0; padding: 0; }
+.sequence-output video { display: block; max-width: 100%; max-height: 55vh; margin: var(--space-3) 0; background: #000; }
 @media(max-width:900px) {
   .sidebar { width: 180px; }
   .sidebar .nav-button { font-size: var(--type-body); justify-content: flex-start; }

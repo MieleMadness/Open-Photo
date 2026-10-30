@@ -29,6 +29,7 @@ mod video_project;
 mod video_render;
 mod video_sequence;
 mod video_timing;
+mod video_workspace;
 mod watch;
 mod xmp;
 use base64::Engine;
@@ -1192,6 +1193,12 @@ pub fn run() {
             video_preview::cancel_video_preview,
             video_preview::start_video_project_preview,
             video_sequence::create_video_sequence,
+            video_workspace::workspace_video_projects,
+            video_workspace::edit_workspace_video_project,
+            video_workspace::save_workspace_video_project,
+            video_workspace::workspace_video_history,
+            video_workspace::start_workspace_video_preview,
+            video_workspace::start_workspace_video_export,
             video_sequence::add_sequence_videos,
             video_sequence::save_video_sequence,
             video_sequence::load_video_sequence,

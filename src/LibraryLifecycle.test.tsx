@@ -44,13 +44,27 @@ it("creates one timeline project from multiple selected Library videos",async()=
   localStorage.setItem("openphoto.workspaces",JSON.stringify(workspace([A])));
   vi.mocked(invoke).mockImplementation(async(command,args)=>{
     if(command==="scan_indexed_with_changes"){const value=scan(A,2);value.scan.photos=value.scan.photos.map(p=>({...p,path:p.path.replace(".jpg",".mp4"),name:p.name.replace(".jpg",".mp4"),extension:"mp4"}));return value;}
-    if(command==="create_video_sequence")return new Promise(()=>{});
+    if(command==="edit_workspace_video_project")return new Promise(()=>{});
     return fallback(command,args);
   });
   render(<App/>);await screen.findByText("alpha-0.mp4");fireEvent.click(screen.getByRole("button",{name:"Select matching"}));
   fireEvent.click(screen.getByRole("button",{name:"Create video from selection…"}));
-  await waitFor(()=>expect(invoke).toHaveBeenCalledWith("create_video_sequence",{root:A,paths:[`${A}\\photo-0.mp4`,`${A}\\photo-1.mp4`]}));
-  expect(vi.mocked(invoke).mock.calls.filter(([command])=>command==="create_video_sequence")).toHaveLength(1);
+  await waitFor(()=>expect(invoke).toHaveBeenCalledWith("edit_workspace_video_project",{workspaceId:"library",action:{type:"create",paths:[`${A}\\photo-0.mp4`,`${A}\\photo-1.mp4`]}}));
+  expect(vi.mocked(invoke).mock.calls.filter(([command])=>command==="edit_workspace_video_project")).toHaveLength(1);
+});
+it("opens a selected video through the shared workspace project route",async()=>{
+  localStorage.setItem("openphoto.workspaces",JSON.stringify(workspace([A])));
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{
+    if(command==="inspect_video")return {duration_seconds:1,codec:"h264",width:96,height:64,frame_rate:"30/1",nominal_frame_rate:"30/1",time_base:"1/90000",sample_aspect_ratio:"1:1",rotation_degrees:0,hdr:false,color_transfer:null,audio:[],warnings:[]};
+    if(command==="video_source")return "/fixture.mp4";
+    if(command==="start_video_preview")return "fixture-preview";
+    if(command==="video_preview_status")return {state:"failed",result:null,error:"This route fixture has no playback media"};
+    if(command==="scan_indexed_with_changes"){const value=scan(A);value.scan.photos=value.scan.photos.map(p=>({...p,path:p.path.replace(".jpg",".mp4"),name:p.name.replace(".jpg",".mp4"),extension:"mp4"}));return value;}
+    if(command==="edit_workspace_video_project")return new Promise(()=>{});return fallback(command,args);
+  });
+  render(<App/>);fireEvent.click(await screen.findByText("alpha-0.mp4"));fireEvent.click(screen.getByRole("button",{name:"Open video editor"}));
+  await waitFor(()=>expect(invoke).toHaveBeenCalledWith("edit_workspace_video_project",{workspaceId:"library",action:{type:"open_source",path:`${A}\\photo-0.mp4`}}));
+  expect(vi.mocked(invoke).mock.calls.some(([c])=>c==="create_video_project")).toBe(false);
 });
 it("resets both the viewport and virtual rows when sorting a scrolled library",async()=>{
   vi.mocked(invoke).mockImplementation((command,args)=>command==="scan_indexed_with_changes"?Promise.resolve(scan((args as {root:string}).root,60)):fallback(command,args));

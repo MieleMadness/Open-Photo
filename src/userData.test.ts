@@ -8,6 +8,15 @@ beforeEach(()=>{
 afterEach(()=>{delete (window as unknown as Record<string,unknown>).__TAURI_INTERNALS__});
 
 describe("durable metadata",()=>{
+  it("waits for workspace ownership to save and surfaces its failure before project access",async()=>{
+    let finish:()=>void=()=>{};
+    vi.mocked(invoke).mockImplementation(()=>new Promise<void>(resolve=>{finish=resolve;}));
+    const {saveSetting,flushSettings}=await import("./userData");saveSetting("openphoto.workspaces","[]");
+    let complete=false;const wait=flushSettings(["openphoto.workspaces"]).then(()=>{complete=true;});
+    await Promise.resolve();await Promise.resolve();expect(complete).toBe(false);finish();await wait;expect(complete).toBe(true);
+    vi.mocked(invoke).mockRejectedValue(Error("Workspace storage unavailable"));saveSetting("openphoto.workspaces","[]");
+    await expect(flushSettings(["openphoto.workspaces"])).rejects.toThrow("Workspace storage unavailable");
+  });
   it("hydrates durable values before the app starts, retaining legacy values for migration",async()=>{
     localStorage.setItem("openphoto.ratings",'{"photo":2}');
     vi.mocked(invoke).mockResolvedValue({"openphoto.ratings":'{"photo":5}'});

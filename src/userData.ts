@@ -35,3 +35,10 @@ export async function retrySettings(){
   await pending;
   if(failures.size)throw Error([...failures.values()].join("; "));
 }
+
+/** Wait for saved ownership/folder settings before native project commands read them. */
+export async function flushSettings(keys?:string[]){
+  await pending.catch(()=>{});
+  const errors=[...failures].filter(([key])=>!keys||keys.includes(key)).map(([,error])=>error);
+  if(errors.length)throw Error(errors.join("; "));
+}

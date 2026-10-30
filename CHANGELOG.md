@@ -1,3 +1,14 @@
+# 0.56.7 — Workspace-owned editing projects and recovery
+
+- Store projects under the saved workspace instead of a source folder. Combine videos from different registered folders, and retain editable projects when folders are offline or removed.
+- Keep per-asset verified root bindings in local storage; portable project files contain no absolute-path access grants. Relinking and imports require matching original bytes inside registered workspace folders.
+- Copy legacy single-video and multi-video drafts and their last 20 previous saves into workspace-owned projects once, transactionally, without modifying the old drafts. Retain unknown historical dates/revisions as unavailable. Report unreadable older drafts while leaving other projects available.
+- Add bounded previous-save history and revision-safe recovery into a new project copy; reject cross-workspace, cross-project, and stale recovery attempts.
+- Wait for workspace settings to finish saving before native project operations, and route playback through each asset’s own verified folder.
+- Route one-video editing and multi-video projects through the same timeline, session, selected-clip inspector, and output controls; remove the separate legacy single-video editor. Resume matching saved source projects, preserving existing trim, transform, crop, brightness/contrast, audio, canvas, preview, and one-clip export.
+- Render one-clip projects from an authoritative saved workspace revision through the proven native pipeline. Reject stale revisions and removed source folders; keep global export progress/cancel and staged no-overwrite publication.
+- Keep the first hard-cut timeline and top-left workspace navigation. Continuous multi-clip preview/export and photo clips remain upcoming.
+
 # 0.56.6 — First hard-cut timeline and restored workspace navigation
 
 - Document the current design system, remaining inconsistencies, product model, and ordered development phases before further UI work.

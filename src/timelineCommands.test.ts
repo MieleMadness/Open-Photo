@@ -30,6 +30,10 @@ it("allows an empty durable timeline and repeated instances of an asset",()=>{
   p=editTimeline(p,{type:"append",assetId:"one",newId:"a"});p=editTimeline(p,{type:"append",assetId:"one",newId:"b"});
   expect(p.clips.map(c=>c.asset_id)).toEqual(["one","one"]);expect(p.assets).toHaveLength(2);
 });
+it("resets only the selected clip while retaining other instances and the project canvas",()=>{
+  const p=project();p.clips[0].edits.brightness=50;p.clips[0].source_in=markTime(0.5,"1/90000");p.clips[1].edits.gain_percent=75;
+  const next=editTimeline(p,{type:"reset",clipId:"one"});expect(next.clips[0].edits).toEqual(defaultEdits());expect(markSeconds(next.clips[0].source_in)).toBe(0);expect(next.clips[1]).toEqual(p.clips[1]);expect(next.output).toEqual(p.output);
+});
 it("rejects invalid edits atomically including tiny splits, source overflow and duplicate identities",()=>{
   const p=project(),before=structuredClone(p);
   for(const action of [

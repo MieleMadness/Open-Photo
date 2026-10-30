@@ -1,4 +1,4 @@
-> Development update: **0.56.6** adds the first hard-cut timeline controls: reorder, source trims, split, ripple delete, append, undo/redo, and revision-safe autosave. Workspace selection is back at the top left; open the editor from the Library instead of a separate Video Projects tab. Combined sequence preview/export, workspace-owned projects, shared single/multi editing, and photo clips remain in progress.
+> Development update: **0.56.7** makes editing projects belong to the workspace and accepts videos across its folders. It preserves and migrates older drafts into new copies, supports previous-save recovery, and keeps project edits accessible when sources are offline. Workspace selection remains at the top left; open editing from the Library. One video and multiple videos now open the same timeline editor. Assembled multi-clip preview/export and photo clips remain in progress.
 
 
 
@@ -24,9 +24,9 @@ Open-Photo uses one shared visual system across the photo library, settings, loc
 ### Browsing and editing
 
 - The **Media library** opens with thumbnails. Expand **Search and library tools** for duplicate review, organization filters, semantic search, text search, and AI indexing.
-- Select videos and choose **Create video from selection…** to place them in one ordered project. **Open video editor…** reopens saved projects. This milestone accepts videos from one source folder, uses original-source previews, and does not yet render the assembled sequence. Photo clips will use this same timeline in the later mixed-media milestone.
+- Select videos and choose **Create video from selection…** to place them in one ordered project. **Open video editor…** reopens saved projects. Projects accept videos across the current workspace’s folders, use original-source previews, and do not yet render the assembled sequence. **Previous saves and recovery** creates a new copy from a retained revision, keeping the current project. Photo clips will use this same timeline in the later mixed-media milestone.
 - Select media to reveal tagging actions. Folder management remains under **Folders**; **By date** browses capture months.
-- **Full-screen viewer** gives media the available window. When viewing a video, choose **Open video editor** to keep the preview beside grouped Trim and transform, Audio, Adjustments, and Export controls.
+- **Full-screen viewer** gives media the available window. When viewing a video, choose **Open video editor** to resume a workspace-owned project in the shared timeline. Trim, transform, audio, brightness/contrast, crop, canvas, and one-clip preview/export remain available there.
 - Workspace, collection, rule, and person naming use labeled forms with cancellation and validation. Invalid video numeric input remains visible and must be corrected before export.
 - Dialogs contain keyboard focus and restore it on close. Export/save notices occupy their own area instead of covering the working surface.
 - See [DESIGN.md](DESIGN.md) for the shared visual and interaction contract and [design verification](docs/DESIGN_AUDIT_FIXES.md) for coverage and limits.

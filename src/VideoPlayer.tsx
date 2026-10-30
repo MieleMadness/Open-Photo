@@ -8,7 +8,7 @@ import {clockTime,markSeconds,markTime,type VideoTime} from "./videoTime";
 type Assets={source:string;proxy:boolean;info:VideoInfo;filmstrip:{seconds:number;image:string}[];warnings:string[]};
 type Status={state:"queued"|"running"|"complete"|"failed";result:Assets|null;error:string|null};
 
-export type VideoSelection={start:VideoTime;end:VideoTime;onChange:(start:VideoTime,end:VideoTime)=>void};
+export type VideoSelection={start:VideoTime;end:VideoTime;disabled?:boolean;onChange:(start:VideoTime,end:VideoTime)=>void};
 export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false}:{root:string;path:string;onOpenExternal:()=>void;selection?:VideoSelection;autoLoad?:boolean}) {
   const video=useRef<HTMLVideoElement>(null);
   const current=useRef(0);
@@ -122,10 +122,10 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false}:
       </div>
       <input className="video-scrubber" type="range" aria-label="Seek video" min={0} max={duration||info?.duration_seconds||0} step={0.001} value={Math.min(position,duration||info?.duration_seconds||0)} onChange={event=>seek(Number(event.target.value))}/>
       {selection&&<div className="video-markers">
-        <button className="secondary-button" onClick={()=>setTrim("in")}>Set trim start</button><button className="secondary-button" onClick={()=>setTrim("out")}>Set trim end</button>
+        <button className="secondary-button" disabled={selection.disabled} onClick={()=>setTrim("in")}>Set trim start</button><button className="secondary-button" disabled={selection.disabled} onClick={()=>setTrim("out")}>Set trim end</button>
         <button className="secondary-button" onClick={()=>{seek(markSeconds(selection.start));rangePlaying.current=true;void video.current?.play().catch(cause=>{rangePlaying.current=false;setError(String(cause));});}}>Preview trim</button>
         <span>Trim: {clockTime(markSeconds(selection.start))} → {clockTime(markSeconds(selection.end))}</span>
-        <button className="secondary-button" onClick={()=>{rangePlaying.current=false;selection.onChange(markTime(0,info?.time_base||null),markTime(info?.duration_seconds||duration,info?.time_base||null));setRangeError("");}}>Reset trim</button>
+        <button className="secondary-button" disabled={selection.disabled} onClick={()=>{rangePlaying.current=false;selection.onChange(markTime(0,info?.time_base||null),markTime(info?.duration_seconds||duration,info?.time_base||null));setRangeError("");}}>Reset trim</button>
       </div>}
       <small>Focus the player: Space to play/pause, arrows to seek 5 seconds, Shift+arrows for 10 seconds.</small>
     </>}
