@@ -1,3 +1,11 @@
+# 0.56.9 — UI polish and design-system completion
+
+- Standardize Map, By date, Memories, People, Tags, and Settings on the shared page-heading structure so every major destination starts with the same title/subtitle rhythm.
+- Improve the Phase 7 timeline action hierarchy with consistent Lucide icons for undo/redo, append, reorder, split, reset, and delete commands without changing timeline semantics.
+- Add a dedicated destructive-action style for ripple deletion so project-reference removal is visually distinct from ordinary editing commands while original media remains untouched.
+- Refine selected clips, empty timeline presentation, inspector framing, hover/focus behavior, and reduced-motion handling using the existing design tokens.
+- Keep this patch presentation-only: no search-index, renderer, project schema, native media, or export behavior changes.
+
 # 0.56.8 — Continuous multi-video preview and export
 
 - Render one continuous hard-cut sequence from the shared workspace editor, including trims, transforms, crop, color adjustments, mixed source geometry/frame rates, repeated clips and linked original audio.
