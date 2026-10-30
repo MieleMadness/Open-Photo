@@ -1,4 +1,4 @@
-> Development update: **0.56.9** keeps the 0.56.8 shared timeline/export foundation and completes another UI consistency pass: standardized page headings, clearer timeline actions, and distinct destructive styling for ripple deletion. Select videos in the Library and choose **Create video from selection…**. Trim, split, reorder and adjust clips, then use **Preview project edits** or **Export project MP4…**. Workspace selection stays at the top left; there is no separate Video Projects tab. Photo clips will join this same editor in the later mixed-media extension.
+> Development update: **0.56.10** keeps the 0.56.9 design-system cleanup and adds a small accessibility/semantics pass: destructive removal actions are visually distinct, the details close control has a tooltip, and AI progress is announced as status. Select videos in the Library and choose **Create video from selection…**. Trim, split, reorder and adjust clips, then use **Preview project edits** or **Export project MP4…**. Workspace selection stays at the top left; there is no separate Video Projects tab. Photo clips will join this same editor in the later mixed-media extension.
 
 
 
