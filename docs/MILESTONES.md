@@ -1,8 +1,8 @@
 # Milestones and validation status
 
-## Current branch — 0.56.9
+## Current branch — 0.56.10
 
-The development branch contains a Windows Tauri photo library with workspaces, local indexing, previews, nondestructive photo-copy export, managed XMP keywords, maps, and opt-in local semantic/People/OCR features. Source-media originals remain read-only. CI success and installed-app acceptance are separate requirements.
+0.56.10 adds a small accessibility and destructive-action semantics pass on top of the 0.56.9 design-system cleanup. Original media behavior is unchanged.\n\nThe development branch contains a Windows Tauri photo library with workspaces, local indexing, previews, nondestructive photo-copy export, managed XMP keywords, maps, and opt-in local semantic/People/OCR features. Source-media originals remain read-only. CI success and installed-app acceptance are separate requirements.
 
 ### Integrity work implemented
 
