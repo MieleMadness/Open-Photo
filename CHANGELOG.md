@@ -4,6 +4,9 @@
 - Improve the Phase 7 timeline action hierarchy with consistent Lucide icons for undo/redo, append, reorder, split, reset, and delete commands without changing timeline semantics.
 - Add a dedicated destructive-action style for ripple deletion so project-reference removal is visually distinct from ordinary editing commands while original media remains untouched.
 - Refine selected clips, empty timeline presentation, inspector framing, hover/focus behavior, and reduced-motion handling using the existing design tokens.
+- Normalize Map, Tags, Settings, Local AI, and video-editor status/error presentation around the existing shared feedback styles.
+- Give the reusable placeholder screen the same page-heading structure and improve the Map no-data state without changing GPS behavior.
+- Remove dead top-bar, breadcrumb, and retired workspace-create CSS left behind by earlier navigation changes.
 - Keep this patch presentation-only: no search-index, renderer, project schema, native media, or export behavior changes.
 
 # 0.56.8 — Continuous multi-video preview and export
