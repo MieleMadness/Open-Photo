@@ -13,7 +13,7 @@ function pump(){
 }
 
 /** Lazy, bounded posters never start a decoder for every item in the media bin at once. */
-export function EditorPoster({root,path,identity}:{root?:string;path?:string;identity:string}){
+export function EditorPoster({root,path,identity,filmstrip=false}:{root?:string;path?:string;identity:string;filmstrip?:boolean}){
   const host=useRef<HTMLSpanElement>(null),[source,setSource]=useState("");
   useEffect(()=>{
     setSource("");if(!root||!path)return;
@@ -31,5 +31,5 @@ export function EditorPoster({root,path,identity}:{root?:string;path?:string;ide
     if(observer&&host.current)observer.observe(host.current);else start();
     return()=>{job.cancelled=true;observer?.disconnect();};
   },[root,path,identity]);
-  return <span ref={host} className="editor-poster" aria-hidden="true">{source?<img src={source} alt="" loading="lazy"/>:<Film size={24}/>}</span>;
+  return <span ref={host} className={filmstrip?"editor-poster editor-filmstrip":"editor-poster"} aria-hidden="true">{source?(filmstrip?<span className="editor-filmstrip-frames">{[0,1,2,3].map(frame=><img key={frame} src={source} alt="" loading="lazy"/>)}</span>:<img src={source} alt="" loading="lazy"/>):<Film size={24}/>}</span>;
 }
