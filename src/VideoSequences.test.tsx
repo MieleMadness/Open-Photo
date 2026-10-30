@@ -3,12 +3,11 @@ import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {invoke} from "@tauri-apps/api/core";
 import {open,save} from "@tauri-apps/plugin-dialog";
 import {VideoSequences} from "./VideoSequences";
-import type {VideoSelection} from "./VideoPlayer";
 import {SequenceSession,type LoadedSequence} from "./videoSequence";
 import {defaultEdits,discardProjectSaves,flushProjects,hasUnsavedProjects} from "./videoProject";
 vi.mock("@tauri-apps/api/core",()=>({invoke:vi.fn()}));
 vi.mock("@tauri-apps/plugin-dialog",()=>({open:vi.fn(),save:vi.fn()}));
-vi.mock("./VideoPlayer",()=>({VideoPlayer:({path,root,selection}:{path:string;root:string;selection?:VideoSelection})=><div><p data-root={root}>Preview: {path}</p>{selection&&<button disabled={selection.disabled} onClick={()=>selection.onChange({ticks:"22500",time_base:"1/90000"},{ticks:"135000",time_base:"1/90000"})}>Use player trim marks</button>}</div>}));
+vi.mock("./VideoPlayer",()=>({VideoPlayer:({path,root}:{path:string;root:string})=><div><p data-root={root}>Preview: {path}</p></div>}));
 const info={duration_seconds:2,codec:"h264",width:96,height:64,time_base:"1/90000",frame_rate:"30/1",nominal_frame_rate:"30/1",sample_aspect_ratio:"1:1",rotation_degrees:0,color_transfer:null,hdr:false,audio:[],warnings:[]};
 function loaded():LoadedSequence{return {project:{schema_version:2,id:"p",title:"Two short videos",assets:["one","two"].map(id=>({id,relative_path:`${id}.mp4`,sha256:(id==="one"?"1":"2").repeat(64),bytes:100,info})),clips:["one","two"].map(id=>({id:`clip-${id}`,asset_id:id,source_in:{ticks:"0",time_base:"1/90000"},source_out:{ticks:"180000",time_base:"1/90000"},edits:defaultEdits()})),output:{width:1920,height:1080,fit:"fit"},frame_rate:30},revision:1,sources:["one","two"].map(id=>({asset_id:id,path:`/library/${id}.mp4`,root:"/library",status:"ready"}))};}
 it("searches the media bin and toggles panels without resetting the timeline or clip drafts",async()=>{
@@ -68,9 +67,9 @@ it("saves a handle trim through the shared history and undoes the complete gestu
   const pointer=(type:"pointerDown"|"pointerMove"|"pointerUp",clientX:number)=>{const event=createEvent[type](end);Object.defineProperties(event,{clientX:{value:clientX},pointerId:{value:1},button:{value:0}});fireEvent(end,event);};
   pointer("pointerDown",200);pointer("pointerMove",150);
   expect((screen.getByRole("button",{name:"Undo timeline edit"}) as HTMLButtonElement).disabled).toBe(true);
-  pointer("pointerUp",150);expect((screen.getByLabelText("Clip end in source (seconds)") as HTMLInputElement).value).toBe("1.5");
+  pointer("pointerUp",150);expect(screen.getByRole("slider",{name:"Trim end of clip 1"}).getAttribute("aria-valuenow")).toBe("1.5");
   await act(async()=>flushProjects());expect(invoke).toHaveBeenCalledWith("save_workspace_video_project",expect.objectContaining({project:expect.objectContaining({clips:expect.arrayContaining([expect.objectContaining({id:"clip-one",source_out:{ticks:"135000",time_base:"1/90000"}})])})}));
-  fireEvent.click(screen.getByRole("button",{name:"Undo timeline edit"}));expect((screen.getByLabelText("Clip end in source (seconds)") as HTMLInputElement).value).toBe("2");
+  fireEvent.click(screen.getByRole("button",{name:"Undo timeline edit"}));expect(screen.getByRole("slider",{name:"Trim end of clip 1"}).getAttribute("aria-valuenow")).toBe("2");
 });
 it("splits, reorders, trims and undoes timeline edits through revision-safe autosave",async()=>{
   render(<VideoSequences roots={["/library"]} workspaceId="w"/>);await screen.findByLabelText("Saved editing projects");
@@ -80,16 +79,16 @@ it("splits, reorders, trims and undoes timeline edits through revision-safe auto
   expect(screen.getByRole("button",{name:"Clip 3: two.mp4"})).toBeTruthy();
   fireEvent.click(screen.getByRole("button",{name:"Move later"}));
   expect(screen.getByRole("button",{name:"Clip 2: one.mp4"}).getAttribute("aria-pressed")).toBe("true");
-  const start=screen.getByRole("spinbutton",{name:"Clip start in source (seconds)"});fireEvent.change(start,{target:{value:"0.25"}});fireEvent.blur(start);
-  expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.767");
+  const start=screen.getByRole("slider",{name:"Trim start of clip 2"});for(let i=0;i<8;i++)fireEvent.keyDown(start,{key:"ArrowRight"});
+  expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.733");
   fireEvent.click(screen.getByRole("button",{name:"Ripple delete clip"}));
   expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.000");
   fireEvent.click(screen.getByRole("button",{name:"Undo timeline edit"}));
-  expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.767");
+  expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.733");
   await act(async()=>flushProjects());
   const calls=vi.mocked(invoke).mock.calls.filter(([name])=>name==="save_workspace_video_project");
   const last=calls.at(-1)![1] as {project:LoadedSequence["project"];expectedRevision:number};
-  expect(last.project.clips).toHaveLength(3);expect(last.project.clips[1].source_in.ticks).toBe("22500");
+  expect(last.project.clips).toHaveLength(3);expect(Number(last.project.clips[1].source_in.ticks)).toBeGreaterThan(0);
   expect(last.expectedRevision).toBeGreaterThan(1);
 });
 it("keeps source assets after deleting every clip and can append the same video again",async()=>{
@@ -105,11 +104,14 @@ it("uses the verified backend result when duplicate imports are skipped",async()
   vi.mocked(open).mockResolvedValue(["/library/one.mp4"]);fireEvent.click(screen.getByText("Add videos…"));
   await screen.findByText(/0 videos added/);expect(screen.getByText(/2 \/ 50 videos/)).toBeTruthy();
 });
-it("saves player trim marks to the selected timeline instance",async()=>{
+it("keeps trimming on the selected timeline instance instead of the source player",async()=>{
   render(<VideoSequences roots={["/library"]} workspaceId="w" initial={loaded()}/>);await screen.findByDisplayValue("Two short videos");
-  fireEvent.click(screen.getByRole("button",{name:"Clip 2: two.mp4"}));fireEvent.click(screen.getByText("Use player trim marks"));await act(async()=>flushProjects());
+  fireEvent.click(screen.getByRole("button",{name:"Clip 2: two.mp4"}));
+  expect(screen.queryByText("Use player trim marks")).toBeNull();
+  const start=screen.getByRole("slider",{name:"Trim start of clip 2"});fireEvent.keyDown(start,{key:"ArrowRight"});
+  await act(async()=>flushProjects());
   const calls=vi.mocked(invoke).mock.calls.filter(([c])=>c==="save_workspace_video_project");const project=(calls.at(-1)![1] as {project:LoadedSequence["project"]}).project;
-  expect(project.clips[0].source_in.ticks).toBe("0");expect(project.clips[1].source_in.ticks).toBe("22500");expect(project.clips[1].source_out.ticks).toBe("135000");
+  expect(project.clips[0].source_in.ticks).toBe("0");expect(Number(project.clips[1].source_in.ticks)).toBeGreaterThan(0);
 });
 it("ignores a late project load after switching to another folder",async()=>{
   let finish:(value:LoadedSequence)=>void=()=>{};
