@@ -157,4 +157,4 @@ Current semantic image search is not enough to guarantee discovery of an object 
 
 ## Current implementation status
 
-Feedback Phase 1 began in 0.56.4.
+Feedback Phase 1 began in 0.56.4 and its page-header/navigation cleanup is completed through the 0.56.9 design-system pass. Phase 7 hard-cut editing and continuous output are implemented through 0.56.8. Ranked unified search, video semantic indexing, large-library optimization, and deeper map discovery remain the next major engineering work.
