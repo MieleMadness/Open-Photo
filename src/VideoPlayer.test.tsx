@@ -18,6 +18,16 @@ beforeEach(()=>{vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(
   });
 });
 afterEach(async()=>{cleanup();await act(async()=>{});vi.restoreAllMocks();vi.resetAllMocks()});
+it("keeps the editor preview focused on native playback and compatibility only",async()=>{
+  render(<VideoPlayer autoLoad root="library" path="one.mp4" onOpenExternal={()=>{}} editorMode/>);
+  await screen.findByLabelText("Selected video");
+  expect(screen.queryByLabelText("Back 5 seconds")).toBeNull();
+  expect(screen.queryByLabelText("Forward 5 seconds")).toBeNull();
+  expect(screen.queryByLabelText("Seek video")).toBeNull();
+  expect(screen.queryByText("Source details & playback options")).toBeNull();
+  expect(screen.queryByText("Playback options")).toBeNull();
+  expect(screen.getByRole("button",{name:"Compatibility view"})).toBeTruthy();
+});
 it("keeps normal viewer tools visible and groups them only in the compact editor",async()=>{
   const props={autoLoad:true,root:"library",path:"one.mp4",onOpenExternal:()=>{}};
   const ui=render(<VideoPlayer {...props}/>);const video=await screen.findByLabelText("Selected video");
