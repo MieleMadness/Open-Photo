@@ -6,9 +6,10 @@ import {VideoPlayer} from "./VideoPlayer";
 import {SequenceSession,workspaceProject,workspaceProjects,type LoadedSequence,type SequenceProject} from "./videoSequence";
 import {exportFilename} from "./videoExport";
 import {SequenceTimeline} from "./SequenceTimeline";
-import {SequenceOutput} from "./SequenceOutput";
+import {SequenceOutput,emptyProjectPreview} from "./SequenceOutput";
 import {editTimeline} from "./timelineCommands";
 import {markSeconds} from "./videoTime";
+import {useVideoElement} from "./mediaPlayback";
 
 const videoFilters=[{name:"Videos",extensions:["mp4","mov","m4v","mkv","webm","avi"]}];
 type PreviousSave={id:number;revision:number|null;saved_at:number|null;title:string;clips:number;duration_seconds:number};
@@ -17,13 +18,17 @@ export function VideoSequences({roots,workspaceId,initial}:{roots:string[];works
 }
 function SequenceWorkspace({roots,workspaceId,initial}:{roots:string[];workspaceId:string;initial?:LoadedSequence}){
   const root=roots[0]||"";
-  const host=useRef<HTMLElement>(null);
+  const host=useRef<HTMLElement>(null),previewStage=useRef<HTMLElement>(null),stopPreview=useRef<(()=>void)|null>(null);
+  const [projectVideo,bindProjectVideo]=useVideoElement();
+  const [previewState,setPreviewState]=useState(emptyProjectPreview),[playhead,setPlayhead]=useState(0),[playbackError,setPlaybackError]=useState("");
   const [session,setSession]=useState<SequenceSession|null>(null),[loaded,setLoaded]=useState<LoadedSequence|null>(null);
   const owner=useRef<SequenceSession|null>(null),generation=useRef(0),working=useRef(false);
   const [recent,setRecent]=useState<{id:string;title:string}[]>([]),[selected,setSelected]=useState(""),[selectedClip,setSelectedClip]=useState("");
   const [busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");const [,refresh]=useState(0);
   const [previous,setPrevious]=useState<{snapshot:SequenceProject;revision:number;entries:PreviousSave[]}|null>(null),[previousId,setPreviousId]=useState("");
   const project=session?.history.present;
+  useEffect(()=>setPlaybackError(""),[previewState.source]);
+  useEffect(()=>{if(previewState.busy){previewStage.current?.scrollIntoView?.({block:"start"});previewStage.current?.focus({preventScroll:true});}},[previewState.busy]);
   const clip=project?.clips.find(c=>c.id===selectedClip)||project?.clips[0];
   useEffect(()=>{const token=++generation.current;void workspaceProjects(workspaceId).then(rows=>{if(token===generation.current){setRecent(rows.projects);if(rows.warnings.length)setError(rows.warnings.join("\n"));}}).catch(e=>{if(token===generation.current)setError(String(e));});return()=>{generation.current++;owner.current?.release();};},[workspaceId]);
   useEffect(()=>session?.subscribe(()=>refresh(n=>n+1)),[session]);
@@ -33,12 +38,14 @@ function SequenceWorkspace({roots,workspaceId,initial}:{roots:string[];workspace
     try{if(flush)await owner.current?.flush();if(current())await task(current);}catch(e){if(current())setError(String(e));}finally{working.current=false;if(current())setBusy(false);}
   }
   function adopt(value:LoadedSequence,current:()=>boolean){
-    if(!current())return;owner.current?.release();const next=new SequenceSession(root,value,workspaceId);owner.current=next;setSession(next);setLoaded(value);setPrevious(null);setPreviousId("");
+    if(!current())return;owner.current?.release();const next=new SequenceSession(root,value,workspaceId);owner.current=next;setSession(next);setLoaded(value);setPrevious(null);setPreviousId("");setPlayhead(0);
     const nextClip=value.project.clips.find(c=>c.id===selectedClip)||value.project.clips[0];
     setSelected(nextClip?.asset_id||value.project.assets[0].id);setSelectedClip(nextClip?.id||"");
     void workspaceProjects(workspaceId).then(rows=>{if(current()){setRecent(rows.projects);if(rows.warnings.length)setError(rows.warnings.join("\n"));}}).catch(e=>{if(current())setError(String(e));});
   }
   async function chooseVideos(current:()=>boolean){const files=await open({multiple:true,defaultPath:root,filters:videoFilters});return current()?(Array.isArray(files)?files:typeof files==="string"?[files]:[]):[];}
+  function seekProject(seconds:number){setPlayhead(seconds);if(projectVideo.current){const duration=projectVideo.current.duration;projectVideo.current.currentTime=Math.min(seconds,Number.isFinite(duration)?duration:seconds);}}
+  function chooseBin(id:string){stopPreview.current?.();setSelected(id);}
   function selectClip(id:string){setSelectedClip(id);const clip=owner.current?.history.present.clips.find(c=>c.id===id);if(clip)setSelected(clip.asset_id);}
   const asset=project?.assets.find(a=>a.id===selected),source=loaded?.sources.find(s=>s.asset_id===selected);
   return <section ref={host} aria-label="Video editing project" className="sequence-workspace">
@@ -69,13 +76,15 @@ function SequenceWorkspace({roots,workspaceId,initial}:{roots:string[];workspace
         {previous&&!previous.entries.length&&<p>No previous saves yet. Changes are retained automatically, up to 20 saves.</p>}
         {previous&&(previous.snapshot!==project||previous.revision!==session.revision)&&<p>Refresh previous saves after editing before recovering a copy.</p>}
       </details>
-      <div className="sequence-layout"><section aria-label="Video media bin" className="sequence-bin"><h2>Media bin <small>{project.assets.length} / 50 videos</small></h2><p>Choose a video to preview. Videos may come from any folder in this workspace; importing identical content again does not duplicate it.</p><ul>{project.assets.map(a=>{const status=loaded?.sources.find(s=>s.asset_id===a.id);return <li key={a.id}><button className={selected===a.id?"sequence-asset selected":"sequence-asset"} aria-pressed={selected===a.id} disabled={busy} onClick={()=>setSelected(a.id)}><strong>{a.relative_path.split("/").at(-1)}</strong><small>{a.info.duration_seconds.toFixed(2)} s · {a.info.width} × {a.info.height} · {a.info.audio.length?"Audio":"Silent"}{!status?.path?" · Needs relinking":""}</small></button></li>;})}</ul></section>
-        <section className="sequence-preview" aria-label="Selected source preview"><h2>Original source preview</h2>{asset&&<><p>{asset.relative_path}</p>{source?.path?<VideoPlayer key={source.path} root={source.root||root} path={source.path} autoLoad selection={clip?.asset_id===selected?{start:clip.source_in,end:clip.source_out,disabled:busy,onChange:(start,end)=>{if(busy)return;try{session.commit(editTimeline(session.history.present,{type:"trim",clipId:clip.id,start:markSeconds(start),end:markSeconds(end)}));setError("");}catch(cause){setError(String(cause));}}}:undefined} onOpenExternal={()=>{void invoke("open_video",{root:source.root||root,path:source.path}).catch(e=>setError(String(e)));}}/>:<p role="alert">This video needs relinking: {source?.status}</p>}
+      <div className="sequence-layout"><section aria-label="Video media bin" className="sequence-bin"><h2>Media bin <small>{project.assets.length} / 50 videos</small></h2><p>Choose a video to preview. Videos may come from any folder in this workspace; importing identical content again does not duplicate it.</p><ul>{project.assets.map(a=>{const status=loaded?.sources.find(s=>s.asset_id===a.id);return <li key={a.id}><button className={selected===a.id?"sequence-asset selected":"sequence-asset"} aria-pressed={selected===a.id} disabled={busy} onClick={()=>chooseBin(a.id)}><strong>{a.relative_path.split("/").at(-1)}</strong><small>{a.info.duration_seconds.toFixed(2)} s · {a.info.width} × {a.info.height} · {a.info.audio.length?"Audio":"Silent"}{!status?.path?" · Needs relinking":""}</small></button></li>;})}</ul></section>
+        <section ref={previewStage} tabIndex={-1} className="sequence-preview" aria-label="Video preview stage"><h2>{previewState.busy||previewState.source?"Edited project preview":"Original source preview"}</h2>
+        {previewState.busy?<p role="status">Building the continuous project preview…</p>:previewState.source?<><video ref={bindProjectVideo} aria-label="Edited project preview" src={previewState.source} controls onError={event=>setPlaybackError(`The project preview could not play (media error ${event.currentTarget.error?.code||"unknown"}). Rebuild the preview or export to open it in the Windows player.`)} onLoadedMetadata={()=>{if(projectVideo.current)seekProject(Math.min(playhead,projectVideo.current.duration||0));}} onTimeUpdate={()=>{if(projectVideo.current)setPlayhead(projectVideo.current.currentTime);}}/>{playbackError&&<ErrorNotice title="The project preview could not play" error={playbackError}/>}<button className="secondary-button" onClick={()=>stopPreview.current?.()}>Show original source</button><ul>{previewState.warnings.map(w=><li key={w}>{w}</li>)}</ul></>:asset&&<><p>{asset.relative_path}</p>{source?.path?<VideoPlayer key={source.path} root={source.root||root} path={source.path} autoLoad selection={clip?.asset_id===selected?{start:clip.source_in,end:clip.source_out,disabled:busy,onChange:(start,end)=>{if(busy)return;try{session.commit(editTimeline(session.history.present,{type:"trim",clipId:clip.id,start:markSeconds(start),end:markSeconds(end)}));setError("");}catch(cause){setError(String(cause));}}}:undefined} onOpenExternal={()=>{void invoke("open_video",{root:source.root||root,path:source.path}).catch(e=>setError(String(e)));}}/>:<p role="alert">This video needs relinking: {source?.status}</p>}</>}
+        {asset&&<>
           <div className="video-transport"><button className="secondary-button" disabled={busy} onClick={()=>void run(async current=>{const path=await open({multiple:false,defaultPath:root,filters:videoFilters});if(typeof path==="string"&&current())adopt(await workspaceProject(workspaceId,{type:"relink",id:project.id,asset_id:asset.id,path,expected_revision:session.revision}),current);})}>Relink original video…</button>
             <button className="secondary-button" disabled={busy||project.assets.length===1} onClick={()=>void run(async current=>adopt(await workspaceProject(workspaceId,{type:"remove_asset",id:project.id,asset_id:asset.id,expected_revision:session.revision}),current))}>Remove from project</button></div><small>Removing a video from this project keeps its original file unchanged.</small>
         </>}</section></div>
-      <SequenceTimeline key={`timeline:${project.id}`} session={session} disabled={busy} assetId={selected} onSelectAsset={setSelected} selected={clip?.id||""} onSelected={selectClip}/>
-      {loaded&&<SequenceOutput key={`output:${project.id}`} session={session} loaded={loaded} disabled={busy} host={host}/>}
+      <SequenceTimeline key={`timeline:${project.id}`} session={session} disabled={busy} assetId={selected} onSelectAsset={setSelected} selected={clip?.id||""} onSelected={selectClip} position={playhead} onPosition={seekProject}/>
+      {loaded&&<SequenceOutput key={`output:${project.id}`} session={session} loaded={loaded} disabled={busy} host={host} previewState={previewState} onPreviewState={setPreviewState} stopRef={stopPreview}/>}
     </>}
   </section>;
 }

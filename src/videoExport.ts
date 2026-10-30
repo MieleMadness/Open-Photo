@@ -1,7 +1,12 @@
 import {useSyncExternalStore} from "react";
 import {invoke} from "@tauri-apps/api/core";
 import type {VideoProject} from "./videoProject";
-export type ExportSize="project"|"hd1080";
+export type ExportSize="project"|"hd1080"|"uhd4k";
+/** The display mirrors native resolution caps; native validation remains authoritative. */
+export function exportCanvas(canvas:VideoProject["output"],preset:ExportSize){
+  if(preset==="project")return {...canvas};let [width,height]=preset==="hd1080"?[1920,1080]:[3840,2160];if(canvas.height>canvas.width)[width,height]=[height,width];
+  const ratio=Math.min(width/canvas.width,height/canvas.height,1);return {...canvas,width:Math.max(16,Math.floor(canvas.width*ratio/2)*2),height:Math.max(16,Math.floor(canvas.height*ratio/2)*2)};
+}
 export type ExportStatus={id:string;title:string;destination:string;active:boolean;can_cancel:boolean;stage:"queued"|"verifying_source"|"encoding"|"checking_output"|"decoding_output"|"publishing"|"cancelling"|"completed"|"cancelled"|"failed";fraction:number|null;bytes:number;elapsed_seconds:number;error:string|null;result:{path:string;bytes:number;width:number;height:number;duration_seconds:number;warnings:string[]}|null};
 let snapshot:ExportStatus|null=null;
 let starting=0,appClosing=false;

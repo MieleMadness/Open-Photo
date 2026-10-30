@@ -26,7 +26,7 @@ pub(crate) fn build(
         &cancel,
     )?;
     video_render::encode(engine, &plan, &cancel, |_| {})?;
-    let info = video_render::validate_output(engine, p, &plan, &output, &cancel)?;
+    let info = video_render::validate_output(engine, &plan, &output, &cancel)?;
     video_project::source(root, p, &cancel)?;
     Ok(PreviewAssets {
         source: output.to_string_lossy().into_owned(),

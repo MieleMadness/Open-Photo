@@ -4,13 +4,14 @@ import {convertFileSrc,invoke} from "@tauri-apps/api/core";
 import {ErrorNotice} from "./Ui";
 import {VideoDetails,type VideoInfo} from "./VideoDetails";
 import {clockTime,markSeconds,markTime,type VideoTime} from "./videoTime";
+import {useVideoElement} from "./mediaPlayback";
 
 type Assets={source:string;proxy:boolean;info:VideoInfo;filmstrip:{seconds:number;image:string}[];warnings:string[]};
 type Status={state:"queued"|"running"|"complete"|"failed";result:Assets|null;error:string|null};
 
 export type VideoSelection={start:VideoTime;end:VideoTime;disabled?:boolean;onChange:(start:VideoTime,end:VideoTime)=>void};
 export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false}:{root:string;path:string;onOpenExternal:()=>void;selection?:VideoSelection;autoLoad?:boolean}) {
-  const video=useRef<HTMLVideoElement>(null);
+  const [video,bindVideo]=useVideoElement();
   const current=useRef(0);
   const restore=useRef(0);
   const rangePlaying=useRef(false);
@@ -77,7 +78,7 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false}:
   }
   function toggle(){
     const element=video.current;if(!element)return;
-    if(element.paused)void element.play().catch(cause=>setError(`Playback could not start: ${String(cause)}`));else element.pause();
+    if(element.paused)void element.play().catch(cause=>{if(video.current===element)setError(`Playback could not start: ${String(cause)}`);});else element.pause();
   }
   function playbackFailure(code:number,detail=""){
     if(mode==="original"&&(code===3||code===4)&&!info?.hdr&&!fallbackAttempted.current){
@@ -107,7 +108,7 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false}:
   return <section className="video-player" aria-label="Video playback" tabIndex={0} onKeyDown={keyboard}>
     {!src&&poster&&<button className="video-poster" disabled={busy} aria-label={requested?"Retry video preview":"Play selected video"} onClick={()=>requested?setRevision(v=>v+1):setRequested(true)}><img src={poster} alt="Selected video preview"/></button>}
     {!requested&&<button className="secondary-button" onClick={()=>setRequested(true)}>Play Live Photo / video</button>}
-    {src&&<><video ref={video} src={src} poster={poster||assets?.filmstrip[0]?.image} autoPlay={playIntent} controls playsInline preload="metadata" aria-label="Selected video"
+    {src&&<><video ref={bindVideo} src={src} poster={poster||assets?.filmstrip[0]?.image} autoPlay={playIntent} controls playsInline preload="metadata" aria-label="Selected video"
       onLoadedMetadata={()=>{const element=video.current;if(!element)return;if(Number.isFinite(element.duration))setDuration(element.duration);element.currentTime=Math.min(restore.current,element.duration||0);setPosition(element.currentTime);current.current=element.currentTime;}}
       onDurationChange={()=>{if(video.current&&Number.isFinite(video.current.duration))setDuration(video.current.duration);}}
       onLoadedData={event=>{if(event.currentTarget.videoWidth===0&&event.currentTarget.videoHeight===0)playbackFailure(4,"The file loaded without a decodable video track");}}
@@ -123,7 +124,7 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false}:
       <input className="video-scrubber" type="range" aria-label="Seek video" min={0} max={duration||info?.duration_seconds||0} step={0.001} value={Math.min(position,duration||info?.duration_seconds||0)} onChange={event=>seek(Number(event.target.value))}/>
       {selection&&<div className="video-markers">
         <button className="secondary-button" disabled={selection.disabled} onClick={()=>setTrim("in")}>Set trim start</button><button className="secondary-button" disabled={selection.disabled} onClick={()=>setTrim("out")}>Set trim end</button>
-        <button className="secondary-button" onClick={()=>{seek(markSeconds(selection.start));rangePlaying.current=true;void video.current?.play().catch(cause=>{rangePlaying.current=false;setError(String(cause));});}}>Preview trim</button>
+        <button className="secondary-button" onClick={()=>{seek(markSeconds(selection.start));rangePlaying.current=true;const element=video.current;void element?.play().catch(cause=>{if(video.current===element){rangePlaying.current=false;setError(String(cause));}});}}>Preview trim</button>
         <span>Trim: {clockTime(markSeconds(selection.start))} → {clockTime(markSeconds(selection.end))}</span>
         <button className="secondary-button" disabled={selection.disabled} onClick={()=>{rangePlaying.current=false;selection.onChange(markTime(0,info?.time_base||null),markTime(info?.duration_seconds||duration,info?.time_base||null));setRangeError("");}}>Reset trim</button>
       </div>}

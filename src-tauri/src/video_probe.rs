@@ -8,6 +8,8 @@ pub struct VideoInfo {
     pub duration_seconds: f64,
     pub video_duration_seconds: Option<f64>,
     pub video_stream: usize,
+    #[serde(default)]
+    pub frame_count: Option<u64>,
     pub codec: String,
     pub width: u32,
     pub height: u32,
@@ -151,6 +153,9 @@ pub(crate) fn parse_probe(bytes: &[u8]) -> Result<VideoInfo, String> {
         warnings.push("This video has no audio track.".into());
     }
     Ok(VideoInfo {
+        frame_count: video["nb_frames"]
+            .as_u64()
+            .or_else(|| video["nb_frames"].as_str().and_then(|v| v.parse().ok())),
         duration_seconds: duration,
         video_duration_seconds,
         video_stream: video["index"].as_u64().unwrap_or(0) as usize,

@@ -1,4 +1,5 @@
-> Development update: **0.56.7** makes editing projects belong to the workspace and accepts videos across its folders. It preserves and migrates older drafts into new copies, supports previous-save recovery, and keeps project edits accessible when sources are offline. Workspace selection remains at the top left; open editing from the Library. One video and multiple videos now open the same timeline editor. Assembled multi-clip preview/export and photo clips remain in progress.
+> Development update: **0.56.8** joins multiple videos into one continuous preview and MP4 export in the shared timeline editor. Select videos in the Library and choose **Create video from selection…**. Trim, split, reorder and adjust clips, then use **Preview project edits** or **Export project MP4…**. Workspace selection stays at the top left; there is no separate Video Projects tab. Photo clips will join this same editor in the later mixed-media extension.
+
 
 
 
@@ -555,12 +556,14 @@ Workspace activation now clears the prior library’s scan summary and invalidat
 
 Generated video exports and compatible previews now include regular H.264 keyframes so long recordings can seek without decoding from the beginning. Original source files remain unchanged.
 
-### Multi-video project media bin in 0.56.3
+### One timeline for one or many videos — 0.56.8
 
-Open **Video projects**, choose a library folder, then **New multi-video project…** and select short videos inside that folder. Add up to 50 distinct source videos, select a source to preview it, rename/autosave the project, reopen a saved project, save a portable project copy, or relink an original with identical contents. Removing a video from a project keeps the source file unchanged. Files from subfolders are supported; sources from unrelated library roots are not combined in this first milestone.
+Open a video's **Edit** action, or select several videos in the Library and choose **Create video from selection…**. Both open the same editor. Add videos from any registered folder in the current workspace with **Add videos…**. Each workspace can keep several named editing projects; each project contains one assembled sequence, not separate edits per video. The workspace dropdown stays at the top left.
 
-Opening an existing single-video project JSON creates a new multi-video draft preserving source identity, rational trims, transforms, audio settings, and canvas. The original file and single-video draft remain unchanged. Project copies reference source videos rather than embedding them. Missing videos are reported individually.
+Select a timeline clip to trim, rotate, flip, crop, adjust brightness/contrast or change its original audio gain/mute. Split at the playhead, drag to reorder (or use Move earlier/later), delete with the gap closed, or append a source again. Undo/redo and revision-safe autosave retain these edits. Previous saves can be recovered as a new copy. Portable project copies reference originals; missing sources require verified relinking.
 
-This milestone prepares and saves the media bin. It does not yet provide an assembled timeline preview or combined multi-video export. The Library's existing single-video editor/export continues to work. Next: sequence ordering, split/trim/ripple delete and undo, continuous preview, then combined export and recovery polish.
+**Preview project edits** builds one continuous video in the preview stage. Its playback and timeline playhead are linked. **Show original source** returns to source playback. Changing edits invalidates the compiled preview. **Export project MP4…** creates a new H.264 SDR MP4 with linked original audio; silent/muted intervals remain silent. Multi-track sources require explicit first-track acknowledgement for export. Existing files are never overwritten.
+
+One clip preserves source frame timing. Joined clips use 30 or 60 fps. Choose a source/project, landscape, portrait or square canvas and fit/fill, then an independent Project / up to 1080p / up to 4K resolution preset. Presets keep the project shape and do not enlarge a smaller canvas; enlarging a canvas cannot add source detail. HDR/wide-gamut conversion, photos, overlays, music and transitions are not yet available. See [project instructions](docs/VIDEO_PROJECTS.md) and [rendering architecture](docs/VIDEO_SEQUENCE_RENDERING.md).
 
 Development tests now use short media. Hour-scale stress checks remain available only when explicitly requested; further long-form work is deferred to 1.x. Physical drive-removal and actual disk-full checks remain on the pre-v1.0 release checklist.

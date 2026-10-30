@@ -10,13 +10,13 @@ vi.mock("@tauri-apps/api/core",()=>({invoke:vi.fn()}));
 vi.mock("@tauri-apps/plugin-dialog",()=>({open:vi.fn(),save:vi.fn()}));
 vi.mock("./VideoPlayer",()=>({VideoPlayer:({path,root,selection}:{path:string;root:string;selection?:VideoSelection})=><div><p data-root={root}>Preview: {path}</p>{selection&&<button disabled={selection.disabled} onClick={()=>selection.onChange({ticks:"22500",time_base:"1/90000"},{ticks:"135000",time_base:"1/90000"})}>Use player trim marks</button>}</div>}));
 const info={duration_seconds:2,codec:"h264",width:96,height:64,time_base:"1/90000",frame_rate:"30/1",nominal_frame_rate:"30/1",sample_aspect_ratio:"1:1",rotation_degrees:0,color_transfer:null,hdr:false,audio:[],warnings:[]};
-function loaded():LoadedSequence{return {project:{schema_version:2,id:"p",title:"Two short videos",assets:["one","two"].map(id=>({id,relative_path:`${id}.mp4`,sha256:(id==="one"?"1":"2").repeat(64),bytes:100,info})),clips:["one","two"].map(id=>({id:`clip-${id}`,asset_id:id,source_in:{ticks:"0",time_base:"1/90000"},source_out:{ticks:"180000",time_base:"1/90000"},edits:defaultEdits()})),output:{width:1920,height:1080,fit:"fit"},frame_rate:30},revision:1,sources:["one","two"].map(id=>({asset_id:id,path:`/library/${id}.mp4`,status:"ready"}))};}
-beforeEach(()=>{vi.mocked(invoke).mockImplementation(async(command,args)=>{
+function loaded():LoadedSequence{return {project:{schema_version:2,id:"p",title:"Two short videos",assets:["one","two"].map(id=>({id,relative_path:`${id}.mp4`,sha256:(id==="one"?"1":"2").repeat(64),bytes:100,info})),clips:["one","two"].map(id=>({id:`clip-${id}`,asset_id:id,source_in:{ticks:"0",time_base:"1/90000"},source_out:{ticks:"180000",time_base:"1/90000"},edits:defaultEdits()})),output:{width:1920,height:1080,fit:"fit"},frame_rate:30},revision:1,sources:["one","two"].map(id=>({asset_id:id,path:`/library/${id}.mp4`,root:"/library",status:"ready"}))};}
+beforeEach(()=>{vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(()=>{});vi.spyOn(HTMLMediaElement.prototype,"load").mockImplementation(()=>{});vi.mocked(invoke).mockImplementation(async(command,args)=>{
   if(command==="workspace_video_projects")return {projects:[{id:"p",title:"Two short videos"}],warnings:[]};
   if(command==="edit_workspace_video_project")return (args as {action:{type:string}}).action.type==="add"?{...loaded(),revision:2}:loaded();
   if(command==="save_workspace_video_project")return (args as {expectedRevision:number}).expectedRevision+1;
 });});
-afterEach(()=>{cleanup();discardProjectSaves();vi.resetAllMocks();});
+afterEach(async()=>{cleanup();await act(async()=>{});discardProjectSaves();vi.resetAllMocks();});
 it("imports several short videos, previews a selected source, and autosaves the project name",async()=>{
   vi.mocked(open).mockResolvedValue(["/library/one.mp4","/library/two.mp4"]);
   render(<VideoSequences roots={["/library"]} workspaceId="w"/>);fireEvent.click(screen.getByText("New video project…"));
@@ -24,6 +24,11 @@ it("imports several short videos, previews a selected source, and autosaves the 
   fireEvent.click(within(screen.getByRole("region",{name:"Video media bin"})).getByRole("button",{name:/two.mp4/}));expect(screen.getByText("Preview: /library/two.mp4")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Video project name"),{target:{value:"Saved assembly"}});
   await waitFor(()=>expect(invoke).toHaveBeenCalledWith("save_workspace_video_project",expect.objectContaining({workspaceId:"w",expectedRevision:1,project:expect.objectContaining({title:"Saved assembly"})})));
+});
+it("fills the timeline proportionally even when the whole edit is shorter than one second",async()=>{
+  const value=loaded();value.project.clips[0].source_out={ticks:"18000",time_base:"1/90000"};value.project.clips[1].source_out={ticks:"27000",time_base:"1/90000"};
+  render(<VideoSequences roots={["/library"]} workspaceId="w" initial={value}/>);const first=await screen.findByRole("button",{name:"Clip 1: one.mp4"}),second=screen.getByRole("button",{name:"Clip 2: two.mp4"});
+  expect(first.parentElement!.style.flexGrow).toBe("0.4");expect(second.parentElement!.style.flexGrow).toBe("0.6");
 });
 it("splits, reorders, trims and undoes timeline edits through revision-safe autosave",async()=>{
   render(<VideoSequences roots={["/library"]} workspaceId="w"/>);await screen.findByLabelText("Saved editing projects");
@@ -34,11 +39,11 @@ it("splits, reorders, trims and undoes timeline edits through revision-safe auto
   fireEvent.click(screen.getByRole("button",{name:"Move later"}));
   expect(screen.getByRole("button",{name:"Clip 2: one.mp4"}).getAttribute("aria-pressed")).toBe("true");
   const start=screen.getByRole("spinbutton",{name:"Clip start in source (seconds)"});fireEvent.change(start,{target:{value:"0.25"}});fireEvent.blur(start);
-  expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.750");
+  expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.767");
   fireEvent.click(screen.getByRole("button",{name:"Ripple delete clip"}));
   expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.000");
   fireEvent.click(screen.getByRole("button",{name:"Undo timeline edit"}));
-  expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.750");
+  expect(screen.getByLabelText("Project duration").textContent).toBe("00:00:03.767");
   await act(async()=>flushProjects());
   const calls=vi.mocked(invoke).mock.calls.filter(([name])=>name==="save_workspace_video_project");
   const last=calls.at(-1)![1] as {project:LoadedSequence["project"];expectedRevision:number};

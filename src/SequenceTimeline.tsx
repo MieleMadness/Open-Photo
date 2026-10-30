@@ -1,4 +1,4 @@
-import {useRef,useState} from "react";
+import {useId,useRef,useState} from "react";
 import {NumberField} from "./EditorFields";
 import {ClipEdits} from "./ClipEdits";
 import {sourceEndLimit} from "./videoProject";
@@ -7,13 +7,14 @@ import {editTimeline,projectDuration,timelineEntries,type TimelineCommand} from 
 import {type SequenceSession} from "./videoSequence";
 
 /** Placement is derived from clip order, never rounded or stored as duplicate timing. */
-export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selected,onSelected}:{session:SequenceSession;disabled:boolean;assetId:string;onSelectAsset:(id:string)=>void;selected:string;onSelected:(id:string)=>void}){
+export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selected,onSelected,position,onPosition}:{session:SequenceSession;disabled:boolean;assetId:string;onSelectAsset:(id:string)=>void;selected:string;onSelected:(id:string)=>void;position:number;onPosition:(seconds:number)=>void}){
   const project=session.history.present,entries=timelineEntries(project),duration=projectDuration(project);
-  const [position,setPosition]=useState(0),[zoom,setZoom]=useState(1),[error,setError]=useState("");
+  const [zoom,setZoom]=useState(1),[error,setError]=useState("");
   const dragging=useRef("");
+  const playheadId=useId();
   const entry=entries.find(e=>e.clip.id===selected),clip=entry?.clip,asset=project.assets.find(a=>a.id===clip?.asset_id);
   const playhead=Math.min(position,duration),index=entries.findIndex(e=>e.clip.id===selected);
-  function choose(id:string){onSelected(id);const item=entries.find(e=>e.clip.id===id);if(item){onSelectAsset(item.clip.asset_id);setPosition(item.start);}}
+  function choose(id:string){onSelected(id);const item=entries.find(e=>e.clip.id===id);if(item){onSelectAsset(item.clip.asset_id);onPosition(item.start);}}
   function history(action:"undo"|"redo"){session.commit(action);const clips=session.history.present.clips;onSelected(clips.find(c=>c.id===selected)?.id||clips[0]?.id||"");}
   function command(action:TimelineCommand){
     try{
@@ -34,10 +35,10 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
       </div>
       <div className="timeline-scroll" tabIndex={0} aria-label="Scrollable timeline">
         <div className="timeline-track" style={{width:`${zoom*100}%`}}>
-          <label className="timeline-scrubber">Project playhead <output>{clockTime(playhead)}</output><input aria-label="Project playhead" type="range" min={0} max={duration||1} step="any" value={playhead} disabled={!entries.length} onChange={e=>setPosition(Number(e.target.value))}/></label>
+          <div className="timeline-scrubber"><label htmlFor={playheadId}>Project playhead</label><output aria-label="Project playhead time">{clockTime(playhead)}</output><input id={playheadId} aria-label="Project playhead" type="range" min={0} max={duration||1} step="any" value={playhead} disabled={!entries.length} onChange={e=>onPosition(Number(e.target.value))}/></div>
           <ol className="timeline-clips">{entries.map((item,i)=>{
             const source=project.assets.find(a=>a.id===item.clip.asset_id)!;
-            return <li key={item.clip.id} style={{flexGrow:item.duration}} onDragOver={e=>{if(dragging.current&&!disabled)e.preventDefault();}} onDrop={e=>{e.preventDefault();if(dragging.current&&!disabled)command({type:"move",clipId:dragging.current,index:i});dragging.current="";}}>
+            return <li key={item.clip.id} style={{flexGrow:item.duration/duration}} onDragOver={e=>{if(dragging.current&&!disabled)e.preventDefault();}} onDrop={e=>{e.preventDefault();if(dragging.current&&!disabled)command({type:"move",clipId:dragging.current,index:i});dragging.current="";}}>
               <button type="button" draggable={!disabled} className="timeline-clip" aria-label={`Clip ${i+1}: ${source.relative_path.split("/").at(-1)}`} aria-pressed={selected===item.clip.id} onClick={()=>choose(item.clip.id)} onDragStart={e=>{dragging.current=item.clip.id;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",item.clip.id);}} onDragEnd={()=>{dragging.current="";}}>
                 <strong>{i+1}. {source.relative_path.split("/").at(-1)}</strong><span>{clockTime(item.duration)}</span><small>{item.clip.edits.muted?"Audio muted":source.info.audio.length?"Linked original audio":"Silent source"}</small>
               </button>
@@ -64,7 +65,7 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
       </div>}
     </fieldset>
     {error&&<p role="alert" className="field-error">{error}</p>}
-    <p className="timeline-help">Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap; its source stays in the media bin. The player above previews the original source. Multi-clip assembled playback and export are the next step.</p>
+    <p className="timeline-help">Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap and keeps its original in the media bin. Joined clips use the project frame clock; source trim marks retain their original timing.</p>
   </section>;
 }
 

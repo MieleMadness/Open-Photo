@@ -214,12 +214,23 @@ pub(crate) fn run_progress(
     cancel: impl Fn() -> bool,
     progress: impl Fn(Progress) + Send + 'static,
 ) -> Result<(), String> {
-    run_reader(
+    run_progress_in(executable, args, timeout, cancel, progress, None)
+}
+pub(crate) fn run_progress_in(
+    executable: &Path,
+    args: &[&std::ffi::OsStr],
+    timeout: Duration,
+    cancel: impl Fn() -> bool,
+    progress: impl Fn(Progress) + Send + 'static,
+    working_directory: Option<&Path>,
+) -> Result<(), String> {
+    run_reader_in(
         executable,
         args,
         timeout,
         cancel,
         move |reader, overflow| progress_reader(reader, overflow, progress),
+        working_directory,
     )
     .map(|_| ())
 }
@@ -232,7 +243,22 @@ fn run_reader(
         + Send
         + 'static,
 ) -> Result<Vec<u8>, String> {
+    run_reader_in(executable, args, timeout, cancel, reader, None)
+}
+fn run_reader_in(
+    executable: &Path,
+    args: &[&std::ffi::OsStr],
+    timeout: Duration,
+    cancel: impl Fn() -> bool,
+    reader: impl FnOnce(std::process::ChildStdout, Arc<AtomicBool>) -> Result<Vec<u8>, String>
+        + Send
+        + 'static,
+    working_directory: Option<&Path>,
+) -> Result<Vec<u8>, String> {
     let mut command = Command::new(executable);
+    if let Some(directory) = working_directory {
+        command.current_dir(directory);
+    }
     command
         .args(args)
         .stdin(Stdio::null())

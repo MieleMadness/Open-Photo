@@ -15,8 +15,8 @@ export type TimelineCommand=
 
 /** Sequence order owns placement. Linked source audio is part of each clip's edits. */
 export function timelineEntries(project:SequenceProject):TimelineEntry[]{
-  let position=0;
-  return project.clips.map(clip=>{const duration=markSeconds(clip.source_out)-markSeconds(clip.source_in),start=position;position+=duration;return {clip,start,end:position,duration};});
+  let position=0,sourceTotal=0;
+  return project.clips.map(clip=>{const start=position;sourceTotal+=markSeconds(clip.source_out)-markSeconds(clip.source_in);position=project.clips.length>1?Math.round(sourceTotal*project.frame_rate)/project.frame_rate:sourceTotal;return {clip,start,end:position,duration:position-start};});
 }
 export function projectDuration(project:SequenceProject):number{return timelineEntries(project).at(-1)?.end||0;}
 

@@ -68,7 +68,7 @@ pub trait Control: Send + Sync {
         available_space(parent)
     }
 }
-fn available_space(parent: &Path) -> Result<Option<u64>, String> {
+pub(crate) fn available_space(parent: &Path) -> Result<Option<u64>, String> {
     #[cfg(windows)]
     {
         use std::os::windows::ffi::OsStrExt;
@@ -110,9 +110,102 @@ fn check_cancel(control: &dyn Control) -> Result<(), String> {
     }
 }
 
+struct PipelineRequest<'a> {
+    engine: &'a Path,
+    destination: &'a Path,
+    duration: f64,
+    bitrate: u64,
+    scratch_bytes: u64,
+}
 pub fn export_file(
     request: Request<'_>,
     control: Arc<dyn Control>,
+) -> Result<ExportReport, String> {
+    video_project::validate(request.project)?;
+    let duration = request.project.clips[0].source_out.seconds()?
+        - request.project.clips[0].source_in.seconds()?;
+    export_pipeline(
+        PipelineRequest {
+            engine: request.engine,
+            destination: request.destination,
+            duration,
+            bitrate: video_render::target_bitrate(request.project, request.size) + 192_000,
+            scratch_bytes: 0,
+        },
+        control,
+        |output, c| {
+            Ok(crate::video_sequence_render::Compiled::single(
+                video_render::plan(
+                    request.engine,
+                    request.root,
+                    request.project,
+                    output,
+                    video_render::RenderOptions {
+                        preview: false,
+                        size: request.size,
+                        acknowledge_first_audio: request.acknowledge_first_audio,
+                    },
+                    || c.cancelled(),
+                )?,
+            ))
+        },
+        |c| video_project::source(request.root, request.project, || c.cancelled()).map(|_| ()),
+    )
+}
+pub struct SequenceRequest<'a> {
+    pub engine: &'a Path,
+    pub snapshot: &'a crate::video_sequence_render::Snapshot,
+    pub destination: &'a Path,
+    pub size: ExportSize,
+    pub acknowledge_first_audio: bool,
+}
+pub fn export_sequence_file(
+    request: SequenceRequest<'_>,
+    control: Arc<dyn Control>,
+) -> Result<ExportReport, String> {
+    request.snapshot.validate()?;
+    let duration = request.snapshot.duration()?;
+    let bitrate = request.snapshot.bitrate(request.size)?;
+    let scratch_bytes = if request.snapshot.project.clips.len() > 1 {
+        (duration * (bitrate as f64 / 8.0 * 1.25 + 384000.0)).ceil() as u64 + 64 * 1024 * 1024
+    } else {
+        0
+    };
+    export_pipeline(
+        PipelineRequest {
+            engine: request.engine,
+            destination: request.destination,
+            duration,
+            bitrate: bitrate + 192_000,
+            scratch_bytes,
+        },
+        control,
+        |output, c| {
+            let progress = c.clone();
+            crate::video_sequence_render::compile(
+                request.engine,
+                request.snapshot,
+                output,
+                video_render::RenderOptions {
+                    preview: false,
+                    size: request.size,
+                    acknowledge_first_audio: request.acknowledge_first_audio,
+                },
+                || c.cancelled(),
+                move |fraction| progress.update(Stage::Encoding, Some(fraction), 0),
+            )
+        },
+        |c| request.snapshot.revalidate(|| c.cancelled()),
+    )
+}
+fn export_pipeline(
+    request: PipelineRequest<'_>,
+    control: Arc<dyn Control>,
+    prepare: impl FnOnce(
+        &Path,
+        Arc<dyn Control>,
+    ) -> Result<crate::video_sequence_render::Compiled, String>,
+    verify: impl FnOnce(&dyn Control) -> Result<(), String>,
 ) -> Result<ExportReport, String> {
     if !request
         .destination
@@ -121,7 +214,6 @@ pub fn export_file(
     {
         return Err("Choose a new .mp4 filename".into());
     }
-    video_project::validate(request.project)?;
     check_cancel(control.as_ref())?;
     control.update(Stage::VerifyingSource, None, 0);
     let parent = fs::canonicalize(
@@ -131,11 +223,10 @@ pub fn export_file(
             .ok_or("Choose an existing output folder")?,
     )
     .map_err(|e| e.to_string())?;
-    let duration = request.project.clips[0].source_out.seconds()?
-        - request.project.clips[0].source_in.seconds()?;
-    // A conservative allowance for the target bitrate plus muxing/faststart overhead.
-    let bitrate = video_render::target_bitrate(request.project, request.size) + 192_000;
-    let required = (duration * bitrate as f64 / 8.0 * 1.25).ceil() as u64 + 64 * 1024 * 1024;
+    let duration = request.duration;
+    let required = (duration * request.bitrate as f64 / 8.0 * 1.25).ceil() as u64
+        + 64 * 1024 * 1024
+        + request.scratch_bytes;
     if control
         .available_space(&parent)?
         .is_some_and(|free| free < required)
@@ -148,30 +239,21 @@ pub fn export_file(
     let staged = crate::safe_output::StagedOutput::new(request.destination)?;
     let temporary = staged.temporary_path().to_owned();
     let result = (|| {
-        let plan = video_render::plan(
-            request.engine,
-            request.root,
-            request.project,
-            &temporary,
-            video_render::RenderOptions {
-                preview: false,
-                size: request.size,
-                acknowledge_first_audio: request.acknowledge_first_audio,
-            },
-            || control.cancelled(),
-        )?;
+        let mut compiled = prepare(&temporary, control.clone())?;
+        let plan = &compiled.plan;
+        let base = compiled.encoded_fraction;
         check_cancel(control.as_ref())?;
-        control.update(Stage::Encoding, Some(0.0), 0);
+        control.update(Stage::Encoding, Some(base), 0);
         let progress = control.clone();
         let length = plan.duration;
         video_render::encode(
             request.engine,
-            &plan,
+            plan,
             || control.cancelled(),
             move |p| {
                 progress.update(
                     Stage::Encoding,
-                    Some((p.seconds / length).clamp(0.0, 1.0) * 0.9),
+                    Some(base + (p.seconds / length).clamp(0.0, 1.0) * (0.9 - base)),
                     p.bytes,
                 )
             },
@@ -179,13 +261,9 @@ pub fn export_file(
         check_cancel(control.as_ref())?;
         let bytes = fs::metadata(&temporary).map_err(|e| e.to_string())?.len();
         control.update(Stage::CheckingOutput, Some(0.9), bytes);
-        let info = video_render::validate_output(
-            request.engine,
-            request.project,
-            &plan,
-            &temporary,
-            || control.cancelled(),
-        )?;
+        let info = video_render::validate_output(request.engine, plan, &temporary, || {
+            control.cancelled()
+        })?;
         check_cancel(control.as_ref())?;
         control.update(Stage::DecodingOutput, Some(0.9), bytes);
         let progress = control.clone();
@@ -202,7 +280,9 @@ pub fn export_file(
             },
         )?;
         control.update(Stage::VerifyingSource, Some(0.99), bytes);
-        video_project::source(request.root, request.project, || control.cancelled())?;
+        verify(control.as_ref())?;
+        let warnings = compiled.plan.warnings.clone();
+        compiled.close()?;
         check_cancel(control.as_ref())?;
         control.begin_publish()?;
         let path = staged.commit()?;
@@ -212,7 +292,7 @@ pub fn export_file(
             width: info.width,
             height: info.height,
             duration_seconds: info.duration_seconds,
-            warnings: plan.warnings,
+            warnings,
         })
     })();
     if result.is_err() && temporary.exists() {
@@ -312,12 +392,58 @@ pub fn start_video_export(
     project: Project,
     options: Options,
 ) -> Result<String, String> {
+    start_export(
+        app,
+        jobs,
+        previews,
+        SourceRequest::Single {
+            root,
+            project: Box::new(project),
+        },
+        options,
+    )
+}
+pub(crate) fn start_sequence_export(
+    app: tauri::AppHandle,
+    jobs: tauri::State<'_, ExportJobs>,
+    previews: tauri::State<'_, crate::video_preview::PreviewJobs>,
+    snapshot: crate::video_sequence_render::Snapshot,
+    options: Options,
+) -> Result<String, String> {
+    start_export(
+        app,
+        jobs,
+        previews,
+        SourceRequest::Sequence(snapshot),
+        options,
+    )
+}
+enum SourceRequest {
+    Single { root: String, project: Box<Project> },
+    Sequence(crate::video_sequence_render::Snapshot),
+}
+fn start_export(
+    app: tauri::AppHandle,
+    jobs: tauri::State<'_, ExportJobs>,
+    previews: tauri::State<'_, crate::video_preview::PreviewJobs>,
+    source: SourceRequest,
+    options: Options,
+) -> Result<String, String> {
     let Options {
         destination,
         size,
         acknowledge_first_audio,
     } = options;
-    video_project::validate(&project)?;
+    let title = match &source {
+        SourceRequest::Single { project, .. } => {
+            video_project::validate(project)?;
+            project.title.clone()
+        }
+        SourceRequest::Sequence(snapshot) => {
+            snapshot.validate()?;
+            snapshot.project.title.clone()
+        }
+    };
     let engine = video_engine::directory(&app)?;
     let mut current = jobs.current.lock().map_err(|e| e.to_string())?;
     if let Some(job) = current.as_ref() {
@@ -331,7 +457,7 @@ pub fn start_video_export(
         started: Instant::now(),
         status: Mutex::new(ExportStatus {
             id: id.clone(),
-            title: project.title.clone(),
+            title,
             destination: destination.clone(),
             active: true,
             can_cancel: true,
@@ -359,17 +485,29 @@ pub fn start_video_export(
                 }
                 std::thread::sleep(Duration::from_millis(20));
             };
-            export_file(
-                Request {
-                    engine: &engine,
-                    root: &root,
-                    project: &project,
-                    destination: Path::new(&destination),
-                    size,
-                    acknowledge_first_audio,
-                },
-                job.clone(),
-            )
+            match source {
+                SourceRequest::Single { root, project } => export_file(
+                    Request {
+                        engine: &engine,
+                        root: &root,
+                        project: &project,
+                        destination: Path::new(&destination),
+                        size,
+                        acknowledge_first_audio,
+                    },
+                    job.clone(),
+                ),
+                SourceRequest::Sequence(snapshot) => export_sequence_file(
+                    SequenceRequest {
+                        engine: &engine,
+                        snapshot: &snapshot,
+                        destination: Path::new(&destination),
+                        size,
+                        acknowledge_first_audio,
+                    },
+                    job.clone(),
+                ),
+            }
         }))
         .unwrap_or_else(|_| Err("Video export stopped unexpectedly".into()));
         if let Ok(mut status) = job.status.lock() {

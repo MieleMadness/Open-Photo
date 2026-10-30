@@ -34,6 +34,11 @@ it("resets only the selected clip while retaining other instances and the projec
   const p=project();p.clips[0].edits.brightness=50;p.clips[0].source_in=markTime(0.5,"1/90000");p.clips[1].edits.gain_percent=75;
   const next=editTimeline(p,{type:"reset",clipId:"one"});expect(next.clips[0].edits).toEqual(defaultEdits());expect(markSeconds(next.clips[0].source_in)).toBe(0);expect(next.clips[1]).toEqual(p.clips[1]);expect(next.output).toEqual(p.output);
 });
+it("places joined clips on the output frame clock without accumulating rounding drift",()=>{
+  const p=project(),clip=p.clips[0];clip.source_out=markTime(0.04,"1/90000");p.clips=Array.from({length:100},(_,i)=>({...structuredClone(clip),id:`short-${i}`}));
+  expect(timelineEntries(p).slice(0,5).map(e=>Math.round(e.duration*30))).toEqual([1,1,2,1,1]);expect(projectDuration(p)).toBe(4);
+  p.frame_rate=60;expect(projectDuration(p)).toBe(4);p.clips=[clip];expect(projectDuration(p)).toBe(0.04);
+});
 it("rejects invalid edits atomically including tiny splits, source overflow and duplicate identities",()=>{
   const p=project(),before=structuredClone(p);
   for(const action of [

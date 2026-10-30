@@ -1659,7 +1659,7 @@ fn independent_stream_validation_rejects_short_video_hidden_by_long_audio() {
     )
     .unwrap();
     assert!(
-        video_render::validate_output(&engine(), &p, &plan, &bad, || false)
+        video_render::validate_output(&engine(), &plan, &bad, || false)
             .unwrap_err()
             .contains("independent timing")
     );
@@ -1681,12 +1681,10 @@ fn independent_stream_validation_rejects_short_video_hidden_by_long_audio() {
         || false,
     )
     .unwrap();
-    video_render::validate_output(&engine(), &p, &plan, &bad, || false).unwrap();
+    video_render::validate_output(&engine(), &plan, &bad, || false).unwrap();
     video_render::encode(&engine(), &plan, || false, |_| {}).unwrap();
-    video_render::validate_output(&engine(), &p, &plan, &fixture.0.join("output.mp4"), || {
-        false
-    })
-    .unwrap();
+    video_render::validate_output(&engine(), &plan, &fixture.0.join("output.mp4"), || false)
+        .unwrap();
     let mut old = serde_json::to_value(&p.asset.info).unwrap();
     old.as_object_mut()
         .unwrap()

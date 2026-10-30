@@ -1,7 +1,7 @@
 import {useEffect,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
 
-export type VideoInfo={duration_seconds:number;codec:string;width:number;height:number;sample_aspect_ratio:string|null;frame_rate:string|null;nominal_frame_rate:string|null;time_base:string|null;rotation_degrees:number;hdr:boolean;color_transfer:string|null;audio:{stream:number;codec:string;sample_rate:string|null;channels:number|null;channel_layout:string|null}[];warnings:string[]};
+export type VideoInfo={frame_count?:number|null;duration_seconds:number;codec:string;width:number;height:number;sample_aspect_ratio:string|null;frame_rate:string|null;nominal_frame_rate:string|null;time_base:string|null;rotation_degrees:number;hdr:boolean;color_transfer:string|null;audio:{stream:number;codec:string;sample_rate:string|null;channels:number|null;channel_layout:string|null}[];warnings:string[]};
 
 export function VideoDetails({root,path,onInfo}:{root:string;path:string;onInfo?:(value:VideoInfo|null)=>void}){
   const [info,setInfo]=useState<VideoInfo|null>(null);

@@ -1,3 +1,13 @@
+# 0.56.8 — Continuous multi-video preview and export
+
+- Render one continuous hard-cut sequence from the shared workspace editor, including trims, transforms, crop, color adjustments, mixed source geometry/frame rates, repeated clips and linked original audio.
+- Compile preview and export from the same saved revision. Connect assembled playback to the timeline playhead and release the previous decoder when switching sources, avoiding overlapping audio.
+- Use a cumulative 30/60 fps clock for joined clips, preserve one-clip source timing, retain audio offsets/gain/mute, and encode one continuous AAC track with silence where required.
+- Separate export resolution presets from saved edit decisions: Project, up to 1080p and up to 4K, including portrait/square canvases without preset upscaling.
+- Bound decoding to one source at a time; verify space, output streams/frame counts, full decode and unchanged originals before staged no-overwrite publication. Clean temporary parts on failure/cancellation. Recovery retains a current verified relink for the same original.
+- Keep the workspace selector at top left and editing entry in the Library. Photo clips and other social editing extensions remain planned for the same editor; no separate Video Projects navigation tab is added.
+- Validation: 111 frontend tests and 131 Rust tests passed (6 explicit acceptance modes ignored), plus TypeScript/build, native formatting and warnings-as-errors lint. Short native cases cover audio offsets/mute/gain, repeated cuts, 4K/portrait/square, preview/export agreement, cancellation, unavailable space, changed sources and destination races. Edge played and sought the real native preview; light/dark/minimum-window checks passed. Existing bundle-size warnings remain. Pushed GitHub Actions and installed WebView2 GUI acceptance are separate gates.
+
 # 0.56.7 — Workspace-owned editing projects and recovery
 
 - Store projects under the saved workspace instead of a source folder. Combine videos from different registered folders, and retain editable projects when folders are offline or removed.

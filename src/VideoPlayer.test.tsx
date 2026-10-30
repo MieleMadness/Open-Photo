@@ -6,7 +6,7 @@ import {VideoPlayer} from "./VideoPlayer";
 vi.mock("@tauri-apps/api/core",()=>({invoke:vi.fn(),convertFileSrc:(path:string)=>`asset:${path}`}));
 const info={duration_seconds:20,codec:"h264",width:96,height:64,frame_rate:"30/1",time_base:"1/90000",rotation_degrees:0,hdr:false,color_transfer:null,audio:[],warnings:[]};
 let sequence=0;
-beforeEach(()=>{
+beforeEach(()=>{vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(()=>{});vi.spyOn(HTMLMediaElement.prototype,"load").mockImplementation(()=>{});
   sequence=0;
   vi.mocked(invoke).mockImplementation(async(command,args)=>{
     if(command==="inspect_video")return info;
@@ -17,7 +17,7 @@ beforeEach(()=>{
     return undefined;
   });
 });
-afterEach(()=>{cleanup();vi.restoreAllMocks();vi.resetAllMocks()});
+afterEach(async()=>{cleanup();await act(async()=>{});vi.restoreAllMocks();vi.resetAllMocks()});
 it("locks project trim markers during source operations while preserving playback",async()=>{
   const onChange=vi.fn(),selection={start:{ticks:"0",time_base:"1/90000"},end:{ticks:"1800000",time_base:"1/90000"},disabled:true,onChange};
   const ui=render(<VideoPlayer autoLoad root="library" path="one.mp4" onOpenExternal={()=>{}} selection={selection}/>);const video=await screen.findByLabelText("Selected video") as HTMLVideoElement;
@@ -25,6 +25,10 @@ it("locks project trim markers during source operations while preserving playbac
   fireEvent.click(screen.getByText("Set trim start"));expect(onChange).not.toHaveBeenCalled();
   ui.rerender(<VideoPlayer autoLoad root="library" path="one.mp4" onOpenExternal={()=>{}} selection={{...selection,disabled:false}}/>);
   video.currentTime=1;fireEvent.timeUpdate(video);fireEvent.click(screen.getByText("Set trim start"));expect(onChange).toHaveBeenCalledWith({ticks:"90000",time_base:"1/90000"},selection.end);
+});
+it("pauses and releases a detached source decoder",async()=>{
+  const ui=render(<IPhoneMotion autoLoad root="library" path="one.mp4" onOpenExternal={()=>{}}/>);const video=await screen.findByLabelText("Selected video") as HTMLVideoElement;ui.unmount();
+  await waitFor(()=>expect(video.getAttribute("src")).toBeNull());expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();expect(HTMLMediaElement.prototype.load).toHaveBeenCalled();
 });
 it("loads a selected standalone video without another click and leaves audio playback to the controls",async()=>{
   render(<IPhoneMotion autoLoad root="library" path="one.mp4" onOpenExternal={()=>{}}/>);

@@ -35,4 +35,6 @@ The audit fixes do not implement Phase 7 clip sequencing or combined export. Kee
 
 ## Shared editing workflow — 0.56.7
 
-The workspace selector stays at the top left; only the navigation list scrolls on smaller windows. There is no Video Projects navigation tab. The Library opens one workspace-owned editor for one or many videos. The media bin chooses original sources, the timeline owns clip selection/placement, the selected-clip inspector owns edit controls, and the output section owns canvas and rendering actions. Keep source versus edited output explicit. One-clip native output is retained; continuous output is gated until validated.
+The workspace selector stays at the top left; only the navigation list scrolls on smaller windows. There is no Video Projects navigation tab. The Library opens one workspace-owned editor for one or many videos. The media bin chooses original sources, the timeline owns clip selection/placement, the selected-clip inspector owns edit controls, and the output section owns canvas and rendering actions. Keep source versus edited output explicit.
+
+In 0.56.8 the same stage shows one compiled continuous preview, with its playhead linked to the timeline. Switching back to a source releases the old decoder. Canvas shape/fit remain project edits; export resolution is a separate choice. Numeric source marks retain precision while joined timeline positions follow the project frame clock. Normalize clip widths against total duration, including sub-second edits. Photos and later social extensions belong in this same editor.

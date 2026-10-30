@@ -5,9 +5,9 @@ Baseline: 0.56.5. This supersedes conflicting future direction in the older feed
 | Phase | Deliverable | Status |
 | --- | --- | --- |
 | A | Design-system audit and conventions | Documented in DESIGN_SYSTEM_AUDIT.md and DESIGN.md |
-| B | Hard-cut timeline: selection, reorder, trim, split, delete/ripple, playhead/zoom, durations, transactional undo/autosave | In progress |
+| B | Hard-cut timeline: selection, reorder, trim, split, delete/ripple, playhead/zoom, durations, transactional undo/autosave | Implemented for video clips; installed GUI acceptance remains |
 | C | One workspace-owned project model/editor for one or many assets; legacy migration/recovery/relink | Shared editor, workspace storage/migration/recovery implemented in 0.56.7 |
-| D | Assembled preview and validated combined MP4/H.264 export, then project-independent export presets | Planned |
+| D | Assembled preview and validated combined MP4/H.264 export, then project-independent export presets | Continuous output/presets implemented in 0.56.8; installed GUI acceptance remains |
 | E | Ranked unified discovery with match reasons and media/timestamp identity | Planned |
 | F | Bounded local video frame sampling, deduplication, embeddings, matching timestamps | Planned |
 | G | Virtualized/lazy results, bounded thumbnail work, stale-work cancellation, scroll/memory checks | Planned |
@@ -19,7 +19,7 @@ Baseline: 0.56.5. This supersedes conflicting future direction in the older feed
 
 Timeline edits operate on ordered clip instances and rational source times. Their commands do not depend on where files or drafts are stored. A split/reorder/trim/delete is one undoable project transaction; original audio stays with its clip.
 
-The current schema-v2 store is keyed by a source folder. That is an existing implementation limitation, not the intended product model. Phase C must move project ownership to a workspace and resolve each asset only within that workspace's selected roots. Keep legacy drafts unchanged and migrate into the shared model; do not create a permanent single-video editor or trust imported absolute paths.
+Projects are owned by the workspace. Local verified bindings resolve each asset within that workspace's registered roots; portable documents carry relative references and fingerprints. Legacy drafts are copied into the shared model, without trusting imported absolute paths or keeping a second editor.
 
 The initial track is gapless: Delete and Ripple delete both close the removed interval. A future gap/track representation needs a versioned migration and tested silence/black semantics. Stable asset/clip identities and separate source versus timeline time leave room for photos, overlays, transitions, and additional audio tracks.
 
@@ -46,3 +46,11 @@ Legacy v1/v2 drafts are copied once in one transaction, with migration provenanc
 Legacy migration also copies up to 20 previous saves per draft. Older revisions with no recorded date or revision keep that information unavailable; no historical dates are invented. Player trim markers update the selected timeline instance, and source-changing operations lock those markers until verification finishes. Reset selected clip restores its source interval/edits; Reset project canvas separately restores the default canvas.
 
 Validation for 0.56.7 before push: 103 frontend tests passed; TypeScript and production build passed with the existing bundle-size warnings; native formatting, warnings-as-errors lint, and 122 Rust tests passed, with 6 explicitly ignored acceptance modes. Native cases include cross-folder short-video import/dedup/rollback, source fingerprints and workspace boundaries, legacy draft/history migration, revision-safe recovery, and resuming/relinking a matching one-source project. Browser fixtures passed shared-editor entry, multi-clip editing, recovery disclosure, light/dark, normal/minimum window geometry, drag/button reorder, and undo. The changed-UI detector returned no findings. GitHub Actions must be verified for this pushed commit separately. Multi-clip output remains gated.
+
+## 0.56.8 implementation checkpoint
+
+Continuous hard-cut preview/export and independent resolution presets are implemented. Both compile one immutable saved sequence, reusing source validation and edit preparation. Each source is decoded in turn into owned temporary parts; final video is stream-copied and audio is encoded once across the sequence. Cumulative frame allocation keeps timeline, preview and export aligned. The stage has one player owner and releases detached decoders. Current verified relinks survive recovery of older edits for the same original.
+
+Short native fixtures cover mixed frame rates/shapes, order/trim, repeated assets, gain/mute/silence, delayed/multiple audio, preview/export agreement, landscape/portrait/square/4K, cancellation, no-space, changed-source and destination-race failures. No long-form footage is used. Photos, text/music/transitions remain in I, after E ranked discovery, F video indexing, G large-library work and H map improvements. Packaged GUI/hardware acceptance and the deferred physical-drive checks remain distinct from these automated checks.
+
+Validation before push: 111 frontend tests in 21 files; TypeScript and production build; native formatting, warnings-as-errors lint, and 131 Rust tests (6 explicit acceptance modes ignored). Existing build chunk-size warnings remain. Real native-produced H.264/AAC preview played and sought in Edge through the assembled stage, with one video element, source restoration/cancellation, light/dark and 1220×780 / 800×580 no-overflow checks. Rendered review also corrected sub-second timeline sizing; StrictMode regression coverage protects ref reattachment from decoder cleanup. The changed-UI detector returned no findings. Pushed GitHub Actions must be verified for the exact commit separately.

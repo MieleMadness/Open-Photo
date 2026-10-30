@@ -23,7 +23,7 @@ async function fallback(command:string,args:unknown){
   if(command==="ai_runtime_status")return {directml_compiled:true,directml_available:false,cpu_fallback:true,automatic_policy:"CPU fallback"};
   return [];
 }
-beforeEach(()=>{
+beforeEach(()=>{vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(()=>{});vi.spyOn(HTMLMediaElement.prototype,"load").mockImplementation(()=>{});
   localStorage.clear();localStorage.setItem("openphoto.workspaces",JSON.stringify(workspace()));localStorage.setItem("openphoto.activeWorkspace","library");
   vi.stubGlobal("matchMedia",()=>({matches:false,addEventListener:()=>{},removeEventListener:()=>{}}));
   vi.mocked(invoke).mockImplementation(fallback);

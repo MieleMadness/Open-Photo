@@ -23,11 +23,13 @@ mod video_export;
 #[cfg(test)]
 mod video_integration_tests;
 mod video_poster;
+mod video_presets;
 mod video_preview;
 mod video_probe;
 mod video_project;
 mod video_render;
 mod video_sequence;
+mod video_sequence_render;
 mod video_timing;
 mod video_workspace;
 mod watch;

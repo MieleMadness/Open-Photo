@@ -1,41 +1,21 @@
 //! One edit/stream mapping pipeline for previews and exports.
+pub use crate::video_presets::ExportSize;
 use crate::{
     video_engine,
     video_probe::{self, VideoInfo},
     video_project::{self, Project},
     video_timing::{self, Span},
 };
-use serde::{Deserialize, Serialize};
 use std::{
     ffi::{OsStr, OsString},
     fs,
-    path::Path,
+    path::{Path, PathBuf},
     time::Duration,
 };
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum ExportSize {
-    #[default]
-    Project,
-    Hd1080,
-}
 pub const MAX_EXPORT_BYTES: u64 = 16 * 1024 * 1024 * 1024;
 fn output_canvas(p: &Project, size: ExportSize) -> Project {
     let mut canvas = p.clone();
-    if size == ExportSize::Hd1080 {
-        let (w, h) = if canvas.output.height > canvas.output.width {
-            (1080.0, 1920.0)
-        } else {
-            (1920.0, 1080.0)
-        };
-        let factor = (w / f64::from(canvas.output.width))
-            .min(h / f64::from(canvas.output.height))
-            .min(1.0);
-        canvas.output.width =
-            ((f64::from(canvas.output.width) * factor / 2.0).floor() as u32 * 2).max(16);
-        canvas.output.height =
-            ((f64::from(canvas.output.height) * factor / 2.0).floor() as u32 * 2).max(16);
-    }
+    canvas.output = crate::video_presets::resolve(&p.output, size);
     canvas
 }
 pub fn target_bitrate(p: &Project, size: ExportSize) -> u64 {
@@ -49,6 +29,9 @@ pub struct Plan {
     pub height: u32,
     pub video_span: Span,
     pub audio_span: Option<Span>,
+    pub expect_audio: bool,
+    pub expected_frames: Option<u64>,
+    pub working_directory: Option<PathBuf>,
     pub duration: f64,
     pub max_bytes: u64,
     pub timeout: Duration,
@@ -64,14 +47,25 @@ pub struct RenderOptions {
     pub size: ExportSize,
     pub acknowledge_first_audio: bool,
 }
-pub fn plan(
+pub struct Prepared {
+    pub source: PathBuf,
+    pub info: VideoInfo,
+    pub start: f64,
+    pub duration: f64,
+    pub video_span: Span,
+    pub audio_span: Option<Span>,
+    pub filter: String,
+    pub width: u32,
+    pub height: u32,
+}
+/// Probe, fingerprint and resolve edits once. Both render paths consume this contract.
+pub fn prepare(
     engine: &Path,
     root: &str,
     p: &Project,
-    output: &Path,
     options: RenderOptions,
     cancel: impl Fn() -> bool,
-) -> Result<Plan, String> {
+) -> Result<Prepared, String> {
     let RenderOptions {
         preview,
         size,
@@ -101,6 +95,40 @@ pub fn plan(
         video_timing::source_spans(engine, &source, &info, start, duration, &cancel)?;
     let canvas = output_canvas(p, if preview { ExportSize::Project } else { size });
     let (filter, width, height) = video_project::filters(&canvas, preview)?;
+    Ok(Prepared {
+        source,
+        info,
+        start,
+        duration,
+        video_span,
+        audio_span,
+        filter,
+        width,
+        height,
+    })
+}
+pub fn plan(
+    engine: &Path,
+    root: &str,
+    p: &Project,
+    output: &Path,
+    options: RenderOptions,
+    cancel: impl Fn() -> bool,
+) -> Result<Plan, String> {
+    let preview = options.preview;
+    let size = options.size;
+    let Prepared {
+        source,
+        info,
+        start,
+        duration,
+        video_span,
+        audio_span,
+        filter,
+        width,
+        height,
+    } = prepare(engine, root, p, options, cancel)?;
+    let clip = &p.clips[0];
     let max_bytes = if preview {
         512 * 1024 * 1024
     } else {
@@ -211,6 +239,9 @@ pub fn plan(
         height,
         video_span,
         audio_span,
+        expect_audio: !clip.edits.muted && audio_span.is_some(),
+        expected_frames: None,
+        working_directory: None,
         duration,
         max_bytes,
         timeout: Duration::from_secs(if preview { 1800 } else { 21600 }),
@@ -225,22 +256,28 @@ pub fn encode(
     progress: impl Fn(video_engine::Progress) + Send + 'static,
 ) -> Result<(), String> {
     let args: Vec<&OsStr> = plan.args.iter().map(OsString::as_os_str).collect();
-    video_engine::run_progress(
+    video_engine::run_progress_in(
         &video_engine::tool(engine, "ffmpeg")?,
         &args,
         plan.timeout,
         cancel,
         progress,
+        plan.working_directory.as_deref(),
     )
 }
 pub fn validate_output(
     engine: &Path,
-    p: &Project,
     plan: &Plan,
     output: &Path,
     cancel: impl Fn() -> bool,
 ) -> Result<VideoInfo, String> {
     let result = video_probe::probe(engine, output, cancel)?;
+    if plan
+        .expected_frames
+        .is_some_and(|count| result.frame_count != Some(count))
+    {
+        return Err("Rendered sequence has the wrong frame count".into());
+    }
     let tolerance = (video_timing::frame_interval(&plan.info) * 2.0).clamp(0.005, 0.1);
     let video_start =
         seconds(result.start_time.as_deref()).ok_or("Rendered video has no start timestamp")?;
@@ -250,10 +287,10 @@ pub fn validate_output(
     if (video_start - plan.video_span.start).abs() > tolerance
         || (video_start + video_duration - plan.video_span.end).abs() > tolerance
     {
-        return Err("Rendered video track failed independent timing validation".into());
+        return Err(format!("Rendered video track failed independent timing validation: expected {:.6}–{:.6} seconds, got {:.6}–{:.6} seconds",plan.video_span.start,plan.video_span.end,video_start,video_start+video_duration));
     }
     if (result.duration_seconds
-        - if p.clips[0].edits.muted {
+        - if !plan.expect_audio {
             plan.video_span.end
         } else {
             plan.audio_span
@@ -271,7 +308,7 @@ pub fn validate_output(
     {
         return Err("Rendered video failed duration, geometry, format, or size validation".into());
     }
-    let expect_audio = !p.clips[0].edits.muted && plan.audio_span.is_some();
+    let expect_audio = plan.expect_audio;
     if result.audio.len() != usize::from(expect_audio) {
         return Err("Rendered video did not preserve the selected audio policy".into());
     }

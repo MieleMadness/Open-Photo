@@ -1,6 +1,6 @@
 # Milestones and validation status
 
-## Current branch — 0.56.7
+## Current branch — 0.56.8
 
 The development branch contains a Windows Tauri photo library with workspaces, local indexing, previews, nondestructive photo-copy export, managed XMP keywords, maps, and opt-in local semantic/People/OCR features. Source-media originals remain read-only. CI success and installed-app acceptance are separate requirements.
 
@@ -30,6 +30,9 @@ Version 0.56.2 adds protected updater installation and a separate full-recording
 Physical source/destination drive removal, actual disk-full/quota/write failure, installed-package GUI playback, and whole-app performance measurements remain required before v1.0. The owner deferred physical drive-failure testing on 2026-10-29. Further long-form development/testing is deferred to 1.x; the successful 0.56.2 long-recording evidence is retained, and current development uses short clips.
 
 ## Phase 7 — Basic multi-video editing
+
+0.56.8 adds continuous assembled preview/export, linked original audio and independent resolution presets to the shared timeline. One source decoder runs at a time. Output is validated and decoded before no-overwrite publication; originals are reverified. Short tests cover mixed clips, sound/silence/gain/offsets, repeat/trim/order, 4K and canvas shapes, preview agreement and failure safety. 111 frontend and 131 Rust tests passed (6 ignored acceptance modes), with formatting and warnings-as-errors native lint. Installed GUI acceptance remains open. See [rendering architecture](VIDEO_SEQUENCE_RENDERING.md).
+
 
 0.56.7 moves project ownership to saved workspaces, supports sources from multiple registered folders, preserves older drafts through one-time transactional copies, and exposes bounded history/recovery. Projects remain editable when source folders are unavailable. Source bindings stay local; imported references and relinks are fingerprint-checked within registered workspace folders. One-video and multi-video editing now share the timeline/session/inspector/output controls; the old single-video controller is removed. One-clip rendering/export retains the tested pipeline through a saved-revision adapter. The assembled renderer remains next.
 

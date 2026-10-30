@@ -593,38 +593,37 @@ pub async fn workspace_video_history(
         }).collect()
     }).await.map_err(|e|e.to_string())?
 }
-fn single_for_render(
+fn render_snapshot(
     db: &Connection,
     workspace: &str,
     roots: &[String],
     id: &str,
     expected: u64,
-) -> Result<(String, video_project::Project), String> {
+) -> Result<crate::video_sequence_render::Snapshot, String> {
     let record = read(db, workspace, id)?;
     if record.revision != expected {
         return Err("Project changed elsewhere. Reopen before rendering.".into());
     }
-    if record.project.clips.len() != 1 {
-        return Err("Continuous output for multiple clips is the next rendering milestone".into());
+    let mut bindings = BTreeMap::new();
+    for asset in &record.project.assets {
+        if !record.project.clips.iter().any(|c| c.asset_id == asset.id) {
+            continue;
+        }
+        let root = registered_root(
+            roots,
+            record
+                .bindings
+                .get(&asset.id)
+                .ok_or("Relink every timeline source before rendering")?,
+        )?;
+        bindings.insert(asset.id.clone(), root.to_string_lossy().into_owned());
     }
-    let clip = record.project.clips[0].clone();
-    let asset = record
-        .project
-        .assets
-        .iter()
-        .find(|a| a.id == clip.asset_id)
-        .ok_or("Source no longer in project")?;
-    let root = registered_root(
-        roots,
-        record
-            .bindings
-            .get(&asset.id)
-            .ok_or("Relink the source video before rendering")?,
-    )?;
-    Ok((
-        root.to_string_lossy().into_owned(),
-        video_sequence::single(&record.project, asset, clip),
-    ))
+    let snapshot = crate::video_sequence_render::Snapshot {
+        project: record.project,
+        roots: bindings,
+    };
+    snapshot.validate()?;
+    Ok(snapshot)
 }
 #[tauri::command]
 pub fn start_workspace_video_preview(
@@ -635,9 +634,8 @@ pub fn start_workspace_video_preview(
     expected_revision: u64,
 ) -> Result<String, String> {
     let roots = user_data::workspace_roots(&workspace_id)?;
-    let (root, project) =
-        single_for_render(&database()?, &workspace_id, &roots, &id, expected_revision)?;
-    crate::video_preview::start_video_project_preview(app, jobs, root, project)
+    let snapshot = render_snapshot(&database()?, &workspace_id, &roots, &id, expected_revision)?;
+    crate::video_preview::start_sequence_preview(app, jobs, snapshot)
 }
 #[tauri::command]
 pub fn start_workspace_video_export(
@@ -650,9 +648,8 @@ pub fn start_workspace_video_export(
     options: crate::video_export::Options,
 ) -> Result<String, String> {
     let roots = user_data::workspace_roots(&workspace_id)?;
-    let (root, project) =
-        single_for_render(&database()?, &workspace_id, &roots, &id, expected_revision)?;
-    crate::video_export::start_video_export(app, jobs, previews, root, project, options)
+    let snapshot = render_snapshot(&database()?, &workspace_id, &roots, &id, expected_revision)?;
+    crate::video_export::start_sequence_export(app, jobs, previews, snapshot, options)
 }
 fn recover(
     db: &Connection,
@@ -675,8 +672,22 @@ fn recover(
     }
     project.id = video_project::id();
     project.title = project.title.chars().take(180).collect::<String>() + " (recovered copy)";
-    let bindings =
+    let mut bindings: Bindings =
         serde_json::from_str(&bindings).map_err(|_| "Invalid saved source references")?;
+    // Historical edits should keep a currently verified relink to the same original bytes.
+    for asset in &mut project.assets {
+        if let Some(now) = current
+            .project
+            .assets
+            .iter()
+            .find(|a| a.id == asset.id && a.sha256 == asset.sha256 && a.bytes == asset.bytes)
+        {
+            *asset = now.clone();
+            if let Some(root) = current.bindings.get(&asset.id) {
+                bindings.insert(asset.id.clone(), root.clone());
+            }
+        }
+    }
     let revision = store(&tx, workspace, &project, &bindings, None)?;
     tx.commit().map_err(|e| e.to_string())?;
     Ok(Record {
@@ -742,21 +753,21 @@ mod tests {
         assert_eq!(read(&db, "one", &id).unwrap().project.title, "Saved edit");
     }
     #[test]
-    fn render_snapshots_require_current_owner_revision_registered_source_and_one_clip() {
+    fn render_snapshots_require_current_owner_revision_registered_source_and_nonempty_timeline() {
         let (root, mut record) = fixture();
         let db = db();
         let workspace = "one";
         let roots = vec![root.to_string_lossy().into_owned()];
         store(&db, workspace, &record.project, &record.bindings, None).unwrap();
         let id = record.project.id.clone();
-        let (_, snapshot) = single_for_render(&db, workspace, &roots, &id, 1).unwrap();
-        assert_eq!(snapshot.clips, record.project.clips);
-        assert!(single_for_render(&db, "other", &roots, &id, 1).is_err());
-        assert!(single_for_render(&db, workspace, &[], &id, 1).is_err());
-        assert!(single_for_render(&db, workspace, &roots, &id, 2).is_err());
+        let snapshot = render_snapshot(&db, workspace, &roots, &id, 1).unwrap();
+        assert_eq!(snapshot.project.clips, record.project.clips);
+        assert!(render_snapshot(&db, "other", &roots, &id, 1).is_err());
+        assert!(render_snapshot(&db, workspace, &[], &id, 1).is_err());
+        assert!(render_snapshot(&db, workspace, &roots, &id, 2).is_err());
         record.project.clips.clear();
         store(&db, workspace, &record.project, &record.bindings, Some(1)).unwrap();
-        assert!(single_for_render(&db, workspace, &roots, &id, 2).is_err());
+        assert!(render_snapshot(&db, workspace, &roots, &id, 2).is_err());
         fs::remove_dir_all(root).unwrap();
     }
     #[test]
@@ -878,6 +889,29 @@ mod tests {
             )
             .unwrap();
         assert_eq!(count, 0);
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn recovery_keeps_current_verified_relink_for_the_same_original() {
+        let (root, mut record) = fixture();
+        let db = db();
+        store(&db, "one", &record.project, &record.bindings, None).unwrap();
+        fs::rename(root.join("source.mp4"), root.join("moved.mp4")).unwrap();
+        record.project.assets[0].relative_path = "moved.mp4".into();
+        store(&db, "one", &record.project, &record.bindings, Some(1)).unwrap();
+        let history: i64 = db
+            .query_row("SELECT max(id) FROM workspace_video_history", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        let copy = recover(&db, "one", &record.project.id, history, 2).unwrap();
+        assert_eq!(copy.project.assets[0].relative_path, "moved.mp4");
+        assert!(
+            loaded(&[root.to_string_lossy().into_owned()], copy).sources[0]
+                .path
+                .is_some()
+        );
+        assert_eq!(read(&db, "one", &record.project.id).unwrap().revision, 2);
         fs::remove_dir_all(root).unwrap();
     }
     #[test]
@@ -1012,8 +1046,8 @@ mod tests {
             open_source(&db, &engine, "workspace", &roots, moved.to_str().unwrap()).unwrap();
         assert_eq!(relinked.project.id, one.project.id);
         assert_eq!(relinked.revision, 3);
-        let (render_root, snapshot) =
-            single_for_render(&db, "workspace", &roots, &one.project.id, 3).unwrap();
+        let snapshot = render_snapshot(&db, "workspace", &roots, &one.project.id, 3).unwrap();
+        let (render_root, snapshot) = snapshot.single(0).unwrap();
         assert_eq!(
             fs::canonicalize(render_root).unwrap(),
             fs::canonicalize(&second).unwrap()
