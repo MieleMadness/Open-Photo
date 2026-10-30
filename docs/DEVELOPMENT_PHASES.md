@@ -1,6 +1,6 @@
 # Development phases
 
-Baseline: 0.56.14. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.15. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -82,3 +82,7 @@ The approved Clipchamp-inspired layout is implemented over the shared editing mo
 ## 0.56.14 — Focused timeline navigation
 
 Adaptive ruler labels, source poster thumbnails, linked-audio labels and explicit before/after reordering are implemented. Real filmstrips, drag trim handles, adjustable pane splits and photos remain follow-up work.
+
+## 0.56.15 — Timeline trim handles
+
+Selected-clip drag trimming and keyboard nudges use the existing rational-time trim command, shared history and revision-safe autosave. Cancelled/stale drafts never publish edits. Next remain real filmstrips, adjustable pane splits and photo clips.

@@ -60,6 +60,17 @@ it("drops after the last clip, ignores adjacent no-op drops and undoes one reord
   fireEvent.click(screen.getByRole("button",{name:"Undo timeline edit"}));
   expect(screen.getByRole("button",{name:"Clip 1: one.mp4"})).toBeTruthy();
 });
+it("saves a handle trim through the shared history and undoes the complete gesture",async()=>{
+  const {container}=render(<VideoSequences roots={["/library"]} workspaceId="w" initial={loaded()}/>);
+  const end=await screen.findByRole("slider",{name:"Trim end of clip 1"});
+  vi.spyOn(container.querySelector(".timeline-track")!,"getBoundingClientRect").mockReturnValue({width:400} as DOMRect);
+  const pointer=(type:"pointerDown"|"pointerMove"|"pointerUp",clientX:number)=>{const event=createEvent[type](end);Object.defineProperties(event,{clientX:{value:clientX},pointerId:{value:1},button:{value:0}});fireEvent(end,event);};
+  pointer("pointerDown",200);pointer("pointerMove",150);
+  expect((screen.getByRole("button",{name:"Undo timeline edit"}) as HTMLButtonElement).disabled).toBe(true);
+  pointer("pointerUp",150);expect((screen.getByLabelText("Clip end in source (seconds)") as HTMLInputElement).value).toBe("1.5");
+  await act(async()=>flushProjects());expect(invoke).toHaveBeenCalledWith("save_workspace_video_project",expect.objectContaining({project:expect.objectContaining({clips:expect.arrayContaining([expect.objectContaining({id:"clip-one",source_out:{ticks:"135000",time_base:"1/90000"}})])})}));
+  fireEvent.click(screen.getByRole("button",{name:"Undo timeline edit"}));expect((screen.getByLabelText("Clip end in source (seconds)") as HTMLInputElement).value).toBe("2");
+});
 it("splits, reorders, trims and undoes timeline edits through revision-safe autosave",async()=>{
   render(<VideoSequences roots={["/library"]} workspaceId="w"/>);await screen.findByLabelText("Saved editing projects");
   fireEvent.change(screen.getByLabelText("Saved editing projects"),{target:{value:"p"}});await screen.findByDisplayValue("Two short videos");

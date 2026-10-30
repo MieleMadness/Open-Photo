@@ -62,3 +62,7 @@ Use immediate panel/selection feedback and no animated editor width or timeline 
 ## Timeline navigation — 0.56.14
 
 Use a native range for ruler seeking so pointer and keyboard behavior stay shared. Tick labels are decorative, adaptive and bounded to 201 entries. Reuse bounded source posters for clip identity; never imply these are sampled filmstrips. Audio bands describe linked/muted/silent source audio without invented waveforms. Drag insertion maps a before/after boundary into the final order after removing the dragged clip; no-op drops must not enter history.
+
+## Trim gestures — 0.56.15
+
+Only the selected clip exposes trim handles. Pointer capture keeps the active edge under control outside its bounds. Freeze pixels-per-second and the source interval at gesture start; display a temporary range rather than continuously modifying the saved project. Commit once on release. Cancel on Escape, lost capture/focus or changed project/selection. Keyboard steps respect both project timing and the source clock; numeric trim fields remain an alternative. Do not animate repeated trimming or scrubbing.

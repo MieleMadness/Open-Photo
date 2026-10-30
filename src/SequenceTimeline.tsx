@@ -1,5 +1,6 @@
 import {useEffect,useId,useRef,useState} from "react";
 import {ArrowLeft,ArrowRight,Plus,RotateCcw,Scissors,Trash2,Undo2,Redo2} from "lucide-react";
+import {TimelineTrimHandles} from "./TimelineTrimHandles";
 import {EditorPoster} from "./EditorPoster";
 import {timelineTicks,clipDropIndex} from "./timelineGeometry";
 import type {LoadedSequence} from "./videoSequence";
@@ -16,7 +17,7 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
   const project=session.history.present,entries=timelineEntries(project),duration=projectDuration(project);
   const [zoom,setZoom]=useState(1);
   const dragging=useRef("");
-  const viewport=useRef<HTMLDivElement>(null);
+  const viewport=useRef<HTMLDivElement>(null),track=useRef<HTMLDivElement>(null);
   const [width,setWidth]=useState(800),[drop,setDrop]=useState<{id:string;after:boolean}|null>(null);
   useEffect(()=>{
     const measure=()=>{if(viewport.current?.clientWidth)setWidth(viewport.current.clientWidth);};measure();
@@ -40,11 +41,12 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
         <label>Timeline zoom<select value={zoom} onChange={e=>setZoom(Number(e.target.value))}><option value={1}>Fit timeline</option><option value={2}>2×</option><option value={4}>4×</option><option value={8}>8×</option></select></label>
       </div>
       <div ref={viewport} className="timeline-scroll" tabIndex={0} aria-label="Scrollable timeline">
-        <div className="timeline-track" style={{width:`${zoom*100}%`}}>
+        <div ref={track} className="timeline-track" style={{width:`${zoom*100}%`}}>
           <div className="timeline-scrubber"><label htmlFor={playheadId}>Project playhead</label><output aria-label="Project playhead time">{clockTime(playhead)}</output><div className="timeline-ruler"><div className="timeline-ticks" aria-hidden="true">{ticks.map(tick=><span key={tick.seconds} data-end={tick.left>95} style={{left:`${tick.left}%`}}>{tick.label}</span>)}</div><input id={playheadId} aria-label="Project playhead" title="Drag the ruler or use arrow keys to seek" type="range" min={0} max={duration||1} step="any" value={playhead} disabled={!entries.length} onChange={e=>onPosition(Number(e.target.value))}/><span className="timeline-ruler-head" aria-hidden="true" style={{left:`${duration?playhead/duration*100:0}%`}}/></div></div>
           <ol className="timeline-clips">{entries.map((item,i)=>{
             const source=project.assets.find(a=>a.id===item.clip.asset_id)!;
             const binding=sources.find(value=>value.asset_id===source.id);
+            const [tickNumerator,tickDenominator]=item.clip.source_in.time_base.split("/").map(Number),sourceTick=tickNumerator/tickDenominator;
             return <li key={item.clip.id} style={{flexGrow:item.duration/duration}} data-drop={drop?.id===item.clip.id?(drop.after?"after":"before"):undefined} onDragOver={e=>{
               if(!dragging.current||disabled)return;e.preventDefault();
               const bounds=e.currentTarget.getBoundingClientRect(),after=e.clientX>=bounds.left+bounds.width/2;
@@ -61,6 +63,7 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
               <button type="button" draggable={!disabled} className="timeline-clip" aria-label={`Clip ${i+1}: ${source.relative_path.split("/").at(-1)}`} aria-pressed={selected===item.clip.id} onClick={()=>choose(item.clip.id)} onDragStart={e=>{dragging.current=item.clip.id;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",item.clip.id);}} onDragEnd={()=>{dragging.current="";setDrop(null);}}>
                 <strong title={source.relative_path}>{i+1}. {source.relative_path.split("/").at(-1)}</strong><EditorPoster root={binding?.root||undefined} path={binding?.path||undefined} identity={source.sha256}/><span className="timeline-clip-duration">{clockTime(item.duration)}</span><small className="timeline-linked-audio" data-muted={item.clip.edits.muted||!source.info.audio.length}>{item.clip.edits.muted?"Audio muted":source.info.audio.length?"Linked original audio":"Silent source"}</small>
               </button>
+              <TimelineTrimHandles range={{start:markSeconds(item.clip.source_in),end:markSeconds(item.clip.source_out)}} limit={Math.max(source.info.duration_seconds,markSeconds(item.clip.source_out))} minimum={0.04+sourceTick} step={Math.max(1/project.frame_rate,sourceTick)} selected={selected===item.clip.id} disabled={disabled} token={project} index={i} pixelsPerSecond={()=>(track.current?.getBoundingClientRect().width||0)/duration} onCommit={range=>command({type:"trim",clipId:item.clip.id,...range})}/>
             </li>;
           })}</ol>
           {!!duration&&<span className="timeline-playhead" aria-hidden="true" style={{left:`${playhead/duration*100}%`}}/>}

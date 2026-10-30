@@ -1,4 +1,4 @@
-> Development update: **0.56.14** adds an adaptive timeline ruler, clip thumbnails, linked-audio labels and clearer before/after drag reordering. The desktop editing layout and safe shared project workflow are retained.
+> Development update: **0.56.15** adds draggable trim handles to the selected timeline clip, with keyboard nudging, cancellation and one undo/autosave transaction per completed gesture.
 
 
 
@@ -594,3 +594,9 @@ This patch establishes the layout. Timeline filmstrips/trim handles, photo clips
 ### Timeline navigation — 0.56.14
 
 Drag the time ruler to seek, or focus it and use the arrow keys. Labels adapt to timeline zoom. Clip thumbnails identify original sources; they are poster images, not frame-by-frame filmstrips. Each clip labels linked, muted or silent original audio. Drag onto the left/right half of another clip to insert before/after it; a marker shows the destination. Unchanged drops do not create undo steps. Move earlier/later and numeric trims remain available in the inspector.
+
+### Timeline trim handles — 0.56.15
+
+Select a timeline clip, then drag its left/right edge to change its source start/end. A temporary outline and time readout show the pending range. Releasing commits the trim and closes the sequence gap; one Undo restores the entire gesture. Escape, pointer cancellation, focus loss or a changed project discards the pending trim.
+
+Focus a handle and use Left/Right for small adjustments, Shift+Left/Right for ten steps, or Home/End for the available limits. Source boundaries and the minimum kept duration are enforced. Numeric trim fields remain available for precise entry, particularly for very narrow clips; zoom in to make handles easier to grab. The original media stays unchanged. Preview remains explicitly source versus rendered project output.

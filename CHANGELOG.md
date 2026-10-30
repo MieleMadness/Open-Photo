@@ -1,3 +1,11 @@
+# 0.56.15 — Draggable timeline trimming
+
+- Add start/end handles to the selected timeline clip with a temporary outline/time readout. Freeze the drag scale and commit one shared trim command on release.
+- Keep each gesture one undo/autosave transaction. Escape, pointer cancellation, lost capture/focus and project/selection changes discard drafts; stale gestures cannot overwrite a newer edit.
+- Support arrow/Shift-arrow and Home/End adjustments, source bounds and minimum duration. Keep numeric trims and original source safety.
+- Keep clip captions clear of handles and constrain poster images to the timeline row so their content remains visible.
+- Add gesture, cancellation, boundary, shared-save and undo regression coverage. Real filmstrips, adjustable pane splits and photo clips remain follow-ups.
+
 # 0.56.14 — Clearer timeline navigation
 
 - Add zoom-aware ruler labels and native pointer/keyboard seeking, with bounded tick generation.

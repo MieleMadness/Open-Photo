@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current branch — 0.56.14
+## Current branch — 0.56.15
+
+0.56.15 adds pointer/keyboard trim handles with local gesture drafts, stale-gesture protection and one-step undo/autosave. Browser fixtures verify drag, cancellation, keyboard nudging and minimum-window layout. Filmstrips, adjustable pane splits and photo clips remain pending.
 
 0.56.14 adds bounded adaptive ruler labels, clip posters/audio labels and before/after reordering with no-op history protection. The shared project/renderer schema is unchanged. Real filmstrips, drag trim handles and photos remain pending.
 
