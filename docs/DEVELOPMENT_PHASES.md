@@ -1,6 +1,6 @@
 # Development phases
 
-Baseline: 0.56.18. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.19. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -91,7 +91,7 @@ Selected-clip drag trimming and keyboard nudges use the existing rational-time t
 
 Preview/timeline resizing now has persistent app-level sizing, pointer/keyboard interaction, cancellation and viewport-aware limits. Project history and rendering are unchanged. Filmstrips and photo clips remain next.
 
-## 0.56.18 — Timeline-first trimming and preview resizing
+## 0.56.19 — Playback and appearance preferences\n\nVideo playback volume is now a persisted global preference shared by normal video playback and assembled project preview. Library video tiles and Live Photos gain lazy muted hover motion previews. Settings adds five stock accent palettes (Purple, Blue, Teal, Green, Rose) that reuse the existing semantic design tokens in light and dark themes. These changes are presentation/playback preferences only and do not alter project or export semantics.\n\n## 0.56.18 — Timeline-first trimming and preview resizing
 
 Editor trimming is now timeline-only: the selected clip's left/right handles are the source-of-truth UI and duplicate numeric/source-player trim controls are removed. The preview/timeline divider stays live during layout measurement, the preview resizes with the divider, and timeline zoom uses direct out/fit/in controls. Timeline clips show a filmstrip-style repeated poster using the existing bounded poster cache; true sampled frames remain a future native enhancement. Crop controls are surfaced by default in the Clip inspector.\n\n## 0.56.17 — Inspector task clarity
 
