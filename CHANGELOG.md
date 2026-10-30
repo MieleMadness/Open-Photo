@@ -1,3 +1,12 @@
+# 0.56.19 — Remembered video volume, hover motion previews, and accent colors
+
+- Remember the last video-player volume globally and restore it when switching videos, reopening details, or using the assembled project preview.
+- Add lazy muted hover playback for Library video tiles; decoding/playback starts only after hover.
+- Add Live Photo hover motion by using the paired motion clip while the still image remains the default tile preview.
+- Add five persisted Settings accent choices: Purple, Blue, Teal, Green, and Rose. Accent selection updates buttons, focus states, selected items, and highlights in both light and dark themes.
+- Keep hover previews muted so browsing never changes the saved playback volume or surprises users with audio.
+- No project schema, renderer, export, or AI-index behavior changes.
+
 # 0.56.18 — Timeline-first trimming and editor resizing
 
 - Remove duplicate source trim controls from the editor preview; trimming now lives on the timeline's left/right clip handles.
