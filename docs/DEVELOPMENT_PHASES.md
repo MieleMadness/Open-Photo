@@ -1,6 +1,6 @@
 # Development phases
 
-Baseline: 0.56.5. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.9. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -8,8 +8,8 @@ Baseline: 0.56.5. This supersedes conflicting future direction in the older feed
 | B | Hard-cut timeline: selection, reorder, trim, split, delete/ripple, playhead/zoom, durations, transactional undo/autosave | Implemented for video clips; installed GUI acceptance remains |
 | C | One workspace-owned project model/editor for one or many assets; legacy migration/recovery/relink | Shared editor, workspace storage/migration/recovery implemented in 0.56.7 |
 | D | Assembled preview and validated combined MP4/H.264 export, then project-independent export presets | Continuous output/presets implemented in 0.56.8; installed GUI acceptance remains |
-| E | Ranked unified discovery with match reasons and media/timestamp identity | Planned |
-| F | Bounded local video frame sampling, deduplication, embeddings, matching timestamps | Planned |
+| E | Ranked unified discovery with match reasons and media/timestamp identity | Planned — Codex/native indexing work |
+| F | Bounded local video frame sampling, deduplication, embeddings, matching timestamps | Planned — Codex/native AI work |
 | G | Virtualized/lazy results, bounded thumbnail work, stale-work cancellation, scroll/memory checks | Planned |
 | H | Clustered map discovery, counts/empty states, safe phone-media GPS extraction | Planned |
 | I | Photos, text, local audio, simple tested transitions and social layouts after hard cuts stabilize | Gated on B–D |
@@ -54,3 +54,7 @@ Continuous hard-cut preview/export and independent resolution presets are implem
 Short native fixtures cover mixed frame rates/shapes, order/trim, repeated assets, gain/mute/silence, delayed/multiple audio, preview/export agreement, landscape/portrait/square/4K, cancellation, no-space, changed-source and destination-race failures. No long-form footage is used. Photos, text/music/transitions remain in I, after E ranked discovery, F video indexing, G large-library work and H map improvements. Packaged GUI/hardware acceptance and the deferred physical-drive checks remain distinct from these automated checks.
 
 Validation before push: 111 frontend tests in 21 files; TypeScript and production build; native formatting, warnings-as-errors lint, and 131 Rust tests (6 explicit acceptance modes ignored). Existing build chunk-size warnings remain. Real native-produced H.264/AAC preview played and sought in Edge through the assembled stage, with one video element, source restoration/cancellation, light/dark and 1220×780 / 800×580 no-overflow checks. Rendered review also corrected sub-second timeline sizing; StrictMode regression coverage protects ref reattachment from decoder cleanup. The changed-UI detector returned no findings. Pushed GitHub Actions must be verified for the exact commit separately.
+
+## 0.56.9 UI polish checkpoint
+
+This patch continues the documented design-system cleanup without changing timeline storage, rendering, search indexes, or native media behavior. Remaining main destinations use the shared page-heading structure; timeline commands keep their existing semantics while gaining consistent iconography, clearer selected/empty states, and a dedicated destructive treatment for ripple deletion. Original media remains untouched when a timeline clip is removed. Deeper ranked search, video semantic indexing, large-library optimization, and map metadata work remain separate Codex/native phases.
