@@ -1,4 +1,4 @@
-> Development update: **0.56.8** joins multiple videos into one continuous preview and MP4 export in the shared timeline editor. Select videos in the Library and choose **Create video from selection…**. Trim, split, reorder and adjust clips, then use **Preview project edits** or **Export project MP4…**. Workspace selection stays at the top left; there is no separate Video Projects tab. Photo clips will join this same editor in the later mixed-media extension.
+> Development update: **0.56.9** keeps the 0.56.8 shared timeline/export foundation and completes another UI consistency pass: standardized page headings, clearer timeline actions, and distinct destructive styling for ripple deletion. Select videos in the Library and choose **Create video from selection…**. Trim, split, reorder and adjust clips, then use **Preview project edits** or **Export project MP4…**. Workspace selection stays at the top left; there is no separate Video Projects tab. Photo clips will join this same editor in the later mixed-media extension.
 
 
 
@@ -25,7 +25,7 @@ Open-Photo uses one shared visual system across the photo library, settings, loc
 ### Browsing and editing
 
 - The **Media library** opens with thumbnails. Expand **Search and library tools** for duplicate review, organization filters, semantic search, text search, and AI indexing.
-- Select videos and choose **Create video from selection…** to place them in one ordered project. **Open video editor…** reopens saved projects. Projects accept videos across the current workspace’s folders, use original-source previews, and do not yet render the assembled sequence. **Previous saves and recovery** creates a new copy from a retained revision, keeping the current project. Photo clips will use this same timeline in the later mixed-media milestone.
+- Select videos and choose **Create video from selection…** to place them in one ordered project. **Open video editor…** reopens saved projects. Projects accept videos across the current workspace’s folders and can preview/export the assembled sequence as one continuous MP4. **Previous saves and recovery** creates a new copy from a retained revision, keeping the current project. Photo clips will use this same timeline in the later mixed-media milestone.
 - Select media to reveal tagging actions. Folder management remains under **Folders**; **By date** browses capture months.
 - **Full-screen viewer** gives media the available window. When viewing a video, choose **Open video editor** to resume a workspace-owned project in the shared timeline. Trim, transform, audio, brightness/contrast, crop, canvas, and one-clip preview/export remain available there.
 - Workspace, collection, rule, and person naming use labeled forms with cancellation and validation. Invalid video numeric input remains visible and must be corrected before export.
