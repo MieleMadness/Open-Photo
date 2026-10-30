@@ -68,3 +68,29 @@
   --accent-text: #d8b7ff;
   --success-text: #43d79b
 }
+
+/* User-selectable accent palettes. Purple remains the default. */
+:root[data-accent="blue"] {
+  --primary:#2563eb; --primary-hover:#1d4ed8; --primary-soft:#e8f0ff; --accent-text:#1d4ed8;
+}
+:root[data-accent="teal"] {
+  --primary:#0f766e; --primary-hover:#0b5f59; --primary-soft:#e5f6f4; --accent-text:#0b655e;
+}
+:root[data-accent="green"] {
+  --primary:#15803d; --primary-hover:#116b33; --primary-soft:#e8f7ed; --accent-text:#126b36;
+}
+:root[data-accent="rose"] {
+  --primary:#be185d; --primary-hover:#9f1239; --primary-soft:#fce7f0; --accent-text:#a91450;
+}
+:root[data-theme="dark"][data-accent="blue"] {
+  --primary:#60a5fa; --primary-hover:#93c5fd; --primary-soft:#1e365a; --accent-text:#a8ceff; --on-primary:#0b1c35;
+}
+:root[data-theme="dark"][data-accent="teal"] {
+  --primary:#5eead4; --primary-hover:#99f6e4; --primary-soft:#183f3b; --accent-text:#8cf4e3; --on-primary:#082d29;
+}
+:root[data-theme="dark"][data-accent="green"] {
+  --primary:#4ade80; --primary-hover:#86efac; --primary-soft:#1d402a; --accent-text:#8bf2ad; --on-primary:#0a2b17;
+}
+:root[data-theme="dark"][data-accent="rose"] {
+  --primary:#fb7185; --primary-hover:#fda4af; --primary-soft:#4a2430; --accent-text:#ffabb7; --on-primary:#361018;
+}
