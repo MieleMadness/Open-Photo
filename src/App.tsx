@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {AppSidebar} from "./AppSidebar";
@@ -28,6 +28,14 @@ type Collection = {id:string;workspaceId:string;name:string;paths:string[]};
 type SmartRule = {id:string;workspaceId:string;name:string;minRating:number;type:"all"|"photo"|"video";minMB:number};
 
 type Theme = "light" | "dark" | "system";
+type Accent = "purple" | "blue" | "teal" | "green" | "rose";
+const ACCENTS:{id:Accent;label:string;color:string}[]=[
+  {id:"purple",label:"Purple",color:"#6727ad"},
+  {id:"blue",label:"Blue",color:"#2563eb"},
+  {id:"teal",label:"Teal",color:"#0f766e"},
+  {id:"green",label:"Green",color:"#15803d"},
+  {id:"rose",label:"Rose",color:"#be185d"}
+];
 type PhotoView = "grid" | "list";
 type SortBy = "relevance" | "name" | "newest" | "oldest" | "largest" | "smallest";
 type Photo = { path: string; name: string; extension: string; bytes: number; modified_unix: number; capture_local?: string | null; live_asset_id?: string | null; libraryRoot?: string };
@@ -179,6 +187,7 @@ export default function App() {
   useEffect(()=>saveSetting("openphoto.ratings",JSON.stringify(photoRatings)),[photoRatings]);
   const ratePhoto=(path:string,rating:number)=>setPhotoRatings(previous=>({...previous,[path]:previous[path]===rating?0:rating}));
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("openphoto.theme") as Theme) || "system");
+  const [accent,setAccent]=useState<Accent>(()=>{const value=localStorage.getItem("openphoto.accent") as Accent|null;return ACCENTS.some(item=>item.id===value)?value!:"purple";});
   const [root, setRoot] = useState("");
   useEffect(()=>{saveSetting("openphoto.workspaces",JSON.stringify(workspaces))},[workspaces]);
   useEffect(()=>{saveSetting("openphoto.activeWorkspace",activeWorkspace)},[activeWorkspace]);
@@ -285,6 +294,10 @@ export default function App() {
     },220);
     return()=>{active=false;window.clearTimeout(timer)};
   },[selected?.path,selected?.libraryRoot,selected?.extension,root,editRotation,editFlipH,editFlipV,editBrightness,editContrast,editCropLeft,editCropTop,editCropRight,editCropBottom,editResizeWidth,editResizeHeight,editGrayscale,editHue,editBlur,editSharpen,editSharpenThreshold]);
+  useEffect(()=>{
+    saveSetting("openphoto.accent",accent);
+    document.documentElement.dataset.accent=accent;
+  },[accent]);
   useEffect(() => {
     saveSetting("openphoto.theme", theme);
     const body = document.documentElement;
