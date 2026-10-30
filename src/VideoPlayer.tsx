@@ -4,7 +4,7 @@ import {convertFileSrc,invoke} from "@tauri-apps/api/core";
 import {ErrorNotice} from "./Ui";
 import {VideoDetails,type VideoInfo} from "./VideoDetails";
 import {clockTime,markSeconds,markTime,type VideoTime} from "./videoTime";
-import {useVideoElement} from "./mediaPlayback";
+import {applySavedVideoVolume,saveVideoVolume,useVideoElement} from "./mediaPlayback";
 
 type Assets={source:string;proxy:boolean;info:VideoInfo;filmstrip:{seconds:number;image:string}[];warnings:string[]};
 type Status={state:"queued"|"running"|"complete"|"failed";result:Assets|null;error:string|null};
@@ -109,11 +109,11 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,c
     {!src&&poster&&<button className="video-poster" disabled={busy} aria-label={requested?"Retry video preview":"Play selected video"} onClick={()=>requested?setRevision(v=>v+1):setRequested(true)}><img src={poster} alt="Selected video preview"/></button>}
     {!requested&&<button className="secondary-button" onClick={()=>setRequested(true)}>Play Live Photo / video</button>}
     {src&&<><video ref={bindVideo} src={src} poster={poster||assets?.filmstrip[0]?.image} autoPlay={playIntent} controls playsInline preload="metadata" aria-label="Selected video"
-      onLoadedMetadata={()=>{const element=video.current;if(!element)return;if(Number.isFinite(element.duration))setDuration(element.duration);element.currentTime=Math.min(restore.current,element.duration||0);setPosition(element.currentTime);current.current=element.currentTime;}}
+      onLoadedMetadata={()=>{const element=video.current;if(!element)return;applySavedVideoVolume(element);if(Number.isFinite(element.duration))setDuration(element.duration);element.currentTime=Math.min(restore.current,element.duration||0);setPosition(element.currentTime);current.current=element.currentTime;}}
       onDurationChange={()=>{if(video.current&&Number.isFinite(video.current.duration))setDuration(video.current.duration);}}
       onLoadedData={event=>{if(event.currentTarget.videoWidth===0&&event.currentTarget.videoHeight===0)playbackFailure(4,"The file loaded without a decodable video track");}}
       onTimeUpdate={()=>{if(video.current){current.current=video.current.currentTime;if(rangePlaying.current&&current.current>=(outMark?markSeconds(outMark):duration)){video.current.pause();video.current.currentTime=outMark?markSeconds(outMark):duration;current.current=video.current.currentTime;rangePlaying.current=false;}setPosition(current.current);}}}
-      onPlay={()=>{setPlaying(true);setPlayIntent(true);}} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)}
+      onPlay={()=>{setPlaying(true);setPlayIntent(true);}} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onVolumeChange={event=>saveVideoVolume(event.currentTarget.volume)}
       onError={event=>playbackFailure(event.currentTarget.error?.code||0,event.currentTarget.error?.message||"")}/>
       {!editorMode&&<><div className="video-transport">
         <button className="secondary-button" onClick={toggle}>{playing?"Pause":"Play"}</button>
