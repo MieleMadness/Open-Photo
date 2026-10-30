@@ -20,7 +20,7 @@ export function EditorTimelineDivider({host,onHeight}:{host:RefObject<HTMLElemen
   useLayoutEffect(()=>{
     const root=host.current;if(!root)return;
     const header=root.querySelector<HTMLElement>(".editor-project-bar"),feedback=root.querySelector<HTMLElement>(".editor-feedback");
-    const measure=()=>{geometry.current={height:root.clientHeight||800,occupied:(header?.getBoundingClientRect().height||80)+(feedback?.getBoundingClientRect().height||0)};setBounds(timelineSplitBounds(geometry.current.height,geometry.current.occupied));if(gesture.current)cancel();else show(geometry.current.height*preference.current);};
+    const measure=()=>{geometry.current={height:root.clientHeight||800,occupied:(header?.getBoundingClientRect().height||80)+(feedback?.getBoundingClientRect().height||0)};setBounds(timelineSplitBounds(geometry.current.height,geometry.current.occupied));if(!gesture.current)show(geometry.current.height*preference.current);};
     measure();const observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(measure):null;
     observer?.observe(root);if(header)observer?.observe(header);if(feedback)observer?.observe(feedback);
     const blur=()=>{if(gesture.current)cancel();};window.addEventListener("blur",blur);
