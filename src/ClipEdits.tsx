@@ -4,14 +4,14 @@ import {cropForAspect,type Edits,type VideoProject} from "./videoProject";
 /** One selected-clip inspector for one-source and multi-source projects. */
 export function ClipEdits({edits,info,onChange}:{edits:Edits;info:VideoProject["asset"]["info"];onChange:(mutate:(edit:Edits)=>void)=>string}){
   return <div className="clip-edits">
-    <details open><summary>Transform and audio</summary><div className="video-edit-fields">
+    <details><summary>Transform and audio</summary><div className="video-edit-fields">
       <label>Rotation<select aria-label="Video rotation" value={edits.quarter_turns} onChange={e=>onChange(edit=>{edit.quarter_turns=Number(e.target.value);})}>{[0,1,2,3].map(turn=><option key={turn} value={turn}>{turn*90}° clockwise</option>)}</select></label>
       <label><input type="checkbox" checked={edits.flip_horizontal} onChange={e=>onChange(edit=>{edit.flip_horizontal=e.target.checked;})}/>Flip horizontally</label>
       <label><input type="checkbox" checked={edits.flip_vertical} onChange={e=>onChange(edit=>{edit.flip_vertical=e.target.checked;})}/>Flip vertically</label>
       <label><input type="checkbox" checked={edits.muted} onChange={e=>onChange(edit=>{edit.muted=e.target.checked;})}/>Mute video audio</label>
       <NumberField label="Audio volume (%)" value={edits.gain_percent} min={0} max={200} onCommit={value=>onChange(edit=>{edit.gain_percent=value;})}/>
     </div></details>
-    <details><summary>Brightness, contrast and crop</summary><div className="video-edit-fields">
+    <details open><summary>Crop & image adjustments</summary><div className="video-edit-fields">
       <NumberField label="Video brightness" value={edits.brightness} min={-100} max={100} onCommit={value=>onChange(edit=>{edit.brightness=value;})}/>
       <NumberField label="Video contrast" value={edits.contrast} min={-100} max={100} onCommit={value=>onChange(edit=>{edit.contrast=value;})}/>
       <button className="secondary-button" onClick={()=>onChange(edit=>{edit.brightness=0;edit.contrast=0;})}>Reset brightness and contrast</button>
