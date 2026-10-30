@@ -1,12 +1,10 @@
 import {useEffect,useId,useRef,useState} from "react";
-import {ArrowLeft,ArrowRight,Plus,RotateCcw,Scissors,Trash2,Undo2,Redo2} from "lucide-react";
+import {ArrowLeft,ArrowRight,Plus,RotateCcw,Scissors,Trash2,Undo2,Redo2,ZoomIn,ZoomOut,Maximize2} from "lucide-react";
 import {TimelineTrimHandles} from "./TimelineTrimHandles";
 import {EditorPoster} from "./EditorPoster";
 import {timelineTicks,clipDropIndex} from "./timelineGeometry";
 import type {LoadedSequence} from "./videoSequence";
-import {NumberField} from "./EditorFields";
 import {ClipEdits} from "./ClipEdits";
-import {sourceEndLimit} from "./videoProject";
 import {clockTime,markSeconds} from "./videoTime";
 import {projectDuration,timelineEntries} from "./timelineCommands";
 import {useTimelineActions} from "./useTimelineActions";
@@ -38,7 +36,12 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
         <button className="secondary-button" disabled={!session.history.past.length} aria-label="Undo timeline edit" title="Undo timeline edit" onClick={()=>history("undo")}><Undo2 size={16}/>Undo</button>
         <button className="secondary-button" disabled={!session.history.future.length} aria-label="Redo timeline edit" title="Redo timeline edit" onClick={()=>history("redo")}><Redo2 size={16}/>Redo</button>
         <button className="secondary-button" aria-label="Append selected video" title="Add selected media to the end of the timeline" onClick={()=>command({type:"append",assetId,newId:crypto.randomUUID()})}><Plus size={16}/>Add clip</button>
-        <label>Timeline zoom<select value={zoom} onChange={e=>setZoom(Number(e.target.value))}><option value={1}>Fit timeline</option><option value={2}>2×</option><option value={4}>4×</option><option value={8}>8×</option></select></label>
+        <div className="timeline-zoom" role="group" aria-label="Timeline zoom">
+          <button type="button" className="icon-button" aria-label="Zoom timeline out" title="Zoom timeline out" disabled={zoom<=1} onClick={()=>setZoom(value=>Math.max(1,value/2))}><ZoomOut size={16}/></button>
+          <button type="button" className="secondary-button" aria-label="Fit timeline" title="Fit the whole project in the timeline" onClick={()=>setZoom(1)}><Maximize2 size={15}/>Fit</button>
+          <button type="button" className="icon-button" aria-label="Zoom timeline in" title="Zoom timeline in" disabled={zoom>=8} onClick={()=>setZoom(value=>Math.min(8,value*2))}><ZoomIn size={16}/></button>
+          <output aria-label="Timeline zoom level">{zoom}×</output>
+        </div>
       </div>
       <div ref={viewport} className="timeline-scroll" tabIndex={0} aria-label="Scrollable timeline">
         <div ref={track} className="timeline-track" style={{width:`${zoom*100}%`}}>
@@ -61,7 +64,7 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
               dragging.current="";setDrop(null);
             }}>
               <button type="button" draggable={!disabled} className="timeline-clip" aria-label={`Clip ${i+1}: ${source.relative_path.split("/").at(-1)}`} aria-pressed={selected===item.clip.id} onClick={()=>choose(item.clip.id)} onDragStart={e=>{dragging.current=item.clip.id;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",item.clip.id);}} onDragEnd={()=>{dragging.current="";setDrop(null);}}>
-                <strong title={source.relative_path}>{i+1}. {source.relative_path.split("/").at(-1)}</strong><EditorPoster root={binding?.root||undefined} path={binding?.path||undefined} identity={source.sha256}/><span className="timeline-clip-duration">{clockTime(item.duration)}</span><small className="timeline-linked-audio" data-muted={item.clip.edits.muted||!source.info.audio.length}>{item.clip.edits.muted?"Audio muted":source.info.audio.length?"Linked original audio":"Silent source"}</small>
+                <strong title={source.relative_path}>{i+1}. {source.relative_path.split("/").at(-1)}</strong><EditorPoster root={binding?.root||undefined} path={binding?.path||undefined} identity={source.sha256} filmstrip/><span className="timeline-clip-duration">{clockTime(item.duration)}</span><small className="timeline-linked-audio" data-muted={item.clip.edits.muted||!source.info.audio.length}>{item.clip.edits.muted?"Audio muted":source.info.audio.length?"Linked original audio":"Silent source"}</small>
               </button>
               <TimelineTrimHandles range={{start:markSeconds(item.clip.source_in),end:markSeconds(item.clip.source_out)}} limit={Math.max(source.info.duration_seconds,markSeconds(item.clip.source_out))} minimum={0.04+sourceTick} step={Math.max(1/project.frame_rate,sourceTick)} selected={selected===item.clip.id} disabled={disabled} token={project} index={i} pixelsPerSecond={()=>(track.current?.getBoundingClientRect().width||0)/duration} onCommit={range=>command({type:"trim",clipId:item.clip.id,...range})}/>
             </li>;
@@ -86,10 +89,6 @@ export function SequenceClipInspector({session,disabled,selected,onSelected,posi
   return <section aria-label="Selected clip controls"><h2>Selected clip</h2><fieldset disabled={disabled}>
       {clip&&asset&&entry&&<div className="timeline-inspector" key={clip.id}>
         <p><strong>Selected clip {index+1}</strong> · Source duration {clockTime(asset.info.duration_seconds)} · Project position {clockTime(entry.start)}–{clockTime(entry.end)}</p>
-        <div className="timeline-trim-fields">
-          <NumberField label="Clip start in source (seconds)" value={markSeconds(clip.source_in)} min={0} max={sourceEndLimit(asset.info)} step="any" onCommit={start=>command({type:"trim",clipId:clip.id,start,end:markSeconds(clip.source_out)})}/>
-          <NumberField label="Clip end in source (seconds)" value={markSeconds(clip.source_out)} min={0} max={sourceEndLimit(asset.info)} step="any" onCommit={end=>command({type:"trim",clipId:clip.id,start:markSeconds(clip.source_in),end})}/>
-        </div>
         <div className="video-transport timeline-clip-actions">
           <button className="secondary-button" disabled={index===0} onClick={()=>command({type:"move",clipId:clip.id,index:index-1})}><ArrowLeft size={16}/>Move earlier</button>
           <button className="secondary-button" disabled={index===entries.length-1} onClick={()=>command({type:"move",clipId:clip.id,index:index+1})}>Move later<ArrowRight size={16}/></button>
