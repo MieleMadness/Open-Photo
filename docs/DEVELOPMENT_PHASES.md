@@ -1,6 +1,6 @@
 # Development phases
 
-Baseline: 0.56.12. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.13. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -74,3 +74,7 @@ Local validation before push: 123 frontend tests in 23 files passed; TypeScript 
 ## 0.56.12 — Requested navigation and viewer refinement
 
 Restore compact sidebar rows and green section labels, add persisted menu collapse/expand with top-left workspace selection, and shorten viewer actions. This is a focused usability patch; Phase F video semantic indexing and later phases remain pending.
+
+## 0.56.13 — Desktop editor frame
+
+The approved Clipchamp-inspired layout is implemented over the shared editing model: project bar, searchable media, preview, side inspector and persistent timeline. Follow-up sequence: timeline filmstrips/drag trimming, photo clips, full mixed-media acceptance, then audio/text/transitions according to the existing gates. No additional provider or codec is exposed.

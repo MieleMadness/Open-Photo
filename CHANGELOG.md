@@ -1,3 +1,14 @@
+# 0.56.13 — Desktop video-editor layout
+
+- Arrange the existing shared editor into media, preview, clip-inspector and persistent-timeline regions inspired by the supplied Clipchamp layout.
+- Replace the tall editor page heading with a compact project/save bar and top-right Export. Keep workspace selection and the user's app-menu width.
+- Add searchable thumbnail media, lazy poster requests bounded to two native jobs, a small identity-keyed cache, and cancellation of queued obsolete work.
+- Add independent media/inspector toggles and narrow-window panels without resetting selection, timeline state or numeric drafts.
+- Move clip controls beside the preview using the same timeline commands, session, autosave and history. Keep project switching, portable copies and recovery in a dismissible Project menu.
+- Keep one preview/export owner and clear source/edited modes. Expandable source tools preserve playback/trim/compatibility controls; invalid hidden clip drafts are revealed before output.
+- Consolidate editor styling in its own stylesheet. Source verification, original media, project schema and export safety are unchanged.
+- Filmstrips/trim handles, photo clips and social/audio extensions remain follow-ups; this release does not claim those capabilities.
+
 # 0.56.12 — Compact navigation and clearer viewing
 
 - Restore compact left-menu rows: fixed 42px rows and 4px gaps stop navigation stretching with window height.

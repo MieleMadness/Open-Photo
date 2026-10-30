@@ -1,4 +1,4 @@
-> Development update: **0.56.12** restores compact left navigation and green section labels, adds a saved collapse/expand menu button, and simplifies the video viewer toolbar. Phase E unified ranked search remains available.
+> Development update: **0.56.13** introduces the desktop video-editor layout: media on the left, preview in the center, clip controls on the right, and a persistent timeline below. Workspace selection and the collapsible application menu stay available.
 
 
 
@@ -580,3 +580,13 @@ Development tests now use short media. Hour-scale stress checks remain available
 Use **Collapse menu** beside the Open-Photo name to switch to an icon rail; **Expand menu** restores labels. Your choice is saved. Workspace selection stays at the top left in both modes; hover or focus navigation icons for labels. On short windows, scroll the navigation list to reach its remaining sections. Rows keep compact spacing on tall windows.
 
 Green labels above page titles identify each section. File Details uses **Edit** to open the shared video editor, **Fullscreen** to enlarge viewing and **Restore** to return. The full filename stays in the summary below the toolbar. Map sizing adapts when menu width changes.
+
+### Desktop editing layout — 0.56.13
+
+Open the Library video editor or choose **Edit** on a video. Import additional videos into the left media panel, search their filenames, select a source and use **Add clip** to append it. Select a timeline clip to trim, rotate, crop or adjust its linked audio in the right inspector. The timeline stays below the preview while panels scroll independently.
+
+Use the two panel buttons near **Export** to show/hide media and clip controls. On narrower windows they open beside/over the preview; the timeline stays visible. **Project** contains project switching, portable copies, previous saves and recovery. Escape or clicking outside closes that menu.
+
+**Source preview** shows the original. **Preview project edits** builds the continuous edited sequence in the same stage. Editing invalidates an older compiled preview. Extra source-player tools remain under expandable sections. **Export** creates a new MP4 using the canvas/export settings in the inspector; invalid drafts are revealed and must be corrected first.
+
+This patch establishes the layout. Timeline filmstrips/trim handles, photo clips, audio waveforms and later social tools remain follow-up work. See [the editor layout guide](docs/EDITOR_LAYOUT.md).

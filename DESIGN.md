@@ -50,3 +50,11 @@ The user explicitly prefers green eyebrow labels above section headings. Keep th
 `AppSidebar` owns explicit, saved menu width rather than breakpoint-driven collapsing. Expanded width is 250px, icon rail 72px. Navigation uses 42px rows, 4px gaps and start alignment; extra height stays below rows. Only the navigation list scrolls, keeping workspace selection and the width toggle reachable. Do not animate layout width during frequent media browsing. Collapsed controls retain accessible names, titles and visible focus. Native workspace options remain readable.
 
 File identity belongs in the summary below the File Details toolbar. Keep Edit and Fullscreen / Restore labels short; group browsing and close controls alongside them. Reuse the modal's focus boundary. Map containers observe size changes without recreating the map or resetting its view.
+
+## Desktop editor frame — 0.56.13
+
+The supplied Clipchamp composition and approved plan guide this editor: compact project bar, media left, preview center, clip inspector right, persistent timeline bottom. `src/editor.css` owns editor geometry and shared timeline primitives. The editor fills the available height; the app page must not scroll the timeline away. Media, inspector and timeline own their scroll independently. On narrow widths, side panels become dismissible overlays while panel toggles remain in the header. The application sidebar's saved preference is respected.
+
+Keep one `SequenceSession` and one output controller. `SequenceOutput` exposes render slots so the shell can position preview/export controls without duplicating native jobs or state. `SequenceClipInspector` and `SequenceTimeline` call the same timeline command helper. Hiding a panel does not unmount its fields or discard drafts. Output validation reveals the inspector and native disclosures before focusing an invalid field. Source versus compiled project preview stays explicit.
+
+Use immediate panel/selection feedback and no animated editor width or timeline scrubbing. Controls have accessible names and tooltips. The Project disclosure supports Escape, outside click and keyboard focus departure. Poster work is lazy and bounded; failed thumbnails never block editing or relinking. Future filmstrips and audio lanes must share the same timing and viewport rather than introducing another editor.

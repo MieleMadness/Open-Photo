@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState,type KeyboardEvent} from "react";
+import {useEffect,useRef,useState,type KeyboardEvent,type ReactNode} from "react";
 import {FastForward,Rewind} from "lucide-react";
 import {convertFileSrc,invoke} from "@tauri-apps/api/core";
 import {ErrorNotice} from "./Ui";
@@ -10,7 +10,7 @@ type Assets={source:string;proxy:boolean;info:VideoInfo;filmstrip:{seconds:numbe
 type Status={state:"queued"|"running"|"complete"|"failed";result:Assets|null;error:string|null};
 
 export type VideoSelection={start:VideoTime;end:VideoTime;disabled?:boolean;onChange:(start:VideoTime,end:VideoTime)=>void};
-export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false}:{root:string;path:string;onOpenExternal:()=>void;selection?:VideoSelection;autoLoad?:boolean}) {
+export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,compact=false}:{root:string;path:string;onOpenExternal:()=>void;selection?:VideoSelection;autoLoad?:boolean;compact?:boolean}) {
   const [video,bindVideo]=useVideoElement();
   const current=useRef(0);
   const restore=useRef(0);
@@ -122,27 +122,33 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false}:
         <output aria-label="Playback time">{clockTime(position)} / {clockTime(duration)}</output>
       </div>
       <input className="video-scrubber" type="range" aria-label="Seek video" min={0} max={duration||info?.duration_seconds||0} step={0.001} value={Math.min(position,duration||info?.duration_seconds||0)} onChange={event=>seek(Number(event.target.value))}/>
-      {selection&&<div className="video-markers">
+      {selection&&<SourceTools compact={compact} label="Source trim controls"><div className="video-markers">
         <button className="secondary-button" disabled={selection.disabled} onClick={()=>setTrim("in")}>Set trim start</button><button className="secondary-button" disabled={selection.disabled} onClick={()=>setTrim("out")}>Set trim end</button>
         <button className="secondary-button" onClick={()=>{seek(markSeconds(selection.start));rangePlaying.current=true;const element=video.current;void element?.play().catch(cause=>{if(video.current===element){rangePlaying.current=false;setError(String(cause));}});}}>Preview trim</button>
         <span>Trim: {clockTime(markSeconds(selection.start))} → {clockTime(markSeconds(selection.end))}</span>
         <button className="secondary-button" disabled={selection.disabled} onClick={()=>{rangePlaying.current=false;selection.onChange(markTime(0,info?.time_base||null),markTime(info?.duration_seconds||duration,info?.time_base||null));setRangeError("");}}>Reset trim</button>
-      </div>}
-      <small>Focus the player: Space to play/pause, arrows to seek 5 seconds, Shift+arrows for 10 seconds.</small>
+      </div></SourceTools>}
+      {!compact&&<small>Focus the player: Space to play/pause, arrows to seek 5 seconds, Shift+arrows for 10 seconds.</small>}
     </>}
     {rangeError&&<p role="alert">{rangeError}</p>}
+    <SourceTools compact={compact} label="Source details & playback options">
     {!!assets?.filmstrip.length&&<div className="video-filmstrip" aria-label="Video filmstrip">{assets.filmstrip.map(frame=><button key={frame.seconds} aria-label={`Seek to ${clockTime(frame.seconds)}`} onClick={()=>seek(frame.seconds)}><img src={frame.image} alt=""/><span>{clockTime(frame.seconds)}</span></button>)}</div>}
     <VideoDetails root={root} path={path} onInfo={setInfo}/>
+    </SourceTools>
     {busy&&<p role="status">{mode==="proxy"?"Creating compatible preview…":"Creating filmstrip…"} <button className="secondary-button" onClick={()=>{cancelJob.current();setBusy(false);}}>Cancel</button></p>}
     {error&&<ErrorNotice title="This video preview could not play" error={error}><button className="secondary-button" onClick={()=>setRevision(v=>v+1)}>Retry preview</button></ErrorNotice>}
     {notice&&busy&&<p role="status">{notice}</p>}
     {assets?.warnings.map(warning=><p key={warning}>{warning}</p>)}
-    {requested&&<div className="video-transport">
+    {requested&&<SourceTools compact={compact} label="Playback options"><div className="video-transport">
       <button className="secondary-button" disabled={busy||!!info?.hdr} onClick={()=>{setPlayIntent(playing);setMode("proxy");setRevision(v=>v+1);}}>Create compatible preview</button>
       {mode==="proxy"&&<button className="secondary-button" onClick={()=>{setPlayIntent(playing);setMode("original");setRevision(v=>v+1);}}>Use original video</button>}
       {mode==="original"&&!busy&&!assets&&<button className="secondary-button" onClick={()=>setRevision(v=>v+1)}>Retry filmstrip</button>}
       <button className="secondary-button" onClick={onOpenExternal}>Open in Windows player</button>
-    </div>}
+    </div></SourceTools>}
     {assets?.proxy&&<p className="results-note">Playing a smaller compatible preview. Original timing and orientation are retained; the original file is unchanged.</p>}
   </section>;
+}
+
+function SourceTools({compact,label,children}:{compact:boolean;label:string;children:ReactNode}){
+  return compact?<details className="source-playback-tools"><summary>{label}</summary>{children}</details>:<>{children}</>;
 }

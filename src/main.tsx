@@ -4,6 +4,7 @@ import {hydrateSettings} from "./userData";
 import App from "./App";
 import {ErrorNotice} from "./Ui";
 import "./styles.css";
+import "./editor.css";
 
 const host=document.getElementById("root")!;
 const root=createRoot(host);

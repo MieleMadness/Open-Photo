@@ -11,6 +11,21 @@ vi.mock("@tauri-apps/plugin-dialog",()=>({open:vi.fn(),save:vi.fn()}));
 vi.mock("./VideoPlayer",()=>({VideoPlayer:({path,root,selection}:{path:string;root:string;selection?:VideoSelection})=><div><p data-root={root}>Preview: {path}</p>{selection&&<button disabled={selection.disabled} onClick={()=>selection.onChange({ticks:"22500",time_base:"1/90000"},{ticks:"135000",time_base:"1/90000"})}>Use player trim marks</button>}</div>}));
 const info={duration_seconds:2,codec:"h264",width:96,height:64,time_base:"1/90000",frame_rate:"30/1",nominal_frame_rate:"30/1",sample_aspect_ratio:"1:1",rotation_degrees:0,color_transfer:null,hdr:false,audio:[],warnings:[]};
 function loaded():LoadedSequence{return {project:{schema_version:2,id:"p",title:"Two short videos",assets:["one","two"].map(id=>({id,relative_path:`${id}.mp4`,sha256:(id==="one"?"1":"2").repeat(64),bytes:100,info})),clips:["one","two"].map(id=>({id:`clip-${id}`,asset_id:id,source_in:{ticks:"0",time_base:"1/90000"},source_out:{ticks:"180000",time_base:"1/90000"},edits:defaultEdits()})),output:{width:1920,height:1080,fit:"fit"},frame_rate:30},revision:1,sources:["one","two"].map(id=>({asset_id:id,path:`/library/${id}.mp4`,root:"/library",status:"ready"}))};}
+it("searches the media bin and toggles panels without resetting the timeline or clip drafts",async()=>{
+  render(<VideoSequences roots={["/library"]} workspaceId="w" initial={loaded()}/>);
+  await screen.findByDisplayValue("Two short videos");
+  fireEvent.change(screen.getByLabelText("Search project media"),{target:{value:"two"}});
+  expect(within(screen.getByRole("region",{name:"Video media bin"})).queryByRole("button",{name:/one.mp4/})).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:"Show media panel"}));expect(screen.queryByRole("region",{name:"Video media bin"})).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:"Show media panel"}));expect((screen.getByLabelText("Search project media") as HTMLInputElement).value).toBe("two");
+  fireEvent.click(screen.getByRole("button",{name:"Clip 2: two.mp4"}));
+  const volume=screen.getByLabelText("Audio volume (%)");fireEvent.change(volume,{target:{value:"999"}});fireEvent.blur(volume);
+  fireEvent.click(screen.getByRole("button",{name:"Show clip controls"}));expect(screen.queryByRole("complementary",{name:"Clip inspector"})).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:"Export project MP4…"}));
+  await screen.findByText(/Correct the highlighted field/);expect(screen.getByRole("complementary",{name:"Clip inspector"})).toBeTruthy();
+  expect((screen.getByLabelText("Audio volume (%)") as HTMLInputElement).value).toBe("999");expect(save).not.toHaveBeenCalled();
+  expect(screen.getByRole("button",{name:"Clip 2: two.mp4"}).getAttribute("aria-pressed")).toBe("true");
+});
 beforeEach(()=>{vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(()=>{});vi.spyOn(HTMLMediaElement.prototype,"load").mockImplementation(()=>{});vi.mocked(invoke).mockImplementation(async(command,args)=>{
   if(command==="workspace_video_projects")return {projects:[{id:"p",title:"Two short videos"}],warnings:[]};
   if(command==="edit_workspace_video_project")return (args as {action:{type:string}}).action.type==="add"?{...loaded(),revision:2}:loaded();

@@ -4,34 +4,27 @@ import {NumberField} from "./EditorFields";
 import {ClipEdits} from "./ClipEdits";
 import {sourceEndLimit} from "./videoProject";
 import {clockTime,markSeconds} from "./videoTime";
-import {editTimeline,projectDuration,timelineEntries,type TimelineCommand} from "./timelineCommands";
+import {projectDuration,timelineEntries} from "./timelineCommands";
+import {useTimelineActions} from "./useTimelineActions";
 import {type SequenceSession} from "./videoSequence";
 
 /** Placement is derived from clip order, never rounded or stored as duplicate timing. */
 export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selected,onSelected,position,onPosition}:{session:SequenceSession;disabled:boolean;assetId:string;onSelectAsset:(id:string)=>void;selected:string;onSelected:(id:string)=>void;position:number;onPosition:(seconds:number)=>void}){
   const project=session.history.present,entries=timelineEntries(project),duration=projectDuration(project);
-  const [zoom,setZoom]=useState(1),[error,setError]=useState("");
+  const [zoom,setZoom]=useState(1);
   const dragging=useRef("");
   const playheadId=useId();
-  const entry=entries.find(e=>e.clip.id===selected),clip=entry?.clip,asset=project.assets.find(a=>a.id===clip?.asset_id);
-  const playhead=Math.min(position,duration),index=entries.findIndex(e=>e.clip.id===selected);
+
+  const playhead=Math.min(position,duration);
   function choose(id:string){onSelected(id);const item=entries.find(e=>e.clip.id===id);if(item){onSelectAsset(item.clip.asset_id);onPosition(item.start);}}
-  function history(action:"undo"|"redo"){session.commit(action);const clips=session.history.present.clips;onSelected(clips.find(c=>c.id===selected)?.id||clips[0]?.id||"");}
-  function command(action:TimelineCommand){
-    try{
-      const next=editTimeline(session.history.present,action);session.commit(next);setError("");
-      if(action.type==="append")onSelected(action.newId);
-      else if(action.type==="delete")onSelected(next.clips[Math.min(index,next.clips.length-1)]?.id||"");
-      return "";
-    }catch(cause){const message=String(cause);setError(message);return message;}
-  }
+  const {command,history,error}=useTimelineActions(session,selected,onSelected);
   return <section aria-label="Project timeline" className="sequence-timeline">
     <div className="timeline-heading"><h2>Timeline</h2><p>{entries.length} {entries.length===1?"clip":"clips"} · Project duration <output aria-label="Project duration">{clockTime(duration)}</output></p></div>
     <fieldset disabled={disabled}>
       <div className="video-transport timeline-actions">
-        <button className="secondary-button" disabled={!session.history.past.length} onClick={()=>history("undo")}><Undo2 size={16}/>Undo timeline edit</button>
-        <button className="secondary-button" disabled={!session.history.future.length} onClick={()=>history("redo")}><Redo2 size={16}/>Redo timeline edit</button>
-        <button className="secondary-button" onClick={()=>command({type:"append",assetId,newId:crypto.randomUUID()})}><Plus size={16}/>Append selected video</button>
+        <button className="secondary-button" disabled={!session.history.past.length} aria-label="Undo timeline edit" title="Undo timeline edit" onClick={()=>history("undo")}><Undo2 size={16}/>Undo</button>
+        <button className="secondary-button" disabled={!session.history.future.length} aria-label="Redo timeline edit" title="Redo timeline edit" onClick={()=>history("redo")}><Redo2 size={16}/>Redo</button>
+        <button className="secondary-button" aria-label="Append selected video" title="Add selected media to the end of the timeline" onClick={()=>command({type:"append",assetId,newId:crypto.randomUUID()})}><Plus size={16}/>Add clip</button>
         <label>Timeline zoom<select value={zoom} onChange={e=>setZoom(Number(e.target.value))}><option value={1}>Fit timeline</option><option value={2}>2×</option><option value={4}>4×</option><option value={8}>8×</option></select></label>
       </div>
       <div className="timeline-scroll" tabIndex={0} aria-label="Scrollable timeline">
@@ -49,6 +42,20 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
           {!entries.length&&<p className="timeline-empty">The timeline is empty. Choose a video in the media bin and append it, or undo the deletion.</p>}
         </div>
       </div>
+
+    </fieldset>
+    {error&&<p role="alert" className="field-error">{error}</p>}
+    <p className="timeline-help">Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap and keeps its original in the media bin. Joined clips use the project frame clock; source trim marks retain their original timing.</p>
+  </section>;
+}
+
+
+/** Selected-clip controls share the same session/commands as the persistent timeline. */
+export function SequenceClipInspector({session,disabled,selected,onSelected,position}:{session:SequenceSession;disabled:boolean;selected:string;onSelected:(id:string)=>void;position:number}){
+  const project=session.history.present,entries=timelineEntries(project),entry=entries.find(e=>e.clip.id===selected);
+  const clip=entry?.clip,asset=project.assets.find(a=>a.id===clip?.asset_id),index=entries.findIndex(e=>e.clip.id===selected),playhead=Math.min(position,projectDuration(project));
+  const {command,error}=useTimelineActions(session,selected,onSelected);
+  return <section aria-label="Selected clip controls"><h2>Selected clip</h2><fieldset disabled={disabled}>
       {clip&&asset&&entry&&<div className="timeline-inspector" key={clip.id}>
         <p><strong>Selected clip {index+1}</strong> · Source duration {clockTime(asset.info.duration_seconds)} · Project position {clockTime(entry.start)}–{clockTime(entry.end)}</p>
         <div className="timeline-trim-fields">
@@ -64,9 +71,6 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
         </div>
         <ClipEdits edits={clip.edits} info={asset.info} onChange={mutate=>{const edits=structuredClone(clip.edits);mutate(edits);return command({type:"edits",clipId:clip.id,edits});}}/>
       </div>}
-    </fieldset>
-    {error&&<p role="alert" className="field-error">{error}</p>}
-    <p className="timeline-help">Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap and keeps its original in the media bin. Joined clips use the project frame clock; source trim marks retain their original timing.</p>
-  </section>;
+    {!clip&&<p>Select a clip on the timeline to edit it.</p>}
+    </fieldset>{error&&<p role="alert" className="field-error">{error}</p>}</section>;
 }
-

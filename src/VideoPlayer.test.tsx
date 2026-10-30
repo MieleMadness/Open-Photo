@@ -18,6 +18,16 @@ beforeEach(()=>{vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(
   });
 });
 afterEach(async()=>{cleanup();await act(async()=>{});vi.restoreAllMocks();vi.resetAllMocks()});
+it("keeps normal viewer tools visible and groups them only in the compact editor",async()=>{
+  const props={autoLoad:true,root:"library",path:"one.mp4",onOpenExternal:()=>{}};
+  const ui=render(<VideoPlayer {...props}/>);const video=await screen.findByLabelText("Selected video");
+  expect(screen.queryByText("Playback options")).toBeNull();expect(screen.getByRole("button",{name:"Create compatible preview"})).toBeTruthy();
+  ui.rerender(<VideoPlayer {...props} compact/>);
+  expect(screen.getByLabelText("Selected video")).toBe(video);
+  const options=screen.getByText("Playback options").closest("details")!;expect(options.open).toBe(false);
+  expect(screen.getByText("Create compatible preview").closest("details")).toBe(options);
+  fireEvent.click(screen.getByText("Playback options"));expect(options.open).toBe(true);
+});
 it("locks project trim markers during source operations while preserving playback",async()=>{
   const onChange=vi.fn(),selection={start:{ticks:"0",time_base:"1/90000"},end:{ticks:"1800000",time_base:"1/90000"},disabled:true,onChange};
   const ui=render(<VideoPlayer autoLoad root="library" path="one.mp4" onOpenExternal={()=>{}} selection={selection}/>);const video=await screen.findByLabelText("Selected video") as HTMLVideoElement;
