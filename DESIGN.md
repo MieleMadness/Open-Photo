@@ -70,3 +70,7 @@ Only the selected clip exposes trim handles. Pointer capture keeps the active ed
 ## Editor split — 0.56.16
 
 The horizontal separator exposes pointer and keyboard resizing and a visible focus indicator. Its ratio is an app preference, never project data. Save completed changes only; cancellation restores the preference. Window/notice changes clamp the visible split while retaining the saved ratio. The editor owns its viewport and its panels retain their scroll responsibilities. Frequent resizing is immediate with no geometry animation.
+
+## Inspector tasks — 0.56.17
+
+Separate clip and project-output scope with Clip and Canvas & export tabs. Keep tab panels mounted to retain numeric drafts. Use linked tab/panel IDs, roving focus and Left/Right/Home/End keys. Direct Canvas access opens the inspector and focuses its active tab. Output validation reveals Clip before focusing invalid fields. Do not introduce a second project/output controller for either tab.

@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current branch — 0.56.16
+## Current branch — 0.56.17
+
+0.56.17 separates Clip and Canvas & export inspector tasks, with direct Canvas access, keyboard navigation and draft-preserving panels. Invalid clip drafts are revealed before output. Filmstrips and photo clips remain pending.
 
 0.56.16 adds a saved, keyboard-accessible preview/timeline divider. Resizing changes only app layout, with viewport/notice-aware bounds and cancellable drafts. Filmstrips and photo clips remain pending.
 

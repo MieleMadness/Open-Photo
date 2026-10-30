@@ -905,3 +905,9 @@
 .editor-timeline-divider::after { content:""; position:absolute; width:32px; height:2px; left:calc(50% - 16px); top:4px; background:var(--muted); border-radius:2px; pointer-events:none; }
 .editor-timeline-divider:hover::after,.editor-timeline-divider:focus-visible::after { background:var(--accent-text); }
 .editor-timeline-divider:focus-visible { outline:2px solid var(--accent-text); outline-offset:-2px; }
+
+.editor-inspector-tabs { display:flex; gap:4px; margin:8px 0 12px; border-bottom:1px solid var(--line); }
+.editor-inspector-tab { flex:1; min-height:36px; padding:6px; background:transparent; border:0; border-bottom:2px solid transparent; color:var(--muted); font-weight:650; font-size:var(--type-caption); }
+.editor-inspector-tab[aria-selected="true"] { color:var(--accent-text); border-bottom-color:var(--accent-text); }
+.editor-inspector [hidden] { display:none!important; }
+.editor-inspector [role="tabpanel"]>.sequence-output { border-top:0; padding-top:0; margin-top:0; }

@@ -1,12 +1,13 @@
 import {useEffect,useRef,useState,type CSSProperties} from "react";
 import {invoke} from "@tauri-apps/api/core";
 import {open,save} from "@tauri-apps/plugin-dialog";
+import {EditorInspector,type InspectorTab} from "./EditorInspector";
 import {EditorTimelineDivider} from "./EditorTimelineDivider";
 import {ErrorNotice} from "./Ui";
 import {VideoPlayer} from "./VideoPlayer";
 import {SequenceSession,workspaceProject,workspaceProjects,type LoadedSequence,type SequenceProject} from "./videoSequence";
 import {exportFilename} from "./videoExport";
-import {PanelLeft,PanelRight,ArrowLeft,Plus,Search,X} from "lucide-react";
+import {PanelLeft,PanelRight,ArrowLeft,Plus,Search} from "lucide-react";
 import {EditorProjectMenu} from "./EditorProjectMenu";
 import {EditorPoster} from "./EditorPoster";
 import {SequenceTimeline,SequenceClipInspector} from "./SequenceTimeline";
@@ -31,6 +32,7 @@ function SequenceWorkspace({roots,workspaceId,initial,onBack}:{roots:string[];wo
   const [busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");const [,refresh]=useState(0);
   const [previous,setPrevious]=useState<{snapshot:SequenceProject;revision:number;entries:PreviousSave[]}|null>(null),[previousId,setPreviousId]=useState("");
   const [mediaOpen,setMediaOpen]=useState(true),[inspectorOpen,setInspectorOpen]=useState(()=>typeof matchMedia==="undefined"||matchMedia("(min-width:1100px)").matches),[mediaQuery,setMediaQuery]=useState("");
+  const [inspectorTab,setInspectorTab]=useState<InspectorTab>("clip");
   const [timelineHeight,setTimelineHeight]=useState<number>();
   const project=session?.history.present;
   useEffect(()=>setPlaybackError(""),[previewState.source]);
@@ -52,10 +54,10 @@ function SequenceWorkspace({roots,workspaceId,initial,onBack}:{roots:string[];wo
   async function chooseVideos(current:()=>boolean){const files=await open({multiple:true,defaultPath:root,filters:videoFilters});return current()?(Array.isArray(files)?files:typeof files==="string"?[files]:[]):[];}
   function seekProject(seconds:number){setPlayhead(seconds);if(projectVideo.current){const duration=projectVideo.current.duration;projectVideo.current.currentTime=Math.min(seconds,Number.isFinite(duration)?duration:seconds);}}
   function chooseBin(id:string){stopPreview.current?.();setSelected(id);}
-  function selectClip(id:string){setSelectedClip(id);const clip=owner.current?.history.present.clips.find(c=>c.id===id);if(clip)setSelected(clip.asset_id);}
+  function selectClip(id:string){setInspectorTab("clip");setSelectedClip(id);const clip=owner.current?.history.present.clips.find(c=>c.id===id);if(clip)setSelected(clip.asset_id);}
   const asset=project?.assets.find(a=>a.id===selected),source=loaded?.sources.find(s=>s.asset_id===selected);
   return <section ref={host} aria-label="Video editing project" className="sequence-workspace" data-ready={!!project} style={{"--editor-timeline-height":timelineHeight===undefined?undefined:`${timelineHeight}px`} as CSSProperties}>
-    {project&&session&&loaded?<SequenceOutput key={`output:${project.id}`} session={session} loaded={loaded} disabled={busy} host={host} previewState={previewState} onPreviewState={setPreviewState} stopRef={stopPreview} onInvalidDraft={()=>setInspectorOpen(true)}>{({settings,previewControls,exportControl,notices:outputNotices,feedback:outputFeedback})=><>
+    {project&&session&&loaded?<SequenceOutput key={`output:${project.id}`} session={session} loaded={loaded} disabled={busy} host={host} previewState={previewState} onPreviewState={setPreviewState} stopRef={stopPreview} onInvalidDraft={()=>{setInspectorOpen(true);setInspectorTab("clip");}}>{({settings,previewControls,exportControl,notices:outputNotices,feedback:outputFeedback})=><>
       <header className="editor-project-bar"><h1 className="visually-hidden">Video editor</h1>
         {onBack&&<button className="icon-button" onClick={onBack} aria-label="Back to Library" title="Back to Library"><ArrowLeft size={18}/></button>}
         <div className="editor-project-identity"><span className="eyebrow">CREATE & EDIT</span><label>Project name<input type="text" aria-label="Video project name" disabled={busy} maxLength={200} value={project.title} onChange={e=>{try{session.commit({...project,title:e.target.value});setError("");}catch(cause){setError(String(cause));}}}/></label>
@@ -76,6 +78,7 @@ function SequenceWorkspace({roots,workspaceId,initial,onBack}:{roots:string[];wo
         {previous&&(previous.snapshot!==project||previous.revision!==session.revision)&&<p>Refresh previous saves after editing before recovering a copy.</p>}
       </details></EditorProjectMenu>
         <div className="editor-panel-toggles"><button className="icon-button" aria-label="Show media panel" title="Show media panel" aria-pressed={mediaOpen} onClick={()=>setMediaOpen(v=>!v)}><PanelLeft size={18}/></button><button className="icon-button" aria-label="Show clip controls" title="Show clip controls" aria-pressed={inspectorOpen} onClick={()=>setInspectorOpen(v=>!v)}><PanelRight size={18}/></button></div>
+        <button className="secondary-button" title="Open canvas and export settings" onClick={()=>{setInspectorOpen(true);setInspectorTab("canvas");requestAnimationFrame(()=>host.current?.querySelector<HTMLButtonElement>('[data-inspector-tab="canvas"]')?.focus());}}>Canvas</button>
         {exportControl}
       </header>
       <div className="editor-feedback">{outputFeedback}
@@ -101,7 +104,8 @@ function SequenceWorkspace({roots,workspaceId,initial,onBack}:{roots:string[];wo
         </section>
         <section ref={previewStage} tabIndex={-1} className="sequence-preview" aria-label="Video preview stage"><div className="editor-stage-heading"><h2>{previewState.busy||previewState.source?"Project preview":"Source preview"}</h2>{previewControls}</div><div className="editor-stage-content">
         {previewState.busy?<p role="status">Building the continuous project preview…</p>:previewState.source?<><video ref={bindProjectVideo} aria-label="Edited project preview" src={previewState.source} controls onError={event=>setPlaybackError(`The project preview could not play (media error ${event.currentTarget.error?.code||"unknown"}). Rebuild the preview or export to open it in the Windows player.`)} onLoadedMetadata={()=>{if(projectVideo.current)seekProject(Math.min(playhead,projectVideo.current.duration||0));}} onTimeUpdate={()=>{if(projectVideo.current)setPlayhead(projectVideo.current.currentTime);}}/>{playbackError&&<ErrorNotice title="The project preview could not play" error={playbackError}/>}<button className="secondary-button" onClick={()=>stopPreview.current?.()}>Show original source</button><ul>{previewState.warnings.map(w=><li key={w}>{w}</li>)}</ul></>:asset&&<><p>{asset.relative_path}</p>{source?.path?<VideoPlayer key={source.path} root={source.root||root} path={source.path} autoLoad compact selection={clip?.asset_id===selected?{start:clip.source_in,end:clip.source_out,disabled:busy,onChange:(start,end)=>{if(busy)return;try{session.commit(editTimeline(session.history.present,{type:"trim",clipId:clip.id,start:markSeconds(start),end:markSeconds(end)}));setError("");}catch(cause){setError(String(cause));}}}:undefined} onOpenExternal={()=>{void invoke("open_video",{root:source.root||root,path:source.path}).catch(e=>setError(String(e)));}}/>:<p role="alert" className="error">This video needs relinking: {source?.status}</p>}</>}</div></section>
-        <aside className="editor-inspector" aria-label="Clip inspector" hidden={!inspectorOpen}><div className="editor-panel-heading"><h2>Controls</h2><button className="icon-button" aria-label="Hide clip controls" title="Hide clip controls" onClick={()=>setInspectorOpen(false)}><X size={18}/></button></div><SequenceClipInspector session={session} disabled={busy} selected={clip?.id||""} onSelected={selectClip} position={playhead}/>{settings}<details className="editor-output-notes"><summary>Output information</summary>{outputNotices}</details></aside>
+        <EditorInspector open={inspectorOpen} tab={inspectorTab} onTab={setInspectorTab} onClose={()=>setInspectorOpen(false)} clip={<SequenceClipInspector session={session} disabled={busy} selected={clip?.id||""} onSelected={selectClip} position={playhead}/>} canvas={<>{settings}<details className="editor-output-notes"><summary>Output information</summary>{outputNotices}</details></>}/>
+
       </div>
       <EditorTimelineDivider host={host} onHeight={setTimelineHeight}/>
       <SequenceTimeline key={`timeline:${project.id}`} session={session} sources={loaded.sources} disabled={busy} assetId={selected} onSelectAsset={setSelected} selected={clip?.id||""} onSelected={selectClip} position={playhead} onPosition={seekProject}/>

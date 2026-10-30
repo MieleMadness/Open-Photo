@@ -20,10 +20,11 @@ it("searches the media bin and toggles panels without resetting the timeline or 
   fireEvent.click(screen.getByRole("button",{name:"Show media panel"}));expect((screen.getByLabelText("Search project media") as HTMLInputElement).value).toBe("two");
   fireEvent.click(screen.getByRole("button",{name:"Clip 2: two.mp4"}));
   const volume=screen.getByLabelText("Audio volume (%)");fireEvent.change(volume,{target:{value:"999"}});fireEvent.blur(volume);
+  fireEvent.click(screen.getByRole("button",{name:"Canvas"}));expect(screen.getByRole("tab",{name:"Canvas & export"}).getAttribute("aria-selected")).toBe("true");
   fireEvent.click(screen.getByRole("button",{name:"Show clip controls"}));expect(screen.queryByRole("complementary",{name:"Clip inspector"})).toBeNull();
   fireEvent.click(screen.getByRole("button",{name:"Export project MP4…"}));
   await screen.findByText(/Correct the highlighted field/);expect(screen.getByRole("complementary",{name:"Clip inspector"})).toBeTruthy();
-  expect((screen.getByLabelText("Audio volume (%)") as HTMLInputElement).value).toBe("999");expect(save).not.toHaveBeenCalled();
+  expect((screen.getByLabelText("Audio volume (%)") as HTMLInputElement).value).toBe("999");expect(save).not.toHaveBeenCalled();expect(screen.getByRole("tab",{name:"Clip"}).getAttribute("aria-selected")).toBe("true");
   expect(screen.getByRole("button",{name:"Clip 2: two.mp4"}).getAttribute("aria-pressed")).toBe("true");
 });
 beforeEach(()=>{vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(()=>{});vi.spyOn(HTMLMediaElement.prototype,"load").mockImplementation(()=>{});vi.mocked(invoke).mockImplementation(async(command,args)=>{

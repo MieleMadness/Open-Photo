@@ -1,3 +1,10 @@
+# 0.56.17 — Clearer clip and output controls
+
+- Separate Clip and Canvas & export inspector tasks with accessible tabs and keyboard navigation.
+- Add a direct Canvas button that opens and focuses project output settings without scrolling through clip controls.
+- Keep panels mounted so unfinished numeric drafts survive task changes. Output validation opens the Clip tab and highlights invalid values.
+- Preserve shared project state, trim/divider behavior and export safety; add tab/draft regression coverage.
+
 # 0.56.16 — Adjustable preview/timeline divider
 
 - Add a draggable horizontal divider with remembered app-level sizing and a usable preview/timeline range.

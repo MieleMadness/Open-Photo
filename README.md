@@ -1,4 +1,4 @@
-> Development update: **0.56.16** adds a saved, adjustable divider between the video preview and timeline, with keyboard controls, reset and cancellation.
+> Development update: **0.56.17** separates clip controls from canvas/export settings with keyboard-accessible inspector tabs and a direct Canvas button. Unfinished edits stay intact when switching tabs.
 
 
 
@@ -604,3 +604,7 @@ Focus a handle and use Left/Right for small adjustments, Shift+Left/Right for te
 ### Resize the editor — 0.56.16
 
 Drag the horizontal divider above the timeline upward for more timeline space, or downward for a larger preview. Your preference is saved and adapts to the available window space. Focus the divider and use Up/Down (Shift for larger changes), Home/End for limits, or double-click to reset. Escape cancels an active drag. Window changes and notices keep the areas within the available space. Resizing changes the layout only; it does not modify project edits or undo history.
+
+### Inspector tasks — 0.56.17
+
+Use **Clip** for the selected timeline clip and **Canvas & export** for project shape, fit, frame rate and export resolution. The top **Canvas** button opens and focuses those settings directly. Left/Right and Home/End navigate the tabs. Selecting a timeline clip returns to Clip controls. Switching tabs or hiding controls preserves unfinished numeric entries. Export reveals the Clip tab and focuses any invalid clip entry before proceeding.

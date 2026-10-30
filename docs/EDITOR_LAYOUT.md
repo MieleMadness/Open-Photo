@@ -5,7 +5,7 @@
 - Top: Back to Library, project name, saved status, Project menu, panel toggles and Export.
 - Left: import, filename search, lazy thumbnails and selected-source options.
 - Center: original source or one compiled continuous project preview, with clear mode labels.
-- Right: selected-clip trim/transform/adjustment/audio controls, canvas and export settings.
+- Right: Clip and Canvas & export tabs separate selected-clip controls from project output settings (0.56.17). A header Canvas button opens output settings directly.
 - Bottom: existing proportional hard-cut timeline, playhead, zoom, undo/redo and Add clip.
 
 The supplied Clipchamp screenshot guides panel placement. Open-Photo retains its own light/dark tokens, purple identity, green section labels and offline source-safety behavior. Workspace selection remains at the top left and no Video Projects navigation tab is added.

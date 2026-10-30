@@ -1,6 +1,6 @@
 # Development phases
 
-Baseline: 0.56.16. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.17. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -90,3 +90,7 @@ Selected-clip drag trimming and keyboard nudges use the existing rational-time t
 ## 0.56.16 — Adjustable editor split
 
 Preview/timeline resizing now has persistent app-level sizing, pointer/keyboard interaction, cancellation and viewport-aware limits. Project history and rendering are unchanged. Filmstrips and photo clips remain next.
+
+## 0.56.17 — Inspector task clarity
+
+Clip editing and project canvas/export settings now have separate accessible tabs with direct Canvas access. Hidden panels retain drafts, and output validation reveals invalid clip fields. Filmstrips and photos remain follow-ups.
