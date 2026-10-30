@@ -1,6 +1,6 @@
 # Development phases
 
-Baseline: 0.56.11. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.12. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -70,3 +70,7 @@ Reviewed the newest 0.56.10 base before implementation; its page/timeline/access
 See [UNIFIED_SEARCH.md](UNIFIED_SEARCH.md) for user instructions, scoring, limits, local-only behavior and Phase F boundaries; [CODE_REVIEW_0_56_10.md](CODE_REVIEW_0_56_10.md) records the review findings. The earlier local mixed-photo/video follow-up is preserved separately while this requested Phase E increment is completed.
 
 Local validation before push: 123 frontend tests in 23 files passed; TypeScript and production build passed with the existing bundle-size warnings. Native formatting, warnings-as-errors lint and 140 Rust tests passed, with 6 explicit acceptance modes ignored. Tests cover provider root/model/current-media scope, read-only Unicode/URI-safe SQLite attachment, cancellation ownership, stale responses, multi-field ranking, facets, match reasons, failure fallback and sort restoration. Rendered Edge fixtures passed combined tag/OCR/meaning results, named People, favorites/ratings, provider failure, and light/dark 1220×780 / 800×580 layouts without horizontal overflow. Changed-UI detection returned no findings. Pushed GitHub Actions and installed WebView2/AI-quality acceptance remain separate gates.
+
+## 0.56.12 — Requested navigation and viewer refinement
+
+Restore compact sidebar rows and green section labels, add persisted menu collapse/expand with top-left workspace selection, and shorten viewer actions. This is a focused usability patch; Phase F video semantic indexing and later phases remain pending.

@@ -1,4 +1,4 @@
-> Development update: **0.56.11** implements Phase E: one ranked Library search for filenames, paths, managed XMP tags, ratings/favorites and optional local OCR/People/image-content matches. Match reasons explain results. Type to filter; press **Search** or **Enter** to add image-content matches. The workspace dropdown remains at the top left, and the latest design/accessibility polish is retained.
+> Development update: **0.56.12** restores compact left navigation and green section labels, adds a saved collapse/expand menu button, and simplifies the video viewer toolbar. Phase E unified ranked search remains available.
 
 
 
@@ -574,3 +574,9 @@ Select a timeline clip to trim, rotate, flip, crop, adjust brightness/contrast o
 One clip preserves source frame timing. Joined clips use 30 or 60 fps. Choose a source/project, landscape, portrait or square canvas and fit/fill, then an independent Project / up to 1080p / up to 4K resolution preset. Presets keep the project shape and do not enlarge a smaller canvas; enlarging a canvas cannot add source detail. HDR/wide-gamut conversion, photos, overlays, music and transitions are not yet available. See [project instructions](docs/VIDEO_PROJECTS.md) and [rendering architecture](docs/VIDEO_SEQUENCE_RENDERING.md).
 
 Development tests now use short media. Hour-scale stress checks remain available only when explicitly requested; further long-form work is deferred to 1.x. Physical drive-removal and actual disk-full checks remain on the pre-v1.0 release checklist.
+
+### Compact navigation and viewer — 0.56.12
+
+Use **Collapse menu** beside the Open-Photo name to switch to an icon rail; **Expand menu** restores labels. Your choice is saved. Workspace selection stays at the top left in both modes; hover or focus navigation icons for labels. On short windows, scroll the navigation list to reach its remaining sections. Rows keep compact spacing on tall windows.
+
+Green labels above page titles identify each section. File Details uses **Edit** to open the shared video editor, **Fullscreen** to enlarge viewing and **Restore** to return. The full filename stays in the summary below the toolbar. Map sizing adapts when menu width changes.

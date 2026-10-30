@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current branch — 0.56.11
+## Current branch — 0.56.12
+
+0.56.12 restores compact navigation, green section labels, saved sidebar collapse/expand and a shorter File Details toolbar. Map resizing and startup teardown are covered. Browser fixtures verified fixed row spacing at different window heights, light/dark icon rails, keyboard toggling, section labels and half-second video playback. Local checks passed: 127 frontend tests, TypeScript/production build, native formatting/clippy and 140 Rust tests (6 ignored acceptance modes). Existing bundle-size warnings remain. Pushed-commit CI and installed GUI visual acceptance are separate checks.
 
 Phase E adds one ranked Library search over metadata and optional cached OCR/People/image-content evidence. Results explain why they matched, honor workspace/library filters, and retain metadata matches when a provider fails. Explicit Search/Enter adds meaning inference; typing does not repeatedly run the model. Workspace/current-index scope is applied before provider caps. See [UNIFIED_SEARCH.md](UNIFIED_SEARCH.md). Phase F must still implement video representative-frame indexing and matching timestamps.
 

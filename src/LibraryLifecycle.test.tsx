@@ -31,6 +31,12 @@ beforeEach(()=>{vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(
 afterEach(async()=>{cleanup();await act(async()=>{});vi.resetAllMocks();vi.restoreAllMocks();vi.unstubAllGlobals();});
 function openFolders(){fireEvent.click(screen.getByRole("button",{name:"Folders"}));}
 function createWorkspaceFromFolders(name:string){openFolders();fireEvent.change(screen.getByRole("combobox",{name:"Active workspace"}),{target:{value:"__new__"}});fireEvent.change(screen.getByLabelText("Workspace name"),{target:{value:name}});fireEvent.click(screen.getByRole("button",{name:"Create"}));}
+it("keeps section labels consistent while navigating the main pages",async()=>{
+  const {container}=render(<App/>);await screen.findByText("alpha-0.jpg");
+  for(const [page,label] of [["Library","YOUR COLLECTION"],["Folders","LIBRARY ORGANIZATION"],["Map","PHOTO LOCATIONS"],["Collections","VIRTUAL ORGANIZATION"],["By date","BY CAPTURE DATE"],["Memories","ON THIS DAY"],["People","LOCAL PEOPLE INDEX"],["Tags","PORTABLE METADATA"],["Settings","PREFERENCES"]]){
+    fireEvent.click(screen.getByRole("button",{name:page}));expect(container.querySelector(".page-heading .eyebrow")?.textContent).toBe(label);
+  }
+});
 it("keeps workspace selection at the top of the sidebar and opens editing from the Library",async()=>{
   const {container}=render(<App/>);await screen.findByText("alpha-0.jpg");
   const selector=screen.getByRole("combobox",{name:"Active workspace"});expect(selector.closest(".sidebar")).toBeTruthy();
@@ -62,7 +68,7 @@ it("opens a selected video through the shared workspace project route",async()=>
     if(command==="scan_indexed_with_changes"){const value=scan(A);value.scan.photos=value.scan.photos.map(p=>({...p,path:p.path.replace(".jpg",".mp4"),name:p.name.replace(".jpg",".mp4"),extension:"mp4"}));return value;}
     if(command==="edit_workspace_video_project")return new Promise(()=>{});return fallback(command,args);
   });
-  render(<App/>);fireEvent.click(await screen.findByText("alpha-0.mp4"));fireEvent.click(screen.getByRole("button",{name:"Open video editor"}));
+  render(<App/>);fireEvent.click(await screen.findByText("alpha-0.mp4"));fireEvent.click(screen.getByRole("button",{name:"Edit"}));
   await waitFor(()=>expect(invoke).toHaveBeenCalledWith("edit_workspace_video_project",{workspaceId:"library",action:{type:"open_source",path:`${A}\\photo-0.mp4`}}));
   expect(vi.mocked(invoke).mock.calls.some(([c])=>c==="create_video_project")).toBe(false);
 });

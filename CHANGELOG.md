@@ -1,3 +1,12 @@
+# 0.56.12 — Compact navigation and clearer viewing
+
+- Restore compact left-menu rows: fixed 42px rows and 4px gaps stop navigation stretching with window height.
+- Restore green section labels across the Library, editor, folders, map, collections, date, memories, People, tags and Settings.
+- Add an accessible Collapse menu / Expand menu button with a saved preference. Workspace selection remains at the top left; icons retain labels/tooltips and keyboard access.
+- Simplify File Details actions to Edit and Fullscreen / Restore; retain previous/next/close and keep long filenames in the summary below.
+- Resize the existing map after menu changes and initialize its view once, preventing a lingering startup zoom when navigating away quickly.
+- Add regression coverage for remembered menu width, workspace/theme/navigation access, section labels, viewer actions and map resize/teardown. Preserve existing media, AI, search and editing behavior.
+
 # 0.56.11 — Phase E unified ranked search
 
 - Replace disconnected filename/OCR/semantic text searches with one Library search and result model. Combine names, paths, managed XMP keywords, ratings/favorites and optional indexed text, named People and image-content evidence.

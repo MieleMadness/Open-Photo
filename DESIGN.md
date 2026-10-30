@@ -42,3 +42,11 @@ In 0.56.8 the same stage shows one compiled continuous preview, with its playhea
 ## Unified discovery — 0.56.11
 
 Keep one Library search field. Metadata/cached evidence updates while typing; Search/Enter explicitly adds image-content inference. Use the existing controls/tokens and a compact status/help disclosure, with visible strongest-match text in existing tile/list metadata and full reasons in File Details. Relevance is a real sort choice; clearing a search restores browsing order. Preserve current matches while extending a query, disclose partial providers, and cancel stale work without disturbing the newest request. Do not add separate OCR/semantic result pages or decorative search cards.
+
+## Compact navigation and section labels — 0.56.12
+
+The user explicitly prefers green eyebrow labels above section headings. Keep them through future design cleanup; this product preference overrides generic guidance against eyebrows. `PageHeading` owns the structure and uses the contrast-tested success-text role in both themes.
+
+`AppSidebar` owns explicit, saved menu width rather than breakpoint-driven collapsing. Expanded width is 250px, icon rail 72px. Navigation uses 42px rows, 4px gaps and start alignment; extra height stays below rows. Only the navigation list scrolls, keeping workspace selection and the width toggle reachable. Do not animate layout width during frequent media browsing. Collapsed controls retain accessible names, titles and visible focus. Native workspace options remain readable.
+
+File identity belongs in the summary below the File Details toolbar. Keep Edit and Fullscreen / Restore labels short; group browsing and close controls alongside them. Reuse the modal's focus boundary. Map containers observe size changes without recreating the map or resetting its view.
