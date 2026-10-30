@@ -4,6 +4,7 @@ import {save} from "@tauri-apps/plugin-dialog";
 import {type LoadedSequence,type SequenceSession} from "./videoSequence";
 import {defaultOutput,sourceCanvas} from "./videoProject";
 import {exportCanvas,exportFilename,startWorkspaceVideoExport,useVideoExport,type ExportSize} from "./videoExport";
+import {assetGeometry,usesFrameClock,videoInfo} from "./sequenceMedia";
 import {ErrorNotice} from "./Ui";
 
 export type ProjectPreviewState={source:string;busy:boolean;warnings:string[]};
@@ -13,12 +14,12 @@ const canvases=[{width:1920,height:1080,label:"1080p landscape"},{width:1080,hei
 /** The stage has one owner: original playback or a compiled project, never two audio players. */
 export function SequenceOutput({session,loaded,disabled,host,previewState,onPreviewState,stopRef,children,onInvalidDraft}:{session:SequenceSession;loaded:LoadedSequence;disabled:boolean;host:RefObject<HTMLElement|null>;previewState:ProjectPreviewState;onPreviewState:Dispatch<SetStateAction<ProjectPreviewState>>;stopRef:RefObject<(()=>void)|null>;children?:(parts:SequenceOutputParts)=>ReactNode;onInvalidDraft?:()=>void}){
   const project=session.history.present,used=project.clips.map(c=>({clip:c,asset:project.assets.find(a=>a.id===c.asset_id)!}));
-  const ready=used.length>0&&used.every(({asset})=>loaded.sources.some(s=>s.asset_id===asset.id&&s.root&&s.path)),hdr=used.some(({asset})=>asset.info.hdr),available=ready&&!hdr;
+  const ready=used.length>0&&used.every(({asset})=>loaded.sources.some(s=>s.asset_id===asset.id&&s.root&&s.path)),hdr=used.some(({asset})=>videoInfo(asset)?.hdr),available=ready&&!hdr;
   const [size,setSize]=useState<ExportSize>("project"),[ack,setAck]=useState(false),[error,setError]=useState(""),[exporting,setExporting]=useState(false);
   const exportOpening=useRef(false),previewOpening=useRef(false),active=useRef(true),snapshot=useRef(project),cancel=useRef(()=>{});snapshot.current=project;
-  const exportStatus=useVideoExport(),needsAck=used.some(({clip,asset})=>!clip.edits.muted&&asset.info.audio.length>1);
+  const exportStatus=useVideoExport(),needsAck=used.some(({clip,asset})=>!clip.edits.muted&&(videoInfo(asset)?.audio.length||0)>1);
   const audioChoiceId=useId();
-  const ackSources=[...new Set(used.filter(({clip,asset})=>!clip.edits.muted&&asset.info.audio.length>1).map(({asset})=>asset.id))].sort().join("|");
+  const ackSources=[...new Set(used.filter(({clip,asset})=>!clip.edits.muted&&(videoInfo(asset)?.audio.length||0)>1).map(({asset})=>asset.id))].sort().join("|");
   const stop=useCallback(()=>{cancel.current();previewOpening.current=false;onPreviewState(emptyProjectPreview());},[onPreviewState]);
   useEffect(()=>{active.current=true;return()=>{active.current=false;cancel.current();};},[]);
   useEffect(()=>setAck(false),[project.id,ackSources]);
@@ -56,15 +57,15 @@ export function SequenceOutput({session,loaded,disabled,host,previewState,onPrev
       await startWorkspaceVideoExport(session.workspaceId!,project.id,session.revision,project.title,{destination,size,acknowledge_first_audio:ack});
     }catch(cause){if(active.current)setError(String(cause));}finally{exportOpening.current=false;if(active.current)setExporting(false);}
   }
-  const first=used[0]?.asset||project.assets[0],sourceSize=sourceCanvas(first.info);
+  const first=used[0]?.asset||project.assets[0],sourceSize=sourceCanvas(assetGeometry(first));
   const exported=exportCanvas(project.output,size);
   const options=sourceSize&&!canvases.some(c=>c.width===sourceSize.width&&c.height===sourceSize.height)?[{...sourceSize,label:"First clip source resolution"},...canvases]:canvases;
   const settings=<section className="sequence-output" aria-label="Project output"><h2>Canvas & export settings</h2>
     <fieldset disabled={disabled}><div className="video-edit-fields"><label>Project canvas<select aria-label="Video canvas" value={`${project.output.width}x${project.output.height}`} onChange={e=>{const[width,height]=e.target.value.split("x").map(Number);session.commit({...project,output:{...project.output,width,height}});}}>{options.map(c=><option key={c.label} value={`${c.width}x${c.height}`}>{c.label} ({c.width} × {c.height})</option>)}{!options.some(c=>c.width===project.output.width&&c.height===project.output.height)&&<option value={`${project.output.width}x${project.output.height}`}>Saved canvas ({project.output.width} × {project.output.height})</option>}</select></label>
     <label>Canvas placement<select aria-label="Video canvas placement" value={project.output.fit} onChange={e=>session.commit({...project,output:{...project.output,fit:e.target.value as "fit"|"fill"}})}><option value="fit">Fit, with black borders</option><option value="fill">Fill, with centered crop</option></select></label>
-    <label>Joined clips frame rate<select aria-label="Sequence frame rate" disabled={project.clips.length<2} value={project.frame_rate} onChange={e=>session.commit({...project,frame_rate:Number(e.target.value) as 30|60})}><option value={30}>30 fps</option><option value={60}>60 fps</option></select></label>
+    <label>Project frame rate<select aria-label="Sequence frame rate" disabled={!usesFrameClock(project.clips,project.assets)} value={project.frame_rate} onChange={e=>session.commit({...project,frame_rate:Number(e.target.value) as 30|60})}><option value={30}>30 fps</option><option value={60}>60 fps</option></select></label>
     <label>Output size<select aria-label="Video export size" value={size} onChange={e=>setSize(e.target.value as ExportSize)}><option value="project">Project resolution</option><option value="hd1080">Up to 1080p</option><option value="uhd4k">Up to 4K</option></select></label></div>
-    <button className="secondary-button" onClick={()=>session.commit({...project,output:defaultOutput(first.info)})}>Reset project canvas</button>
+    <button className="secondary-button" onClick={()=>session.commit({...project,output:defaultOutput(assetGeometry(first))})}>Reset project canvas</button>
     {needsAck&&<label><input aria-label="Confirm first audio track only" type="checkbox" checked={ack} onChange={e=>setAck(e.target.checked)}/>Use only each video's first audio track as AAC stereo; exclude its other tracks.</label>}
     </fieldset></section>;
   const previewControls=<div className="video-transport"><button className="secondary-button" disabled={disabled||!available||previewState.busy} onClick={()=>void renderPreview()}>Preview project edits</button>{previewState.busy&&<button className="secondary-button" onClick={stop}>Cancel preview</button>}</div>;
@@ -78,7 +79,7 @@ export function SequenceOutput({session,loaded,disabled,host,previewState,onPrev
   const notices=<>
     <p>One continuous MP4/H.264 SDR video with saved edits. Originals stay unchanged and existing output files are never overwritten. A larger canvas does not add source detail.</p>
     <p>Export resolution: {exported.width} × {exported.height}. Resolution presets keep the project's shape and do not enlarge a smaller canvas.</p>
-    <p>{project.clips.length===1?"One clip keeps its source frame timing.":`Joined clips use ${project.frame_rate} fps with linked original audio and silence for muted or silent intervals.`}</p>
+    <p>{!usesFrameClock(project.clips,project.assets)?"One video clip keeps its source frame timing.":`Joined clips use ${project.frame_rate} fps with linked original audio and silence for muted or silent intervals.`}</p>
   </>;
   return children?children({settings,previewControls,exportControl,notices,feedback}):<>{settings}{previewControls}{exportControl}{feedback}{notices}</>;
 }

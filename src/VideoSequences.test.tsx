@@ -9,7 +9,21 @@ vi.mock("@tauri-apps/api/core",()=>({invoke:vi.fn()}));
 vi.mock("@tauri-apps/plugin-dialog",()=>({open:vi.fn(),save:vi.fn()}));
 vi.mock("./VideoPlayer",()=>({VideoPlayer:({path,root}:{path:string;root:string})=><div><p data-root={root}>Preview: {path}</p></div>}));
 const info={duration_seconds:2,codec:"h264",width:96,height:64,time_base:"1/90000",frame_rate:"30/1",nominal_frame_rate:"30/1",sample_aspect_ratio:"1:1",rotation_degrees:0,color_transfer:null,hdr:false,audio:[],warnings:[]};
-function loaded():LoadedSequence{return {project:{schema_version:2,id:"p",title:"Two short videos",assets:["one","two"].map(id=>({id,relative_path:`${id}.mp4`,sha256:(id==="one"?"1":"2").repeat(64),bytes:100,info})),clips:["one","two"].map(id=>({id:`clip-${id}`,asset_id:id,source_in:{ticks:"0",time_base:"1/90000"},source_out:{ticks:"180000",time_base:"1/90000"},edits:defaultEdits()})),output:{width:1920,height:1080,fit:"fit"},frame_rate:30},revision:1,sources:["one","two"].map(id=>({asset_id:id,path:`/library/${id}.mp4`,root:"/library",status:"ready"}))};}
+function loaded():LoadedSequence{return {project:{schema_version:3,id:"p",title:"Two short videos",assets:["one","two"].map(id=>({id,relative_path:`${id}.mp4`,sha256:(id==="one"?"1":"2").repeat(64),bytes:100,media:{kind:"video" as const,info}})),clips:["one","two"].map(id=>({id:`clip-${id}`,asset_id:id,source_in:{ticks:"0",time_base:"1/90000"},source_out:{ticks:"180000",time_base:"1/90000"},edits:defaultEdits()})),output:{width:1920,height:1080,fit:"fit"},frame_rate:30},revision:1,sources:["one","two"].map(id=>({asset_id:id,path:`/library/${id}.mp4`,root:"/library",status:"ready"}))};}
+it("edits photo duration and geometry in the same project without exposing photo audio controls",async()=>{
+  const value=loaded();value.project.assets.push({id:"photo",relative_path:"still.png",sha256:"3".repeat(64),bytes:200,media:{kind:"photo",width:64,height:96}});
+  value.project.clips.splice(1,0,{id:"still",asset_id:"photo",source_in:{ticks:"0",time_base:"1/1000000"},source_out:{ticks:"3000000",time_base:"1/1000000"},edits:defaultEdits()});
+  value.sources.push({asset_id:"photo",path:"/library/still.png",root:"/library",status:"ready"});
+  render(<VideoSequences roots={["/library"]} workspaceId="w" initial={value}/>);
+  fireEvent.click(await screen.findByRole("button",{name:"Clip 2: still.png"}));await screen.findByAltText("Original timeline photo");
+  expect(screen.queryByLabelText("Audio volume (%)")).toBeNull();expect(screen.queryByLabelText("Video rotation")).toBeNull();
+  const duration=screen.getByLabelText("Photo duration (seconds)");fireEvent.change(duration,{target:{value:"0.5"}});fireEvent.blur(duration);
+  fireEvent.change(screen.getByLabelText("Photo rotation"),{target:{value:"1"}});await act(async()=>flushProjects());
+  const saved=vi.mocked(invoke).mock.calls.filter(([name])=>name==="save_workspace_video_project").at(-1)![1] as {project:LoadedSequence["project"]};
+  expect(saved.project.schema_version).toBe(3);expect(saved.project.clips[1].source_out).toEqual({ticks:"500000",time_base:"1/1000000"});expect(saved.project.clips[1].edits.quarter_turns).toBe(1);
+  fireEvent.click(screen.getByRole("button",{name:"Undo timeline edit"}));expect((duration as HTMLInputElement).value).toBe("0.5");
+  fireEvent.click(screen.getByRole("button",{name:"Undo timeline edit"}));expect((duration as HTMLInputElement).value).toBe("3");
+});
 it("searches the media bin and toggles panels without resetting the timeline or clip drafts",async()=>{
   render(<VideoSequences roots={["/library"]} workspaceId="w" initial={loaded()}/>);
   await screen.findByDisplayValue("Two short videos");
@@ -27,6 +41,7 @@ it("searches the media bin and toggles panels without resetting the timeline or 
   expect(screen.getByRole("button",{name:"Clip 2: two.mp4"}).getAttribute("aria-pressed")).toBe("true");
 });
 beforeEach(()=>{vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(()=>{});vi.spyOn(HTMLMediaElement.prototype,"load").mockImplementation(()=>{});vi.mocked(invoke).mockImplementation(async(command,args)=>{
+  if(command==="preview_image")return "data:image/png;base64,photo";
   if(command==="workspace_video_projects")return {projects:[{id:"p",title:"Two short videos"}],warnings:[]};
   if(command==="edit_workspace_video_project")return (args as {action:{type:string}}).action.type==="add"?{...loaded(),revision:2}:loaded();
   if(command==="save_workspace_video_project")return (args as {expectedRevision:number}).expectedRevision+1;
@@ -95,14 +110,14 @@ it("keeps source assets after deleting every clip and can append the same video 
   render(<VideoSequences roots={["/library"]} workspaceId="w"/>);await screen.findByLabelText("Saved editing projects");
   fireEvent.change(screen.getByLabelText("Saved editing projects"),{target:{value:"p"}});await screen.findByDisplayValue("Two short videos");
   fireEvent.click(screen.getByRole("button",{name:"Ripple delete clip"}));fireEvent.click(screen.getByRole("button",{name:"Ripple delete clip"}));
-  expect(screen.getByText(/The timeline is empty/)).toBeTruthy();expect(screen.getByText(/2 \/ 50 videos/)).toBeTruthy();
-  fireEvent.click(within(screen.getByRole("region",{name:"Video media bin"})).getByRole("button",{name:/one.mp4/}));fireEvent.click(screen.getByRole("button",{name:"Append selected video"}));expect(screen.getByRole("button",{name:"Clip 1: one.mp4"})).toBeTruthy();
+  expect(screen.getByText(/The timeline is empty/)).toBeTruthy();expect(screen.getByText(/2 \/ 50 media/)).toBeTruthy();
+  fireEvent.click(within(screen.getByRole("region",{name:"Video media bin"})).getByRole("button",{name:/one.mp4/}));fireEvent.click(screen.getByRole("button",{name:"Append selected media"}));expect(screen.getByRole("button",{name:"Clip 1: one.mp4"})).toBeTruthy();
   await act(async()=>flushProjects());
 });
 it("uses the verified backend result when duplicate imports are skipped",async()=>{
   render(<VideoSequences roots={["/library"]} workspaceId="w"/>);await screen.findByLabelText("Saved editing projects");fireEvent.change(screen.getByLabelText("Saved editing projects"),{target:{value:"p"}});await screen.findByDisplayValue("Two short videos");
-  vi.mocked(open).mockResolvedValue(["/library/one.mp4"]);fireEvent.click(screen.getByText("Add videos…"));
-  await screen.findByText(/0 videos added/);expect(screen.getByText(/2 \/ 50 videos/)).toBeTruthy();
+  vi.mocked(open).mockResolvedValue(["/library/one.mp4"]);fireEvent.click(screen.getByText("Add media…"));
+  await screen.findByText(/0 media sources added/);expect(screen.getByText(/2 \/ 50 media/)).toBeTruthy();
 });
 it("keeps trimming on the selected timeline instance instead of the source player",async()=>{
   render(<VideoSequences roots={["/library"]} workspaceId="w" initial={loaded()}/>);await screen.findByDisplayValue("Two short videos");

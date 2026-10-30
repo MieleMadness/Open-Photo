@@ -52,7 +52,7 @@ impl Snapshot {
             .clone();
         Ok((
             root,
-            crate::video_sequence::single(&self.project, asset, clip.clone()),
+            crate::video_sequence::single(&self.project, asset, clip.clone())?,
         ))
     }
     pub fn revalidate(&self, cancel: impl Fn() -> bool) -> Result<(), String> {
@@ -64,12 +64,7 @@ impl Snapshot {
                 .roots
                 .get(&asset.id)
                 .ok_or("Relink this timeline source")?;
-            let p = crate::video_sequence::single(
-                &self.project,
-                asset,
-                crate::video_sequence::default_clip(asset)?,
-            );
-            video_project::source(root, &p, &cancel)?;
+            crate::sequence_media::source(root, asset, &cancel)?;
         }
         Ok(())
     }
@@ -80,9 +75,20 @@ impl Snapshot {
             .map(|c| Ok(c.source_out.seconds()? - c.source_in.seconds()?))
             .sum()
     }
+    pub fn has_photos(&self) -> bool {
+        self.project.clips.iter().any(|c| {
+            self.project
+                .assets
+                .iter()
+                .any(|a| a.id == c.asset_id && a.is_photo())
+        })
+    }
     pub fn bitrate(&self, size: ExportSize) -> Result<u64, String> {
-        let (_, p) = self.single(0)?;
-        Ok(video_render::target_bitrate(&p, size))
+        let canvas = crate::video_presets::resolve(&self.project.output, size);
+        Ok(
+            (12_000_000 * u64::from(canvas.width) * u64::from(canvas.height) / (1920 * 1080))
+                .clamp(12_000_000, 48_000_000),
+        )
     }
 }
 
@@ -185,6 +191,36 @@ fn progress_args(args: &mut Vec<OsString>, output: &Path, format: &str, max_byte
         output.into(),
     ]);
 }
+struct PartSource {
+    source: PathBuf,
+    photo: bool,
+    video_stream: usize,
+    audio_stream: Option<usize>,
+    start: f64,
+    duration: f64,
+    filter: String,
+    width: u32,
+    height: u32,
+}
+impl PartSource {
+    fn video(p: video_render::Prepared) -> Self {
+        Self {
+            source: p.source,
+            photo: false,
+            video_stream: p.info.video_stream,
+            audio_stream: if p.audio_span.is_some() {
+                p.info.audio.first().map(|a| a.stream)
+            } else {
+                None
+            },
+            start: p.start,
+            duration: p.duration,
+            filter: p.filter,
+            width: p.width,
+            height: p.height,
+        }
+    }
+}
 struct PartOptions<'a> {
     frames: u64,
     fps: u32,
@@ -194,7 +230,7 @@ struct PartOptions<'a> {
     max_bytes: u64,
 }
 fn part_args(
-    prepared: &video_render::Prepared,
+    prepared: &PartSource,
     edits: &video_project::Edits,
     options: PartOptions<'_>,
 ) -> Vec<OsString> {
@@ -222,19 +258,31 @@ fn part_args(
         "1",
         "-protocol_whitelist",
         "file,pipe",
-        "-format_whitelist",
-        "mov,matroska,webm,avi",
-        "-ss",
     ]
     .into_iter()
     .map(Into::into)
     .collect();
-    args.extend([
-        format!("{:.9}", prepared.start).into(),
-        "-i".into(),
-        prepared.source.clone().into(),
-    ]);
-    let real_audio = audio && !edits.muted && prepared.audio_span.is_some();
+    if prepared.photo {
+        args.extend([
+            "-format_whitelist".into(),
+            "image2,png_pipe".into(),
+            "-f".into(),
+            "image2".into(),
+            "-loop".into(),
+            "1".into(),
+            "-framerate".into(),
+            fps.to_string().into(),
+        ]);
+    } else {
+        args.extend([
+            "-format_whitelist".into(),
+            "mov,matroska,webm,avi".into(),
+            "-ss".into(),
+            format!("{:.9}", prepared.start).into(),
+        ]);
+    }
+    args.extend(["-i".into(), prepared.source.clone().into()]);
+    let real_audio = audio && !edits.muted && prepared.audio_stream.is_some();
     if audio && !real_audio {
         args.extend([
             "-f".into(),
@@ -246,14 +294,14 @@ fn part_args(
     let filter=format!("trim=start=0:end={:.9},setpts=PTS-STARTPTS,fps=fps={fps}:start_time=0,tpad=stop_mode=clone:stop_duration={:.9},trim=end_frame={frames},setpts=N/({fps}*TB),{},scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setsar=1",prepared.duration,duration+1.0/f64::from(fps),prepared.filter);
     args.extend([
         "-map".into(),
-        format!("0:{}", prepared.info.video_stream).into(),
+        format!("0:{}", prepared.video_stream).into(),
         "-vf".into(),
         filter.into(),
     ]);
     if audio {
         let (map, filter) = if real_audio {
             // Preserve decoded audio timestamps, including encoder delay and a late first sample.
-            (format!("0:{}",prepared.info.audio[0].stream),format!("atrim=start=0:end={:.9},aformat=sample_fmts=flt:channel_layouts=stereo,aresample=48000:async=1:first_pts=0,volume={:.4},apad=whole_len={samples},atrim=end_sample={samples},asetpts=N/SR/TB",prepared.duration,f64::from(edits.gain_percent)/100.0))
+            (format!("0:{}",prepared.audio_stream.expect("real audio")),format!("atrim=start=0:end={:.9},aformat=sample_fmts=flt:channel_layouts=stereo,aresample=48000:async=1:first_pts=0,volume={:.4},apad=whole_len={samples},atrim=end_sample={samples},asetpts=N/SR/TB",prepared.duration,f64::from(edits.gain_percent)/100.0))
         } else {
             ("1:a:0".into(),format!("aformat=sample_fmts=flt:channel_layouts=stereo,atrim=end_sample={samples},asetpts=N/SR/TB"))
         };
@@ -341,7 +389,7 @@ pub fn compile(
     progress: impl Fn(f64) + Send + Sync + 'static,
 ) -> Result<Compiled, String> {
     snapshot.validate()?;
-    if snapshot.project.clips.len() == 1 {
+    if snapshot.project.clips.len() == 1 && !snapshot.has_photos() {
         let (root, p) = snapshot.single(0)?;
         return Ok(Compiled {
             plan: video_render::plan(engine, &root, &p, output, options, cancel)?,
@@ -374,36 +422,75 @@ pub fn compile(
         let mut retained_bytes = 0u64;
         let progress = std::sync::Arc::new(progress);
         let mut contexts = Vec::with_capacity(frames.len());
-        for index in 0..frames.len() {
+        for (index, frame_count) in frames.iter().enumerate() {
             if cancel() {
                 return Err("Video render cancelled".into());
             }
-            let (root, p) = snapshot.single(index)?;
-            let prepared = video_render::prepare(engine, &root, &p, options, &cancel)?;
-            if prepared
-                .info
-                .color_primaries
-                .as_deref()
-                .is_some_and(|p| p != "bt709")
-                || prepared
+            let clip = &snapshot.project.clips[index];
+            let asset = snapshot
+                .project
+                .assets
+                .iter()
+                .find(|a| a.id == clip.asset_id)
+                .ok_or("Missing source")?;
+            let root = snapshot.roots.get(&asset.id).ok_or("Relink this source")?;
+            let prepared = if asset.is_photo() {
+                let source = crate::sequence_media::source(root, asset, &cancel)?;
+                let output = crate::video_presets::resolve(
+                    &snapshot.project.output,
+                    if options.preview {
+                        ExportSize::Project
+                    } else {
+                        options.size
+                    },
+                );
+                let (filter, width, height) =
+                    video_project::edit_filters(&clip.edits, &output, options.preview)?;
+                PartSource {
+                    source,
+                    photo: true,
+                    video_stream: 0,
+                    audio_stream: None,
+                    start: 0.0,
+                    duration: *frame_count as f64 / f64::from(fps),
+                    filter,
+                    width,
+                    height,
+                }
+            } else {
+                let (root, p) = snapshot.single(index)?;
+                let prepared = video_render::prepare(engine, &root, &p, options, &cancel)?;
+                if prepared
                     .info
-                    .color_transfer
+                    .color_primaries
                     .as_deref()
                     .is_some_and(|p| p != "bt709")
-            {
-                return Err("Multi-clip output currently requires SDR Rec.709 sources; wide-gamut conversion needs separate validation".into());
-            }
+                    || prepared
+                        .info
+                        .color_transfer
+                        .as_deref()
+                        .is_some_and(|p| p != "bt709")
+                {
+                    return Err("Multi-clip output currently requires SDR Rec.709 sources; wide-gamut conversion needs separate validation".into());
+                }
+                PartSource::video(prepared)
+            };
             contexts.push(prepared);
         }
         let audio = contexts
             .iter()
             .enumerate()
-            .any(|(i, p)| !snapshot.project.clips[i].edits.muted && p.audio_span.is_some());
+            .any(|(i, p)| !snapshot.project.clips[i].edits.muted && p.audio_stream.is_some());
         if options.preview {
             let required = (duration
                 * (2.0 * bitrate as f64 / 8.0 * 1.25 + if audio { 384000.0 } else { 0.0 }))
             .ceil() as u64
-                + 64 * 1024 * 1024;
+                + 64 * 1024 * 1024
+                + if snapshot.has_photos() {
+                    256 * 1024 * 1024
+                } else {
+                    0
+                };
             if crate::video_export::available_space(&directory)?.is_some_and(|free| free < required)
             {
                 return Err(format!(
@@ -412,10 +499,35 @@ pub fn compile(
                 ));
             }
         }
-        for (index, (prepared, count)) in contexts.into_iter().zip(frames.iter()).enumerate() {
+        for (index, (mut prepared, count)) in contexts.into_iter().zip(frames.iter()).enumerate() {
             if cancel() {
                 return Err("Video render cancelled".into());
             }
+            let normalized_photo = if prepared.photo {
+                let image = crate::sequence_media::decode_photo(&prepared.source)?;
+                let asset = snapshot
+                    .project
+                    .assets
+                    .iter()
+                    .find(|a| a.id == snapshot.project.clips[index].asset_id)
+                    .ok_or("Missing source")?;
+                if asset.media
+                    != (crate::sequence_media::Media::Photo {
+                        width: image.width(),
+                        height: image.height(),
+                    })
+                {
+                    return Err("Photo geometry differs from its verified project metadata".into());
+                }
+                let normalized = directory.join(format!("photo-{index:04}.png"));
+                crate::sequence_media::flatten_photo(image)
+                    .save_with_format(&normalized, image::ImageFormat::Png)
+                    .map_err(|e| e.to_string())?;
+                prepared.source = normalized.clone();
+                Some(normalized)
+            } else {
+                None
+            };
             let part = directory.join(format!("clip-{index:04}.mkv"));
             let args = part_args(
                 &prepared,
@@ -443,6 +555,9 @@ pub fn compile(
                     )
                 },
             )?;
+            if let Some(path) = normalized_photo {
+                fs::remove_file(path).map_err(|e| e.to_string())?;
+            }
             let result = video_probe::probe(engine, &part, &cancel)?;
             if result.width != prepared.width
                 || result.height != prepared.height
@@ -462,7 +577,7 @@ pub fn compile(
             }
             width = prepared.width;
             height = prepared.height;
-            info = Some(prepared.info);
+            info = Some(result);
             completed += count;
             manifest.push_str(&format!("file clip-{index:04}.mkv\nduration {length:.9}\n"));
         }
@@ -600,7 +715,7 @@ mod tests {
         fs::create_dir(&dir).unwrap();
         let mut snapshot = Snapshot {
             project: Sequence {
-                schema_version: 2,
+                schema_version: 3,
                 id: video_project::id(),
                 title: "Short cuts".into(),
                 assets: vec![],
@@ -672,7 +787,7 @@ mod tests {
             snapshot
                 .roots
                 .insert(p.asset.id.clone(), dir.to_string_lossy().into_owned());
-            snapshot.project.assets.push(p.asset);
+            snapshot.project.assets.push(p.asset.into());
             snapshot.project.clips.extend(p.clips);
         }
         (Fixture(dir), snapshot)
@@ -700,6 +815,111 @@ mod tests {
             Duration::from_secs(10),
         )
         .unwrap()
+    }
+    #[test]
+    fn photos_join_videos_and_still_only_output_uses_the_same_validated_frame_clock() {
+        let (fixture, mut snapshot) = fixture();
+        let path = fixture.0.join("yellow still 世界.png");
+        image::RgbaImage::from_pixel(96, 64, image::Rgba([255, 255, 0, 255]))
+            .save(&path)
+            .unwrap();
+        let asset = crate::sequence_media::new_photo(&fixture.0, &path).unwrap();
+        let original = video_project::fingerprint(&path, || false).unwrap();
+        let mut clip = crate::sequence_media::default_clip(&asset).unwrap();
+        clip.source_out = VideoTime::from_seconds(0.2, "1/1000000").unwrap();
+        clip.edits.flip_horizontal = true;
+        clip.edits.brightness = -5;
+        snapshot
+            .roots
+            .insert(asset.id.clone(), fixture.0.to_string_lossy().into_owned());
+        snapshot.project.assets.push(asset.clone());
+        snapshot.project.clips.insert(1, clip.clone());
+        let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
+        assert_eq!(preview.info.frame_count, Some(21));
+        assert_eq!(preview.info.audio.len(), 1);
+        let yellow = pixel(Path::new(&preview.source), "0.3");
+        assert!(
+            yellow[0] > 180 && yellow[1] > 180 && yellow[2] < 30,
+            "{yellow:?}"
+        );
+        assert!(rms(Path::new(&preview.source), "0.25") < 0.002);
+        let output = fixture.0.join("mixed.mp4");
+        let mut compiled = compile(
+            &engine(),
+            &snapshot,
+            &output,
+            RenderOptions {
+                preview: false,
+                size: ExportSize::Project,
+                acknowledge_first_audio: false,
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        video_render::encode(&engine(), &compiled.plan, || false, |_| {}).unwrap();
+        let info =
+            video_render::validate_output(&engine(), &compiled.plan, &output, || false).unwrap();
+        assert_eq!(info.frame_count, Some(21));
+        video_render::decode_check(&engine(), &output, || false, |_| {}).unwrap();
+        compiled.close().unwrap();
+        assert_eq!(pixel(&output, "0.3"), yellow);
+        let mixed_project = snapshot.project.clone();
+        snapshot.project.clips = vec![clip];
+        let single_output = fixture.0.join("still-only.mp4");
+        let mut still = compile(
+            &engine(),
+            &snapshot,
+            &single_output,
+            RenderOptions {
+                preview: false,
+                size: ExportSize::Project,
+                acknowledge_first_audio: false,
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        video_render::encode(&engine(), &still.plan, || false, |_| {}).unwrap();
+        let info = video_render::validate_output(&engine(), &still.plan, &single_output, || false)
+            .unwrap();
+        assert_eq!(info.frame_count, Some(6));
+        assert!(info.audio.is_empty());
+        video_render::decode_check(&engine(), &single_output, || false, |_| {}).unwrap();
+        still.close().unwrap();
+        snapshot.revalidate(|| false).unwrap();
+        assert_eq!(
+            video_project::fingerprint(&path, || false).unwrap(),
+            original
+        );
+        if let Some(folder) = std::env::var_os("OPENPHOTO_PHOTO_ARTIFACT_DIR") {
+            let folder = PathBuf::from(folder);
+            fs::create_dir_all(&folder).unwrap();
+            for (name, bytes) in [
+                (
+                    "project.json".to_string(),
+                    serde_json::to_vec_pretty(&mixed_project).unwrap(),
+                ),
+                (
+                    "sequence-preview.mp4".into(),
+                    fs::read(&preview.source).unwrap(),
+                ),
+            ] {
+                let mut staged = crate::safe_output::StagedOutput::new(&folder.join(name)).unwrap();
+                staged.file().write_all(&bytes).unwrap();
+                staged.commit().unwrap();
+            }
+            for asset in mixed_project.assets {
+                let mut staged =
+                    crate::safe_output::StagedOutput::new(&folder.join(&asset.relative_path))
+                        .unwrap();
+                staged
+                    .file()
+                    .write_all(&fs::read(fixture.0.join(&asset.relative_path)).unwrap())
+                    .unwrap();
+                staged.commit().unwrap();
+            }
+        }
     }
     fn rms(file: &Path, time: &str) -> f64 {
         let data = video_engine::run(
@@ -874,11 +1094,7 @@ mod tests {
     fn cumulative_frame_allocation_avoids_rounding_drift() {
         let (_fixture, mut snapshot) = fixture();
         let mut clip = snapshot.project.clips[0].clone();
-        let base = snapshot.project.assets[0]
-            .info
-            .time_base
-            .as_deref()
-            .unwrap();
+        let base = snapshot.project.assets[0].time_base();
         clip.source_in = VideoTime::from_seconds(0.0, base).unwrap();
         clip.source_out = VideoTime::from_seconds(0.04, base).unwrap();
         snapshot.project.clips = (0..100)
@@ -1007,7 +1223,7 @@ mod tests {
         snapshot
             .roots
             .insert(p.asset.id.clone(), folder.to_string_lossy().into_owned());
-        snapshot.project.assets[0] = p.asset;
+        snapshot.project.assets[0] = p.asset.into();
     }
     #[test]
     fn delayed_original_audio_and_multiple_track_acknowledgement_are_preserved() {

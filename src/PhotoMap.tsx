@@ -2,11 +2,11 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 export type PhotoLocation = {path:string;lat:number;lon:number};
-export default function PhotoMap({points,onChoose}:{points:PhotoLocation[];onChoose:(path:string)=>void}) {
+export default function PhotoMap({points,onChoose,compact=false}:{points:PhotoLocation[];onChoose:(path:string)=>void;compact?:boolean}) {
   const container = useRef<HTMLDivElement>(null);
   useEffect(()=>{
     if(!container.current) return;
-    const map = L.map(container.current,{minZoom:2,maxBounds:[[-85,-180],[85,180]],maxBoundsViscosity:1,worldCopyJump:false});
+    const map = L.map(container.current,{scrollWheelZoom:!compact,minZoom:2,maxBounds:[[-85,-180],[85,180]],maxBoundsViscosity:1,worldCopyJump:false});
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {minZoom:2,maxZoom:19,noWrap:true,bounds:[[-85,-180],[85,180]],attribution:'© OpenStreetMap contributors'}).addTo(map);
     // Sidebar width changes resize the map without changing its media or view.
     const resize=()=>map.invalidateSize({pan:false});
@@ -25,6 +25,6 @@ export default function PhotoMap({points,onChoose}:{points:PhotoLocation[];onCho
     if(bounds.length) map.fitBounds(L.latLngBounds(bounds),{padding:[48,48],maxZoom:15,animate:false});
     else map.setView([27.95,-82.46],6);
     return ()=>{window.clearTimeout(initialResize);observer?.disconnect();map.remove();};
-  },[points,onChoose]);
+  },[points,onChoose,compact]);
   return <div ref={container} className="photo-location-map" aria-label="Photo locations map"/>;
 }

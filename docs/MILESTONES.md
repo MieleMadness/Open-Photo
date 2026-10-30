@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current branch — 0.56.20
+## Current branch — 0.56.21
+0.56.21 integrates typed still-photo clips into the shared editor and continuous renderer, with schema migration and normal first-run playback volume. JPEG/PNG/BMP/TIFF import, duration, source inspection, shared adjustments, undo/autosave/history/relink and photo-only or mixed output are covered with short fixtures. The new File Details location map is retained and regression-tested. Installed Windows acceptance, video semantic indexing and remaining social/music tools are pending. Local validation: 155 frontend tests, TypeScript/production build, native formatting/clippy and 145 Rust tests passed (6 explicitly ignored acceptance modes). Browser fixtures verified original-photo display, duration/undo, continuous playback and light/dark/minimum-window layout. Existing bundle-size warnings remain; exact pushed-commit CI must be verified separately.
+
 0.56.20 aligns the remaining frontend trim tests with the timeline-only workflow; runtime behavior is unchanged.
 
 0.56.19 adds global remembered video volume, lazy muted Library hover previews for videos and Live Photos, and five persisted accent palettes.

@@ -6,8 +6,16 @@ import {validSequence,type SequenceProject} from "./videoSequence";
 
 function project():SequenceProject{
   const info={duration_seconds:2,codec:"h264",width:96,height:64,time_base:"1/90000",frame_rate:"30/1",nominal_frame_rate:"30/1",sample_aspect_ratio:"1:1",rotation_degrees:0,color_transfer:null,hdr:false,audio:[],warnings:[]};
-  return {schema_version:2,id:"p",title:"Short assembly",assets:["one","two"].map((id,i)=>({id,relative_path:`${id}.mp4`,sha256:String(i+1).repeat(64),bytes:100,info})),clips:["one","two"].map(id=>({id,asset_id:id,source_in:markTime(0,info.time_base),source_out:markTime(2,info.time_base),edits:defaultEdits()})),output:{width:1920,height:1080,fit:"fit"},frame_rate:30};
+  return {schema_version:3,id:"p",title:"Short assembly",assets:["one","two"].map((id,i)=>({id,relative_path:`${id}.mp4`,sha256:String(i+1).repeat(64),bytes:100,media:{kind:"video" as const,info}})),clips:["one","two"].map(id=>({id,asset_id:id,source_in:markTime(0,info.time_base),source_out:markTime(2,info.time_base),edits:defaultEdits()})),output:{width:1920,height:1080,fit:"fit"},frame_rate:30};
 }
+it("extends, splits and reorders a still clip on the shared frame clock without changing its asset",()=>{
+  const p=project();p.assets.push({id:"photo",relative_path:"still.jpg",sha256:"3".repeat(64),bytes:200,media:{kind:"photo",width:96,height:64}});
+  const appended=editTimeline(p,{type:"append",assetId:"photo",newId:"still"}),extended=editTimeline(appended,{type:"trim",clipId:"still",start:0,end:5});
+  const split=editTimeline(extended,{type:"split",clipId:"still",at:5,newId:"right"});
+  expect(split.clips[2].source_out).toEqual(split.clips[3].source_in);expect(projectDuration(split)).toBe(9);
+  const moved=editTimeline(split,{type:"move",clipId:"right",index:0});expect(projectDuration(moved)).toBe(9);expect(moved.assets).toEqual(p.assets);
+  expect(()=>editTimeline(appended,{type:"trim",clipId:"still",start:0,end:601})).toThrow();
+});
 it("splits at project time into adjacent source ticks while preserving edits and linked audio",()=>{
   const p=project();p.clips[1].edits.gain_percent=75;p.clips[1].edits.brightness=20;
   const before=structuredClone(p),next=editTimeline(p,{type:"split",clipId:"two",at:2+1/3,newId:"right"});

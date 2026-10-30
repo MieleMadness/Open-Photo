@@ -1,3 +1,14 @@
+# 0.56.21 — Photos in the shared timeline
+
+- Add typed photo assets to the shared project/editor with JPEG, PNG, BMP and TIFF import, source previews, adjustable duration, split/reorder/undo and shared crop/transform adjustments.
+- Render mixed and photo-only timelines through the same bounded continuous preview/export pipeline, honoring orientation and transparency and preserving linked video audio with silent photo intervals.
+- Migrate older video documents to schema 3 while retaining revision-safe saves, history, verified relinking, portable references and non-destructive output protections.
+- Fix first-run playback starting silently when no volume preference exists; explicitly saved zero remains valid.
+- Add short native rendering, migration, persistence, frontend interaction and stale-preview regressions.
+- Add a compact GPS map and coordinates below file metadata with the existing JPEG/TIFF reader.
+- Handle missing GPS, unsupported formats, read failures/retry, and stale responses when switching files.
+- Disable map wheel zoom in details to preserve panel scrolling.
+
 # 0.56.20 — CI alignment for timeline-only trimming
 
 - Update remaining frontend regression tests that still expected removed numeric/player trim controls.

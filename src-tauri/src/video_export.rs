@@ -166,8 +166,15 @@ pub fn export_sequence_file(
     request.snapshot.validate()?;
     let duration = request.snapshot.duration()?;
     let bitrate = request.snapshot.bitrate(request.size)?;
-    let scratch_bytes = if request.snapshot.project.clips.len() > 1 {
-        (duration * (bitrate as f64 / 8.0 * 1.25 + 384000.0)).ceil() as u64 + 64 * 1024 * 1024
+    let scratch_bytes = if request.snapshot.project.clips.len() > 1 || request.snapshot.has_photos()
+    {
+        (duration * (bitrate as f64 / 8.0 * 1.25 + 384000.0)).ceil() as u64
+            + 64 * 1024 * 1024
+            + if request.snapshot.has_photos() {
+                256 * 1024 * 1024
+            } else {
+                0
+            }
     } else {
         0
     };

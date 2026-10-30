@@ -79,6 +79,15 @@ it("creates one timeline project from multiple selected Library videos",async()=
   await waitFor(()=>expect(invoke).toHaveBeenCalledWith("edit_workspace_video_project",{workspaceId:"library",action:{type:"create",paths:[`${A}\\photo-0.mp4`,`${A}\\photo-1.mp4`]}}));
   expect(vi.mocked(invoke).mock.calls.filter(([command])=>command==="edit_workspace_video_project")).toHaveLength(1);
 });
+it("creates one continuous project from a mixed Library selection",async()=>{
+  localStorage.setItem("openphoto.workspaces",JSON.stringify(workspace([A])));
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{
+    if(command==="scan_indexed_with_changes"){const value=scan(A,2);value.scan.photos[1]={...value.scan.photos[1],path:`${A}\\video.mp4`,name:"video.mp4",extension:"mp4"};return value;}
+    if(command==="edit_workspace_video_project")return new Promise(()=>{});return fallback(command,args);
+  });
+  render(<App/>);await screen.findByText("alpha-0.jpg");expect(screen.getByText("Photo",{exact:true})).toBeTruthy();expect(screen.getByText("Video",{exact:true})).toBeTruthy();fireEvent.click(screen.getByRole("button",{name:"Select matching"}));fireEvent.click(screen.getByRole("button",{name:"Create video from selection…"}));
+  await waitFor(()=>expect(invoke).toHaveBeenCalledWith("edit_workspace_video_project",{workspaceId:"library",action:{type:"create",paths:[`${A}\\photo-0.jpg`,`${A}\\video.mp4`]}}));
+});
 it("opens a selected video through the shared workspace project route",async()=>{
   localStorage.setItem("openphoto.workspaces",JSON.stringify(workspace([A])));
   vi.mocked(invoke).mockImplementation(async(command,args)=>{

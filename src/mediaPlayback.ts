@@ -3,7 +3,9 @@ import {useCallback,useRef} from "react";
 
 const volumeKey="openphoto.videoVolume";
 export function savedVideoVolume(){
-  const value=Number(localStorage.getItem(volumeKey));
+  const saved=localStorage.getItem(volumeKey);
+  if(saved===null||!saved.trim())return 1;
+  const value=Number(saved);
   return Number.isFinite(value)&&value>=0&&value<=1?value:1;
 }
 export function saveVideoVolume(value:number){

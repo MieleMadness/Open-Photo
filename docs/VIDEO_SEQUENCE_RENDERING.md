@@ -12,7 +12,7 @@ This trades temporary disk space for bounded decoding memory. Estimate space for
 
 Keep rational source in/out times in the project. Normalize multi-clip output to the project's 30/60 fps clock. Round cumulative clip boundaries, rather than rounding every duration independently, so rounding does not accumulate across the sequence. Audio intervals use that same frame allocation; preserve source audio offsets/gain and fill silent or muted clips with silence when the project contains audio. A wholly silent/muted project has no audio track.
 
-Reuse the existing source verification, metadata inspection and edit-filter preparation. Hard-cut normalization uses one canvas, pixel format and SDR color contract. Unsupported HDR/wide-gamut conversion remains an explicit error. One-clip projects retain the established source-timestamp pipeline.
+Reuse the existing source verification, metadata inspection and edit-filter preparation. Hard-cut normalization uses one canvas, pixel format and SDR color contract. Unsupported HDR/wide-gamut conversion remains an explicit error. One-video-clip projects retain the established source-timestamp pipeline. Photo-only projects use the shared project frame clock.
 
 ## Required checks
 
@@ -26,6 +26,13 @@ Joining Matroska parts uses a private working directory and a generated relative
 
 ## Limits and presets
 
-Only MP4/H.264 SDR and optional AAC stereo are exposed. Explicit HDR/non-BT709 transfer/primaries requiring conversion are rejected. Export size resolves separately from saved edits, caps the requested envelope and never enlarges a smaller canvas. Canvas shape and fit/fill remain editing decisions. The 50-asset/200-clip project bounds and processing/output byte limits still apply; temporary PCM needs additional disk space. Photos, transitions and extra audio tracks require a later schema/renderer extension in this same editor. Long-form optimization remains in 1.x.
+Only MP4/H.264 SDR and optional AAC stereo are exposed. Explicit HDR/non-BT709 transfer/primaries requiring conversion are rejected. Export size resolves separately from saved edits, caps the requested envelope and never enlarges a smaller canvas. Canvas shape and fit/fill remain editing decisions. The 50-asset/200-clip project bounds and processing/output byte limits still apply; temporary PCM needs additional disk space. Photos are supported by schema 3; text, transitions and extra audio tracks require later extensions in this same editor. Long-form optimization remains in 1.x.
 
 Native acceptance uses sub-second synthetic source clips, including Unicode paths, mixed geometry/frame rates, real encoded audio and full final decode. Cancellation, insufficient-space checks, changed-source and racing-destination tests leave no published partial file or temporary parts. Simulated failures do not replace deferred physical disk-failure acceptance. Browser fixture checks do not replace an installed WebView2 listening/interaction check.
+
+
+## Still sources — 0.56.21
+
+A photo asset stores oriented width/height and a fingerprint, not video metadata. Its clip timing uses microseconds, bounded to a 600-second virtual interval. Supported files are JPEG/PNG/BMP/TIFF up to 250 MB, 50 megapixels and 20,000 pixels per edge. Animated PNG is rejected explicitly. Existing bounded decoding normalizes EXIF orientation, then alpha is flattened against black into a job-owned PNG. Only one source is decoded at a time. The same clip filter builder handles crop, turns, flips, brightness/contrast and fit/fill; frame allocation and silent audio use the continuous timeline contract. Normalized files are removed with the owned scratch directory. Revalidate originals and fully decode the staged result before safe publication.
+
+The sub-second mixed fixture verifies a video/photo/video sequence, a distinguishable photo frame, silent audio over the photo, preview/export geometry agreement, and a photo-only output with the expected frame count. Migration tests preserve legacy IDs, timing and edits; workspace tests cover save/reopen/history/relink and failed import atomicity. These checks do not replace installed WebView2 acceptance.

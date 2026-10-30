@@ -17,6 +17,7 @@ mod media_stream;
 mod safe_output;
 mod search;
 mod search_providers;
+mod sequence_media;
 mod similar;
 mod user_data;
 mod video_edit_preview;

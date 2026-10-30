@@ -18,14 +18,14 @@ Panel hiding preserves fields and drafts. Export validation opens hidden control
 
 ## Follow-up patches
 
-1. Timeline filmstrips. Trim handles shipped in 0.56.15 and the adjustable preview/timeline divider in 0.56.16. The adaptive time ruler, clip posters and before/after insertion markers shipped in 0.56.14. Retain numeric trim and move buttons as alternatives.
-2. Photos as duration-based clips in the same project, with verified source decoding and joined preview/export. Reconcile the preserved mixed-media work against the current branch before integration.
-3. Short mixed-media acceptance: two videos plus one photo, trim/split/reorder, save/reopen, joined audio/video export and unchanged originals.
+1. Timeline filmstrips. Trim handles shipped in 0.56.15 and the adjustable preview/timeline divider in 0.56.16. The adaptive time ruler, clip posters and before/after insertion markers shipped in 0.56.14. Keep timeline trim handles and move buttons keyboard accessible; numeric video trimming was removed in 0.56.18.
+2. Implemented in 0.56.21: photos as duration-based clips in the same project, with verified source decoding and joined preview/export. Photo-specific duration controls replace irrelevant source-audio controls.
+3. Short mixed-media automated checks cover two videos plus one photo, duration/split/reorder, save/reopen, joined audio/video export and unchanged originals. Installed Windows acceptance remains open.
 4. Local audio import and waveforms, then text and a small tested transition set under the existing roadmap gates.
 
 ## Verification and limits
 
-Use normal/wide/minimum windows, both themes, expanded/collapsed app navigation, hidden panels, long names, empty media search, missing sources, invalid drafts, source compatibility fallback, preview cancellation and revision-safe export. Browser fixtures complement native/installed checks. Use short fixtures; long-form acceptance remains deferred. The layout patch does not add photo rendering, new transitions, instant live recomposition or an online music catalog.
+Use normal/wide/minimum windows, both themes, expanded/collapsed app navigation, hidden panels, long names, empty media search, missing sources, invalid drafts, source compatibility fallback, preview cancellation and revision-safe export. Browser fixtures complement native/installed checks. Use short fixtures; long-form acceptance remains deferred. Photo rendering joined this layout in 0.56.21. New transitions, instant live recomposition and an online music catalog remain outside the current implementation.
 
 
 ## 0.56.18 editor interaction decisions

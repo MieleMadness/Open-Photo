@@ -4,6 +4,8 @@ import {TimelineTrimHandles} from "./TimelineTrimHandles";
 import {EditorPoster} from "./EditorPoster";
 import {timelineTicks,clipDropIndex} from "./timelineGeometry";
 import type {LoadedSequence} from "./videoSequence";
+import {NumberField} from "./EditorFields";
+import {assetGeometry,hasAudio,videoInfo} from "./sequenceMedia";
 import {ClipEdits} from "./ClipEdits";
 import {clockTime,markSeconds} from "./videoTime";
 import {projectDuration,timelineEntries} from "./timelineCommands";
@@ -35,7 +37,7 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
       <div className="video-transport timeline-actions">
         <button className="secondary-button" disabled={!session.history.past.length} aria-label="Undo timeline edit" title="Undo timeline edit" onClick={()=>history("undo")}><Undo2 size={16}/>Undo</button>
         <button className="secondary-button" disabled={!session.history.future.length} aria-label="Redo timeline edit" title="Redo timeline edit" onClick={()=>history("redo")}><Redo2 size={16}/>Redo</button>
-        <button className="secondary-button" aria-label="Append selected video" title="Add selected media to the end of the timeline" onClick={()=>command({type:"append",assetId,newId:crypto.randomUUID()})}><Plus size={16}/>Add clip</button>
+        <button className="secondary-button" aria-label="Append selected media" title="Add selected media to the end of the timeline" onClick={()=>command({type:"append",assetId,newId:crypto.randomUUID()})}><Plus size={16}/>Add clip</button>
         <div className="timeline-zoom" role="group" aria-label="Timeline zoom">
           <button type="button" className="icon-button" aria-label="Zoom timeline out" title="Zoom timeline out" disabled={zoom<=1} onClick={()=>setZoom(value=>Math.max(1,value/2))}><ZoomOut size={16}/></button>
           <button type="button" className="secondary-button" aria-label="Fit timeline" title="Fit the whole project in the timeline" onClick={()=>setZoom(1)}><Maximize2 size={15}/>Fit</button>
@@ -64,13 +66,13 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
               dragging.current="";setDrop(null);
             }}>
               <button type="button" draggable={!disabled} className="timeline-clip" aria-label={`Clip ${i+1}: ${source.relative_path.split("/").at(-1)}`} aria-pressed={selected===item.clip.id} onClick={()=>choose(item.clip.id)} onDragStart={e=>{dragging.current=item.clip.id;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",item.clip.id);}} onDragEnd={()=>{dragging.current="";setDrop(null);}}>
-                <strong title={source.relative_path}>{i+1}. {source.relative_path.split("/").at(-1)}</strong><EditorPoster root={binding?.root||undefined} path={binding?.path||undefined} identity={source.sha256} filmstrip/><span className="timeline-clip-duration">{clockTime(item.duration)}</span><small className="timeline-linked-audio" data-muted={item.clip.edits.muted||!source.info.audio.length}>{item.clip.edits.muted?"Audio muted":source.info.audio.length?"Linked original audio":"Silent source"}</small>
+                <strong title={source.relative_path}>{i+1}. {source.relative_path.split("/").at(-1)}</strong><EditorPoster root={binding?.root||undefined} path={binding?.path||undefined} identity={source.sha256} photo={source.media.kind==="photo"} filmstrip={source.media.kind==="video"}/><span className="timeline-clip-duration">{clockTime(item.duration)}</span><small className="timeline-linked-audio" data-muted={item.clip.edits.muted||!hasAudio(source)}>{source.media.kind==="photo"?"Still image":item.clip.edits.muted?"Audio muted":hasAudio(source)?"Linked original audio":"Silent source"}</small>
               </button>
-              <TimelineTrimHandles range={{start:markSeconds(item.clip.source_in),end:markSeconds(item.clip.source_out)}} limit={Math.max(source.info.duration_seconds,markSeconds(item.clip.source_out))} minimum={0.04+sourceTick} step={Math.max(1/project.frame_rate,sourceTick)} selected={selected===item.clip.id} disabled={disabled} token={project} index={i} pixelsPerSecond={()=>(track.current?.getBoundingClientRect().width||0)/duration} onCommit={range=>command({type:"trim",clipId:item.clip.id,...range})}/>
+              <TimelineTrimHandles range={{start:markSeconds(item.clip.source_in),end:markSeconds(item.clip.source_out)}} limit={Math.max((videoInfo(source)?.duration_seconds||600),markSeconds(item.clip.source_out))} minimum={0.04+sourceTick} step={Math.max(1/project.frame_rate,sourceTick)} selected={selected===item.clip.id} disabled={disabled} token={project} index={i} pixelsPerSecond={()=>(track.current?.getBoundingClientRect().width||0)/duration} onCommit={range=>command({type:"trim",clipId:item.clip.id,...range})}/>
             </li>;
           })}</ol>
           {!!duration&&<span className="timeline-playhead" aria-hidden="true" style={{left:`${playhead/duration*100}%`}}/>}
-          {!entries.length&&<p className="timeline-empty">The timeline is empty. Choose a video in the media bin and append it, or undo the deletion.</p>}
+          {!entries.length&&<p className="timeline-empty">The timeline is empty. Choose media in the media bin and append it, or undo the deletion.</p>}
         </div>
       </div>
 
@@ -88,7 +90,8 @@ export function SequenceClipInspector({session,disabled,selected,onSelected,posi
   const {command,error}=useTimelineActions(session,selected,onSelected);
   return <section aria-label="Selected clip controls"><h2>Selected clip</h2><fieldset disabled={disabled}>
       {clip&&asset&&entry&&<div className="timeline-inspector" key={clip.id}>
-        <p><strong>Selected clip {index+1}</strong> · Source duration {clockTime(asset.info.duration_seconds)} · Project position {clockTime(entry.start)}–{clockTime(entry.end)}</p>
+        <p><strong>Selected clip {index+1}</strong> · {asset.media.kind==="photo"?"Still image":`Source duration ${clockTime(videoInfo(asset)!.duration_seconds)}`} · Project position {clockTime(entry.start)}–{clockTime(entry.end)}</p>
+        {asset.media.kind==="photo"&&<NumberField label="Photo duration (seconds)" value={markSeconds(clip.source_out)-markSeconds(clip.source_in)} min={.04} max={600-markSeconds(clip.source_in)} step="any" onCommit={duration=>command({type:"trim",clipId:clip.id,start:markSeconds(clip.source_in),end:markSeconds(clip.source_in)+duration})}/>}
         <div className="video-transport timeline-clip-actions">
           <button className="secondary-button" disabled={index===0} onClick={()=>command({type:"move",clipId:clip.id,index:index-1})}><ArrowLeft size={16}/>Move earlier</button>
           <button className="secondary-button" disabled={index===entries.length-1} onClick={()=>command({type:"move",clipId:clip.id,index:index+1})}>Move later<ArrowRight size={16}/></button>
@@ -96,7 +99,7 @@ export function SequenceClipInspector({session,disabled,selected,onSelected,posi
           <button className="destructive-button" onClick={()=>command({type:"delete",clipId:clip.id})}><Trash2 size={16}/>Ripple delete clip</button>
           <button className="secondary-button" onClick={()=>command({type:"reset",clipId:clip.id})}><RotateCcw size={16}/>Reset selected clip</button>
         </div>
-        <ClipEdits edits={clip.edits} info={asset.info} onChange={mutate=>{const edits=structuredClone(clip.edits);mutate(edits);return command({type:"edits",clipId:clip.id,edits});}}/>
+        <ClipEdits edits={clip.edits} info={assetGeometry(asset)} photo={asset.media.kind==="photo"} onChange={mutate=>{const edits=structuredClone(clip.edits);mutate(edits);return command({type:"edits",clipId:clip.id,edits});}}/>
       </div>}
     {!clip&&<p>Select a clip on the timeline to edit it.</p>}
     </fieldset>{error&&<p role="alert" className="field-error">{error}</p>}</section>;

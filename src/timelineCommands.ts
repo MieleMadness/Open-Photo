@@ -1,3 +1,4 @@
+import {assetTimeBase,assetDuration,usesFrameClock} from "./sequenceMedia";
 import {defaultEdits,type VideoProject} from "./videoProject";
 import {markSeconds,markTime} from "./videoTime";
 import {validSequence,type SequenceProject} from "./videoSequence";
@@ -16,7 +17,7 @@ export type TimelineCommand=
 /** Sequence order owns placement. Linked source audio is part of each clip's edits. */
 export function timelineEntries(project:SequenceProject):TimelineEntry[]{
   let position=0,sourceTotal=0;
-  return project.clips.map(clip=>{const start=position;sourceTotal+=markSeconds(clip.source_out)-markSeconds(clip.source_in);position=project.clips.length>1?Math.round(sourceTotal*project.frame_rate)/project.frame_rate:sourceTotal;return {clip,start,end:position,duration:position-start};});
+  return project.clips.map(clip=>{const start=position;sourceTotal+=markSeconds(clip.source_out)-markSeconds(clip.source_in);position=usesFrameClock(project.clips,project.assets)?Math.round(sourceTotal*project.frame_rate)/project.frame_rate:sourceTotal;return {clip,start,end:position,duration:position-start};});
 }
 export function projectDuration(project:SequenceProject):number{return timelineEntries(project).at(-1)?.end||0;}
 
@@ -25,7 +26,7 @@ export function editTimeline(project:SequenceProject,command:TimelineCommand):Se
   const next=structuredClone(project);
   if(command.type==="append"){
     const asset=next.assets.find(a=>a.id===command.assetId);if(!asset)throw Error("Choose a video from this project's media bin.");
-    next.clips.push({id:command.newId,asset_id:asset.id,source_in:markTime(0,asset.info.time_base),source_out:markTime(asset.info.duration_seconds,asset.info.time_base),edits:defaultEdits()});
+    next.clips.push({id:command.newId,asset_id:asset.id,source_in:markTime(0,assetTimeBase(asset)),source_out:markTime(assetDuration(asset),assetTimeBase(asset)),edits:defaultEdits()});
   }else{
     const index=next.clips.findIndex(c=>c.id===command.clipId);if(index<0)throw Error("The selected clip is no longer in this project.");
     const clip=next.clips[index],asset=next.assets.find(a=>a.id===clip.asset_id)!;
@@ -36,16 +37,16 @@ export function editTimeline(project:SequenceProject,command:TimelineCommand):Se
       next.clips.splice(index,1);
     }else if(command.type==="trim"){
       if(!Number.isFinite(command.start)||!Number.isFinite(command.end))throw Error("Enter valid trim times.");
-      clip.source_in=markTime(command.start,asset.info.time_base);clip.source_out=markTime(command.end,asset.info.time_base);
+      clip.source_in=markTime(command.start,assetTimeBase(asset));clip.source_out=markTime(command.end,assetTimeBase(asset));
       if(command.start<0||command.end<=command.start)throw Error("Trim end must be after trim start.");
     }else if(command.type==="edits"){
       clip.edits=structuredClone(command.edits);
     }else if(command.type==="reset"){
-      clip.edits=defaultEdits();clip.source_in=markTime(0,asset.info.time_base);clip.source_out=markTime(asset.info.duration_seconds,asset.info.time_base);
+      clip.edits=defaultEdits();clip.source_in=markTime(0,assetTimeBase(asset));clip.source_out=markTime(assetDuration(asset),assetTimeBase(asset));
     }else{
       const entry=timelineEntries(project)[index];
       if(!Number.isFinite(command.at)||command.at<=entry.start||command.at>=entry.end)throw Error("Place the playhead inside the selected clip to split it.");
-      const cut=markTime(markSeconds(clip.source_in)+command.at-entry.start,asset.info.time_base);
+      const cut=markTime(markSeconds(clip.source_in)+command.at-entry.start,assetTimeBase(asset));
       const right={...structuredClone(clip),id:command.newId,source_in:cut};clip.source_out=cut;
       next.clips.splice(index+1,0,right);
     }

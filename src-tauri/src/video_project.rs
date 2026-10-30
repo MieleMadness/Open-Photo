@@ -148,7 +148,7 @@ pub struct RecentProject {
     pub title: String,
 }
 
-fn valid_id(s: &str) -> bool {
+pub(crate) fn valid_id(s: &str) -> bool {
     !s.is_empty() && s.len() <= 120 && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
 }
 fn relative_path(s: &str) -> bool {
@@ -165,17 +165,14 @@ pub fn validate(p: &Project) -> Result<(), String> {
     if p.schema_version != 1 {
         return Err("Unsupported video project version".into());
     }
-    if !valid_id(&p.id)
-        || !valid_id(&p.asset.id)
-        || p.title.trim().is_empty()
-        || p.title.chars().count() > 200
-        || !relative_path(&p.asset.relative_path)
-        || p.asset.sha256.len() != 64
-        || !p.asset.sha256.chars().all(|c| c.is_ascii_hexdigit())
-        || p.asset.bytes > 9_007_199_254_740_991
-    {
-        return Err("Invalid video project or asset".into());
-    }
+    validate_identity(
+        &p.id,
+        &p.asset.id,
+        &p.title,
+        &p.asset.relative_path,
+        &p.asset.sha256,
+        p.asset.bytes,
+    )?;
     let info = &p.asset.info;
     if !info.duration_seconds.is_finite()
         || info.duration_seconds <= 0.0
@@ -208,7 +205,34 @@ pub fn validate(p: &Project) -> Result<(), String> {
     {
         return Err("Invalid project trim range (minimum 0.04 seconds)".into());
     }
-    let e = &c.edits;
+    validate_edits_output(&c.edits, &p.output)?;
+    if serde_json::to_vec(p).map_err(|e| e.to_string())?.len() > MAX_DOCUMENT {
+        return Err("Project document too large".into());
+    }
+    Ok(())
+}
+pub(crate) fn validate_identity(
+    id: &str,
+    asset_id: &str,
+    title: &str,
+    path: &str,
+    hash: &str,
+    bytes: u64,
+) -> Result<(), String> {
+    if !valid_id(id)
+        || !valid_id(asset_id)
+        || title.trim().is_empty()
+        || title.chars().count() > 200
+        || !relative_path(path)
+        || hash.len() != 64
+        || !hash.chars().all(|c| c.is_ascii_hexdigit())
+        || bytes > 9_007_199_254_740_991
+    {
+        return Err("Invalid video project or asset".into());
+    }
+    Ok(())
+}
+pub(crate) fn validate_edits_output(e: &Edits, o: &Output) -> Result<(), String> {
     let crop = &e.crop;
     if e.quarter_turns > 3
         || e.gain_percent > 200
@@ -223,7 +247,6 @@ pub fn validate(p: &Project) -> Result<(), String> {
     {
         return Err("Invalid crop, rotation, audio gain, brightness, or contrast".into());
     }
-    let o = &p.output;
     if o.width < 16
         || o.height < 16
         || o.width > 4096
@@ -236,9 +259,6 @@ pub fn validate(p: &Project) -> Result<(), String> {
         || !matches!(o.fit.as_str(), "fit" | "fill")
     {
         return Err("Invalid output canvas".into());
-    }
-    if serde_json::to_vec(p).map_err(|e| e.to_string())?.len() > MAX_DOCUMENT {
-        return Err("Project document too large".into());
     }
     Ok(())
 }
@@ -704,7 +724,14 @@ pub async fn relink_video_project(
 /// Shared, deterministic edit graph, ready for the later export pipeline.
 pub fn filters(p: &Project, preview: bool) -> Result<(String, u32, u32), String> {
     validate(p)?;
-    let e = &p.clips[0].edits;
+    edit_filters(&p.clips[0].edits, &p.output, preview)
+}
+pub(crate) fn edit_filters(
+    e: &Edits,
+    output: &Output,
+    preview: bool,
+) -> Result<(String, u32, u32), String> {
+    validate_edits_output(e, output)?;
     let c = &e.crop;
     let mut f=vec!["scale=w='max(2,trunc(iw*sar/2)*2)':h='max(2,trunc(ih/2)*2)':reset_sar=1".to_string(),format!("crop=w='max(2,trunc(iw*{}/10000/2)*2)':h='max(2,trunc(ih*{}/10000/2)*2)':x='trunc(iw*{}/10000/2)*2':y='trunc(ih*{}/10000/2)*2'",c.width,c.height,c.x,c.y)];
     match e.quarter_turns {
@@ -733,15 +760,15 @@ pub fn filters(p: &Project, preview: bool) -> Result<(String, u32, u32), String>
         ));
     }
     let ratio = if preview {
-        (960.0 / f64::from(p.output.width))
-            .min(540.0 / f64::from(p.output.height))
+        (960.0 / f64::from(output.width))
+            .min(540.0 / f64::from(output.height))
             .min(1.0)
     } else {
         1.0
     };
-    let width = ((f64::from(p.output.width) * ratio / 2.0).floor() as u32 * 2).max(2);
-    let height = ((f64::from(p.output.height) * ratio / 2.0).floor() as u32 * 2).max(2);
-    if p.output.fit == "fit" {
+    let width = ((f64::from(output.width) * ratio / 2.0).floor() as u32 * 2).max(2);
+    let height = ((f64::from(output.height) * ratio / 2.0).floor() as u32 * 2).max(2);
+    if output.fit == "fit" {
         f.push(format!("scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black"));
     } else {
         f.push(format!("scale={width}:{height}:force_original_aspect_ratio=increase:force_divisible_by=2,crop={width}:{height}"));

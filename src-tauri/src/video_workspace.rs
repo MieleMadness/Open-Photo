@@ -120,9 +120,9 @@ fn registered_root(roots: &[String], bound: &str) -> Result<PathBuf, String> {
 }
 pub(crate) fn source(
     roots: &[String],
-    project: &Sequence,
+    _project: &Sequence,
     bindings: &Bindings,
-    asset: &video_project::Asset,
+    asset: &crate::sequence_media::Asset,
 ) -> Result<(PathBuf, PathBuf), String> {
     let root = registered_root(
         roots,
@@ -130,10 +130,9 @@ pub(crate) fn source(
             .get(&asset.id)
             .ok_or("Relink this project's original video")?,
     )?;
-    let single = video_sequence::single(project, asset, video_sequence::default_clip(asset)?);
-    let file = video_project::source(
+    let file = crate::sequence_media::source(
         root.to_str().ok_or("Unsupported folder path")?,
-        &single,
+        asset,
         || false,
     )?;
     Ok((root, file))
@@ -174,7 +173,7 @@ fn root_for_file(roots: &[String], path: &str) -> Result<(PathBuf, PathBuf), Str
         .filter(|r| file.starts_with(r))
         .max_by_key(|r| r.components().count())
         .ok_or("Choose a video inside this workspace's folders")?;
-    crate::media_stream::validated_video(root.to_str().ok_or("Unsupported folder path")?, path)?;
+    crate::safe_media_path(root.to_str().ok_or("Unsupported folder path")?, path)?;
     Ok((root, file))
 }
 fn bind_import(roots: &[String], project: &Sequence) -> Bindings {
@@ -196,7 +195,7 @@ fn bind_import(roots: &[String], project: &Sequence) -> Bindings {
 fn new_record() -> Record {
     Record {
         project: Sequence {
-            schema_version: 2,
+            schema_version: 3,
             id: video_project::id(),
             title: "New video project".into(),
             assets: vec![],
@@ -261,32 +260,59 @@ fn add_files(
     paths: &[String],
 ) -> Result<(), String> {
     if paths.is_empty() || paths.len() > 50 {
-        return Err("Choose 1–50 videos".into());
+        return Err("Choose 1–50 media files".into());
     }
     let mut project = record.project.clone();
     let mut bindings = record.bindings.clone();
     for path in paths {
         let (root, file) = root_for_file(roots, path)?;
-        let info = video_probe::probe(engine, &file, || false)?;
-        let legacy = video_project::new_project(
-            root.to_str().ok_or("Unsupported folder path")?,
-            &file,
-            info,
-        )?;
+        let asset = if crate::sequence_media::photo_extension(&file) {
+            crate::sequence_media::new_photo(&root, &file)?
+        } else {
+            let file = crate::media_stream::validated_video(
+                root.to_str().ok_or("Unsupported folder path")?,
+                file.to_str().ok_or("Unsupported media path")?,
+            )?;
+            let info = video_probe::probe(engine, &file, || false)?;
+            video_project::new_project(
+                root.to_str().ok_or("Unsupported folder path")?,
+                &file,
+                info,
+            )?
+            .asset
+            .into()
+        };
         if project
             .assets
             .iter()
-            .any(|a| a.bytes == legacy.asset.bytes && a.sha256 == legacy.asset.sha256)
+            .any(|a| a.bytes == asset.bytes && a.sha256 == asset.sha256)
         {
             continue;
         }
         if project.assets.is_empty() {
-            project.output = legacy.output;
-            project.title = legacy.title;
+            let (width, height) = match &asset.media {
+                crate::sequence_media::Media::Photo { width, height } => (*width, *height),
+                crate::sequence_media::Media::Video { info } => {
+                    if ((info.rotation_degrees / 90.0).round() as i64).rem_euclid(2) == 1 {
+                        (info.height, info.width)
+                    } else {
+                        (info.width, info.height)
+                    }
+                }
+            };
+            project.output.width = if height > width { 1080 } else { 1920 };
+            project.output.height = if height > width { 1920 } else { 1080 };
+            project.title = file
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .chars()
+                .take(80)
+                .collect();
         }
-        bindings.insert(legacy.asset.id.clone(), root.to_string_lossy().into_owned());
-        project.assets.push(legacy.asset);
-        project.clips.extend(legacy.clips);
+        bindings.insert(asset.id.clone(), root.to_string_lossy().into_owned());
+        project.clips.push(video_sequence::default_clip(&asset)?);
+        project.assets.push(asset);
     }
     video_sequence::validate(&project)?;
     record.project = project;
@@ -700,6 +726,84 @@ fn recover(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn still_projects_roundtrip_duration_relink_history_and_failed_batches_without_changing_sources(
+    ) {
+        let root = std::env::temp_dir().join(format!("workspace-photo-{}", video_project::id()));
+        fs::create_dir(&root).unwrap();
+        let file = root.join("still 世界.png");
+        image::RgbImage::from_pixel(32, 48, image::Rgb([255, 255, 0]))
+            .save(&file)
+            .unwrap();
+        let before = fs::read(&file).unwrap();
+        let roots = vec![root.to_string_lossy().into_owned()];
+        let db = db();
+        let mut record = new_record();
+        add_files(
+            Path::new("unused-engine"),
+            &roots,
+            &mut record,
+            &[file.to_string_lossy().into_owned()],
+        )
+        .unwrap();
+        assert!(record.project.assets[0].is_photo());
+        assert_eq!(record.project.output.width, 1080);
+        assert_eq!(record.project.clips[0].source_out.seconds().unwrap(), 3.0);
+        record.revision = store(&db, "w", &record.project, &record.bindings, None).unwrap();
+        let saved = record.project.clone();
+        assert!(add_files(
+            Path::new("unused-engine"),
+            &roots,
+            &mut record,
+            &[
+                file.to_string_lossy().into_owned(),
+                root.join("missing.png").to_string_lossy().into_owned()
+            ]
+        )
+        .is_err());
+        assert_eq!(record.project, saved);
+        record.project.clips[0].source_out =
+            video_project::VideoTime::from_seconds(0.2, "1/1000000").unwrap();
+        record.revision = store(&db, "w", &record.project, &record.bindings, Some(1)).unwrap();
+        assert_eq!(
+            read(&db, "w", &record.project.id).unwrap().project,
+            record.project
+        );
+        let moved = root.join("moved.png");
+        fs::rename(&file, &moved).unwrap();
+        assert!(
+            loaded(&roots, read(&db, "w", &record.project.id).unwrap()).sources[0]
+                .path
+                .is_none()
+        );
+        record.project.assets[0].relative_path = "moved.png".into();
+        assert!(source(
+            &roots,
+            &record.project,
+            &record.bindings,
+            &record.project.assets[0]
+        )
+        .is_ok());
+        let original = record.project.assets[0].sha256.clone();
+        fs::write(&moved, b"different bytes").unwrap();
+        assert!(source(
+            &roots,
+            &record.project,
+            &record.bindings,
+            &record.project.assets[0]
+        )
+        .is_err());
+        assert_eq!(record.project.assets[0].sha256, original);
+        fs::write(&moved, before).unwrap();
+        assert!(source(
+            &roots,
+            &record.project,
+            &record.bindings,
+            &record.project.assets[0]
+        )
+        .is_ok());
+        fs::remove_dir_all(root).unwrap();
+    }
     fn fixture() -> (PathBuf, Record) {
         let root = std::env::temp_dir().join(format!("workspace-project-{}", video_project::id()));
         fs::create_dir(&root).unwrap();
@@ -817,9 +921,17 @@ mod tests {
             &record.project,
             &record.project.assets[0],
             record.project.clips[0].clone(),
-        );
+        )
+        .unwrap();
         let single = serde_json::to_string(&legacy).unwrap();
-        let multi = serde_json::to_string(&record.project).unwrap();
+        let mut old_multi = serde_json::to_value(&record.project).unwrap();
+        old_multi["schema_version"] = serde_json::json!(2);
+        for asset in old_multi["assets"].as_array_mut().unwrap() {
+            let fields = asset.as_object_mut().unwrap();
+            let media = fields.remove("media").unwrap();
+            fields.insert("info".into(), media["info"].clone());
+        }
+        let multi = serde_json::to_string(&old_multi).unwrap();
         db.execute(
             "INSERT INTO projects VALUES('old-single',?1,'legacy',7,?2,0)",
             params![key, single],

@@ -2477,3 +2477,8 @@ select {
 @media(max-width:620px) {
   .accent-picker { justify-content:flex-start; }
 }
+
+.file-location { margin-top: var(--space-5); min-width: 0; }
+.file-location h3 { margin: 0 0 var(--space-3); }
+.file-location p { color: var(--muted); overflow-wrap: anywhere; }
+.file-location .photo-location-map { height: 240px; min-height: 240px; margin-top: var(--space-3); }

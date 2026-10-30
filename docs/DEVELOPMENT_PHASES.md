@@ -1,18 +1,18 @@
 # Development phases
 
-Baseline: 0.56.20. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.21. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
 | A | Design-system audit and conventions | Documented in DESIGN_SYSTEM_AUDIT.md and DESIGN.md |
-| B | Hard-cut timeline: selection, reorder, trim, split, delete/ripple, playhead/zoom, durations, transactional undo/autosave | Implemented for video clips; installed GUI acceptance remains |
+| B | Hard-cut timeline: selection, reorder, trim, split, delete/ripple, playhead/zoom, durations, transactional undo/autosave | Implemented for video and supported photo clips; installed GUI acceptance remains |
 | C | One workspace-owned project model/editor for one or many assets; legacy migration/recovery/relink | Shared editor, workspace storage/migration/recovery implemented in 0.56.7 |
 | D | Assembled preview and validated combined MP4/H.264 export, then project-independent export presets | Continuous output/presets implemented in 0.56.8; installed GUI acceptance remains |
 | E | Ranked unified discovery with match reasons and media/timestamp identity | Implemented in 0.56.11; installed GUI/AI quality acceptance remains |
 | F | Bounded local video frame sampling, deduplication, embeddings, matching timestamps | Planned — Codex/native AI work |
 | G | Virtualized/lazy results, bounded thumbnail work, stale-work cancellation, scroll/memory checks | Planned |
 | H | Clustered map discovery, counts/empty states, safe phone-media GPS extraction | Planned |
-| I | Photos, text, local audio, simple tested transitions and social layouts after hard cuts stabilize | Gated on B–D |
+| I | Photos, text, local audio, simple tested transitions and social layouts after hard cuts stabilize | Photo clips implemented in 0.56.21; text/music/transitions remain |
 | J | Import-your-own music first; provider-neutral source/license/attribution metadata | Planned |
 
 ## Architecture decisions
@@ -91,8 +91,25 @@ Selected-clip drag trimming and keyboard nudges use the existing rational-time t
 
 Preview/timeline resizing now has persistent app-level sizing, pointer/keyboard interaction, cancellation and viewport-aware limits. Project history and rendering are unchanged. Filmstrips and photo clips remain next.
 
-## 0.56.20 — CI alignment\n\nRemaining frontend tests were migrated from the removed numeric/player trim UI to the timeline-handle workflow introduced in 0.56.18. Runtime behavior is unchanged.\n\n## 0.56.19 — Playback and appearance preferences\n\nVideo playback volume is now a persisted global preference shared by normal video playback and assembled project preview. Library video tiles and Live Photos gain lazy muted hover motion previews. Settings adds five stock accent palettes (Purple, Blue, Teal, Green, Rose) that reuse the existing semantic design tokens in light and dark themes. These changes are presentation/playback preferences only and do not alter project or export semantics.\n\n## 0.56.18 — Timeline-first trimming and preview resizing
+## 0.56.20 — CI alignment
 
-Editor trimming is now timeline-only: the selected clip's left/right handles are the source-of-truth UI and duplicate numeric/source-player trim controls are removed. The preview/timeline divider stays live during layout measurement, the preview resizes with the divider, and timeline zoom uses direct out/fit/in controls. Timeline clips show a filmstrip-style repeated poster using the existing bounded poster cache; true sampled frames remain a future native enhancement. Crop controls are surfaced by default in the Clip inspector.\n\n## 0.56.17 — Inspector task clarity
+Remaining frontend tests were migrated from the removed numeric/player trim UI to the timeline-handle workflow introduced in 0.56.18. Runtime behavior is unchanged.
+
+## 0.56.19 — Playback and appearance preferences
+
+Video playback volume is now a persisted global preference shared by normal video playback and assembled project preview. Library video tiles and Live Photos gain lazy muted hover motion previews. Settings adds five stock accent palettes (Purple, Blue, Teal, Green, Rose) that reuse the existing semantic design tokens in light and dark themes. These changes are presentation/playback preferences only and do not alter project or export semantics.
+
+## 0.56.18 — Timeline-first trimming and preview resizing
+
+Editor trimming is now timeline-only: the selected clip's left/right handles are the source-of-truth UI and duplicate numeric/source-player trim controls are removed. The preview/timeline divider stays live during layout measurement, the preview resizes with the divider, and timeline zoom uses direct out/fit/in controls. Timeline clips show a filmstrip-style repeated poster using the existing bounded poster cache; true sampled frames remain a future native enhancement. Crop controls are surfaced by default in the Clip inspector.
+
+## 0.56.17 — Inspector task clarity
 
 Clip editing and project canvas/export settings now have separate accessible tabs with direct Canvas access. Hidden panels retain drafts, and output validation reveals invalid clip fields. Filmstrips and photos remain follow-ups.
+
+
+## 0.56.21 — Shared photo/video timeline
+
+The existing typed-media work is now integrated with the newer timeline-only trimming, inspector tabs, native playback controls, persisted volume and accent themes. Photos have geometry and an explicit virtual duration, rather than fabricated video stream metadata. Schema 3 migrates v1/v2 video documents at the native boundary. Photos use the existing clip commands and durable session; no second editor was introduced. Continuous rendering normalizes one owned still at a time, with the same geometry filters, cumulative frame clock, cancellation, source verification and safe publication as video.
+
+Local short-fixture coverage checks mixed and photo-only decode, frame allocation, orientation, alpha flattening, silent photo intervals, persistence/recovery/relink and source preservation. Browser fixtures cover duration/undo, original photo display, assembled playback and light/dark/minimum-window layout. Installed Windows interaction/listening acceptance remains separate. Next planned core phase is F (bounded local video semantic indexing); remaining I/J extensions follow in small patches. Long-form work stays deferred to 1.x, and physical-drive failure checks remain a pre-v1.0 gate.

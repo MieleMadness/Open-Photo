@@ -1,7 +1,8 @@
 //! Multi-asset documents share durable project storage, but never overwrite v1 drafts.
 use crate::{
+    sequence_media::{self, Asset, Media},
     video_engine, video_probe,
-    video_project::{self, Asset, Clip, Output, Project, VideoTime},
+    video_project::{self, Clip, Output, Project},
 };
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -41,27 +42,20 @@ pub struct Loaded {
 }
 
 pub(crate) fn default_clip(asset: &Asset) -> Result<Clip, String> {
-    let base = asset.info.time_base.as_deref().unwrap_or("1/1000000");
-    Ok(Clip {
-        id: video_project::id(),
-        asset_id: asset.id.clone(),
-        source_in: VideoTime::from_seconds(0.0, base)?,
-        source_out: VideoTime::from_seconds(asset.info.duration_seconds, base)?,
-        edits: Default::default(),
-    })
+    sequence_media::default_clip(asset)
 }
-pub(crate) fn single(sequence: &Sequence, asset: &Asset, clip: Clip) -> Project {
-    Project {
+pub(crate) fn single(sequence: &Sequence, asset: &Asset, clip: Clip) -> Result<Project, String> {
+    Ok(Project {
         schema_version: 1,
         id: sequence.id.clone(),
         title: sequence.title.clone(),
-        asset: asset.clone(),
+        asset: asset.video()?,
         clips: vec![clip],
         output: sequence.output.clone(),
-    }
+    })
 }
 pub fn validate(p: &Sequence) -> Result<(), String> {
-    if p.schema_version != 2 {
+    if p.schema_version != 3 {
         return Err("Unsupported multi-video project version".into());
     }
     if p.assets.is_empty()
@@ -70,7 +64,7 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
         || !matches!(p.frame_rate, 30 | 60)
     {
         return Err(
-            "A project needs 1–50 videos, at most 200 clips, and a 30 or 60 fps canvas".into(),
+            "A project needs 1–50 media files, at most 200 clips, and a 30 or 60 fps canvas".into(),
         );
     }
     let mut asset_ids = HashSet::new();
@@ -79,9 +73,17 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
         if !asset_ids.insert(&asset.id)
             || !identities.insert((asset.bytes, asset.sha256.to_ascii_lowercase()))
         {
-            return Err("Duplicate project video identity".into());
+            return Err("Duplicate project media identity".into());
         }
-        video_project::validate(&single(p, asset, default_clip(asset)?))?;
+        video_project::validate_identity(
+            &p.id,
+            &asset.id,
+            &p.title,
+            &asset.relative_path,
+            &asset.sha256,
+            asset.bytes,
+        )?;
+        validate_clip(p, asset, &default_clip(asset)?)?;
     }
     let mut clip_ids = HashSet::new();
     let mut duration = 0.0;
@@ -94,7 +96,7 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
         if !clip_ids.insert(&clip.id) {
             return Err("Duplicate timeline clip identity".into());
         }
-        video_project::validate(&single(p, asset, clip.clone()))?;
+        validate_clip(p, asset, clip)?;
         duration += clip.source_out.seconds()? - clip.source_in.seconds()?;
     }
     if duration > 7200.0 {
@@ -105,13 +107,19 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
     }
     Ok(())
 }
+fn validate_clip(p: &Sequence, asset: &Asset, clip: &Clip) -> Result<(), String> {
+    match asset.media {
+        Media::Photo { .. } => sequence_media::validate_photo(asset, clip, &p.output),
+        Media::Video { .. } => video_project::validate(&single(p, asset, clip.clone())?),
+    }
+}
 pub(crate) fn migrate(p: Project) -> Result<Sequence, String> {
     video_project::validate(&p)?;
     let next = Sequence {
-        schema_version: 2,
+        schema_version: 3,
         id: p.id,
         title: p.title,
-        assets: vec![p.asset],
+        assets: vec![p.asset.into()],
         clips: p.clips,
         output: p.output,
         frame_rate: 30,
@@ -123,10 +131,28 @@ pub(crate) fn parse(bytes: &[u8]) -> Result<Sequence, String> {
     if bytes.len() > MAX_DOCUMENT {
         return Err("Project file too large".into());
     }
-    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+    let mut value: serde_json::Value = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
     let p = match value.get("schema_version").and_then(|v| v.as_u64()) {
         Some(1) => migrate(serde_json::from_value(value).map_err(|e| e.to_string())?)?,
-        Some(2) => serde_json::from_value(value).map_err(|e| e.to_string())?,
+        Some(2) => {
+            value["schema_version"] = serde_json::json!(3);
+            for asset in value["assets"]
+                .as_array_mut()
+                .ok_or("Invalid project assets")?
+            {
+                let fields = asset.as_object_mut().ok_or("Invalid project asset")?;
+                let info = fields.remove("info").ok_or("Missing source metadata")?;
+                if fields.contains_key("media") {
+                    return Err("Ambiguous legacy source".into());
+                }
+                fields.insert(
+                    "media".into(),
+                    serde_json::json!({"kind":"video","info":info}),
+                );
+            }
+            serde_json::from_value(value).map_err(|e| e.to_string())?
+        }
+        Some(3) => serde_json::from_value(value).map_err(|e| e.to_string())?,
         _ => return Err("Unsupported video project version".into()),
     };
     validate(&p)?;
@@ -177,8 +203,8 @@ fn read(db: &Connection, root: &str, id: &str) -> Result<(Sequence, u64), String
     let (data, revision) = row.ok_or("Multi-video project not found in this folder")?;
     Ok((parse(data.as_bytes())?, revision))
 }
-fn source(root: &str, p: &Sequence, asset: &Asset) -> Result<PathBuf, String> {
-    video_project::source(root, &single(p, asset, default_clip(asset)?), || false)
+fn source(root: &str, _p: &Sequence, asset: &Asset) -> Result<PathBuf, String> {
+    sequence_media::source(root, asset, || false)
 }
 fn loaded(root: &str, p: Sequence, revision: u64) -> Loaded {
     let sources = p
@@ -224,7 +250,7 @@ fn add_files(engine: &Path, root: &str, p: &mut Sequence, paths: &[String]) -> R
             return Err("A project can contain up to 50 videos".into());
         }
         candidate.clips.push(legacy.clips[0].clone());
-        candidate.assets.push(legacy.asset);
+        candidate.assets.push(legacy.asset.into());
     }
     validate(&candidate)?;
     *p = candidate;
@@ -239,7 +265,7 @@ pub async fn create_video_sequence(
     let engine = video_engine::directory(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
         let mut p = Sequence {
-            schema_version: 2,
+            schema_version: 3,
             id: video_project::id(),
             title: "New video project".into(),
             assets: vec![],
@@ -422,6 +448,7 @@ pub async fn relink_sequence_video(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::video_project::VideoTime;
     fn fixture() -> (PathBuf, Sequence) {
         let root = std::env::temp_dir().join(format!("sequence-{}", video_project::id()));
         fs::create_dir(&root).unwrap();
@@ -550,12 +577,22 @@ mod tests {
         let (root, mut p) = fixture();
         p.clips[0].source_in = VideoTime::from_seconds(0.37, "1/90000").unwrap();
         p.clips[0].edits.brightness = 19;
-        let legacy = single(&p, &p.assets[0], p.clips[0].clone());
+        let legacy = single(&p, &p.assets[0], p.clips[0].clone()).unwrap();
         let bytes = serde_json::to_vec(&legacy).unwrap();
         let restored = parse(&bytes).unwrap();
         assert_eq!(restored, p);
         assert_eq!(serde_json::to_vec(&legacy).unwrap(), bytes);
         assert!(source(root.to_str().unwrap(), &restored, &restored.assets[0]).is_ok());
+        let mut v2 = serde_json::to_value(&p).unwrap();
+        v2["schema_version"] = serde_json::json!(2);
+        for asset in v2["assets"].as_array_mut().unwrap() {
+            let fields = asset.as_object_mut().unwrap();
+            let media = fields.remove("media").unwrap();
+            fields.insert("info".into(), media["info"].clone());
+        }
+        let old = serde_json::to_vec(&v2).unwrap();
+        assert_eq!(parse(&old).unwrap(), p);
+        assert_eq!(serde_json::to_vec(&v2).unwrap(), old);
         fs::remove_dir_all(root).unwrap();
     }
     #[test]
@@ -596,7 +633,7 @@ mod tests {
         bad.assets[0].relative_path = "../escape.mp4".into();
         assert!(validate(&bad).is_err());
         let mut bad = p;
-        bad.schema_version = 3;
+        bad.schema_version = 99;
         assert!(parse(&serde_json::to_vec(&bad).unwrap()).is_err());
         fs::remove_dir_all(root).unwrap();
     }
@@ -605,10 +642,13 @@ mod tests {
         let (root, mut p) = fixture();
         let second = root.join("second.mp4");
         fs::write(&second, b"second unchanged original").unwrap();
-        let second =
-            video_project::new_project(root.to_str().unwrap(), &second, p.assets[0].info.clone())
-                .unwrap();
-        p.assets.push(second.asset);
+        let second = video_project::new_project(
+            root.to_str().unwrap(),
+            &second,
+            p.assets[0].video().unwrap().info,
+        )
+        .unwrap();
+        p.assets.push(second.asset.into());
         p.clips.push(second.clips[0].clone());
         let db = Connection::open(root.join("test.sqlite")).unwrap();
         initialize(&db).unwrap();

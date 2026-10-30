@@ -1,4 +1,6 @@
-> Development update: **0.56.20** separates clip controls from canvas/export settings with keyboard-accessible inspector tabs and a direct Canvas button. Unfinished edits stay intact when switching tabs.
+File Details includes a location map below metadata for GPS-tagged JPEG/TIFF photos. Map imagery requires internet; coordinates remain visible offline.
+
+> Development update: **0.56.21** adds photos to the shared video timeline. Select videos and supported photos together in Library, choose **Create video from selection…**, or use **Add media…** inside the editor. They preview and export as one continuous video.
 
 
 
@@ -278,7 +280,7 @@ The newer AI semantic similarity feature is separate from dHash and requires AI 
 
 The Map view reads GPS metadata from supported photos and displays those points on a Leaflet map.
 
-**Privacy note:** photo files and EXIF data are processed locally, but opening the Map view requests map tiles from **OpenStreetMap** at https://tile.openstreetmap.org. The requested tile coordinates necessarily correspond to the visible map area. If you require a fully offline workflow, avoid opening the Map view until offline tiles are supported.
+**Privacy note:** photo files and EXIF data are processed locally, but opening the Map view or File Details for a GPS-tagged photo requests map tiles from **OpenStreetMap** at https://tile.openstreetmap.org. The requested tile coordinates necessarily correspond to the visible map area. If you require a fully offline workflow, disconnect from the internet before viewing maps; coordinates remain available but map imagery may be unavailable until offline tiles are supported.
 
 ## iPhone media notes
 
@@ -608,3 +610,12 @@ Drag the horizontal divider above the timeline upward for more timeline space, o
 ### Inspector tasks — 0.56.20
 
 Use **Clip** for the selected timeline clip and **Canvas & export** for project shape, fit, frame rate and export resolution. The top **Canvas** button opens and focuses those settings directly. Left/Right and Home/End navigate the tabs. Selecting a timeline clip returns to Clip controls. Switching tabs or hiding controls preserves unfinished numeric entries. Export reveals the Clip tab and focuses any invalid clip entry before proceeding.
+
+
+### Photos in a continuous video — 0.56.21
+
+JPEG, PNG, BMP and TIFF photos use the same timeline, autosave, history, relinking and safe export as video clips. New photos start at three seconds; select a photo and change **Photo duration (seconds)** or drag its trim handles. Split, reorder, repeat and ripple-delete photos like other clips. Rotate, flip, crop, brightness and contrast apply to stills; photo clips have no original audio controls. **Preview project edits** shows the assembled result. The source stage shows the original photo.
+
+Photo-only and mixed sequences use the project's 30/60 fps clock. Original video audio stays linked to its clip; photo intervals are silent. MP4/H.264 remains the tested output. Transparent pixels render against black and embedded photo orientation is honored. Still clips support 0.04–600 seconds within the existing 50-source/200-clip/two-hour project bounds. Timeline photos are bounded to 250 MB, 50 megapixels and 20,000 pixels per edge. HEIC, GIF, WebP and animated PNG timeline imports are not supported yet; existing Library support is unchanged. Older video projects load through a validated schema migration; portable references and fingerprints remain intact.
+
+Fresh installations now start video playback at normal volume. A deliberately saved zero-volume setting is still honored. Text, music, transitions, real sampled filmstrips and installed Windows acceptance remain future work. Long-form optimization stays deferred to 1.x.
