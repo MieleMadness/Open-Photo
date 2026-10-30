@@ -1,6 +1,6 @@
 # Development phases
 
-Baseline: 0.56.9. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.10. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -55,6 +55,6 @@ Short native fixtures cover mixed frame rates/shapes, order/trim, repeated asset
 
 Validation before push: 111 frontend tests in 21 files; TypeScript and production build; native formatting, warnings-as-errors lint, and 131 Rust tests (6 explicit acceptance modes ignored). Existing build chunk-size warnings remain. Real native-produced H.264/AAC preview played and sought in Edge through the assembled stage, with one video element, source restoration/cancellation, light/dark and 1220×780 / 800×580 no-overflow checks. Rendered review also corrected sub-second timeline sizing; StrictMode regression coverage protects ref reattachment from decoder cleanup. The changed-UI detector returned no findings. Pushed GitHub Actions must be verified for the exact commit separately.
 
-## 0.56.9 UI polish checkpoint
+## 0.56.10 accessibility checkpoint\n\n0.56.10 completes a small presentation/accessibility follow-up: removal actions for smart collections, manual collections, and library-folder references now use the shared destructive treatment; the details close control has a tooltip; local AI progress is announced as status. These changes do not alter media files, project state, rendering, indexing, or export behavior.\n\n## 0.56.9 UI polish checkpoint
 
 This patch continues the documented design-system cleanup without changing timeline storage, rendering, search indexes, or native media behavior. Remaining main destinations use the shared page-heading structure; timeline commands keep their existing semantics while gaining consistent iconography, clearer selected/empty states, and a dedicated destructive treatment for ripple deletion. Original media remains untouched when a timeline clip is removed. Deeper ranked search, video semantic indexing, large-library optimization, and map metadata work remain separate Codex/native phases.
