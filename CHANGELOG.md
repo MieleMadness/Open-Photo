@@ -1,3 +1,11 @@
+# 0.56.10 — Accessibility and destructive-action semantics
+
+- Add the missing tooltip to the File Details close control.
+- Give smart-collection removal, manual-collection removal, and folder-reference removal the shared destructive treatment so removal actions no longer look like ordinary neutral commands.
+- Clarify through tooltips that removing a library folder reference or collection does not delete original media.
+- Mark local AI progress text as a status region for assistive technology.
+- Keep this patch presentation/accessibility-only; no media, project, renderer, indexing, or export behavior changes.
+
 # 0.56.9 — UI polish and design-system completion
 
 - Standardize Map, By date, Memories, People, Tags, and Settings on the shared page-heading structure so every major destination starts with the same title/subtitle rhythm.
