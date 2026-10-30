@@ -26,3 +26,14 @@ Panel hiding preserves fields and drafts. Export validation opens hidden control
 ## Verification and limits
 
 Use normal/wide/minimum windows, both themes, expanded/collapsed app navigation, hidden panels, long names, empty media search, missing sources, invalid drafts, source compatibility fallback, preview cancellation and revision-safe export. Browser fixtures complement native/installed checks. Use short fixtures; long-form acceptance remains deferred. The layout patch does not add photo rendering, new transitions, instant live recomposition or an online music catalog.
+
+
+## 0.56.18 editor interaction decisions
+
+- Source trimming is performed only from the timeline clip handles. Do not reintroduce duplicate trim controls in the preview/player area.
+- The preview stage uses the browser/native video controls for playback. Open-Photo-specific Play, skip-five-seconds and duplicate scrubber controls are intentionally hidden in the editor.
+- Compatibility playback remains available as a small action near the preview rather than a separate details/playback-options section.
+- The horizontal divider directly controls preview versus timeline space and must not reset during an active pointer drag.
+- Timeline zoom uses explicit Zoom out / Fit / Zoom in controls.
+- Timeline clips should visually preview their video content. 0.56.18 uses repeated cached posters as a safe presentation layer; replace these with bounded sampled frames when a native filmstrip provider is available.
+- Crop belongs to the selected clip inspector and remains nondestructive.
