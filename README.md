@@ -1,4 +1,4 @@
-> Development update: **0.56.15** adds draggable trim handles to the selected timeline clip, with keyboard nudging, cancellation and one undo/autosave transaction per completed gesture.
+> Development update: **0.56.16** adds a saved, adjustable divider between the video preview and timeline, with keyboard controls, reset and cancellation.
 
 
 
@@ -600,3 +600,7 @@ Drag the time ruler to seek, or focus it and use the arrow keys. Labels adapt to
 Select a timeline clip, then drag its left/right edge to change its source start/end. A temporary outline and time readout show the pending range. Releasing commits the trim and closes the sequence gap; one Undo restores the entire gesture. Escape, pointer cancellation, focus loss or a changed project discards the pending trim.
 
 Focus a handle and use Left/Right for small adjustments, Shift+Left/Right for ten steps, or Home/End for the available limits. Source boundaries and the minimum kept duration are enforced. Numeric trim fields remain available for precise entry, particularly for very narrow clips; zoom in to make handles easier to grab. The original media stays unchanged. Preview remains explicitly source versus rendered project output.
+
+### Resize the editor — 0.56.16
+
+Drag the horizontal divider above the timeline upward for more timeline space, or downward for a larger preview. Your preference is saved and adapts to the available window space. Focus the divider and use Up/Down (Shift for larger changes), Home/End for limits, or double-click to reset. Escape cancels an active drag. Window changes and notices keep the areas within the available space. Resizing changes the layout only; it does not modify project edits or undo history.

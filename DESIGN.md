@@ -66,3 +66,7 @@ Use a native range for ruler seeking so pointer and keyboard behavior stay share
 ## Trim gestures — 0.56.15
 
 Only the selected clip exposes trim handles. Pointer capture keeps the active edge under control outside its bounds. Freeze pixels-per-second and the source interval at gesture start; display a temporary range rather than continuously modifying the saved project. Commit once on release. Cancel on Escape, lost capture/focus or changed project/selection. Keyboard steps respect both project timing and the source clock; numeric trim fields remain an alternative. Do not animate repeated trimming or scrubbing.
+
+## Editor split — 0.56.16
+
+The horizontal separator exposes pointer and keyboard resizing and a visible focus indicator. Its ratio is an app preference, never project data. Save completed changes only; cancellation restores the preference. Window/notice changes clamp the visible split while retaining the saved ratio. The editor owns its viewport and its panels retain their scroll responsibilities. Frequent resizing is immediate with no geometry animation.

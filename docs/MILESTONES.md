@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current branch — 0.56.15
+## Current branch — 0.56.16
+
+0.56.16 adds a saved, keyboard-accessible preview/timeline divider. Resizing changes only app layout, with viewport/notice-aware bounds and cancellable drafts. Filmstrips and photo clips remain pending.
 
 0.56.15 adds pointer/keyboard trim handles with local gesture drafts, stale-gesture protection and one-step undo/autosave. Browser fixtures verify drag, cancellation, keyboard nudging and minimum-window layout. Filmstrips, adjustable pane splits and photo clips remain pending.
 

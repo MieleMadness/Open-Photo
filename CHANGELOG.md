@@ -1,3 +1,11 @@
+# 0.56.16 — Adjustable preview/timeline divider
+
+- Add a draggable horizontal divider with remembered app-level sizing and a usable preview/timeline range.
+- Add keyboard Up/Down, Shift, Home/End, double-click reset and Escape/pointer/focus-loss cancellation.
+- Recalculate limits when the window or notice area changes. Preserve the preferred ratio without saving temporary clamped values or repeated unchanged boundary actions.
+- Keep resizing outside project state, autosave and undo history. Add gesture/persistence/boundary tests and short-fixture browser checks.
+- Filmstrips and photo clips remain follow-up work.
+
 # 0.56.15 — Draggable timeline trimming
 
 - Add start/end handles to the selected timeline clip with a temporary outline/time readout. Freeze the drag scale and commit one shared trim command on release.
