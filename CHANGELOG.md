@@ -1,3 +1,9 @@
+# 0.56.33 — Phase G: bounded Library thumbnail memory
+
+- Replace count-only preview caching with an LRU cache limited to 80 items and a conservative 24 MiB estimate of in-memory data URL strings.
+- Recently used thumbnails remain cached; stale entries are evicted first. Oversized individual previews are not retained in memory.
+- Add cache regression tests for eviction, replacement and memory caps. Native read-only source protections and other Library behavior are unchanged.
+
 # 0.56.32 — Phase G: scroll reset regression fix
 
 - Cancel pending animation-frame scroll updates when sort, query, filter or layout changes reset the Library viewport.
