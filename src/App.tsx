@@ -785,16 +785,21 @@ function Placeholder({title,subtitle,icon:Icon,description}:{title:string;subtit
 }
 function formatBytes(n:number){if(n<1024)return n+" B";const u=["KB","MB","GB","TB"];let i=-1;do{n/=1024;i++}while(n>=1024&&i<u.length-1);return n.toFixed(n<10?1:0)+" "+u[i];}
 
-type LibraryPreviewJob={cancelled:boolean;run:()=>Promise<void>};
+type LibraryPreviewJob={key:string;started:boolean;cancelled:boolean;listeners:Set<(value?:string)=>void>;run:()=>Promise<void>};
 const libraryPreviewQueue:LibraryPreviewJob[]=[];
+const libraryPreviewPending=new Map<string,LibraryPreviewJob>();
 const libraryPreviewCache=new ThumbnailCache();
 let libraryPreviewActive=0;
 function pumpLibraryPreviews(){
   while(libraryPreviewActive<3&&libraryPreviewQueue.length){
     const job=libraryPreviewQueue.shift()!;
     if(job.cancelled)continue;
-    libraryPreviewActive++;
-    void job.run().finally(()=>{libraryPreviewActive--;pumpLibraryPreviews();});
+    job.started=true;libraryPreviewActive++;
+    void job.run().finally(()=>{
+      libraryPreviewActive--;
+      if(libraryPreviewPending.get(job.key)===job)libraryPreviewPending.delete(job.key);
+      pumpLibraryPreviews();
+    });
   }
 }
 function PhotoThumb({root,photo,maxEdge,hoverVideoPath}:{root:string;photo:Photo;maxEdge:number;hoverVideoPath?:string}) {
@@ -809,19 +814,21 @@ function PhotoThumb({root,photo,maxEdge,hoverVideoPath}:{root:string;photo:Photo
     const key=JSON.stringify([root,photo.path,photo.bytes,photo.modified_unix,maxEdge,command]);
     const cached=libraryPreviewCache.get(key);
     if(cached){setSrc(cached);return;}
-    const job:LibraryPreviewJob={cancelled:false,run:async()=>{
-      if(job.cancelled)return;
-      try{
-        const data=await invoke<string>(command,{root,path:photo.path,maxEdge});
-        if(typeof data==="string"&&data){
-          libraryPreviewCache.set(key,data);
-
-          if(active)setSrc(data);
-        }
-      }catch{if(active)setFailed(true);}
-    }};
-    libraryPreviewQueue.push(job);pumpLibraryPreviews();
-    return ()=>{active=false;job.cancelled=true;};
+    const listener=(value?:string)=>{if(!active)return;if(value)setSrc(value);else setFailed(true);};
+    let job=libraryPreviewPending.get(key);
+    if(!job){
+      job={key,started:false,cancelled:false,listeners:new Set(),run:async()=>{
+        let data:string|undefined;
+        try{const result=await invoke<string>(command,{root,path:photo.path,maxEdge});if(typeof result==="string"&&result){data=result;libraryPreviewCache.set(key,result);}}
+        catch{/* Failed previews retain their existing placeholder. */}
+        for(const notify of job!.listeners)notify(data);
+      }};
+      libraryPreviewPending.set(key,job);
+      libraryPreviewQueue.push(job);
+    }
+    job.listeners.add(listener);
+    pumpLibraryPreviews();
+    return ()=>{active=false;job!.listeners.delete(listener);if(!job!.started&&job!.listeners.size===0){job!.cancelled=true;if(libraryPreviewPending.get(key)===job)libraryPreviewPending.delete(key);}};
   },[root,photo.path,photo.bytes,photo.modified_unix,maxEdge]);
   useEffect(()=>{
     let active=true;
