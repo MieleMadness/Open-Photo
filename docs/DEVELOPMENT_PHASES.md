@@ -1,6 +1,8 @@
 # Development phases
 
-## 0.56.33 Phase G preview memory checkpoint
+## 0.56.34 Phase G deduplication checkpoint
+
+Identical Library thumbnail requests now share one pending or active native decode. Subscribers may unmount independently and unneeded queued work is discarded. Installed 10k+ Windows library acceptance remains open.\n\n## 0.56.33 Phase G preview memory checkpoint
 
 Library preview caching now enforces both an 80-item and a conservative 24 MiB in-memory data URL budget, using LRU recency, with regression coverage. Real 10k+ installed Windows acceptance remains outstanding.\n\n## 0.56.32 Phase G scroll reset checkpoint
 
@@ -27,7 +29,7 @@ Automatic AI indexing/counters/failures/folder policy (R2), viewer width/zoom/Li
 Remaining order: installed short-media AI/viewer acceptance and signed upgrade gate; G large-library work; H maps; remaining I text/audio/transitions; J music. Vault R5/R6 remains separately gated on a security/storage design, and is not implemented. Long-form work remains in 1.x and physical-drive checks before v1.0.
 
 
-Baseline: 0.56.33 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.34 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 ## October 30 feedback — implementation checkpoint
 
