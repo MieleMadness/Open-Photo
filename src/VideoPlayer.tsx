@@ -1,3 +1,4 @@
+import {createPortal} from "react-dom";
 import {useEffect,useRef,useState,type KeyboardEvent,type ReactNode} from "react";
 import {FastForward,Rewind} from "lucide-react";
 import {convertFileSrc,invoke} from "@tauri-apps/api/core";
@@ -10,7 +11,7 @@ type Assets={source:string;proxy:boolean;info:VideoInfo;filmstrip:{seconds:numbe
 type Status={state:"queued"|"running"|"complete"|"failed";result:Assets|null;error:string|null};
 
 export type VideoSelection={start:VideoTime;end:VideoTime;disabled?:boolean;onChange:(start:VideoTime,end:VideoTime)=>void};
-export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,compact=false,editorMode=false,viewerMode=false,startAt=0}:{root:string;path:string;onOpenExternal:()=>void;selection?:VideoSelection;autoLoad?:boolean;compact?:boolean;editorMode?:boolean;viewerMode?:boolean;startAt?:number}) {
+export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,compact=false,editorMode=false,viewerMode=false,startAt=0,compatibilityTarget}:{root:string;path:string;onOpenExternal:()=>void;selection?:VideoSelection;autoLoad?:boolean;compact?:boolean;editorMode?:boolean;viewerMode?:boolean;startAt?:number;compatibilityTarget?:HTMLElement|null}) {
   const [video,bindVideo]=useVideoElement();
   const current=useRef(startAt);
   const restore=useRef(startAt);
@@ -141,10 +142,10 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,c
     {error&&<ErrorNotice title="This video preview could not play" error={error}><button className="secondary-button" onClick={()=>setRevision(v=>v+1)}>Retry preview</button></ErrorNotice>}
     {notice&&busy&&<p role="status">{notice}</p>}
     {assets?.warnings.map(warning=><p key={warning}>{warning}</p>)}
-    {requested&&((editorMode||viewerMode)?<div className="editor-compatibility-actions">
+    {requested&&((editorMode||viewerMode)?(editorMode&&compatibilityTarget?createPortal(<div className="editor-compatibility-actions">
       <button className="secondary-button" disabled={busy||!!info?.hdr} onClick={()=>{setPlayIntent(playing);setMode("proxy");setRevision(v=>v+1);}}>{mode==="proxy"?"Rebuild compatible preview":"Compatibility view"}</button>
       {mode==="proxy"&&<button className="secondary-button" onClick={()=>{setPlayIntent(playing);setMode("original");setRevision(v=>v+1);}}>Use original</button>}
-    </div>:<SourceTools compact={compact} label="Playback options"><div className="video-transport">
+    </div>,compatibilityTarget):<div className="editor-compatibility-actions"><button className="secondary-button" disabled={busy||!!info?.hdr} onClick={()=>{setPlayIntent(playing);setMode("proxy");setRevision(v=>v+1);}}>{mode==="proxy"?"Rebuild compatible preview":"Compatibility view"}</button>{mode==="proxy"&&<button className="secondary-button" onClick={()=>{setPlayIntent(playing);setMode("original");setRevision(v=>v+1);}}>Use original</button>}</div>):<SourceTools compact={compact} label="Playback options"><div className="video-transport">
       <button className="secondary-button" disabled={busy||!!info?.hdr} onClick={()=>{setPlayIntent(playing);setMode("proxy");setRevision(v=>v+1);}}>Create compatible preview</button>
       {mode==="proxy"&&<button className="secondary-button" onClick={()=>{setPlayIntent(playing);setMode("original");setRevision(v=>v+1);}}>Use original video</button>}
       {mode==="original"&&!busy&&!assets&&<button className="secondary-button" onClick={()=>setRevision(v=>v+1)}>Retry filmstrip</button>}
