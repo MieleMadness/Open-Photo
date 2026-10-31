@@ -14,6 +14,8 @@ import {EditorProjectMenu} from "./EditorProjectMenu";
 import {EditorPoster} from "./EditorPoster";
 import {SequenceTimeline,SequenceClipInspector} from "./SequenceTimeline";
 import {SequenceOutput,emptyProjectPreview} from "./SequenceOutput";
+import {timelineEntries} from "./timelineCommands";
+import {markSeconds} from "./videoTime";
 import {applySavedVideoVolume,saveVideoVolume,useVideoElement} from "./mediaPlayback";
 
 const mediaFilters=[{name:"Videos and photos",extensions:["mp4","mov","m4v","mkv","webm","avi","jpg","jpeg","png","bmp","tif","tiff"]}];
@@ -34,6 +36,7 @@ function SequenceWorkspace({roots,workspaceId,initial,onBack}:{roots:string[];wo
   const [mediaOpen,setMediaOpen]=useState(true),[inspectorOpen,setInspectorOpen]=useState(()=>typeof matchMedia==="undefined"||matchMedia("(min-width:1100px)").matches),[mediaQuery,setMediaQuery]=useState("");
   const [inspectorTab,setInspectorTab]=useState<InspectorTab>("clip");
   const [timelineHeight,setTimelineHeight]=useState<number>();
+  const [trimPreview,setTrimPreview]=useState<{clipId:string;seconds:number}|null>(null);
   const [previewHeading,setPreviewHeading]=useState<HTMLDivElement|null>(null);
   const project=session?.history.present;
   useEffect(()=>setPlaybackError(""),[previewState.source]);
@@ -53,10 +56,16 @@ function SequenceWorkspace({roots,workspaceId,initial,onBack}:{roots:string[];wo
     void workspaceProjects(workspaceId).then(rows=>{if(current()){setRecent(rows.projects);if(rows.warnings.length)setError(rows.warnings.join("\n"));}}).catch(e=>{if(current())setError(String(e));});
   }
   async function chooseMedia(current:()=>boolean){const files=await open({multiple:true,defaultPath:root,filters:mediaFilters});return current()?(Array.isArray(files)?files:typeof files==="string"?[files]:[]):[];}
-  function seekProject(seconds:number){setPlayhead(seconds);if(projectVideo.current){const duration=projectVideo.current.duration;projectVideo.current.currentTime=Math.min(seconds,Number.isFinite(duration)?duration:seconds);}}
+  function seekProject(seconds:number){setTrimPreview(null);setPlayhead(seconds);if(projectVideo.current){const duration=projectVideo.current.duration;projectVideo.current.currentTime=Math.min(seconds,Number.isFinite(duration)?duration:seconds);}}
   function chooseBin(id:string){stopPreview.current?.();setSelected(id);}
   function selectClip(id:string){setInspectorTab("clip");setSelectedClip(id);const clip=owner.current?.history.present.clips.find(c=>c.id===id);if(clip)setSelected(clip.asset_id);}
-  const asset=project?.assets.find(a=>a.id===selected),source=loaded?.sources.find(s=>s.asset_id===selected);
+  const entries=project?timelineEntries(project):[];
+  const activeEntry=entries.find(entry=>playhead>=entry.start&&playhead<entry.end)||entries.at(-1);
+  const trimEntry=entries.find(entry=>entry.clip.id===trimPreview?.clipId);
+  const previewEntry=trimEntry||activeEntry;
+  const previewAssetId=previewEntry?.clip.asset_id||selected;
+  const asset=project?.assets.find(a=>a.id===previewAssetId),source=loaded?.sources.find(s=>s.asset_id===previewAssetId);
+  const sourcePosition=trimPreview&&trimEntry?trimPreview.seconds:previewEntry?markSeconds(previewEntry.clip.source_in)+Math.max(0,Math.min(playhead-previewEntry.start,previewEntry.duration)):0;
   return <section ref={host} aria-label="Video editing project" className="sequence-workspace" data-ready={!!project} style={{"--editor-timeline-height":timelineHeight===undefined?undefined:`${timelineHeight}px`} as CSSProperties}>
     {project&&session&&loaded?<SequenceOutput key={`output:${project.id}`} session={session} loaded={loaded} disabled={busy} host={host} previewState={previewState} onPreviewState={setPreviewState} stopRef={stopPreview} onInvalidDraft={()=>{setInspectorOpen(true);setInspectorTab("clip");}}>{({settings,previewControls,exportControl,notices:outputNotices,feedback:outputFeedback})=><>
       <header className="editor-project-bar"><h1 className="visually-hidden">Video editor</h1>
@@ -104,12 +113,12 @@ function SequenceWorkspace({roots,workspaceId,initial,onBack}:{roots:string[];wo
         </>}</details>
         </section>
         <section ref={previewStage} tabIndex={-1} className="sequence-preview" aria-label="Video preview stage"><div ref={setPreviewHeading} className="editor-stage-heading"><h2>{previewState.busy||previewState.source?"Project preview":"Source preview"}</h2>{previewControls}</div><div className="editor-stage-content">
-        {previewState.busy?<p role="status">Building the continuous project preview…</p>:previewState.source?<><video ref={bindProjectVideo} aria-label="Edited project preview" src={previewState.source} controls onError={event=>setPlaybackError(`The project preview could not play (media error ${event.currentTarget.error?.code||"unknown"}). Rebuild the preview or export to open it in the Windows player.`)} onLoadedMetadata={()=>{if(projectVideo.current){applySavedVideoVolume(projectVideo.current);seekProject(Math.min(playhead,projectVideo.current.duration||0));}}} onTimeUpdate={()=>{if(projectVideo.current)setPlayhead(projectVideo.current.currentTime);}} onVolumeChange={event=>saveVideoVolume(event.currentTarget.volume)}/>{playbackError&&<ErrorNotice title="The project preview could not play" error={playbackError}/>}<button className="secondary-button" onClick={()=>stopPreview.current?.()}>Show original source</button><ul>{previewState.warnings.map(w=><li key={w}>{w}</li>)}</ul></>:asset&&<><p>{asset.relative_path}</p>{source?.path?(asset.media.kind==="photo"?<PhotoClipSource root={source.root||root} path={source.path}/>:<VideoPlayer key={source.path} root={source.root||root} path={source.path} autoLoad compact editorMode compatibilityTarget={previewHeading} onOpenExternal={()=>{void invoke("open_video",{root:source.root||root,path:source.path}).catch(e=>setError(String(e)));}}/>):<p role="alert" className="error">This source needs relinking: {source?.status}</p>}</>}</div></section>
+        {previewState.busy?<p role="status">Building the continuous project preview…</p>:previewState.source?<><video ref={bindProjectVideo} aria-label="Edited project preview" src={previewState.source} controls onError={event=>setPlaybackError(`The project preview could not play (media error ${event.currentTarget.error?.code||"unknown"}). Rebuild the preview or export to open it in the Windows player.`)} onLoadedMetadata={()=>{if(projectVideo.current){applySavedVideoVolume(projectVideo.current);seekProject(Math.min(playhead,projectVideo.current.duration||0));}}} onTimeUpdate={()=>{if(projectVideo.current)setPlayhead(projectVideo.current.currentTime);}} onVolumeChange={event=>saveVideoVolume(event.currentTarget.volume)}/>{playbackError&&<ErrorNotice title="The project preview could not play" error={playbackError}/>}<button className="secondary-button" onClick={()=>stopPreview.current?.()}>Show original source</button><ul>{previewState.warnings.map(w=><li key={w}>{w}</li>)}</ul></>:asset&&<><p>{asset.relative_path}</p>{source?.path?(asset.media.kind==="photo"?<PhotoClipSource root={source.root||root} path={source.path}/>:<VideoPlayer key={source.path} root={source.root||root} path={source.path} autoLoad compact editorMode startAt={sourcePosition} onPlaybackPosition={seconds=>{if(!previewEntry||trimPreview)return;setPlayhead(previewEntry.start+Math.max(0,Math.min(seconds-markSeconds(previewEntry.clip.source_in),previewEntry.duration)));}} compatibilityTarget={previewHeading} onOpenExternal={()=>{void invoke("open_video",{root:source.root||root,path:source.path}).catch(e=>setError(String(e)));}}/>):<p role="alert" className="error">This source needs relinking: {source?.status}</p>}</>}</div></section>
         <EditorInspector open={inspectorOpen} tab={inspectorTab} onTab={setInspectorTab} onClose={()=>setInspectorOpen(false)} clip={<SequenceClipInspector session={session} disabled={busy} selected={clip?.id||""} onSelected={selectClip} position={playhead}/>} canvas={<>{settings}<details className="editor-output-notes"><summary>Output information</summary>{outputNotices}</details></>}/>
 
       </div>
       <EditorTimelineDivider host={host} onHeight={setTimelineHeight}/>
-      <SequenceTimeline key={`timeline:${project.id}`} session={session} sources={loaded.sources} disabled={busy} assetId={selected} onSelectAsset={setSelected} selected={clip?.id||""} onSelected={selectClip} position={playhead} onPosition={seekProject}/>
+      <SequenceTimeline key={`timeline:${project.id}`} session={session} sources={loaded.sources} disabled={busy} assetId={selected} onSelectAsset={setSelected} selected={clip?.id||""} onSelected={selectClip} position={playhead} onPosition={seekProject} onTrimPreview={(clipId,seconds)=>{setSelectedClip(clipId);setTrimPreview({clipId,seconds});}}/>
     </>}</SequenceOutput>:<div className="editor-empty"><span className="eyebrow">CREATE & EDIT</span><h1>Video editor</h1><p>Import videos and photos to arrange one continuous project.</p>{onBack&&<button className="secondary-button" onClick={onBack}>Back to Library</button>}    <details className="project-file-actions" open={!project}><summary>{project?"Switch or create project":"Open a video project"}</summary><div className="video-transport">
       <button className="primary-button" disabled={busy||!roots.length} onClick={()=>void run(async current=>{const paths=await chooseMedia(current);if(paths.length)adopt(await workspaceProject(workspaceId,{type:"create",paths}),current);})}>New video project…</button>
       <button className="secondary-button" disabled={busy} onClick={()=>void run(async current=>{const path=await open({multiple:false,filters:[{name:"Open-Photo video project",extensions:["json"]}]});if(typeof path==="string"&&current()){adopt(await workspaceProject(workspaceId,{type:"import",path}),current);if(current())setMessage("Opened a new project copy. Existing drafts remain unchanged; this copy belongs to the current workspace.");}})}>Open project file…</button>
