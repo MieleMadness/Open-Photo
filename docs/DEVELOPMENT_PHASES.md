@@ -1,6 +1,8 @@
 # Development phases
 
-## 0.56.31 Phase G scroll scheduling checkpoint
+## 0.56.32 Phase G scroll reset checkpoint
+
+Cancel pending scroll frames when Library search, sorting, filtering or view changes reset the virtual viewport. A lifecycle regression now waits for coalesced frame updates. The 0.56.31 frontend CI failure is addressed.\n\n## 0.56.31 Phase G scroll scheduling checkpoint
 
 Grid and list scrolling coalesce virtual-window updates to the latest animation frame, reducing unnecessary React renders during rapid scroll input. Installed large-library acceptance remains outstanding.\n\n## 0.56.30 Phase G virtualization regression checkpoint
 
@@ -23,7 +25,7 @@ Automatic AI indexing/counters/failures/folder policy (R2), viewer width/zoom/Li
 Remaining order: installed short-media AI/viewer acceptance and signed upgrade gate; G large-library work; H maps; remaining I text/audio/transitions; J music. Vault R5/R6 remains separately gated on a security/storage design, and is not implemented. Long-form work remains in 1.x and physical-drive checks before v1.0.
 
 
-Baseline: 0.56.31 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.32 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 ## October 30 feedback — implementation checkpoint
 
