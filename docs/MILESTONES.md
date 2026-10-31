@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current source update — 0.56.27
+## Current source update — 0.56.28
+
+0.56.28 adds bounded, cache-aware Library thumbnail requests and skips stale queued thumbnails when users scroll quickly.
 
 0.56.27 begins Phase G with viewport-aware Library grid virtualization and retained overscan; large-library performance acceptance remains pending.
 
