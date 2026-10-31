@@ -11,7 +11,7 @@ type Assets={source:string;proxy:boolean;info:VideoInfo;filmstrip:{seconds:numbe
 type Status={state:"queued"|"running"|"complete"|"failed";result:Assets|null;error:string|null};
 
 export type VideoSelection={start:VideoTime;end:VideoTime;disabled?:boolean;onChange:(start:VideoTime,end:VideoTime)=>void};
-export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,compact=false,editorMode=false,viewerMode=false,startAt=0,compatibilityTarget}:{root:string;path:string;onOpenExternal:()=>void;selection?:VideoSelection;autoLoad?:boolean;compact?:boolean;editorMode?:boolean;viewerMode?:boolean;startAt?:number;compatibilityTarget?:HTMLElement|null}) {
+export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,compact=false,editorMode=false,viewerMode=false,startAt=0,compatibilityTarget,onPlaybackPosition}:{root:string;path:string;onOpenExternal:()=>void;selection?:VideoSelection;autoLoad?:boolean;compact?:boolean;editorMode?:boolean;viewerMode?:boolean;startAt?:number;compatibilityTarget?:HTMLElement|null;onPlaybackPosition?:(seconds:number)=>void}) {
   const [video,bindVideo]=useVideoElement();
   const current=useRef(startAt);
   const restore=useRef(startAt);
@@ -78,7 +78,7 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,c
     const value=Math.max(0,Math.min(duration||info?.duration_seconds||0,seconds));
     if(video.current){video.current.currentTime=value;current.current=value;setPosition(value);}
   }
-  useEffect(()=>{if(!Number.isFinite(startAt)||startAt<0)return;restore.current=startAt;current.current=startAt;if(video.current?.readyState&&video.current.readyState>=1)seek(startAt);},[startAt]);
+  useEffect(()=>{if(!Number.isFinite(startAt)||startAt<0)return;restore.current=startAt;current.current=startAt;if(video.current?.readyState&&video.current.readyState>=1&&Math.abs(video.current.currentTime-startAt)>.06)seek(startAt);},[startAt]);
   function toggle(){
     const element=video.current;if(!element)return;
     if(element.paused)void element.play().catch(cause=>{if(video.current===element)setError(`Playback could not start: ${String(cause)}`);});else element.pause();
@@ -115,7 +115,7 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,c
       onLoadedMetadata={()=>{const element=video.current;if(!element)return;applySavedVideoVolume(element);if(Number.isFinite(element.duration))setDuration(element.duration);element.currentTime=Math.min(restore.current,element.duration||0);setPosition(element.currentTime);current.current=element.currentTime;}}
       onDurationChange={()=>{if(video.current&&Number.isFinite(video.current.duration))setDuration(video.current.duration);}}
       onLoadedData={event=>{if(event.currentTarget.videoWidth===0&&event.currentTarget.videoHeight===0)playbackFailure(4,"The file loaded without a decodable video track");}}
-      onTimeUpdate={()=>{if(video.current){current.current=video.current.currentTime;if(rangePlaying.current&&current.current>=(outMark?markSeconds(outMark):duration)){video.current.pause();video.current.currentTime=outMark?markSeconds(outMark):duration;current.current=video.current.currentTime;rangePlaying.current=false;}setPosition(current.current);}}}
+      onTimeUpdate={()=>{if(video.current){current.current=video.current.currentTime;if(rangePlaying.current&&current.current>=(outMark?markSeconds(outMark):duration)){video.current.pause();video.current.currentTime=outMark?markSeconds(outMark):duration;current.current=video.current.currentTime;rangePlaying.current=false;}setPosition(current.current);onPlaybackPosition?.(current.current);}}}
       onPlay={()=>{setPlaying(true);setPlayIntent(true);}} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onVolumeChange={event=>saveVideoVolume(event.currentTarget.volume)}
       onError={event=>playbackFailure(event.currentTarget.error?.code||0,event.currentTarget.error?.message||"")}/>
       {!editorMode&&!viewerMode&&<><div className="video-transport">
