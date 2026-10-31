@@ -48,3 +48,12 @@ it("adapts the number of video frames to measured clip width with an eight-frame
   await waitFor(()=>expect(ui.container.querySelectorAll(".editor-filmstrip-frames img")).toHaveLength(8));
   measure.mockRestore();
 });
+
+it("drops obsolete frame requests when a clip is removed before the scheduling debounce",async()=>{
+  vi.stubGlobal("IntersectionObserver",undefined);
+  vi.mocked(invoke).mockResolvedValue("data:image/png;base64,poster");
+  const ui=render(<EditorPoster root="/media" path="/media/obsolete.mp4" identity="obsolete" filmstrip clipStart={0} clipEnd={8}/>);
+  ui.unmount();
+  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,160));});
+  expect(vi.mocked(invoke).mock.calls.some(([command])=>command==="video_timeline_frame")).toBe(false);
+});
