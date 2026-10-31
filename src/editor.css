@@ -980,3 +980,11 @@
 }
 
 .editor-stage-content>img { display:block; flex:1; min-height:0; width:100%; max-height:100%; object-fit:contain; background:var(--surface-muted); border-radius:var(--radius-sm); }
+
+/* Keep editor controls in the preview header rather than reserving player height. */
+.editor-stage-heading .editor-compatibility-actions { justify-content:flex-end; align-items:center; flex-wrap:wrap; }
+.editor-stage-heading .editor-compatibility-actions .secondary-button { min-height:34px; }
+/* The timeline and preview share the editor's fixed available height; no outer overflow strip. */
+.page-editor,.page-editor>.sequence-workspace { min-height:0; overflow:hidden; }
+.sequence-workspace[data-ready="true"] { min-height:0; max-height:100%; grid-template-rows:auto auto minmax(0,1fr) 10px minmax(0,var(--editor-timeline-height,32%)); }
+.sequence-workspace>.sequence-timeline { min-height:0; max-height:100%; overscroll-behavior:contain; }
