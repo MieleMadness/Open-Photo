@@ -1,3 +1,10 @@
+# 0.56.28 — Phase G: bounded Library thumbnail requests
+
+- Queue normal JPEG/PNG/video Library previews through a shared three-request scheduler instead of starting all visible native jobs together.
+- Skip queued previews after their tiles unmount during rapid scrolling, and use an 80-entry cache keyed by source path, file metadata and requested size.
+- Preserve existing HEIC handling, Live Photo hover playback, source read-only protections and search behavior.
+- Further Phase G work remains: virtualized list mode, persistent thumbnail cache tuning, and installed 10k+ media performance checks.
+
 # 0.56.27 — Phase G: viewport-aware Library rows
 
 - Measure actual Library gallery height alongside width using the existing ResizeObserver.
