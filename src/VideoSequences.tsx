@@ -37,6 +37,7 @@ function SequenceWorkspace({roots,workspaceId,initial,onBack}:{roots:string[];wo
   const [inspectorTab,setInspectorTab]=useState<InspectorTab>("clip");
   const [timelineHeight,setTimelineHeight]=useState<number>();
   const [trimPreview,setTrimPreview]=useState<{clipId:string;seconds:number}|null>(null);
+  const [followPlayhead,setFollowPlayhead]=useState(false);
   const [previewHeading,setPreviewHeading]=useState<HTMLDivElement|null>(null);
   const project=session?.history.present;
   useEffect(()=>setPlaybackError(""),[previewState.source]);
@@ -56,13 +57,13 @@ function SequenceWorkspace({roots,workspaceId,initial,onBack}:{roots:string[];wo
     void workspaceProjects(workspaceId).then(rows=>{if(current()){setRecent(rows.projects);if(rows.warnings.length)setError(rows.warnings.join("\n"));}}).catch(e=>{if(current())setError(String(e));});
   }
   async function chooseMedia(current:()=>boolean){const files=await open({multiple:true,defaultPath:root,filters:mediaFilters});return current()?(Array.isArray(files)?files:typeof files==="string"?[files]:[]):[];}
-  function seekProject(seconds:number){setTrimPreview(null);setPlayhead(seconds);if(projectVideo.current){const duration=projectVideo.current.duration;projectVideo.current.currentTime=Math.min(seconds,Number.isFinite(duration)?duration:seconds);}}
+  function seekProject(seconds:number){setFollowPlayhead(true);setTrimPreview(null);setPlayhead(seconds);if(projectVideo.current){const duration=projectVideo.current.duration;projectVideo.current.currentTime=Math.min(seconds,Number.isFinite(duration)?duration:seconds);}}
   function chooseBin(id:string){stopPreview.current?.();setSelected(id);}
   function selectClip(id:string){setInspectorTab("clip");setSelectedClip(id);const clip=owner.current?.history.present.clips.find(c=>c.id===id);if(clip)setSelected(clip.asset_id);}
   const entries=project?timelineEntries(project):[];
   const activeEntry=entries.find(entry=>playhead>=entry.start&&playhead<entry.end)||entries.at(-1);
   const trimEntry=entries.find(entry=>entry.clip.id===trimPreview?.clipId);
-  const previewEntry=trimEntry||activeEntry;
+  const previewEntry=trimEntry||(followPlayhead?activeEntry:entries.find(entry=>entry.clip.asset_id===selected));
   const previewAssetId=previewEntry?.clip.asset_id||selected;
   const asset=project?.assets.find(a=>a.id===previewAssetId),source=loaded?.sources.find(s=>s.asset_id===previewAssetId);
   const sourcePosition=trimPreview&&trimEntry?trimPreview.seconds:previewEntry?markSeconds(previewEntry.clip.source_in)+Math.max(0,Math.min(playhead-previewEntry.start,previewEntry.duration)):0;
@@ -118,7 +119,7 @@ function SequenceWorkspace({roots,workspaceId,initial,onBack}:{roots:string[];wo
 
       </div>
       <EditorTimelineDivider host={host} onHeight={setTimelineHeight}/>
-      <SequenceTimeline key={`timeline:${project.id}`} session={session} sources={loaded.sources} disabled={busy} assetId={selected} onSelectAsset={setSelected} selected={clip?.id||""} onSelected={selectClip} position={playhead} onPosition={seekProject} onTrimPreview={(clipId,seconds)=>{setSelectedClip(clipId);setTrimPreview({clipId,seconds});}}/>
+      <SequenceTimeline key={`timeline:${project.id}`} session={session} sources={loaded.sources} disabled={busy} assetId={selected} onSelectAsset={setSelected} selected={clip?.id||""} onSelected={selectClip} position={playhead} onPosition={seekProject} onTrimPreview={(clipId,seconds)=>{setFollowPlayhead(true);setSelectedClip(clipId);setTrimPreview({clipId,seconds});}}/>
     </>}</SequenceOutput>:<div className="editor-empty"><span className="eyebrow">CREATE & EDIT</span><h1>Video editor</h1><p>Import videos and photos to arrange one continuous project.</p>{onBack&&<button className="secondary-button" onClick={onBack}>Back to Library</button>}    <details className="project-file-actions" open={!project}><summary>{project?"Switch or create project":"Open a video project"}</summary><div className="video-transport">
       <button className="primary-button" disabled={busy||!roots.length} onClick={()=>void run(async current=>{const paths=await chooseMedia(current);if(paths.length)adopt(await workspaceProject(workspaceId,{type:"create",paths}),current);})}>New video project…</button>
       <button className="secondary-button" disabled={busy} onClick={()=>void run(async current=>{const path=await open({multiple:false,filters:[{name:"Open-Photo video project",extensions:["json"]}]});if(typeof path==="string"&&current()){adopt(await workspaceProject(workspaceId,{type:"import",path}),current);if(current())setMessage("Opened a new project copy. Existing drafts remain unchanged; this copy belongs to the current workspace.");}})}>Open project file…</button>
