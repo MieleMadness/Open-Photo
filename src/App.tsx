@@ -1,3 +1,4 @@
+import {virtualRows} from "./virtualRows";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -635,13 +636,11 @@ export default function App() {
   const gridGap = 14;
   const columns = Math.max(1, Math.floor((gridWidth - 48 + gridGap) / (tileSize + gridGap)));
   const rowHeight = Math.max(tileSize, (gridWidth - 48) / columns - gridGap) + TILE_CAPTION_HEIGHT + TILE_ROW_GAP;
-  const windowStart = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
   const rowCount = Math.ceil(visible.length / columns);
-  const windowEnd = Math.min(rowCount, windowStart + Math.ceil(Math.max(0,gridHeight) / rowHeight) + 6);
+  const {start:windowStart,end:windowEnd}=virtualRows(rowCount,rowHeight,scrollTop,gridHeight,2,6);
   const windowPhotos = visible.slice(windowStart * columns, windowEnd * columns);
   const listRowHeight = 64;
-  const listStart = Math.max(0,Math.floor(scrollTop/listRowHeight)-3);
-  const listEnd = Math.min(visible.length,listStart+Math.ceil(Math.max(0,gridHeight)/listRowHeight)+8);
+  const {start:listStart,end:listEnd}=virtualRows(visible.length,listRowHeight,scrollTop,gridHeight,3,8);
   const listPhotos = visible.slice(listStart,listEnd);
   useEffect(()=>{
     if(!selected)return;
