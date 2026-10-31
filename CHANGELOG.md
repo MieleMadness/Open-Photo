@@ -1,3 +1,9 @@
+# 0.56.30 — Phase G: shared virtual-row regression tests
+
+- Extract grid/list visible-row window calculations into one tested helper.
+- Cover 10,000-row data, scrolled-to-bottom boundaries, negative offsets and varying viewport heights.
+- Maintain bounded overscan and avoid mounting all Library items; source media and exports are unchanged.
+
 # 0.56.29 — Phase G: virtualized Library list view
 
 - List view now renders only rows near the actual scroll viewport (plus overscan) instead of mounting the entire result set.
