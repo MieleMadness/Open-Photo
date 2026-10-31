@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current source update — 0.56.26
+## Current source update — 0.56.27
+
+0.56.27 begins Phase G with viewport-aware Library grid virtualization and retained overscan; large-library performance acceptance remains pending.
 
 0.56.26 adds bounded, debounced timeline frame scheduling and skips obsolete queued requests after zoom/resize or unmount. 0.56.25 added adaptive sample density, and 0.56.24 added timestamp-specific sampled frames. Windows installer acceptance is still required.
 
