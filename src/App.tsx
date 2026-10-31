@@ -217,10 +217,11 @@ export default function App() {
   const [tagMessage, setTagMessage] = useState("");
   const [scrollTop, setScrollTop] = useState(0);
   const [gridWidth, setGridWidth] = useState(940);
+  const [gridHeight, setGridHeight] = useState(700);
   const [gridHost,setGridHost]=useState<HTMLDivElement|null>(null);
   useLayoutEffect(()=>{
     if(!gridHost)return;
-    const measure=()=>setGridWidth(gridHost.clientWidth);
+    const measure=()=>{setGridWidth(gridHost.clientWidth);setGridHeight(gridHost.clientHeight);};
     measure();
     const observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(measure):null;
     observer?.observe(gridHost);window.addEventListener("resize",measure);
@@ -636,7 +637,7 @@ export default function App() {
   const rowHeight = Math.max(tileSize, (gridWidth - 48) / columns - gridGap) + TILE_CAPTION_HEIGHT + TILE_ROW_GAP;
   const windowStart = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
   const rowCount = Math.ceil(visible.length / columns);
-  const windowEnd = Math.min(rowCount, windowStart + Math.ceil(700 / rowHeight) + 6);
+  const windowEnd = Math.min(rowCount, windowStart + Math.ceil(Math.max(0,gridHeight) / rowHeight) + 6);
   const windowPhotos = visible.slice(windowStart * columns, windowEnd * columns);
   useEffect(()=>{
     if(!selected)return;
