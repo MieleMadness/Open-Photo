@@ -1,3 +1,9 @@
+# 0.56.25 — Adaptive timeline thumbnail density
+
+- Timeline video frame count follows measured clip width as zoom changes, from 1 to 8 sampled frames; compact clips avoid unnecessary decoding.
+- Keep timestamp sampling within each trimmed source interval, cached frames, visibility-based demand, and a still poster fallback.
+- Correct Rust formatting failures found in 0.56.24 CI. No changes to project files, original media, or render/export semantics.
+
 # 0.56.24 — Actual timeline video frame previews
 
 - Video timeline clips now display four frames sampled from their actual trimmed source interval instead of four copies of a poster.
