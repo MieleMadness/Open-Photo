@@ -13,7 +13,7 @@ import {useTimelineActions} from "./useTimelineActions";
 import {type SequenceSession} from "./videoSequence";
 
 /** Placement is derived from clip order, never rounded or stored as duplicate timing. */
-export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selected,onSelected,position,onPosition,sources=[]}:{sources?:LoadedSequence["sources"];session:SequenceSession;disabled:boolean;assetId:string;onSelectAsset:(id:string)=>void;selected:string;onSelected:(id:string)=>void;position:number;onPosition:(seconds:number)=>void}){
+export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selected,onSelected,position,onPosition,onTrimPreview,sources=[]}:{sources?:LoadedSequence["sources"];session:SequenceSession;disabled:boolean;assetId:string;onSelectAsset:(id:string)=>void;selected:string;onSelected:(id:string)=>void;position:number;onPosition:(seconds:number)=>void;onTrimPreview?:(clipId:string,sourceSeconds:number)=>void}){
   const project=session.history.present,entries=timelineEntries(project),duration=projectDuration(project);
   const [zoom,setZoom]=useState(1);
   const dragging=useRef("");
@@ -68,7 +68,7 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
               <button type="button" draggable={!disabled} className="timeline-clip" aria-label={`Clip ${i+1}: ${source.relative_path.split("/").at(-1)}`} aria-pressed={selected===item.clip.id} onClick={()=>choose(item.clip.id)} onDragStart={e=>{dragging.current=item.clip.id;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",item.clip.id);}} onDragEnd={()=>{dragging.current="";setDrop(null);}}>
                 <strong title={source.relative_path}>{i+1}. {source.relative_path.split("/").at(-1)}</strong><EditorPoster root={binding?.root||undefined} path={binding?.path||undefined} identity={source.sha256} photo={source.media.kind==="photo"} filmstrip={source.media.kind==="video"}/><span className="timeline-clip-duration">{clockTime(item.duration)}</span><small className="timeline-linked-audio" data-muted={item.clip.edits.muted||!hasAudio(source)}>{source.media.kind==="photo"?"Still image":item.clip.edits.muted?"Audio muted":hasAudio(source)?"Linked original audio":"Silent source"}</small>
               </button>
-              <TimelineTrimHandles range={{start:markSeconds(item.clip.source_in),end:markSeconds(item.clip.source_out)}} limit={Math.max((videoInfo(source)?.duration_seconds||600),markSeconds(item.clip.source_out))} minimum={0.04+sourceTick} step={Math.max(1/project.frame_rate,sourceTick)} selected={selected===item.clip.id} disabled={disabled} token={project} index={i} pixelsPerSecond={()=>(track.current?.getBoundingClientRect().width||0)/duration} onCommit={range=>command({type:"trim",clipId:item.clip.id,...range})}/>
+              <TimelineTrimHandles range={{start:markSeconds(item.clip.source_in),end:markSeconds(item.clip.source_out)}} limit={Math.max((videoInfo(source)?.duration_seconds||600),markSeconds(item.clip.source_out))} minimum={0.04+sourceTick} step={Math.max(1/project.frame_rate,sourceTick)} selected={selected===item.clip.id} disabled={disabled} token={project} index={i} pixelsPerSecond={()=>(track.current?.getBoundingClientRect().width||0)/duration} onPreview={seconds=>onTrimPreview?.(item.clip.id,seconds)} onCommit={range=>command({type:"trim",clipId:item.clip.id,...range})}/>
             </li>;
           })}</ol>
           {!!duration&&<span className="timeline-playhead" aria-hidden="true" style={{left:`${playhead/duration*100}%`}}/>}
