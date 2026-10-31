@@ -1,3 +1,9 @@
+# 0.56.32 — Phase G: scroll reset regression fix
+
+- Cancel pending animation-frame scroll updates when sort, query, filter or layout changes reset the Library viewport.
+- Wait for the scheduled frame in the Library lifecycle regression test rather than asserting against stale rows immediately after a scroll event.
+- Retain smooth grid/list scrolling, virtualization, thumbnail limits and media-source safety.
+
 # 0.56.31 — Phase G: animation-frame virtual scrolling
 
 - Coalesce rapid Library grid/list scroll events into at most one virtual-row state update per animation frame.
