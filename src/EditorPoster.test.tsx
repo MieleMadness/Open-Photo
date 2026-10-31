@@ -16,3 +16,16 @@ it("limits native poster work, skips queued unmounted items and reuses verified 
   await act(async()=>{});expect(cached.container.querySelector("img")?.getAttribute("src")).toBe("data:image/png;base64,poster");
   expect(invoke).toHaveBeenCalledTimes(2);expect(screen.queryByText("Loading")).toBeNull();
 });
+
+it("samples different timestamps within the trimmed source interval",async()=>{
+  vi.stubGlobal("IntersectionObserver",undefined);
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{
+    if(command==="video_timeline_frame")return "frame:"+String((args as {seconds:number}).seconds);
+    return "poster";
+  });
+  const ui=render(<EditorPoster root="/media" path="/media/timeline.mp4" identity="timeline" filmstrip clipStart={2} clipEnd={6}/>);
+  await act(async()=>{for(let i=0;i<8;i++)await Promise.resolve();});
+  const samples=vi.mocked(invoke).mock.calls.filter(([command])=>command==="video_timeline_frame").map(([,args])=>(args as {seconds:number}).seconds);
+  expect(samples).toEqual([2.5,3.5,4.5,5.5]);
+  expect(ui.container.querySelectorAll(".editor-filmstrip-frames img")).toHaveLength(4);
+});
