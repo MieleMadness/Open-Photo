@@ -1,3 +1,10 @@
+# 0.56.26 — Bounded timeline frame scheduling
+
+- Debounce timeline frame requests while the user rapidly resizes the editor or changes timeline zoom.
+- Schedule at most two active frame requests across visible clips; skip queued requests after a clip becomes hidden, changes, or unmounts.
+- Reuse cached timestamp-specific frames, preserve still-poster fallback, and avoid changing source media or edit/export semantics.
+- Add a regression test for cancelling work before the debounce completes.
+
 # 0.56.25 — Adaptive timeline thumbnail density
 
 - Timeline video frame count follows measured clip width as zoom changes, from 1 to 8 sampled frames; compact clips avoid unnecessary decoding.
