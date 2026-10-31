@@ -632,8 +632,8 @@ export default function App() {
       }
     });
   }, [result, query, discovery.results, sortBy, folderFilter, mediaType, smartFilter, smartRules, selectedSmartRule, activeWorkspace, organizeFilter, photoRatings, currentCollection, hiddenLiveVideos, timelineMonth, memoryYear, selectedTag, managedTags]);
-  useLayoutEffect(() => {if(gridHost)gridHost.scrollTop=0;setScrollTop(0);}, [gridHost,query,sortBy,photoView,tileSize,root,folderFilter,mediaType,organizeFilter,smartFilter,timelineMonth,memoryYear,selectedTag]);
   const scrollFrame=useRef<number|null>(null);
+  useLayoutEffect(() => {if(scrollFrame.current!==null){cancelAnimationFrame(scrollFrame.current);scrollFrame.current=null;}if(gridHost)gridHost.scrollTop=0;setScrollTop(0);}, [gridHost,query,sortBy,photoView,tileSize,root,folderFilter,mediaType,organizeFilter,smartFilter,timelineMonth,memoryYear,selectedTag]);
   const handleLibraryScroll=(event:UIEvent<HTMLDivElement>)=>{
     const next=event.currentTarget.scrollTop;
     if(scrollFrame.current!==null)cancelAnimationFrame(scrollFrame.current);
