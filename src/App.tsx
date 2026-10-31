@@ -1,5 +1,5 @@
 import {virtualRows} from "./virtualRows";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type UIEvent } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {AppSidebar} from "./AppSidebar";
@@ -634,7 +634,7 @@ export default function App() {
   }, [result, query, discovery.results, sortBy, folderFilter, mediaType, smartFilter, smartRules, selectedSmartRule, activeWorkspace, organizeFilter, photoRatings, currentCollection, hiddenLiveVideos, timelineMonth, memoryYear, selectedTag, managedTags]);
   useLayoutEffect(() => {if(gridHost)gridHost.scrollTop=0;setScrollTop(0);}, [gridHost,query,sortBy,photoView,tileSize,root,folderFilter,mediaType,organizeFilter,smartFilter,timelineMonth,memoryYear,selectedTag]);
   const scrollFrame=useRef<number|null>(null);
-  const handleLibraryScroll=(event:React.UIEvent<HTMLDivElement>)=>{
+  const handleLibraryScroll=(event:UIEvent<HTMLDivElement>)=>{
     const next=event.currentTarget.scrollTop;
     if(scrollFrame.current!==null)cancelAnimationFrame(scrollFrame.current);
     scrollFrame.current=requestAnimationFrame(()=>{scrollFrame.current=null;setScrollTop(next);});
