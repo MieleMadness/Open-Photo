@@ -1,6 +1,8 @@
 # Development phases
 
-## 0.56.29 Phase G list virtualization checkpoint
+## 0.56.30 Phase G virtualization regression checkpoint
+
+Both grid and list virtual windows use a common helper with 10k-row boundary tests. Installed large-library scroll and memory profiling remain outstanding.\n\n## 0.56.29 Phase G list virtualization checkpoint
 
 List mode now renders only viewport-near rows with stable geometry, building on grid virtualization and bounded thumbnail requests. Full large-library profiling and installed acceptance remain.\n\n## 0.56.28 Phase G thumbnail queue checkpoint
 
@@ -19,7 +21,7 @@ Automatic AI indexing/counters/failures/folder policy (R2), viewer width/zoom/Li
 Remaining order: installed short-media AI/viewer acceptance and signed upgrade gate; G large-library work; H maps; remaining I text/audio/transitions; J music. Vault R5/R6 remains separately gated on a security/storage design, and is not implemented. Long-form work remains in 1.x and physical-drive checks before v1.0.
 
 
-Baseline: 0.56.29 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.30 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 ## October 30 feedback — implementation checkpoint
 
