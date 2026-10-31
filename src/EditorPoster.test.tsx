@@ -29,3 +29,22 @@ it("samples different timestamps within the trimmed source interval",async()=>{
   expect([...new Set(samples)]).toEqual([2.5,3.5,4.5,5.5]);
   expect(ui.container.querySelectorAll(".editor-filmstrip-frames img")).toHaveLength(4);
 });
+
+it("adapts the number of video frames to measured clip width with an eight-frame cap",async()=>{
+  vi.stubGlobal("IntersectionObserver",undefined);
+  let width=170;
+  const callbacks:Array<()=>void>=[];
+  class FakeResizeObserver{
+    constructor(private callback:()=>void){callbacks.push(callback);}
+    observe(){} disconnect(){}
+  }
+  vi.stubGlobal("ResizeObserver",FakeResizeObserver);
+  const measure=vi.spyOn(HTMLElement.prototype,"getBoundingClientRect").mockImplementation(()=>({width} as DOMRect));
+  vi.mocked(invoke).mockResolvedValue("data:image/png;base64,frame");
+  const ui=render(<EditorPoster root="/media" path="/media/adaptive.mp4" identity="adaptive" filmstrip clipStart={0} clipEnd={8}/>);
+  await waitFor(()=>expect(ui.container.querySelectorAll(".editor-filmstrip-frames img")).toHaveLength(2));
+  width=1200;
+  await act(async()=>{callbacks.forEach(callback=>callback());});
+  await waitFor(()=>expect(ui.container.querySelectorAll(".editor-filmstrip-frames img")).toHaveLength(8));
+  measure.mockRestore();
+});
