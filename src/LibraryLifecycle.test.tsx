@@ -119,7 +119,7 @@ it("uses the Library search for tags and favorites, shows match reasons and keep
 it("resets both the viewport and virtual rows when sorting a scrolled library",async()=>{
   vi.mocked(invoke).mockImplementation((command,args)=>command==="saved_library"?Promise.resolve(scan((args as {root:string}).root,60)):fallback(command,args));
   const {container}=render(<App/>);await screen.findByText("alpha-0.jpg");const grid=container.querySelector<HTMLElement>(".photo-grid")!;
-  grid.scrollTop=2000;fireEvent.scroll(grid);expect(screen.queryByText("alpha-0.jpg")).toBeNull();
+  grid.scrollTop=2000;fireEvent.scroll(grid);await waitFor(()=>expect(screen.queryByText("alpha-0.jpg")).toBeNull());
   fireEvent.change(screen.getByRole("combobox",{name:"Sort media"}),{target:{value:"name"}});
   expect(grid.scrollTop).toBe(0);expect(screen.getByText("alpha-0.jpg")).toBeTruthy();
 });
