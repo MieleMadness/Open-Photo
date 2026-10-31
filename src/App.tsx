@@ -774,6 +774,18 @@ function Placeholder({title,subtitle,icon:Icon,description}:{title:string;subtit
 }
 function formatBytes(n:number){if(n<1024)return n+" B";const u=["KB","MB","GB","TB"];let i=-1;do{n/=1024;i++}while(n>=1024&&i<u.length-1);return n.toFixed(n<10?1:0)+" "+u[i];}
 
+type LibraryPreviewJob={cancelled:boolean;run:()=>Promise<void>};
+const libraryPreviewQueue:LibraryPreviewJob[]=[];
+const libraryPreviewCache=new Map<string,string>();
+let libraryPreviewActive=0;
+function pumpLibraryPreviews(){
+  while(libraryPreviewActive<3&&libraryPreviewQueue.length){
+    const job=libraryPreviewQueue.shift()!;
+    if(job.cancelled)continue;
+    libraryPreviewActive++;
+    void job.run().finally(()=>{libraryPreviewActive--;pumpLibraryPreviews();});
+  }
+}
 function PhotoThumb({root,photo,maxEdge,hoverVideoPath}:{root:string;photo:Photo;maxEdge:number;hoverVideoPath?:string}) {
   const [src,setSrc] = useState("");
   const [failed,setFailed] = useState(false);
@@ -782,11 +794,24 @@ function PhotoThumb({root,photo,maxEdge,hoverVideoPath}:{root:string;photo:Photo
     let active = true;
     setSrc(""); setFailed(false);
     if (!isDesktop || !root || ["heic","heif"].includes(photo.extension)) return;
-    invoke<string>(["mov","mp4","m4v","avi","mkv","webm"].includes(photo.extension.toLowerCase())?"video_poster":"preview_image",{root,path:photo.path,maxEdge})
-      .then(data=>{if(active)setSrc(data);})
-      .catch(()=>{if(active)setFailed(true);});
-    return ()=>{active=false;};
-  },[root,photo.path,maxEdge]);
+    const command=["mov","mp4","m4v","avi","mkv","webm"].includes(photo.extension.toLowerCase())?"video_poster":"preview_image";
+    const key=JSON.stringify([root,photo.path,photo.bytes,photo.modified_unix,maxEdge,command]);
+    const cached=libraryPreviewCache.get(key);
+    if(cached){setSrc(cached);return;}
+    const job:LibraryPreviewJob={cancelled:false,run:async()=>{
+      if(job.cancelled)return;
+      try{
+        const data=await invoke<string>(command,{root,path:photo.path,maxEdge});
+        if(typeof data==="string"&&data){
+          libraryPreviewCache.set(key,data);
+          while(libraryPreviewCache.size>80)libraryPreviewCache.delete(libraryPreviewCache.keys().next().value!);
+          if(active)setSrc(data);
+        }
+      }catch{if(active)setFailed(true);}
+    }};
+    libraryPreviewQueue.push(job);pumpLibraryPreviews();
+    return ()=>{active=false;job.cancelled=true;};
+  },[root,photo.path,photo.bytes,photo.modified_unix,maxEdge]);
   useEffect(()=>{
     let active=true;
     if(!hovering||!hoverVideoPath||!isDesktop||!root){setHoverSrc("");return()=>{active=false};}
