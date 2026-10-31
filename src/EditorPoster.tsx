@@ -37,6 +37,17 @@ export function EditorPoster({root,path,identity,filmstrip=false,photo=false,cli
 
 /** One request lane for visible timeline clips; hidden/unmounted clips don't queue more work. */
 const frameCache=new Map<string,string>();
+type FrameRequest={key:string;cancelled:boolean;run:()=>Promise<void>};
+const frameWaiting:FrameRequest[]=[];
+let frameRunning=0;
+function pumpFrames(){
+  while(frameRunning<2&&frameWaiting.length){
+    const job=frameWaiting.shift()!;
+    if(job.cancelled)continue;
+    frameRunning++;
+    void job.run().finally(()=>{frameRunning--;pumpFrames();});
+  }
+}
 function TimelineFrames({root,path,identity,start,end,fallback,host}:{root?:string;path?:string;identity:string;start:number;end:number;fallback:string;host:React.RefObject<HTMLSpanElement|null>}){
   const [frames,setFrames]=useState<string[]>([]);
   const [visible,setVisible]=useState(false);
@@ -52,34 +63,42 @@ function TimelineFrames({root,path,identity,start,end,fallback,host}:{root?:stri
     return()=>observer.disconnect();
   },[host]);
   useEffect(()=>{
-    if(!host.current)return;
     const element=host.current;
+    if(!element)return;
     if(typeof IntersectionObserver==="undefined"){setVisible(true);return;}
     const observer=new IntersectionObserver(entries=>setVisible(entries.some(e=>e.isIntersecting)),{rootMargin:"100px"});
-    observer.observe(element);return()=>observer.disconnect();
+    observer.observe(element);
+    return()=>observer.disconnect();
   },[host]);
   useEffect(()=>{
     let cancelled=false;
+    const jobs:FrameRequest[]=[];
     if(!visible||!root||!path||!Number.isFinite(start)||!Number.isFinite(end)||end<=start){setFrames([]);return;}
-    const count=frameCount;
-    const timestamps=Array.from({length:count},(_,i)=>start+(end-start)*(i+.5)/count);
-    setFrames(Array(count).fill(""));
-    const fetch=async()=>{
-      const values:string[]=[];
-      for(const timestamp of timestamps){
-        if(cancelled)return;
-        const key=JSON.stringify([root,path,identity,Math.round(timestamp*1000)]);
-        let result=frameCache.get(key);
-        if(!result){
-          try{result=await invoke<string>("video_timeline_frame",{root,path,seconds:timestamp});}
-          catch{result="";}
-          if(result){frameCache.set(key,result);while(frameCache.size>96)frameCache.delete(frameCache.keys().next().value!);}
-        }
-        values.push(result||fallback);
-        if(!cancelled)setFrames([...values]);
-      }
-    };
-    void fetch();return()=>{cancelled=true;};
-  },[visible,root,path,identity,start,end,fallback,frameCount]);
+    const timestamps=Array.from({length:frameCount},(_,i)=>start+(end-start)*(i+.5)/frameCount);
+    const keys=timestamps.map(time=>JSON.stringify([root,path,identity,Math.round(time*1000)]));
+    const initial=keys.map(key=>frameCache.get(key)||"");
+    setFrames(initial);
+    // A brief debounce collapses rapid zoom/resize changes before queuing native work.
+    const timer=window.setTimeout(()=>{
+      if(cancelled)return;
+      keys.forEach((key,index)=>{
+        if(frameCache.has(key))return;
+        const job:FrameRequest={key,cancelled:false,run:async()=>{
+          if(cancelled||job.cancelled)return;
+          try{
+            const image=await invoke<string>("video_timeline_frame",{root,path,seconds:timestamps[index]});
+            if(typeof image==="string"&&image){
+              frameCache.set(key,image);
+              while(frameCache.size>96)frameCache.delete(frameCache.keys().next().value!);
+              if(!cancelled)setFrames(previous=>{const next=[...previous];next[index]=image;return next;});
+            }
+          }catch{/* Poster fallback is preserved if the decoder rejects a frame. */}
+        }};
+        jobs.push(job);frameWaiting.push(job);
+      });
+      pumpFrames();
+    },120);
+    return()=>{cancelled=true;window.clearTimeout(timer);jobs.forEach(job=>{job.cancelled=true;});};
+  },[visible,root,path,identity,start,end,frameCount]);
   return <span ref={host} className="editor-poster editor-filmstrip" aria-hidden="true"><span className="editor-filmstrip-frames">{Array.from({length:frameCount},(_,index)=><img key={index} style={{flexBasis:`${100/frameCount}%`,width:`${100/frameCount}%`}} src={frames[index]||fallback||undefined} alt="" loading="lazy"/>)}</span></span>;
 }
