@@ -1,10 +1,10 @@
 import {useEffect,useMemo,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
 import {flushSettings} from "./userData";
-import {mediaIdentity,parseSearch,rankSearch,type SearchEvidence,type SearchMedia} from "./unifiedSearch";
+import {mediaIdentity,parseSearch,rankSearch,projectLiveEvidence,type SearchEvidence,type SearchMedia} from "./unifiedSearch";
 type NativeResponse={evidence:SearchEvidence[];warnings:string[];cancelled:boolean};
 /** Keep one completed view while a newer query is debounced or awaiting evidence. */
-export function useUnifiedSearch({photos,root,workspace,query,tags,ratings,aiEnabled,desktop,device,indexing,refresh}:{photos:SearchMedia[]|undefined;root:string;workspace:string;query:string;tags:Record<string,string[]>;ratings:Record<string,number>;aiEnabled:boolean;desktop:boolean;device:string;indexing:boolean;refresh:number}){
+export function useUnifiedSearch({photos,root,workspace,query,tags,ratings,aiEnabled,desktop,device,indexing,refresh,livePairs}:{photos:SearchMedia[]|undefined;root:string;workspace:string;query:string;tags:Record<string,string[]>;ratings:Record<string,number>;aiEnabled:boolean;desktop:boolean;device:string;indexing:boolean;refresh:number;livePairs?:Map<string,SearchMedia>}){
   const parsed=useMemo(()=>parseSearch(query),[query]),context=JSON.stringify([workspace,root,aiEnabled,device]);
   const [submitted,setSubmitted]=useState<{query:string;context:string;nonce:number}|null>(null);
   const [pending,setPending]=useState(false);
@@ -13,7 +13,7 @@ export function useUnifiedSearch({photos,root,workspace,query,tags,ratings,aiEna
     if(!photos||parsed.error||!query.trim()){setPending(false);return;}
     setPending(true);
     let active=true;const requestId=crypto.randomUUID();
-    const finish=(evidence:SearchEvidence[],warnings:string[])=>{if(active){setCompleted({context,photos,query,evidence,warnings,refresh,indexing});setPending(false);}};
+    const finish=(evidence:SearchEvidence[],warnings:string[])=>{if(active){setCompleted({context,photos,query,evidence:projectLiveEvidence(photos,root,livePairs,evidence),warnings,refresh,indexing});setPending(false);}};
     const timer=setTimeout(()=>{void(async()=>{
       if(!desktop||!workspace||!aiEnabled||indexing||(!parsed.text&&!parsed.person)){finish([],indexing?["Content indexes are being updated."]:[]);return;}
       try{
@@ -24,7 +24,7 @@ export function useUnifiedSearch({photos,root,workspace,query,tags,ratings,aiEna
       }catch(error){finish([],[`Indexed content could not be searched: ${String(error)}`]);}
     })();},submitted?.query===query&&submitted.context===context?0:400);
     return()=>{active=false;clearTimeout(timer);if(desktop)void invoke("cancel_workspace_search",{requestId}).catch(()=>{});};
-  },[query,context,photos,desktop,workspace,aiEnabled,indexing,refresh,parsed,submitted,device]);
+  },[query,context,photos,desktop,workspace,aiEnabled,indexing,refresh,parsed,submitted,device,livePairs,root]);
   const current=completed?.context===context&&completed.photos===photos?completed:null;
   const displayQuery=query.trim()?current?.query||"":"",displayParsed=useMemo(()=>parseSearch(displayQuery),[displayQuery]);
   const results=useMemo(()=>rankSearch(photos||[],root,displayParsed,tags,ratings,current?.evidence||[]),[photos,root,displayParsed,tags,ratings,current]);

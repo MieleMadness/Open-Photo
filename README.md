@@ -1,6 +1,12 @@
 File Details includes a location map below metadata for GPS-tagged JPEG/TIFF photos. Map imagery requires internet; coordinates remain visible offline.
 
-> Development update: **0.56.22** brings media higher in Library, adds Edits navigation and remembered List/Tiles folder/collection views, switches folder updates to manual Sync, and searches automatically after typing stops.
+> Development update: **0.56.23** adds automatic local AI indexing with counters/failures/folder exclusions, video-content search with matching times, expanded zoomable previews and a fullscreen library filmstrip. Signed Preview update support is prepared; channel publication and installed upgrade acceptance remain pending.
+
+Turn Local AI on in Settings to index known workspace media automatically; use manual **Sync** to discover new/changed files. The AI dashboard shows progress and failed files, with retries and **Don't index** per folder. Counters count source files (a Live still and motion can count separately). Video sampling can miss brief content; HEIC AI and HDR conversion remain unsupported. See [AI indexing](docs/AUTOMATIC_AI_INDEXING.md).
+
+In File Details, scroll over an image to zoom, drag to pan, or use **+ / − / 0** and **Fit**. **100% preview** refers to the decoded preview, not original resolution. Fullscreen has side navigation and a remembered **Hide filmstrip** control; **Play Live image** uses the shared stage. See [viewer controls](docs/MEDIA_VIEWER.md).
+
+See [update channels](docs/UPDATES.md) for signing/bootstrap requirements and [0.56.23 handoff](docs/LOCAL_HANDOFF_0_56_23.md) for verification and remaining acceptance.
 
 
 

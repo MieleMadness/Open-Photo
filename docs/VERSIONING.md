@@ -7,4 +7,4 @@ Open-Photo uses MAJOR.MINOR.PATCH across package.json, both dependency lockfiles
 3. Keep version-bearing files and the normal Windows workflow name/run-name aligned in one finalized commit.
 4. Diagnose failed jobs and fix root causes without weakening formatting, linting, or tests.
 5. Verify the workflow for the final pushed commit before declaring that build green.
-6. Reserve a MINOR milestone or MAJOR public release for an explicitly chosen release scope. The signed public updater accepts only deliberate newer N.0.0 releases; development patch builds do not change that policy.
+6. Reserve a MINOR milestone or MAJOR public release for an explicitly chosen release scope. The signed public updater accepts only deliberate newer N.0.0 releases; the separately selected Preview channel accepts newer numeric patch/minor versions only from its fixed signed manifest. Preview does not change Stable policy, bypass signatures or permit downgrades.

@@ -59,6 +59,9 @@ pub(crate) fn database() -> Result<Connection, String> {
     let connection =
         Connection::open(directory.join("ai-ocr.sqlite")).map_err(|e| e.to_string())?;
     connection
+        .busy_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| e.to_string())?;
+    connection
         .execute_batch(
             "CREATE TABLE IF NOT EXISTS ocr_index (
                 root TEXT NOT NULL,
@@ -502,6 +505,7 @@ pub async fn ai_index_ocr_batch(
     paths: Vec<String>,
     device: Option<String>,
 ) -> Result<OcrBatchResult, String> {
+    crate::ai_index::require_allowed(&root, &paths)?;
     if paths.is_empty() || paths.len() > MAX_BATCH {
         return Err(format!(
             "Select between 1 and {MAX_BATCH} photos per OCR indexing batch"
@@ -608,6 +612,60 @@ fn search_index(
         }
     }
     Ok(matches)
+}
+
+/// A service pass retains its validated model sessions across images.
+pub(crate) struct IndexWorker {
+    db: Connection,
+    first: Session,
+    second: Session,
+    first_key: String,
+    second_key: String,
+}
+impl IndexWorker {
+    pub(crate) fn new(device: &str) -> Result<Self, String> {
+        let (first, second, first_key, second_key) = sessions(Some(device))?;
+        Ok(Self {
+            db: database()?,
+            first,
+            second,
+            first_key,
+            second_key,
+        })
+    }
+    pub(crate) fn process(
+        &mut self,
+        root: &str,
+        path: &str,
+        modified: i64,
+        bytes: u64,
+    ) -> Result<(), String> {
+        crate::ai_index::verify_source(root, path, modified, bytes)?;
+        if index_is_current(
+            &self.db,
+            root,
+            path,
+            modified,
+            &self.first_key,
+            &self.second_key,
+        )? {
+            return Ok(());
+        }
+        let (processed, records) = process_photo(&mut self.first, &mut self.second, root, path)?;
+        crate::ai_index::verify_source(root, path, modified, bytes)?;
+        if processed != modified {
+            return Err("The source changed during indexing; Sync the library again".into());
+        }
+        store_result(
+            &self.db,
+            root,
+            path,
+            modified,
+            &self.first_key,
+            &self.second_key,
+            &records,
+        )
+    }
 }
 
 #[cfg(test)]

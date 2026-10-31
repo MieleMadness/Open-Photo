@@ -19,6 +19,9 @@ pub(crate) fn database() -> Result<Connection, String> {
     let connection =
         Connection::open(directory.join("ai-embeddings.sqlite")).map_err(|e| e.to_string())?;
     connection
+        .busy_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| e.to_string())?;
+    connection
         .execute_batch(
             "CREATE TABLE IF NOT EXISTS semantic_embeddings (
                 root TEXT NOT NULL,
@@ -32,6 +35,7 @@ pub(crate) fn database() -> Result<Connection, String> {
             CREATE INDEX IF NOT EXISTS idx_semantic_model ON semantic_embeddings(model_sha256);",
         )
         .map_err(|e| e.to_string())?;
+    crate::video_semantic::initialize(&connection)?;
     Ok(connection)
 }
 
@@ -111,6 +115,7 @@ pub fn ai_index_semantic_image(
     path: String,
     device: Option<String>,
 ) -> Result<usize, String> {
+    crate::ai_index::require_allowed(&root, std::slice::from_ref(&path))?;
     let source = crate::safe_media_path(&root, &path)?;
     let modified_unix = modified_unix(&source)?;
     let model_key = crate::ai_models::validate_supported_clip_vision()?;
@@ -205,6 +210,7 @@ pub async fn ai_index_semantic_batch(
     paths: Vec<String>,
     device: Option<String>,
 ) -> Result<BatchEmbeddingResult, String> {
+    crate::ai_index::require_allowed(&root, &paths)?;
     if paths.is_empty() || paths.len() > 5000 {
         return Err("Select between 1 and 5,000 photos per AI indexing batch".into());
     }
@@ -255,6 +261,8 @@ pub fn ai_find_similar_by_photo(
     path: String,
     limit: usize,
 ) -> Result<Vec<SemanticMatch>, String> {
+    crate::ai_index::require_allowed(&root, std::slice::from_ref(&path))?;
+    let excluded = crate::ai_index::active_exclusions()?;
     let limit = limit.clamp(1, 100);
     let current_sha = crate::ai_models::validate_supported_clip_vision()?;
     let db = database()?;
@@ -283,6 +291,9 @@ pub fn ai_find_similar_by_photo(
     let mut matches = Vec::new();
     for row in rows {
         let (candidate_path, blob) = row.map_err(|e| e.to_string())?;
+        if !crate::ai_index::allowed(&candidate_path, &excluded) {
+            continue;
+        }
         let candidate = decode_f32(&blob)?;
         if candidate.len() != query.len() {
             continue;
@@ -304,6 +315,7 @@ pub fn ai_search_semantic_text(
     limit: usize,
     device: Option<String>,
 ) -> Result<Vec<SemanticMatch>, String> {
+    let excluded = crate::ai_index::active_exclusions()?;
     let current_key = crate::ai_models::validate_supported_clip_bundle()?;
     let query_vector = crate::ai_text::run_semantic_text(&query, device.as_deref())?;
     let db = database()?;
@@ -321,6 +333,9 @@ pub fn ai_search_semantic_text(
     let mut matches = Vec::new();
     for row in rows {
         let (candidate_path, blob) = row.map_err(|e| e.to_string())?;
+        if !crate::ai_index::allowed(&candidate_path, &excluded) {
+            continue;
+        }
         let candidate = decode_f32(&blob)?;
         if candidate.len() != query_vector.len() {
             continue;
@@ -359,6 +374,39 @@ pub fn ai_embedding_status(root: String) -> Result<EmbeddingStatus, String> {
         stale,
         model_sha256: current_sha,
     })
+}
+
+/// One session for a bounded background service pass, not one model load per image.
+pub(crate) struct IndexWorker {
+    db: Connection,
+    key: String,
+    session: ort::session::Session,
+}
+impl IndexWorker {
+    pub(crate) fn new(device: &str) -> Result<Self, String> {
+        Ok(Self {
+            db: database()?,
+            key: crate::ai_models::validate_supported_clip_vision()?,
+            session: crate::ai_inference::semantic_image_session(Some(device))?,
+        })
+    }
+    pub(crate) fn process(
+        &mut self,
+        root: &str,
+        path: &str,
+        modified: i64,
+        bytes: u64,
+    ) -> Result<(), String> {
+        crate::ai_index::verify_source(root, path, modified, bytes)?;
+        if embedding_is_current(&self.db, root, path, modified, &self.key)? {
+            return Ok(());
+        }
+        let result =
+            crate::ai_inference::run_semantic_image_with_session(&mut self.session, root, path)?;
+        crate::ai_index::verify_source(root, path, modified, bytes)?;
+        store_embedding(&self.db, root, path, modified, &self.key, &result.values)?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

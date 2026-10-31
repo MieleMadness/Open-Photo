@@ -84,6 +84,13 @@ it("does not contact the public updater from a development build",async()=>{
   const hook=await setup();await act(async()=>{await vi.advanceTimersByTimeAsync(5000);await hook.result.current.checkNow();});
   expect(check).not.toHaveBeenCalled();expect(hook.result.current.phase).toBe("disabled");
 });
+it("accepts signed Preview patch metadata while retaining the Stable gate and resource cleanup",async()=>{
+ vi.mocked(invoke).mockResolvedValue({enabled:true,policy:"preview-patches",channel:"preview"});
+ const candidate=update();Object.assign(candidate,{version:"0.56.23"});vi.mocked(check).mockResolvedValue(candidate);
+ const hook=await setup();await act(async()=>{await vi.advanceTimersByTimeAsync(1200);});expect(hook.result.current.phase).toBe("available");expect(hook.result.current.channel).toBe("preview");
+ vi.mocked(invoke).mockResolvedValue({enabled:true,policy:"major-only",channel:"stable"});await act(async()=>hook.result.current.changeChannel("stable"));expect(candidate.close).toHaveBeenCalledOnce();expect(invoke).toHaveBeenCalledWith("set_update_channel",{channel:"stable"});
+ await act(async()=>{await vi.advanceTimersByTimeAsync(1200);});expect(hook.result.current.phase).toBe("current");
+});
 it("releases downloaded bytes that arrive after hook cleanup already closed the update",async()=>{
   const candidate=update();let finish:()=>void=()=>{};let bytesRetained=false;
   vi.mocked(candidate.download).mockImplementation(()=>new Promise<void>(resolve=>{finish=()=>{bytesRetained=true;resolve();};}));

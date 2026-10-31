@@ -29,6 +29,12 @@ pub(crate) fn run_semantic_image_with_session(
     path: &str,
 ) -> Result<InferenceResult, String> {
     let values = crate::ai_preprocess::prepare_tensor(root, path)?;
+    run_semantic_tensor(session, values)
+}
+pub(crate) fn run_semantic_tensor(
+    session: &mut Session,
+    values: Vec<f32>,
+) -> Result<InferenceResult, String> {
     let tensor = ort::value::Tensor::from_array(([1usize, 3, 224, 224], values.into_boxed_slice()))
         .map_err(|e| e.to_string())?;
     let outputs = session
@@ -45,8 +51,8 @@ pub(crate) fn run_semantic_image_with_session(
     }
     let mut values = data.to_vec();
     let norm = values.iter().map(|value| value * value).sum::<f32>().sqrt();
-    if norm == 0.0 {
-        return Err("Semantic model returned a zero embedding".into());
+    if !norm.is_finite() || norm == 0.0 {
+        return Err("Semantic model returned an invalid embedding".into());
     }
     for value in &mut values {
         *value /= norm;

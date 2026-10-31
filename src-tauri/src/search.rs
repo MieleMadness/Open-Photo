@@ -13,6 +13,7 @@ pub enum Kind {
     Ocr,
     Person,
     Semantic,
+    VideoSemantic,
 }
 #[derive(Clone, Debug, Serialize)]
 pub struct Evidence {
@@ -167,8 +168,10 @@ pub async fn search_workspace_evidence(
     };
     let gate = state.gate.clone();
     let permit = gate.lock_owned().await;
+    let inference = crate::ai_index::foreground_permit().await;
     tauri::async_runtime::spawn_blocking(move || {
         let _permit = permit;
+        let _inference = inference;
         let cancelled = || {
             requests
                 .lock()
@@ -181,6 +184,7 @@ pub async fn search_workspace_evidence(
             });
         }
         let roots = crate::user_data::workspace_roots(&workspace_id)?;
+        let excluded = crate::ai_index::exclusions(&workspace_id)?;
         let mut response = Response::default();
         if !include_ai || roots.is_empty() {
             return Ok(response);
@@ -189,7 +193,7 @@ pub async fn search_workspace_evidence(
             append(
                 &mut response,
                 "Indexed photo text",
-                crate::search_providers::ocr(&roots, &terms, cancelled),
+                crate::search_providers::ocr(&roots, &terms, &excluded, cancelled),
             );
         }
         if cancelled() {
@@ -207,7 +211,7 @@ pub async fn search_workspace_evidence(
             append(
                 &mut response,
                 "Named People",
-                crate::search_providers::people(&roots, name, cancelled),
+                crate::search_providers::people(&roots, name, &excluded, cancelled),
             );
         }
         if cancelled() {
@@ -218,10 +222,16 @@ pub async fn search_workspace_evidence(
         }
         if include_semantic && !query.trim().is_empty() {
             // Inference validates the pinned bundle once, rather than repeating it for every root.
-            let result = crate::ai_text::run_semantic_text(&query, device.as_deref())
-                .and_then(|vector| crate::search_providers::semantic(&roots, &vector, cancelled));
+            let result =
+                crate::ai_text::run_semantic_text(&query, device.as_deref()).and_then(|vector| {
+                    crate::search_providers::semantic(&roots, &vector, &excluded, cancelled)
+                });
             append(&mut response, "Image content search", result);
         }
+        let latest_excluded = crate::ai_index::exclusions(&workspace_id)?;
+        response
+            .evidence
+            .retain(|item| crate::ai_index::allowed(&item.path, &latest_excluded));
         if cancelled() {
             Ok(Response {
                 cancelled: true,

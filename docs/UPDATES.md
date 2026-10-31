@@ -1,8 +1,16 @@
-# Open-Photo stable updater
+# Open-Photo signed update channels
 
-## Planned Preview channel — not implemented
+## Preview support — 0.56.23 source update
 
-The October 30 feedback adds a separate signed Preview channel for in-app updates to development patch releases. The implementation/release gates are specified in [R0 of the feedback plan](AI_VIEWER_VAULT_ROADMAP.md#r0--preview-builds-update-in-place). The current Stable-only behavior below remains the actual implementation. A one-time signed bootstrap installer may be required before existing installations can receive Preview updates. Keep the same app/data identity, preserve user data, isolate Stable and Preview manifests, retain signature and active-work protections, and verify a genuine signed upgrade between two versions before publishing the channel as ready. No keys, release workflow or update manifest were changed by this documentation update.
+Settings offers **Stable / Preview**. Native code persists the choice and only checks a fixed HTTPS endpoint for that channel. Stable retains newer `N.0.0` releases; Preview accepts strictly newer numeric MAJOR.MINOR.PATCH versions. Neither channel permits downgrade, signature bypass, overlapping downloads or installation during protected work. Switching is blocked while an update is ready/downloading/installing. Unsigned development builds still explain that a signed bootstrap installation is required.
+
+Preview endpoint: `https://github.com/MieleMadness/Open-Photo/releases/download/preview-channel/latest.json`. Versioned signed installers use `preview-vVERSION` releases; replacing the fixed channel manifest is the final publication step, after tests and asset publication. The channel selector does not publish releases or download AI from a remote service.
+
+The manual **Publish signed Preview update** workflow (`preview-release.yml`) accepts an exact version/notes from main or the maintained desktop feature branch. It checks out the dispatch commit, requires configured signing secrets, repeats frontend/native checks, builds with `OPENPHOTO_UPDATE_CHANNEL=preview`, verifies optimized export and installed lifecycle, then publishes signed assets and the channel manifest. Ordinary source pushes do not dispatch it. The Stable workflow remains separate.
+
+Before using it: complete the one-time signing setup below, verify the tested source version and explicitly authorize publication. Install a signed bootstrap built with the trusted public key for existing unsigned/disabled-updater installations. Verify a real signed upgrade between two Preview versions, including preservation of projects, folders, tags, indexes and exclusions, offline behavior, bad signatures, channel isolation and active-work blocking. Local mocked updater tests do not verify this gate. **No signing keys were generated, secrets changed, workflow dispatched or channel published by the 0.56.23 coding pass.**
+
+## Stable channel
 
 Open-Photo uses Tauri's signed updater for deliberately published major releases.
 

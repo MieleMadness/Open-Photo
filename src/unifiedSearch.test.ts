@@ -1,5 +1,5 @@
 import {expect,it} from "vitest";
-import {mediaIdentity,parseSearch,rankSearch,type SearchEvidence,type SearchMedia} from "./unifiedSearch";
+import {projectLiveEvidence,mediaIdentity,parseSearch,rankSearch,type SearchEvidence,type SearchMedia} from "./unifiedSearch";
 const media:SearchMedia[]=[{path:"C:/A/burger.jpg",name:"burger.jpg",extension:"jpg",libraryRoot:"C:/A",modified_unix:10},{path:"C:/A/IMG_2.jpg",name:"IMG_2.jpg",extension:"jpg",libraryRoot:"C:/A",modified_unix:10},{path:"C:/B/game.mp4",name:"game.mp4",extension:"mp4",libraryRoot:"C:/B",modified_unix:20}];
 const evidence=(index:number,kind:SearchEvidence["kind"],text="",score=1):SearchEvidence=>({root:media[index].libraryRoot!,path:media[index].path,modified_unix:media[index].modified_unix,kind,text,score,timestamp_seconds:null});
 const rank=(query:string,e:SearchEvidence[]=[],tags:Record<string,string[]>={},ratings:Record<string,number>={})=>rankSearch(media,"",parseSearch(query),tags,ratings,e);
@@ -20,4 +20,10 @@ it("deduplicates evidence without inflating scores and retains valid video times
 });
 it("supports quoted Unicode names and literal paths while surfacing invalid field values",()=>{
  expect(parseSearch('person:"Zoë Lee" family dinner').person).toBe("zoë lee");expect(parseSearch('C:\\Media\\trip').text).toBe('c:\\media\\trip');expect(parseSearch("rating:6").error).not.toBe("");expect(rank("rating:6")).toEqual([]);expect(parseSearch("x".repeat(501)).error).not.toBe("");
+});
+
+it("projects current Live motion matches to the paired image while keeping video timestamps",()=>{
+ const image={path:"C:/r/still.jpg",name:"still.jpg",extension:"jpg",modified_unix:10,libraryRoot:"C:/r"},video={path:"C:/r/motion.mov",name:"motion.mov",extension:"mov",modified_unix:20,libraryRoot:"C:/r"};
+ const evidence=projectLiveEvidence([image,video],"C:/r",new Map([[image.path,video]]),[{root:"C:/r",path:video.path,modified_unix:20,kind:"video_semantic",text:"",score:.8,timestamp_seconds:2.5}]);
+ const result=rankSearch([image,video],"C:/r",parseSearch("burger type:photo"),{}, {},evidence);expect(result).toHaveLength(1);expect(result[0].path).toBe(image.path);expect(result[0].matched_timestamps).toEqual([2.5]);
 });

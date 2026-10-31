@@ -86,6 +86,9 @@ pub(crate) fn database() -> Result<Connection, String> {
     let connection =
         Connection::open(directory.join("ai-faces.sqlite")).map_err(|e| e.to_string())?;
     connection
+        .busy_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| e.to_string())?;
+    connection
         .execute_batch(
             "CREATE TABLE IF NOT EXISTS face_index_state (
                 root TEXT NOT NULL,
@@ -721,6 +724,7 @@ pub async fn ai_index_faces_batch(
     paths: Vec<String>,
     device: Option<String>,
 ) -> Result<FaceIndexResult, String> {
+    crate::ai_index::require_allowed(&root, &paths)?;
     if paths.is_empty() || paths.len() > MAX_BATCH {
         return Err(format!(
             "Select between 1 and {MAX_BATCH} photos per People indexing batch"
@@ -828,13 +832,15 @@ pub fn ai_people_groups(
     }
     let (_, embedder_key) = crate::ai_models::validate_supported_face_bundle()?;
     let mut db = database()?;
+    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::prepare_scope(&db, &crate::ai_index::active_exclusions()?)?;
     // Filter roots before applying the cap, so other workspaces cannot crowd this one out.
     let candidates = {
         let mut statement = db
             .prepare(
-                "SELECT root,path,face_index,x,y,width,height,score,vector FROM face_embeddings
-            WHERE embedder_key=?1 AND root IN (SELECT value FROM json_each(?2))
-            ORDER BY root,path,face_index LIMIT ?3",
+                "SELECT f.root,f.path,face_index,x,y,width,height,score,vector FROM face_embeddings f JOIN visible_media m ON m.root=f.root AND m.path=f.path AND m.modified_unix=f.modified_unix
+            WHERE embedder_key=?1 AND f.root IN (SELECT value FROM json_each(?2))
+            ORDER BY f.root,f.path,face_index LIMIT ?3",
             )
             .map_err(|e| e.to_string())?;
         let rows = statement
@@ -973,22 +979,28 @@ pub fn ai_face_index_status(roots: Vec<String>) -> Result<FaceIndexStatus, Strin
     let (detector_key, embedder_key) = crate::ai_models::validate_supported_face_bundle()?;
     let allowed: HashSet<String> = roots.into_iter().collect();
     let db = database()?;
+    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::prepare_scope(&db, &crate::ai_index::active_exclusions()?)?;
     let mut statement = db
         .prepare(
-            "SELECT root,faces FROM face_index_state
-             WHERE detector_key=?1 AND embedder_key=?2",
+            "SELECT f.root,faces,f.path FROM face_index_state f JOIN visible_media m ON m.root=f.root AND m.path=f.path AND m.modified_unix=f.modified_unix WHERE detector_key=?1 AND embedder_key=?2",
         )
         .map_err(|e| e.to_string())?;
     let rows = statement
         .query_map(params![detector_key, embedder_key], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, String>(2)?,
+            ))
         })
         .map_err(|e| e.to_string())?;
+    let excluded = crate::ai_index::active_exclusions()?;
     let mut indexed_images = 0usize;
     let mut faces = 0usize;
     for row in rows {
-        let (root, face_count) = row.map_err(|e| e.to_string())?;
-        if allowed.contains(&root) {
+        let (root, face_count, path) = row.map_err(|e| e.to_string())?;
+        if allowed.contains(&root) && crate::ai_index::allowed(&path, &excluded) {
             indexed_images += 1;
             faces += face_count.max(0) as usize;
         }
@@ -997,6 +1009,60 @@ pub fn ai_face_index_status(roots: Vec<String>) -> Result<FaceIndexStatus, Strin
         indexed_images,
         faces,
     })
+}
+
+/// A service pass retains its validated model sessions across images.
+pub(crate) struct IndexWorker {
+    db: Connection,
+    first: Session,
+    second: Session,
+    first_key: String,
+    second_key: String,
+}
+impl IndexWorker {
+    pub(crate) fn new(device: &str) -> Result<Self, String> {
+        let (first, second, first_key, second_key) = face_sessions(Some(device))?;
+        Ok(Self {
+            db: database()?,
+            first,
+            second,
+            first_key,
+            second_key,
+        })
+    }
+    pub(crate) fn process(
+        &mut self,
+        root: &str,
+        path: &str,
+        modified: i64,
+        bytes: u64,
+    ) -> Result<(), String> {
+        crate::ai_index::verify_source(root, path, modified, bytes)?;
+        if index_state_is_current(
+            &self.db,
+            root,
+            path,
+            modified,
+            &self.first_key,
+            &self.second_key,
+        )? {
+            return Ok(());
+        }
+        let (processed, records) = process_image(&mut self.first, &mut self.second, root, path)?;
+        crate::ai_index::verify_source(root, path, modified, bytes)?;
+        if processed != modified {
+            return Err("The source changed during indexing; Sync the library again".into());
+        }
+        store_faces(
+            &mut self.db,
+            root,
+            path,
+            modified,
+            &self.first_key,
+            &self.second_key,
+            &records,
+        )
+    }
 }
 
 #[cfg(test)]

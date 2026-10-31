@@ -164,21 +164,12 @@ it("removes a folder during scanning, rejects the stale result, and does not res
   fireEvent.click(screen.getByRole("button",{name:"Library"}));await screen.findByText("gamma-0.jpg");expect(screen.queryByText("alpha-0.jpg")).toBeNull();
   expect(JSON.parse(localStorage.getItem("openphoto.workspaces")!)[0].roots).toEqual([C]);
 });
-it("stops scheduling AI batches when the switch is turned off and retains that preference",async()=>{
-  localStorage.setItem("openphoto.ai.optin","true");localStorage.setItem("openphoto.workspaces",JSON.stringify(workspace([A])));
-  let finish:(value:unknown)=>void=()=>{};
-  vi.mocked(invoke).mockImplementation((command,args)=>{
-    if(command==="saved_library")return Promise.resolve(scan(A,129));
-    if(command==="ai_index_semantic_batch")return new Promise(resolve=>{finish=resolve});
-    return fallback(command,args);
-  });
-  render(<App/>);await screen.findByText("alpha-0.jpg");
-  fireEvent.click(screen.getByRole("button",{name:"Settings"}));const start=screen.getByRole("button",{name:"Index library with AI"});await waitFor(()=>expect((start as HTMLButtonElement).disabled).toBe(false));fireEvent.click(start);
-  await waitFor(()=>expect(vi.mocked(invoke).mock.calls.filter(([c])=>c==="ai_index_semantic_batch")).toHaveLength(1));
-  fireEvent.click(screen.getByRole("button",{name:"Settings"}));fireEvent.click(await screen.findByRole("switch",{name:"Local AI"}));
-  await act(async()=>finish({requested:64,indexed:64,skipped:0,failed:0,errors:[]}));
-  expect(vi.mocked(invoke).mock.calls.filter(([c])=>c==="ai_index_semantic_batch")).toHaveLength(1);
-  expect(localStorage.getItem("openphoto.ai.optin")).toBe("false");expect((screen.getByRole("switch",{name:"Local AI"}) as HTMLInputElement).checked).toBe(false);
+it("starts the native AI queue automatically and pauses it when switched off",async()=>{
+ localStorage.setItem("openphoto.ai.optin","true");localStorage.setItem("openphoto.workspaces",JSON.stringify(workspace([A])));
+ render(<App/>);await screen.findByText("alpha-0.jpg");await waitFor(()=>expect(invoke).toHaveBeenCalledWith("configure_ai_index",{workspaceId:"library",enabled:true,device:"auto"}));
+ expect(vi.mocked(invoke).mock.calls.some(([c])=>c==="ai_index_semantic_batch")).toBe(false);
+ fireEvent.click(screen.getByRole("button",{name:"Settings"}));fireEvent.click(await screen.findByRole("switch",{name:"Local AI"}));
+ await waitFor(()=>expect(invoke).toHaveBeenCalledWith("configure_ai_index",{workspaceId:"library",enabled:false,device:"auto"}));expect(localStorage.getItem("openphoto.ai.optin")).toBe("false");
 });
 
 it("ignores old auto-sync settings, restores saved media, and scans only on manual Sync",async()=>{

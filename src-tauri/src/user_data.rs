@@ -59,6 +59,16 @@ fn workspace_roots_from(db: &Connection, id: &str) -> Result<Vec<String>, String
     Ok(roots.into_iter().filter(|r| !r.is_empty()).collect())
 }
 
+pub(crate) fn setting(key: &str) -> Result<Option<String>, String> {
+    use rusqlite::OptionalExtension;
+    database()?
+        .query_row("SELECT value FROM user_data WHERE key=?1", [key], |r| {
+            r.get(0)
+        })
+        .optional()
+        .map_err(|e| e.to_string())
+}
+
 fn validate(key: &str, value: &str) -> Result<(), String> {
     if !key.starts_with("openphoto.") || key.len() > 100 || value.len() > 16 * 1024 * 1024 {
         return Err("Invalid Open-Photo setting or setting too large".into());

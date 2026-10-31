@@ -1,5 +1,6 @@
 mod ai_embeddings;
 mod ai_faces;
+mod ai_index;
 mod ai_inference;
 mod ai_models;
 mod ai_ocr;
@@ -19,6 +20,7 @@ mod search;
 mod search_providers;
 mod sequence_media;
 mod similar;
+mod update_channel;
 mod user_data;
 mod video_edit_preview;
 mod video_engine;
@@ -31,6 +33,7 @@ mod video_preview;
 mod video_probe;
 mod video_project;
 mod video_render;
+mod video_semantic;
 mod video_sequence;
 mod video_sequence_render;
 mod video_timing;
@@ -1051,15 +1054,28 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
 struct UpdaterChannelStatus {
     enabled: bool,
     policy: &'static str,
+    channel: String,
 }
 
 #[tauri::command]
-fn updater_channel_status() -> UpdaterChannelStatus {
-    UpdaterChannelStatus {
+fn updater_channel_status() -> Result<UpdaterChannelStatus, String> {
+    let channel = update_channel::selected()?;
+    Ok(UpdaterChannelStatus {
         enabled: option_env!("OPENPHOTO_UPDATER_PUBLIC_KEY")
             .is_some_and(|key| !key.trim().is_empty()),
-        policy: "major-only",
-    }
+        policy: if channel == "preview" {
+            "preview-patches"
+        } else {
+            "major-only"
+        },
+        channel,
+    })
+}
+#[tauri::command]
+fn set_update_channel(channel: String) -> Result<UpdaterChannelStatus, String> {
+    update_channel::endpoint(&channel)?;
+    user_data::save_user_data("openphoto.updateChannel".into(), channel)?;
+    updater_channel_status()
 }
 
 #[derive(Serialize)]
@@ -1078,11 +1094,20 @@ async fn check_app_update(webview: tauri::Webview) -> Result<Option<AppUpdateMet
     use std::time::Duration;
     use tauri::Manager;
     use tauri_plugin_updater::UpdaterExt;
-    if !updater_channel_status().enabled {
+    if !updater_channel_status()?.enabled {
         return Ok(None);
     }
+    let channel = update_channel::selected()?;
+    let endpoint = update_channel::endpoint(&channel)?
+        .parse()
+        .map_err(|e| format!("Invalid update endpoint: {e}"))?;
     let updater = webview
         .updater_builder()
+        .endpoints(vec![endpoint])
+        .map_err(|e| e.to_string())?
+        .version_comparator(move |current, release| {
+            update_channel::accepts(&channel, &current.to_string(), &release.version.to_string())
+        })
         .timeout(Duration::from_secs(15))
         .configure_client(|client| {
             client
@@ -1166,9 +1191,15 @@ pub fn run() {
         .manage(video_poster::PosterJobs::default())
         .manage(video_export::ExportJobs::default())
         .manage(search::SearchState::default())
+        .manage(ai_index::AiIndexState::default())
         .invoke_handler(tauri::generate_handler![
             search::search_workspace_evidence,
             search::cancel_workspace_search,
+            ai_index::pause_ai_index,
+            ai_index::configure_ai_index,
+            ai_index::ai_index_report,
+            ai_index::ai_index_exclude,
+            ai_index::retry_ai_index,
             ai_embeddings::ai_embedding_status,
             ai_embeddings::ai_find_similar_by_photo,
             ai_embeddings::ai_index_semantic_batch,
@@ -1239,6 +1270,7 @@ pub fn run() {
             edit_export::preview_edited_photo,
             open_video,
             updater_channel_status,
+            set_update_channel,
             check_app_update,
             geo::gps_for_photos,
             index::scan_indexed,

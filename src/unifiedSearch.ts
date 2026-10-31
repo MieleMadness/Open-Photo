@@ -1,7 +1,7 @@
 /** One result identity and evidence-based ranking contract for all discovery providers. */
 export type SearchMedia={path:string;name:string;extension:string;modified_unix:number;libraryRoot?:string};
 export type MatchKind="filename"|"path"|"tag"|"rating"|"person"|"ocr"|"semantic"|"video_semantic"|"type";
-export type SearchEvidence={root:string;path:string;modified_unix:number;kind:"person"|"ocr"|"semantic"|"video_semantic";text:string;matched_terms?:string[];score:number;timestamp_seconds:number|null};
+export type SearchEvidence={root:string;path:string;modified_unix:number;kind:"person"|"ocr"|"semantic"|"video_semantic";text:string;matched_terms?:string[];score:number;timestamp_seconds:number|null;source_video_path?:string};
 export type MatchReason={kind:MatchKind;label:string;score:number;timestamp_seconds?:number};
 export type RankedResult={media_id:string;root:string;path:string;media_type:"photo"|"video";score:number;reasons:MatchReason[];matched_timestamps:number[]};
 export type SearchQuery={text:string;terms:string[];tag:string;person:string;path:string;rating:number|null;minimumRating:boolean;favorite:boolean;type:""|"photo"|"video";error:string};
@@ -39,7 +39,7 @@ export function rankSearch(photos:SearchMedia[],root:string,query:SearchQuery,ta
     const reasons:MatchReason[]=[],current=(indexed.get(id)||[]).filter(e=>e.modified_unix===photo.modified_unix);
     const people=current.filter(e=>e.kind==="person");if(query.person&&!people.some(e=>normalize(e.text).includes(query.person)))continue;
     const corpus=[photo.name,photo.path,...keywords,...current.filter(e=>e.kind==="ocr"||e.kind==="person").flatMap(e=>[e.text,...e.matched_terms||[]])].join(" ");
-    const semantic=query.text?current.filter(e=>e.score>=0.2&&(e.kind==="semantic"?type==="photo"&&e.timestamp_seconds===null:e.kind==="video_semantic"&&type==="video"&&e.timestamp_seconds!==null&&Number.isFinite(e.timestamp_seconds)&&e.timestamp_seconds>=0)):[];
+    const semantic=query.text?current.filter(e=>e.score>=0.2&&(e.kind==="semantic"?type==="photo"&&e.timestamp_seconds===null:e.kind==="video_semantic"&&(type==="video"||!!e.source_video_path)&&e.timestamp_seconds!==null&&Number.isFinite(e.timestamp_seconds)&&e.timestamp_seconds>=0)):[];
     if(query.terms.length&&!containsTerms(corpus,query.terms)&&!semantic.length)continue;
     const add=(kind:MatchKind,label:string,score:number,timestamp?:number)=>reasons.push({kind,label,score,...timestamp!==undefined?{timestamp_seconds:timestamp}:{}});
     if(query.terms.length){
@@ -62,4 +62,9 @@ export function rankSearch(photos:SearchMedia[],root:string,query:SearchQuery,ta
     results.push({media_id:id,root:parent,path:photo.path,media_type:type,score,reasons:ordered,matched_timestamps:[...new Set(semantic.flatMap(e=>e.timestamp_seconds===null?[]:[e.timestamp_seconds]))].sort((a,b)=>a-b)});
   }
   return results.sort((a,b)=>b.score-a.score||a.path.localeCompare(b.path)||a.root.localeCompare(b.root));
+}
+
+/** Carry a verified Live pair's motion evidence to its still identity without losing time. */
+export function projectLiveEvidence(photos:SearchMedia[],root:string,pairs:Map<string,SearchMedia>|undefined,evidence:SearchEvidence[]):SearchEvidence[]{
+ if(!pairs?.size)return evidence;const projected=[...evidence];for(const[imagePath,video]of pairs){const image=photos.find(p=>p.path===imagePath);if(!image)continue;for(const item of evidence){if(item.kind!=="video_semantic"||item.path!==video.path||item.root!==(video.libraryRoot||root)||item.modified_unix!==video.modified_unix)continue;projected.push({...item,root:image.libraryRoot||root,path:image.path,modified_unix:image.modified_unix,source_video_path:video.path});}}return projected;
 }

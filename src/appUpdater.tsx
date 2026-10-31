@@ -5,7 +5,7 @@ import {type Update,type DownloadEvent} from "@tauri-apps/plugin-updater";
 import {checkForAppUpdate as check} from "./appUpdateService";
 import {withAppExitProtection} from "./appExit";
 
-type ChannelStatus={enabled:boolean;policy:string};
+type ChannelStatus={enabled:boolean;policy:string;channel?:"stable"|"preview"};
 type Phase="disabled"|"idle"|"checking"|"current"|"available"|"downloading"|"ready"|"installing"|"error";
 
 export function isMajorStableRelease(version:string):boolean {
@@ -13,12 +13,13 @@ export function isMajorStableRelease(version:string):boolean {
 }
 
 export type AppUpdater={
-  enabled:boolean; phase:Phase; currentVersion:string; availableVersion:string; notes:string;
+  enabled:boolean; channel:"stable"|"preview"; changeChannel:(channel:"stable"|"preview")=>Promise<void>; phase:Phase; currentVersion:string; availableVersion:string; notes:string;
   progress:number|null; message:string; dismissed:boolean;
   checkNow:()=>Promise<void>; download:()=>Promise<void>; install:()=>Promise<void>; dismiss:()=>void;
 };
 
 export function useAppUpdater(desktop:boolean):AppUpdater {
+  const [channel,setChannel]=useState<"stable"|"preview">("stable");
   const [enabled,setEnabled]=useState(false);
   const [phase,setPhase]=useState<Phase>("disabled");
   const [currentVersion,setCurrentVersion]=useState("");
@@ -47,7 +48,7 @@ export function useAppUpdater(desktop:boolean):AppUpdater {
       const update=await check();
       if(scope!==lifetime.current){if(update)await update.close().catch(()=>undefined);return;}
       if(!update){ setAvailableVersion(""); setNotes(""); setPhase("current"); return; }
-      if(!isMajorStableRelease(update.version)){
+      if(channel==="stable"&&!isMajorStableRelease(update.version)||channel==="preview"&&!/^\d+\.\d+\.\d+$/.test(update.version)){
         await update.close();
         if(scope!==lifetime.current)return;
         setAvailableVersion(""); setNotes(""); setPhase("current");
@@ -60,24 +61,24 @@ export function useAppUpdater(desktop:boolean):AppUpdater {
       setPhase("available");
     }catch(error){ if(scope===lifetime.current){setPhase("error"); setMessage(String(error));} }
     finally{if(operation.current===task)operation.current=null;}
-  },[desktop,enabled,releaseUpdate]);
+  },[desktop,enabled,channel,releaseUpdate]);
 
   useEffect(()=>{
     const scope=++lifetime.current;
     if(!desktop)return;
     void Promise.all([
       getVersion().catch(()=>""),
-      invoke<ChannelStatus>("updater_channel_status").catch(()=>({enabled:false,policy:"major-only"}))
+      invoke<ChannelStatus>("updater_channel_status").catch(()=>({enabled:false,policy:"major-only",channel:"stable" as const}))
     ]).then(([version,channel])=>{
       if(scope!==lifetime.current)return;
-      setCurrentVersion(version); setEnabled(channel.enabled); setPhase(channel.enabled?"idle":"disabled");
+      setCurrentVersion(version); setChannel(channel.channel||"stable");setEnabled(channel.enabled); setPhase(channel.enabled?"idle":"disabled");
     });
     return()=>{lifetime.current++;operation.current=null;void releaseUpdate();};
   },[desktop,releaseUpdate]);
 
   useEffect(()=>{
     if(!desktop||!enabled||!currentVersion)return;
-    const key=`openphoto.updater.checked.${currentVersion}`;
+    const key=`openphoto.updater.checked.${channel}.${currentVersion}`;
     // Mark a check only when it actually starts. StrictMode cleanup cancels its timer.
     try{if(sessionStorage.getItem(key)==="true")return;}catch{/* Checking still works when browser storage is unavailable. */}
     const timer=window.setTimeout(()=>{
@@ -86,7 +87,7 @@ export function useAppUpdater(desktop:boolean):AppUpdater {
       void checkNow();
     },1200);
     return()=>window.clearTimeout(timer);
-  },[desktop,enabled,currentVersion,checkNow]);
+  },[desktop,enabled,currentVersion,channel,checkNow]);
 
   const download=useCallback(async()=>{
     const update=updateRef.current;
@@ -124,7 +125,13 @@ export function useAppUpdater(desktop:boolean):AppUpdater {
     finally{if(operation.current===task)operation.current=null;}
   },[phase]);
 
-  return {enabled,phase,currentVersion,availableVersion,notes,progress,message,dismissed,
+  async function changeChannel(value:"stable"|"preview"){
+    if(operation.current||phase==="ready")return;
+    const scope=++lifetime.current;setMessage("");setPhase("checking");
+    try{await releaseUpdate();const status=await invoke<ChannelStatus>("set_update_channel",{channel:value});if(scope!==lifetime.current)return;setChannel(status.channel||value);setEnabled(status.enabled);setAvailableVersion("");setNotes("");setPhase(status.enabled?"idle":"disabled");}
+    catch(error){if(scope===lifetime.current){setMessage(String(error));setPhase("error");}}
+  }
+  return {enabled,channel,changeChannel,phase,currentVersion,availableVersion,notes,progress,message,dismissed,
     checkNow,download,install,dismiss:()=>setDismissed(true)};
 }
 
@@ -134,7 +141,7 @@ export function UpdateToast({updater,onOpenSettings}:{updater:AppUpdater;onOpenS
   const title=updater.phase==="ready"?"Update ready":updater.phase==="downloading"?"Downloading update":updater.phase==="error"?"Update check needs attention":`Open-Photo ${updater.availableVersion} is available`;
   return <aside className="update-toast" aria-live="polite" aria-label="Open-Photo update">
     <div><strong>{title}</strong>
-      {updater.phase==="available"&&<p>Stable major release available. Your current work is not interrupted.</p>}
+      {updater.phase==="available"&&<p>{updater.channel==="preview"?"Preview update available.":"Stable major release available."} Your current work is not interrupted.</p>}
       {updater.phase==="downloading"&&<><progress max={1} value={updater.progress??undefined}/><small>{updater.progress===null?"Downloading…":`${Math.round(updater.progress*100)}%`}</small></>}
       {updater.phase==="ready"&&<p>The update is downloaded. Finish or save active work, then restart and install from Settings.</p>}
       {updater.phase==="error"&&<p>{updater.message}</p>}
@@ -147,11 +154,11 @@ export function UpdateSettingsCard({updater}:{updater:AppUpdater}){
   return <div className="settings-card update-settings-card">
     <div>
       <h2>Open-Photo updates</h2>
-      <p>Installed users receive only tested major releases published from main: 1.0.0, 2.0.0, 3.0.0, and so on. Minor, patch, preview, and development versions are never offered through this channel.</p>
+      <p>Stable offers major releases. Preview offers deliberately published development updates. Both require trusted signatures; changing channels never downgrades your app.</p><label>Update channel<select aria-label="Update channel" value={updater.channel} disabled={["checking","downloading","ready","installing"].includes(updater.phase)} onChange={event=>void updater.changeChannel(event.target.value as "stable"|"preview")}><option value="stable">Stable</option><option value="preview">Preview</option></select></label>
       <p className="update-version-line">Installed version: <strong>{updater.currentVersion||"Unknown"}</strong>{updater.availableVersion&&<> · Available: <strong>{updater.availableVersion}</strong></>}</p>
       {updater.notes&&<details><summary>What’s new</summary><p className="update-notes">{updater.notes}</p></details>}
       {updater.message&&<p role={updater.phase==="error"?"alert":"status"}>{updater.message}</p>}
-      {!updater.enabled&&<small>This development build is not connected to the public stable updater. Signed public builds enable it automatically.</small>}
+      {!updater.enabled&&<small>This build has no updater signing key. One signed bootstrap installation is needed before in-app updates work. The Preview channel also needs a published signed manifest.</small>}
       {updater.phase==="ready"&&<small>Installing on Windows closes Open-Photo, runs the signed updater, then relaunches the app. Finish or save active edits and exports first.</small>}
     </div>
     <div className="update-card-actions">

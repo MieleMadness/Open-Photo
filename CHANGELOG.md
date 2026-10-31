@@ -1,3 +1,13 @@
+# 0.56.23 — Automatic AI, video discovery and expanded viewers
+
+- Start/resume durable local AI indexing when enabled; add per-workspace folder exclusions, source-file counters, searchable/paged failures and retry. Keep folder Sync manual, preserve reviewed names, and pause immediately when AI is switched off.
+- Reuse existing model sessions and inference services with foreground-search priority, source/generation fences, offline-folder handling and bounded preprocessing.
+- Index bounded representative video frames locally with deduplication, resumable private staging and atomic publication. Rank image/video evidence together, retain matching timestamps and project verified Live motion evidence to its still. Add Play near actions.
+- Expand File Details and photo editing width, add taller padded previews and display-only wheel zoom/pan. Simplify Live/video viewing to one player with native controls.
+- Add a fullscreen library filmstrip with remembered visibility, bounded thumbnail rendering and side navigation.
+- Add Stable/Preview selection and a manually dispatched signed Preview publication workflow. Stable stays major-only; signatures, no-downgrade and active-work protections remain. Signing/bootstrap and a real two-version upgrade are still required before claiming Preview distribution works.
+- Add queue, search, viewer, updater and short-video regression coverage. Document local verification and outstanding installed-app acceptance. No installer/release publication is included in this source update.
+
 # 0.56.22 — Content-first browsing and automatic search
 
 - Simplify Library, move search into its toolbar, put thumbnail sizing above the grid on the right, and consolidate filters/sort in a dismissible disclosure.

@@ -4,7 +4,7 @@ use rusqlite::{params, Connection};
 use std::collections::{HashMap, HashSet};
 
 /// ATTACH uses a fixed local index path, opened read-only; source paths never become database names.
-fn attach_current(db: &Connection, path: &std::path::Path) -> Result<(), String> {
+pub(crate) fn attach_current(db: &Connection, path: &std::path::Path) -> Result<(), String> {
     if !path.is_file() {
         return Err("Sync the workspace Library before searching content indexes".into());
     }
@@ -21,14 +21,62 @@ fn attach_current(db: &Connection, path: &std::path::Path) -> Result<(), String>
     Ok(())
 }
 
+/// Exclude before ranking/scan caps. Normal filesystem metadata remains untouched.
+pub(crate) fn prepare_scope(db: &Connection, excluded: &[String]) -> Result<(), String> {
+    // SQLite lower() is ASCII-only. Resolve Windows/Unicode path policy in Rust,
+    // then apply indexed anti-joins before provider limits.
+    db.execute_batch("CREATE TEMP TABLE IF NOT EXISTS blocked_ai_roots(root TEXT PRIMARY KEY); CREATE TEMP TABLE IF NOT EXISTS blocked_ai_paths(root TEXT,path TEXT,PRIMARY KEY(root,path)); DELETE FROM blocked_ai_roots; DELETE FROM blocked_ai_paths;").map_err(|e|e.to_string())?;
+    if !excluded.is_empty() {
+        let mut statement = db
+            .prepare("SELECT DISTINCT root FROM current_media.media")
+            .map_err(|e| e.to_string())?;
+        let roots = statement
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+        for root in roots {
+            if !crate::ai_index::allowed(&root, excluded) {
+                db.execute("INSERT INTO blocked_ai_roots VALUES(?1)", [&root])
+                    .map_err(|e| e.to_string())?;
+                continue;
+            }
+            if !excluded.iter().any(|folder| {
+                crate::ai_index::normalized(folder)
+                    .starts_with(&(crate::ai_index::normalized(&root) + "/"))
+            }) {
+                continue;
+            }
+            let mut paths = db
+                .prepare("SELECT path FROM current_media.media WHERE root=?1")
+                .map_err(|e| e.to_string())?;
+            for row in paths
+                .query_map([&root], |r| r.get::<_, String>(0))
+                .map_err(|e| e.to_string())?
+            {
+                let path = row.map_err(|e| e.to_string())?;
+                if !crate::ai_index::allowed(&path, excluded) {
+                    db.execute(
+                        "INSERT OR IGNORE INTO blocked_ai_paths VALUES(?1,?2)",
+                        params![root, path],
+                    )
+                    .map_err(|e| e.to_string())?;
+                }
+            }
+        }
+    }
+    db.execute_batch("CREATE TEMP VIEW IF NOT EXISTS visible_media AS SELECT * FROM current_media.media m WHERE NOT EXISTS(SELECT 1 FROM blocked_ai_roots b WHERE b.root=m.root) AND NOT EXISTS(SELECT 1 FROM blocked_ai_paths b WHERE b.root=m.root AND b.path=m.path);").map_err(|e|e.to_string())
+}
 pub(crate) fn ocr(
     roots: &[String],
     query: &[String],
+    excluded: &[String],
     cancelled: impl Fn() -> bool,
 ) -> Result<Batch, String> {
     {
         let db = crate::ai_ocr::database()?;
         attach_current(&db, &crate::index::database_path()?)?;
+        prepare_scope(&db, excluded)?;
         ocr_from(&db, roots, query, cancelled)
     }
 }
@@ -48,7 +96,7 @@ fn ocr_from(
         crate::image_decode::POLICY,
         crate::ai_models::SUPPORTED_OCR_RECOGNIZER_SHA256
     );
-    let mut statement=db.prepare("SELECT a.root,a.path,a.modified_unix,a.text FROM ocr_index a JOIN current_media.media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix WHERE a.root IN (SELECT value FROM json_each(?1)) AND a.recognizer_key=?2 ORDER BY a.root,a.path LIMIT ?3").map_err(|e|e.to_string())?;
+    let mut statement=db.prepare("SELECT a.root,a.path,a.modified_unix,a.text FROM ocr_index a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix WHERE a.root IN (SELECT value FROM json_each(?1)) AND a.recognizer_key=?2 ORDER BY a.root,a.path LIMIT ?3").map_err(|e|e.to_string())?;
     let rows = statement
         .query_map(
             params![
@@ -104,11 +152,13 @@ fn ocr_from(
 pub(crate) fn people(
     roots: &[String],
     query: &str,
+    excluded: &[String],
     cancelled: impl Fn() -> bool,
 ) -> Result<Batch, String> {
     {
         let db = crate::ai_faces::database()?;
         attach_current(&db, &crate::index::database_path()?)?;
+        prepare_scope(&db, excluded)?;
         people_from(&db, roots, query, cancelled)
     }
 }
@@ -124,7 +174,7 @@ fn people_from(
         crate::image_decode::POLICY,
         crate::ai_models::SUPPORTED_SFACE_SHA256
     );
-    let mut statement=db.prepare("SELECT a.root,a.path,a.modified_unix,a.vector FROM face_embeddings a JOIN current_media.media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix WHERE a.root IN (SELECT value FROM json_each(?1)) AND a.embedder_key=?2 AND a.dimensions=128 AND length(a.vector)=512 ORDER BY a.root,a.path,a.face_index LIMIT ?3").map_err(|e|e.to_string())?;
+    let mut statement=db.prepare("SELECT a.root,a.path,a.modified_unix,a.vector FROM face_embeddings a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix WHERE a.root IN (SELECT value FROM json_each(?1)) AND a.embedder_key=?2 AND a.dimensions=128 AND length(a.vector)=512 ORDER BY a.root,a.path,a.face_index LIMIT ?3").map_err(|e|e.to_string())?;
     let rows = statement
         .query_map(
             params![
@@ -202,12 +252,36 @@ fn people_from(
 pub(crate) fn semantic(
     roots: &[String],
     vector: &[f32],
+    excluded: &[String],
     cancelled: impl Fn() -> bool,
 ) -> Result<Batch, String> {
     {
         let db = crate::ai_embeddings::database()?;
         attach_current(&db, &crate::index::database_path()?)?;
-        semantic_from(&db, roots, vector, cancelled)
+        prepare_scope(&db, excluded)?;
+        let mut photos = semantic_from(&db, roots, vector, &cancelled)?;
+        let videos = video_semantic_from(&db, roots, vector, &cancelled)?;
+        photos.truncated |= videos.truncated;
+        photos.evidence.extend(videos.evidence);
+        photos
+            .evidence
+            .sort_by(|a, b| b.score.total_cmp(&a.score).then(a.path.cmp(&b.path)));
+        let mut parents = HashMap::new();
+        let mut kept = vec![];
+        for item in photos.evidence {
+            let id = (item.root.clone(), item.path.clone());
+            if !parents.contains_key(&id) && parents.len() >= 200 {
+                photos.truncated = true;
+                continue;
+            }
+            let count = parents.entry(id).or_insert(0);
+            if *count < 5 {
+                *count += 1;
+                kept.push(item);
+            }
+        }
+        photos.evidence = kept;
+        Ok(photos)
     }
 }
 fn semantic_from(
@@ -220,7 +294,7 @@ fn semantic_from(
         "openclip-vit-b32-oriented-v2:{}",
         crate::ai_models::SUPPORTED_CLIP_VISION_SHA256
     );
-    let mut statement=db.prepare("SELECT a.root,a.path,a.modified_unix,a.vector FROM semantic_embeddings a JOIN current_media.media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix WHERE a.root IN (SELECT value FROM json_each(?1)) AND a.model_sha256=?2 AND a.dimensions=512 AND length(a.vector)=2048 ORDER BY a.root,a.path LIMIT ?3").map_err(|e|e.to_string())?;
+    let mut statement=db.prepare("SELECT a.root,a.path,a.modified_unix,a.vector FROM semantic_embeddings a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix WHERE a.root IN (SELECT value FROM json_each(?1)) AND a.model_sha256=?2 AND a.dimensions=512 AND length(a.vector)=2048 ORDER BY a.root,a.path LIMIT ?3").map_err(|e|e.to_string())?;
     let rows = statement
         .query_map(
             params![
@@ -273,17 +347,150 @@ fn semantic_from(
     Ok(batch)
 }
 
+fn video_semantic_from(
+    db: &Connection,
+    roots: &[String],
+    vector: &[f32],
+    cancelled: impl Fn() -> bool,
+) -> Result<Batch, String> {
+    let mut stmt=db.prepare("SELECT v.root,v.path,v.modified,v.seconds,v.vector FROM video_frames v JOIN video_index_state s ON s.root=v.root AND s.path=v.path AND s.modified=v.modified AND s.bytes=v.bytes AND s.model=v.model JOIN visible_media m ON m.root=v.root AND m.path=v.path AND m.modified_unix=v.modified AND m.bytes=v.bytes WHERE v.root IN(SELECT value FROM json_each(?1)) AND v.model=?2 AND length(v.vector)=2048 ORDER BY v.root,v.path,v.seconds LIMIT ?3").map_err(|e|e.to_string())?;
+    let rows = stmt
+        .query_map(
+            params![
+                serde_json::to_string(roots).map_err(|e| e.to_string())?,
+                crate::video_semantic::key(),
+                (MAX_SCAN + 1) as i64
+            ],
+            |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, i64>(2)?,
+                    r.get::<_, f64>(3)?,
+                    r.get::<_, Vec<u8>>(4)?,
+                ))
+            },
+        )
+        .map_err(|e| e.to_string())?;
+    let mut batch = Batch::default();
+    let mut parents: HashMap<(String, String), Vec<Evidence>> = HashMap::new();
+    for (index, row) in rows.enumerate() {
+        if cancelled() {
+            return Ok(Batch::default());
+        }
+        if index == MAX_SCAN {
+            batch.truncated = true;
+            break;
+        }
+        let (root, path, modified, seconds, blob) = row.map_err(|e| e.to_string())?;
+        if !seconds.is_finite() || seconds < 0. {
+            continue;
+        }
+        let candidate = crate::ai_embeddings::decode_f32(&blob)?;
+        let score = crate::ai_embeddings::cosine_similarity(vector, &candidate)?;
+        if !score.is_finite() || score < 0.2 {
+            continue;
+        }
+        let hits = parents.entry((root.clone(), path.clone())).or_default();
+        hits.push(Evidence {
+            root,
+            path,
+            modified_unix: modified,
+            kind: Kind::VideoSemantic,
+            text: String::new(),
+            matched_terms: vec![],
+            score,
+            timestamp_seconds: Some(seconds),
+        });
+        hits.sort_by(|a, b| b.score.total_cmp(&a.score));
+        hits.truncate(5);
+    }
+    let mut groups = parents.into_values().collect::<Vec<_>>();
+    groups.sort_by(|a, b| {
+        b[0].score
+            .total_cmp(&a[0].score)
+            .then(a[0].path.cmp(&b[0].path))
+    });
+    if groups.len() > 200 {
+        batch.truncated = true;
+        groups.truncate(200);
+    }
+    batch.evidence = groups.into_iter().flatten().collect();
+    Ok(batch)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     fn db() -> Connection {
         let db = Connection::open_in_memory().unwrap();
-        db.execute_batch("ATTACH DATABASE ':memory:' AS current_media; CREATE TABLE current_media.media(root TEXT,path TEXT,modified_unix INTEGER,PRIMARY KEY(root,path));").unwrap();
+        db.execute_batch("ATTACH DATABASE ':memory:' AS current_media; CREATE TABLE current_media.media(root TEXT,path TEXT,modified_unix INTEGER,bytes INTEGER DEFAULT 0,PRIMARY KEY(root,path));").unwrap();
         db.execute_batch("CREATE TABLE ocr_index(root TEXT,path TEXT,modified_unix INTEGER,text TEXT,recognizer_key TEXT);CREATE TABLE face_embeddings(root TEXT,path TEXT,modified_unix INTEGER,vector BLOB,embedder_key TEXT,dimensions INTEGER,face_index INTEGER);CREATE TABLE people(id TEXT PRIMARY KEY,name TEXT);CREATE TABLE person_faces(face_key TEXT PRIMARY KEY,person_id TEXT);CREATE TABLE semantic_embeddings(root TEXT,path TEXT,modified_unix INTEGER,vector BLOB,model_sha256 TEXT,dimensions INTEGER);").unwrap();
+        crate::video_semantic::initialize(&db).unwrap();
+        prepare_scope(&db, &[]).unwrap();
         db
     }
     fn vector(value: f32, size: usize) -> Vec<u8> {
         (0..size).flat_map(|_| value.to_le_bytes()).collect()
+    }
+    #[test]
+    fn video_matches_require_committed_current_frames_and_return_parent_timestamps() {
+        let db = db();
+        let key = crate::video_semantic::key();
+        let blob = vector(1., 512);
+        db.execute_batch("INSERT INTO current_media.media(root,path,modified_unix,bytes) VALUES('C:/r','C:/r/one.mp4',10,100),('C:/r','C:/r/hidden/two.mp4',10,100);").unwrap();
+        for path in ["C:/r/one.mp4", "C:/r/hidden/two.mp4"] {
+            db.execute(
+                "INSERT INTO video_frames VALUES('C:/r',?1,10,100,?2,2.5,?3)",
+                params![path, key, blob],
+            )
+            .unwrap();
+            db.execute(
+                "INSERT INTO video_index_state VALUES('C:/r',?1,10,100,?2)",
+                params![path, key],
+            )
+            .unwrap();
+        }
+        prepare_scope(&db, &["C:/r/hidden".into()]).unwrap();
+        let result = video_semantic_from(&db, &["C:/r".into()], &[1.; 512], || false).unwrap();
+        assert_eq!(result.evidence.len(), 1);
+        assert_eq!(result.evidence[0].timestamp_seconds, Some(2.5));
+        db.execute("DELETE FROM video_index_state", []).unwrap();
+        assert!(
+            video_semantic_from(&db, &["C:/r".into()], &[1.; 512], || false)
+                .unwrap()
+                .evidence
+                .is_empty()
+        );
+    }
+    #[test]
+    fn exclusion_paths_use_unicode_case_folding_before_query_limits() {
+        let db = db();
+        db.execute_batch("INSERT INTO current_media.media(root,path,modified_unix) VALUES('C:/ФОТО','C:/ФОТО/СЕКРЕТ/one.jpg',10),('C:/ФОТО','C:/ФОТО/other.jpg',10);").unwrap();
+        prepare_scope(&db, &["c:/фото/секрет".into()]).unwrap();
+        assert_eq!(
+            db.query_row("SELECT COUNT(*) FROM visible_media", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+    }
+    #[test]
+    fn excluded_subfolders_are_filtered_before_content_scan_limits() {
+        let db = db();
+        db.execute_batch("INSERT INTO current_media.media(root,path,modified_unix) VALUES('C:/Photos','C:/Photos/Private/one.jpg',10),('C:/Photos','C:/Photos/Public/two.jpg',10),('C:/Photos','C:/Photos/Private-other/three.jpg',10);").unwrap();
+        prepare_scope(&db, &["c:\\photos\\private".into()]).unwrap();
+        let count: i64 = db
+            .query_row("SELECT COUNT(*) FROM visible_media", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 2);
+        prepare_scope(&db, &[]).unwrap();
+        assert_eq!(
+            db.query_row("SELECT COUNT(*) FROM visible_media", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            3
+        );
     }
     #[test]
     fn ocr_scope_model_keys_cancellation_and_long_text_terms_are_preserved() {
@@ -310,7 +517,7 @@ mod tests {
             params![text, key],
         )
         .unwrap();
-        db.execute_batch("INSERT INTO current_media.media VALUES('r','one',10),('r','two',10);")
+        db.execute_batch("INSERT INTO current_media.media(root,path,modified_unix) VALUES('r','one',10),('r','two',10);")
             .unwrap();
         let roots = vec!["r".into()];
         let batch = ocr_from(&db, &roots, &search::terms("burger cream"), || false).unwrap();
@@ -348,8 +555,10 @@ mod tests {
             )
             .unwrap();
         }
-        db.execute_batch("INSERT INTO current_media.media VALUES('r','local',10);")
-            .unwrap();
+        db.execute_batch(
+            "INSERT INTO current_media.media(root,path,modified_unix) VALUES('r','local',10);",
+        )
+        .unwrap();
         let batch = people_from(&db, &["r".into()], "ZOË", || false).unwrap();
         assert_eq!(batch.evidence.len(), 1);
         assert_eq!(batch.evidence[0].path, "local");
@@ -386,7 +595,7 @@ mod tests {
             .unwrap();
         }
         db.execute_batch(
-            "INSERT INTO current_media.media VALUES('a','a',10),('b','best',10),('a','stale',10);",
+            "INSERT INTO current_media.media(root,path,modified_unix) VALUES('a','a',10),('b','best',10),('a','stale',10);",
         )
         .unwrap();
         let batch =
@@ -419,7 +628,7 @@ mod tests {
         )
         .unwrap();
         db.execute_batch(
-            "INSERT INTO current_media.media VALUES('r','changed',10),('r','current',10);",
+            "INSERT INTO current_media.media(root,path,modified_unix) VALUES('r','changed',10),('r','current',10);",
         )
         .unwrap();
         let batch = ocr_from(&db, &["r".into()], &search::terms("burger"), || false).unwrap();

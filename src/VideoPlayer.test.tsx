@@ -18,6 +18,12 @@ beforeEach(()=>{vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(
   });
 });
 afterEach(async()=>{cleanup();await act(async()=>{});vi.restoreAllMocks();vi.resetAllMocks()});
+it("uses only native controls for viewer playback without starting a filmstrip job",async()=>{
+ render(<IPhoneMotion autoLoad viewerMode root="library" path="one.mp4" onOpenExternal={()=>{}}/>);
+ const video=await screen.findByLabelText("Selected video") as HTMLVideoElement;expect(video.controls).toBe(true);
+ expect(screen.queryByLabelText("Seek video")).toBeNull();expect(screen.queryByLabelText("Video filmstrip")).toBeNull();expect(screen.queryByRole("button",{name:"Play"})).toBeNull();
+ expect(vi.mocked(invoke).mock.calls.some(([command])=>command==="start_video_preview")).toBe(false);
+});
 it("keeps the editor preview focused on native playback and compatibility only",async()=>{
   render(<VideoPlayer autoLoad root="library" path="one.mp4" onOpenExternal={()=>{}} editorMode/>);
   await screen.findByLabelText("Selected video");

@@ -1,6 +1,13 @@
 # AI, media viewer and private vault roadmap
 
-Requested October 30, 2026 against 0.56.21. The focused 0.56.22 implementation is recorded below; other groups remain planned. Preserve the existing A–J phases and shared editor architecture.
+## Implementation checkpoint — 0.56.23
+
+R2, R3, R4 and Phase F are implemented in this source update with local tests: durable automatic AI indexing, inspectable/paged failures and folder exclusions; wider/taller zoomable details with one Live player; fullscreen library filmstrip; and sampled video semantics with ranked matching times. R0 signed Preview code/workflow is prepared, with signing/bootstrap and a genuine two-version upgrade still required. R5/R6 vault remains planned and is not part of this patch. No installer/release publication was performed. See [handoff](LOCAL_HANDOFF_0_56_23.md).
+
+Implemented counters count **physical source files**, not service rows or frames: a paired Live still and motion can contribute two sources. Library presentation remains one Live image. This replaces any earlier proposal below for logical-pair counters. Video semantics uses bounded 3–48 frame sampling, private resumable staging and committed-only search; see [AI indexing](AUTOMATIC_AI_INDEXING.md) for limits and safety. Historical findings/specifications below describe the original requests, not current implementation status.
+
+
+Requested October 30, 2026 against 0.56.21. Implementation checkpoints are recorded below; the encrypted vault remains planned. Preserve the existing A–J phases and shared editor architecture.
 
 ## Implementation checkpoint — 0.56.22
 

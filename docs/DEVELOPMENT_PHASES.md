@@ -1,6 +1,13 @@
 # Development phases
 
-Baseline: 0.56.22. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+## 0.56.23 implementation checkpoint
+
+Automatic AI indexing/counters/failures/folder policy (R2), viewer width/zoom/Live controls (R3), fullscreen library filmstrip (R4), and bounded video semantic indexing/search (F) are implemented locally and tested. Signed Preview selection/publication code (R0) is prepared, but signing/bootstrap and a genuine two-version upgrade remain unverified. This source update is pushed for manual review; no release publication is included. See [handoff](LOCAL_HANDOFF_0_56_23.md). The older 0.56.22 descriptions below are historical checkpoints.
+
+Remaining order: installed short-media AI/viewer acceptance and signed upgrade gate; G large-library work; H maps; remaining I text/audio/transitions; J music. Vault R5/R6 remains separately gated on a security/storage design, and is not implemented. Long-form work remains in 1.x and physical-drive checks before v1.0.
+
+
+Baseline: 0.56.23 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 ## October 30 feedback — implementation checkpoint
 
@@ -23,7 +30,7 @@ Before the next feature expansion, follow [AI, viewer and vault roadmap](AI_VIEW
 | C | One workspace-owned project model/editor for one or many assets; legacy migration/recovery/relink | Shared editor, workspace storage/migration/recovery implemented in 0.56.7 |
 | D | Assembled preview and validated combined MP4/H.264 export, then project-independent export presets | Continuous output/presets implemented in 0.56.8; installed GUI acceptance remains |
 | E | Ranked unified discovery with match reasons and media/timestamp identity | Implemented in 0.56.11; installed GUI/AI quality acceptance remains |
-| F | Bounded local video frame sampling, deduplication, embeddings, matching timestamps | Planned — Codex/native AI work |
+| F | Bounded local video frame sampling, deduplication, embeddings, matching timestamps | Implemented in 0.56.23; installed AI/quality acceptance remains |
 | G | Virtualized/lazy results, bounded thumbnail work, stale-work cancellation, scroll/memory checks | Planned |
 | H | Clustered map discovery, counts/empty states, safe phone-media GPS extraction | Planned |
 | I | Photos, text, local audio, simple tested transitions and social layouts after hard cuts stabilize | Photo clips implemented in 0.56.21; text/music/transitions remain |

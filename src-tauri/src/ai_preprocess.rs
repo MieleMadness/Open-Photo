@@ -15,7 +15,7 @@ pub struct ImageTensorPreview {
     values_base64: String,
 }
 
-fn clip_tensor(input: image::DynamicImage) -> Result<Vec<f32>, String> {
+pub(crate) fn clip_tensor(input: image::DynamicImage) -> Result<Vec<f32>, String> {
     let (width, height) = input.dimensions();
     if width == 0 || height == 0 {
         return Err("Cannot preprocess an empty image".into());
@@ -23,6 +23,11 @@ fn clip_tensor(input: image::DynamicImage) -> Result<Vec<f32>, String> {
     let scale = 224.0_f32 / (width.min(height) as f32);
     let resized_width = ((width as f32 * scale).round() as u32).max(224);
     let resized_height = ((height as f32 * scale).round() as u32).max(224);
+    if u64::from(resized_width) * u64::from(resized_height) > 16_777_216 {
+        return Err(
+            "Image aspect ratio exceeds bounded AI preprocessing; use a cropped copy".into(),
+        );
+    }
     let resized = input.resize_exact(
         resized_width,
         resized_height,
@@ -69,6 +74,14 @@ pub fn ai_prepare_image(root: String, path: String) -> Result<ImageTensorPreview
 #[cfg(test)]
 mod tests {
     use super::{clip_tensor, CLIP_MEAN, CLIP_STD};
+
+    #[test]
+    fn extreme_aspect_ratios_are_rejected_before_resize_allocation() {
+        let image = image::DynamicImage::new_rgb8(20_000, 1);
+        assert!(clip_tensor(image)
+            .unwrap_err()
+            .contains("bounded AI preprocessing"));
+    }
 
     #[test]
     fn clip_tensor_is_channel_first_and_normalized() {

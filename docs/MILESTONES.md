@@ -1,6 +1,15 @@
 # Milestones and validation status
 
-## Current branch — 0.56.22
+## Current source update — 0.56.23
+
+Requested groups 1/2/3/4/6 are implemented: native automatic AI queue/dashboard/exclusions, expanded zoomable details and simplified Live playback, fullscreen library filmstrip, signed Preview channel code/workflow, and bounded video semantic indexing with ranked timestamps. Source media stay read-only; folder Sync stays manual. See [handoff](LOCAL_HANDOFF_0_56_23.md), [AI architecture](AUTOMATIC_AI_INDEXING.md) and [viewer controls](MEDIA_VIEWER.md).
+
+Local verification: 170 frontend tests, TypeScript and production build passed; native formatting, warnings-as-errors clippy and 161 Rust tests passed (7 acceptance modes ignored in the normal suite). The new ignored CPU-model video acceptance was also explicitly run and passed with a 0.6-second clip, cancellation/resume and unchanged-source checks. Edge fixtures verified both themes, normal/minimum-window sizing, wheel zoom/reset, fullscreen/Live controls and the AI dashboard. Existing bundle-size warnings remain. GitHub Actions for this source update and installed-app acceptance are unverified; the user will check manually. No installer/release publication or signed upgrade was performed.
+
+Last published development baseline: 0.56.22. Preview signing/bootstrap and a real two-version upgrade remain deployment gates. Vault, large-library acceleration, map expansion and remaining text/music/transitions remain separate phases.
+
+
+## Previous checkpoint — 0.56.22
 0.56.22 completes the focused Library/search update: compact controls, Edits navigation, per-workspace folder/collection List/Tiles, manual Sync and offline saved-index restoration, automatic debounced semantic search and stable media labels. Cleanup/manual AI tools remain available outside Library. Automatic AI indexing/counters/exclusions, viewer refinements, encrypted vault and signed Preview channel remain planned; see AI_VIEWER_VAULT_ROADMAP.md. Local validation: 159 frontend tests, TypeScript/production build, native formatting/clippy and 146 Rust tests passed (6 explicitly ignored acceptance modes). Edge fixtures verified automatic semantic search, media labels, navigation, view modes and light/dark/minimum-window layout. Existing bundle-size warnings remain. Pushed-commit CI and installed GUI acceptance must be verified separately.
 
 0.56.21 integrates typed still-photo clips into the shared editor and continuous renderer, with schema migration and normal first-run playback volume. JPEG/PNG/BMP/TIFF import, duration, source inspection, shared adjustments, undo/autosave/history/relink and photo-only or mixed output are covered with short fixtures. The new File Details location map is retained and regression-tested. Installed Windows acceptance, video semantic indexing and remaining social/music tools are pending. Local validation: 155 frontend tests, TypeScript/production build, native formatting/clippy and 145 Rust tests passed (6 explicitly ignored acceptance modes). Browser fixtures verified original-photo display, duration/undo, continuous playback and light/dark/minimum-window layout. Existing bundle-size warnings remain; exact pushed-commit CI must be verified separately.
