@@ -1,3 +1,10 @@
+# 0.56.27 — Phase G: viewport-aware Library rows
+
+- Measure actual Library gallery height alongside width using the existing ResizeObserver.
+- Size the rendered virtual row window to the visible gallery viewport rather than an assumed 700px height; retain small overscan for smooth scrolling.
+- Reduce unnecessary thumbnail mounts in compact windows and avoid undersized windows in taller layouts.
+- Preserve filters, selection, saved snapshots, source files and decoder behavior.
+
 # 0.56.26 — Bounded timeline frame scheduling
 
 - Debounce timeline frame requests while the user rapidly resizes the editor or changes timeline zoom.
