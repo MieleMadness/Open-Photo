@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current source update — 0.56.29
+## Current source update — 0.56.30
+
+0.56.30 adds shared grid/list viewport-bound calculations and tests for large result sets.
 
 0.56.29 virtualizes Library list rows with viewport-aware overscan and stable 64px geometry.
 
