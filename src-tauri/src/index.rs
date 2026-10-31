@@ -73,6 +73,45 @@ pub fn scan_indexed(root: String) -> Result<ScanResult, String> {
     Ok(scan_indexed_with_changes(root)?.scan)
 }
 
+/// Restore known media without touching source folders (including offline drives).
+#[tauri::command]
+pub fn saved_library(root: String) -> Result<ScanResult, String> {
+    saved_library_from(&database()?, &root)
+}
+fn saved_library_from(db: &Connection, root: &str) -> Result<ScanResult, String> {
+    let mut statement = db.prepare("SELECT path,bytes,modified_unix,capture_local,live_asset_id FROM media WHERE root=?1 ORDER BY path LIMIT 100001").map_err(|e| e.to_string())?;
+    let mut photos = statement
+        .query_map([root], |row| {
+            let path: String = row.get(0)?;
+            let name = path.rsplit(['/', '\\']).next().unwrap_or(&path).to_string();
+            let extension = name
+                .rsplit_once('.')
+                .map(|(_, ext)| ext.to_ascii_lowercase())
+                .unwrap_or_default();
+            Ok(crate::Photo {
+                path,
+                name,
+                extension,
+                bytes: row.get(1)?,
+                modified_unix: row.get(2)?,
+                capture_local: row.get(3)?,
+                live_asset_id: row.get(4)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    let truncated = photos.len() > 100_000;
+    photos.truncate(100_000);
+    Ok(ScanResult {
+        scanned_files: photos.len(),
+        photos,
+        truncated,
+        incomplete: truncated,
+        errors: vec![],
+    })
+}
+
 #[derive(Serialize)]
 pub struct ChangeCounts {
     pub added: usize,
@@ -479,6 +518,32 @@ fn sha256_file(path: &Path) -> std::io::Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn restores_only_requested_root_without_accessing_missing_source_files() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE media(root TEXT,path TEXT,bytes INTEGER,modified_unix INTEGER,capture_local TEXT,live_asset_id TEXT);
+            INSERT INTO media VALUES('offline','Z:/missing/世界.JPG',42,10,'2026-10-30T12:00:00','pair'),('other','Z:/other.jpg',8,20,NULL,NULL);").unwrap();
+        let restored = saved_library_from(&db, "offline").unwrap();
+        assert_eq!(restored.photos.len(), 1);
+        assert_eq!(restored.photos[0].name, "世界.JPG");
+        assert_eq!(restored.photos[0].extension, "jpg");
+        assert_eq!(restored.photos[0].bytes, 42);
+        assert_eq!(restored.photos[0].live_asset_id.as_deref(), Some("pair"));
+        assert_eq!(
+            restored.photos[0].capture_local.as_deref(),
+            Some("2026-10-30T12:00:00")
+        );
+        assert!(saved_library_from(&db, "unknown")
+            .unwrap()
+            .photos
+            .is_empty());
+        assert_eq!(
+            db.query_row("SELECT COUNT(*) FROM media", [], |row| row.get::<_, i64>(0))
+                .unwrap(),
+            2
+        );
+    }
 
     #[test]
     fn incomplete_snapshot_keeps_previous_index_but_complete_snapshot_reconciles() {

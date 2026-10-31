@@ -1,6 +1,20 @@
 # Development phases
 
-Baseline: 0.56.21. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.22. This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+
+## October 30 feedback — implementation checkpoint
+
+0.56.22 implements the focused browsing/search batch: compact Library, Edits navigation, manual Sync with saved-index restoration, independent folder/collection List/Tiles preferences, relocated cleanup/manual AI tools, automatic debounced search and corrected media labels. R2 automatic indexing/counters/exclusions, R3–R4 viewers, R5–R6 vault and R0 signed Preview distribution remain planned. See the [detailed checkpoint](AI_VIEWER_VAULT_ROADMAP.md#implementation-checkpoint--05622).
+
+Collections also gains a remembered **List / Tiles** switch, separate from Browse folders and Library. R0 adds a separate signed **Preview** update channel so future preview releases upgrade the app in place without uninstalling. The existing disabled/major-only updater may require one final signed bootstrap installation. Preserve Stable policy and app data; verify a real signed two-version upgrade before claiming the channel works. No publishing is authorized by this planning update.
+
+Browse folders in Folders & Workspaces gains a remembered **List / Tiles** choice, with the same folder actions in either view and no automatic Sync on switching.
+
+Latest navigation/sync decisions: add **Edits** to the left navigation as the shared editor dashboard entry. Remove Auto sync, including periodic and watcher-triggered reconciliation; use a manual **Sync** button. Restore saved library snapshots on startup. AI still automatically processes known eligible media when enabled, and new changes become eligible after explicit folder import/manual Sync. These navigation/manual-sync changes are implemented in 0.56.22.
+
+Latest Library refinement: remove the permanent Open video editor button, search tips and Search and library tools section; place search where thumbnail zoom currently sits, and place thumbnail zoom immediately above the grid on the right. Move duplicate/similar review to Folders & Workspaces → Library cleanup. Automatic AI indexing is controlled in the AI dashboard, including per-folder **Don't index / Index folder** controls; these do not remove folders from Library. Keep the media grid high and content-focused. See R1/R2 in the linked plan for details.
+
+Before the next feature expansion, follow [AI, viewer and vault roadmap](AI_VIEWER_VAULT_ROADMAP.md): R1 automatic search/layout/media labels; R2 automatic AI indexing with durable counters and inspectable failures; R3 details width, taller padded previews, wheel zoom and simplified Live image playback; R4 fullscreen viewer with hideable library filmstrip; R5–R6 reviewed encrypted PIN vault opened through three clicks on the version. Only the focused R1 browsing/search subset is implemented in 0.56.22; the other groups remain planned. Phase F supplies video semantic coverage to the shared indexing coordinator; keep the remaining F–J work and deferred acceptance gates.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
@@ -14,6 +28,7 @@ Baseline: 0.56.21. This supersedes conflicting future direction in the older fee
 | H | Clustered map discovery, counts/empty states, safe phone-media GPS extraction | Planned |
 | I | Photos, text, local audio, simple tested transitions and social layouts after hard cuts stabilize | Photo clips implemented in 0.56.21; text/music/transitions remain |
 | J | Import-your-own music first; provider-neutral source/license/attribution metadata | Planned |
+| K | Private encrypted vault with PIN, version triple-click entry, lock/recovery and index isolation | Planned — R5 security/storage design precedes R6 implementation |
 
 ## Architecture decisions
 

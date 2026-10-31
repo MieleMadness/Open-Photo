@@ -1242,6 +1242,7 @@ pub fn run() {
             check_app_update,
             geo::gps_for_photos,
             index::scan_indexed,
+            index::saved_library,
             index::scan_indexed_with_changes,
             index::update_indexed_path,
             index::library_health,

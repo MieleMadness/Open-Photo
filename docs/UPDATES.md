@@ -1,5 +1,9 @@
 # Open-Photo stable updater
 
+## Planned Preview channel — not implemented
+
+The October 30 feedback adds a separate signed Preview channel for in-app updates to development patch releases. The implementation/release gates are specified in [R0 of the feedback plan](AI_VIEWER_VAULT_ROADMAP.md#r0--preview-builds-update-in-place). The current Stable-only behavior below remains the actual implementation. A one-time signed bootstrap installer may be required before existing installations can receive Preview updates. Keep the same app/data identity, preserve user data, isolate Stable and Preview manifests, retain signature and active-work protections, and verify a genuine signed upgrade between two versions before publishing the channel as ready. No keys, release workflow or update manifest were changed by this documentation update.
+
 Open-Photo uses Tauri's signed updater for deliberately published major releases.
 
 ## Release policy

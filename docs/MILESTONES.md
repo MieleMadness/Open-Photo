@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current branch — 0.56.21
+## Current branch — 0.56.22
+0.56.22 completes the focused Library/search update: compact controls, Edits navigation, per-workspace folder/collection List/Tiles, manual Sync and offline saved-index restoration, automatic debounced semantic search and stable media labels. Cleanup/manual AI tools remain available outside Library. Automatic AI indexing/counters/exclusions, viewer refinements, encrypted vault and signed Preview channel remain planned; see AI_VIEWER_VAULT_ROADMAP.md. Local validation: 159 frontend tests, TypeScript/production build, native formatting/clippy and 146 Rust tests passed (6 explicitly ignored acceptance modes). Edge fixtures verified automatic semantic search, media labels, navigation, view modes and light/dark/minimum-window layout. Existing bundle-size warnings remain. Pushed-commit CI and installed GUI acceptance must be verified separately.
+
 0.56.21 integrates typed still-photo clips into the shared editor and continuous renderer, with schema migration and normal first-run playback volume. JPEG/PNG/BMP/TIFF import, duration, source inspection, shared adjustments, undo/autosave/history/relink and photo-only or mixed output are covered with short fixtures. The new File Details location map is retained and regression-tested. Installed Windows acceptance, video semantic indexing and remaining social/music tools are pending. Local validation: 155 frontend tests, TypeScript/production build, native formatting/clippy and 145 Rust tests passed (6 explicitly ignored acceptance modes). Browser fixtures verified original-photo display, duration/undo, continuous playback and light/dark/minimum-window layout. Existing bundle-size warnings remain; exact pushed-commit CI must be verified separately.
 
 0.56.20 aligns the remaining frontend trim tests with the timeline-only workflow; runtime behavior is unchanged.

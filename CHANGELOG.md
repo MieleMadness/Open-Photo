@@ -1,3 +1,14 @@
+# 0.56.22 — Content-first browsing and automatic search
+
+- Simplify Library, move search into its toolbar, put thumbnail sizing above the grid on the right, and consolidate filters/sort in a dismissible disclosure.
+- Add Edits navigation; keep multi-media project creation contextual to Library selection.
+- Add independent workspace-persisted List/Tiles views for Browse folders and Collections.
+- Move duplicate/similar review into Folders → Library cleanup and manual AI/text tools into Settings; remove search tips and the old tools disclosure.
+- Replace automatic folder refresh with manual Sync. Restore saved SQLite media snapshots without scanning folders, disable timers/watchers and ignore old enabled Auto-sync preferences.
+- Preserve known media for failed/incomplete roots during a partial refresh; retain source-file safety and stale-work protection.
+- Run complete search after 400ms idle, retain the previous completed view during updates, and keep Image / Live image / Video identity distinct from match evidence.
+- Add regression coverage for manual sync, offline snapshot restore, view persistence, partial failures, automatic semantic queries and stale-result handling. Record the remaining feedback roadmap without implementing its security/indexing/update-channel expansions.
+
 # 0.56.21 — Photos in the shared timeline
 
 - Add typed photo assets to the shared project/editor with JPEG, PNG, BMP and TIFF import, source previews, adjustable duration, split/reorder/undo and shared crop/transform adjustments.

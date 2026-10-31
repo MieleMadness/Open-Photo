@@ -1,6 +1,6 @@
 File Details includes a location map below metadata for GPS-tagged JPEG/TIFF photos. Map imagery requires internet; coordinates remain visible offline.
 
-> Development update: **0.56.21** adds photos to the shared video timeline. Select videos and supported photos together in Library, choose **Create video from selection…**, or use **Add media…** inside the editor. They preview and export as one continuous video.
+> Development update: **0.56.22** brings media higher in Library, adds Edits navigation and remembered List/Tiles folder/collection views, switches folder updates to manual Sync, and searches automatically after typing stops.
 
 
 
@@ -619,3 +619,14 @@ JPEG, PNG, BMP and TIFF photos use the same timeline, autosave, history, relinki
 Photo-only and mixed sequences use the project's 30/60 fps clock. Original video audio stays linked to its clip; photo intervals are silent. MP4/H.264 remains the tested output. Transparent pixels render against black and embedded photo orientation is honored. Still clips support 0.04–600 seconds within the existing 50-source/200-clip/two-hour project bounds. Timeline photos are bounded to 250 MB, 50 megapixels and 20,000 pixels per edge. HEIC, GIF, WebP and animated PNG timeline imports are not supported yet; existing Library support is unchanged. Older video projects load through a validated schema migration; portable references and fingerprints remain intact.
 
 Fresh installations now start video playback at normal volume. A deliberately saved zero-volume setting is still honored. Text, music, transitions, real sampled filmstrips and installed Windows acceptance remain future work. Long-form optimization stays deferred to 1.x.
+
+
+### Browsing and search — 0.56.22
+
+- **Library:** search sits in the compact toolbar; **Filters & sort** contains rating, media-type and sort choices. Thumbnail size is just above the grid on the right. Search tips and the old Search and library tools section are removed. Image / Live image / Video labels stay visible; match reasons remain available on hover and in File Details.
+- **Edits:** use the left navigation to create or resume a video project. Select media in Library to reveal **Create video from selection…**; photo/video projects still share one continuous editor.
+- **Sync:** startup and workspace switching restore saved index contents without scanning source folders. Click **Sync** in Library or **Sync now** in Folders to discover filesystem changes. Adding a folder explicitly imports it. Automatic sync timers and watcher-driven updates are disabled, including old saved Auto-sync settings. An empty saved index needs a manual Sync. Offline/failed folders retain known media during a partial refresh; no original is changed.
+- **Folders / Collections:** use **List / Tiles**. Each section remembers its view per workspace. **Find Exact Duplicates** and **Find Similar Photos** are under Folders → Library cleanup; review never deletes media. Existing manual AI/text indexing tools are under Settings → Local content indexes.
+- **Search:** after about 400ms without typing, the full query runs, including local semantic matches when AI is enabled. Enter/Search starts immediately. Previous results stay visible with an updating state until the new query finishes; changing workspace or AI state discards incompatible evidence. **Clear search** restores browsing. Provider failures leave metadata matches available.
+
+Automatic AI indexing, durable indexing counters/folder exclusions, viewer zoom/fullscreen improvements, the private vault and signed Preview updates remain planned in [the feedback roadmap](docs/AI_VIEWER_VAULT_ROADMAP.md). This release still uses the existing installer/update policy.

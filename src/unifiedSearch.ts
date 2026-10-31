@@ -54,7 +54,7 @@ export function rankSearch(photos:SearchMedia[],root:string,query:SearchQuery,ta
       if(item.kind==="person"&&(query.person?normalize(item.text).includes(query.person):query.terms.some(term=>normalize(item.text).includes(term))))add("person",`Person: ${item.text}`,query.person||containsTerms(item.text,query.terms)?88:60);
       if(item.kind==="ocr"&&query.terms.some(term=>normalize(item.text).includes(term)||item.matched_terms?.includes(term)))add("ocr",`Text: ${item.text.slice(0,160)}`,containsTerms([item.text,...item.matched_terms||[]].join(" "),query.terms)?68:50);
     }
-    for(const item of semantic)add(item.kind,item.kind==="video_semantic"?"Video content":"Image content",Math.min(72,Math.max(25,25+(item.score-.2)*100)),item.timestamp_seconds??undefined);
+    for(const item of semantic)add(item.kind,item.kind==="video_semantic"?"Video match":"Visual match",Math.min(72,Math.max(25,25+(item.score-.2)*100)),item.timestamp_seconds??undefined);
     // Keep the strongest evidence for each kind. Duplicate tags/faces cannot inflate relevance.
     const best=new Map<MatchKind,MatchReason>();for(const reason of reasons){const previous=best.get(reason.kind);if(!previous||previous.score<reason.score||previous.score===reason.score&&reason.label.localeCompare(previous.label)<0)best.set(reason.kind,reason);}
     const ordered=[...best.values()].sort((a,b)=>b.score-a.score||a.kind.localeCompare(b.kind)),primary=ordered[0]?.score||0;

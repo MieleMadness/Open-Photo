@@ -1,5 +1,19 @@
 # Open-Photo feedback roadmap
 
+## October 30, 2026 — feedback priorities
+
+**0.56.22 checkpoint:** compact Library, Edits navigation, manual Sync, folder/collection List/Tiles and automatic search are implemented. The following feedback records include still-planned AI dashboard, viewer, vault and signed Preview-channel work; the detailed plan distinguishes them.
+
+Collections: remembered **List / Tiles** views with equivalent collection actions. Preview distribution: add a separate signed Preview update channel for in-app upgrades that preserve local data; plan one final bootstrap installation if required by the current disabled/major-only updater. See R0/R1 in the detailed plan. These remain planned, not deployed.
+
+Browse folders: add a remembered **List / Tiles** view switch with equivalent folder navigation/actions, independent of the Library media view preference.
+
+Latest additions: **Edits** in the left navigation opens the shared video editor dashboard. Library syncing becomes manual through **Sync**; remove Auto sync timers and watcher-triggered updates. Automatic AI indexing remains enabled for eligible media already in the saved library snapshot and changes discovered through explicit import/manual Sync.
+
+Latest refinement: simplify Library by removing the permanent video-editor opener, search tips and the Search and library tools section. Relocate search to the old thumbnail-zoom position and thumbnail zoom to the right immediately above the grid. Duplicate/similar actions and their review move to Folders & Workspaces → Library cleanup. The AI dashboard lists folder indexing status and **Don't index / Index folder** controls; Library browsing/metadata indexing remains intact. Keep contextual multi-media project creation accessible when media is selected.
+
+The detailed [AI, viewer and vault plan](AI_VIEWER_VAULT_ROADMAP.md) takes priority over older conflicting UI suggestions below. It schedules automatic AI indexing and durable failures/counters; search after typing stops and corrected result spacing; Image/Live image/Video labels; wider photo editing controls; padded, window-height-aware previews and wheel zoom; simplified Live image playback; a fullscreen viewer with a hideable library filmstrip; and a PIN-protected encrypted vault entered through three clicks on the app version. See the 0.56.22 checkpoint for the implemented browsing/search subset; remaining groups are pending.
+
 This roadmap organizes the October 2026 hands-on app feedback by implementation owner and by phase. The goal is to improve the current experience without duplicating work already planned in Phase 7.
 
 ## Ownership guide
