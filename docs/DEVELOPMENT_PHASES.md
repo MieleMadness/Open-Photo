@@ -1,13 +1,15 @@
 # Development phases
 
-## 0.56.23 implementation checkpoint
+## 0.56.24 timeline filmstrip checkpoint
+
+Real timeline filmstrips sample four distinct timestamps within each trimmed video interval. Native frame extraction reuses validated bounded cached poster infrastructure; preview failures fall back to the source poster. Larger adaptive filmstrips and installed performance checks remain follow-up work.\n\n## 0.56.23 implementation checkpoint
 
 Automatic AI indexing/counters/failures/folder policy (R2), viewer width/zoom/Live controls (R3), fullscreen library filmstrip (R4), and bounded video semantic indexing/search (F) are implemented locally and tested. Signed Preview selection/publication code (R0) is prepared, but signing/bootstrap and a genuine two-version upgrade remain unverified. This source update is pushed for manual review; no release publication is included. See [handoff](LOCAL_HANDOFF_0_56_23.md). The older 0.56.22 descriptions below are historical checkpoints.
 
 Remaining order: installed short-media AI/viewer acceptance and signed upgrade gate; G large-library work; H maps; remaining I text/audio/transitions; J music. Vault R5/R6 remains separately gated on a security/storage design, and is not implemented. Long-form work remains in 1.x and physical-drive checks before v1.0.
 
 
-Baseline: 0.56.23 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.24 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 ## October 30 feedback — implementation checkpoint
 
