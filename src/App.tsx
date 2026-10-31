@@ -1,4 +1,5 @@
 import {virtualRows} from "./virtualRows";
+import {ThumbnailCache} from "./thumbnailCache";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type UIEvent } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -786,7 +787,7 @@ function formatBytes(n:number){if(n<1024)return n+" B";const u=["KB","MB","GB","
 
 type LibraryPreviewJob={cancelled:boolean;run:()=>Promise<void>};
 const libraryPreviewQueue:LibraryPreviewJob[]=[];
-const libraryPreviewCache=new Map<string,string>();
+const libraryPreviewCache=new ThumbnailCache();
 let libraryPreviewActive=0;
 function pumpLibraryPreviews(){
   while(libraryPreviewActive<3&&libraryPreviewQueue.length){
@@ -814,7 +815,7 @@ function PhotoThumb({root,photo,maxEdge,hoverVideoPath}:{root:string;photo:Photo
         const data=await invoke<string>(command,{root,path:photo.path,maxEdge});
         if(typeof data==="string"&&data){
           libraryPreviewCache.set(key,data);
-          while(libraryPreviewCache.size>80)libraryPreviewCache.delete(libraryPreviewCache.keys().next().value!);
+
           if(active)setSrc(data);
         }
       }catch{if(active)setFailed(true);}
