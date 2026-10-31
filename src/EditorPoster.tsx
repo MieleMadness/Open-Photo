@@ -40,6 +40,17 @@ const frameCache=new Map<string,string>();
 function TimelineFrames({root,path,identity,start,end,fallback,host}:{root?:string;path?:string;identity:string;start:number;end:number;fallback:string;host:React.RefObject<HTMLSpanElement|null>}){
   const [frames,setFrames]=useState<string[]>([]);
   const [visible,setVisible]=useState(false);
+  const [frameCount,setFrameCount]=useState(4);
+  useEffect(()=>{
+    const element=host.current;
+    if(!element)return;
+    const measure=()=>setFrameCount(Math.max(1,Math.min(8,Math.ceil((element.getBoundingClientRect().width||320)/90))));
+    measure();
+    if(typeof ResizeObserver==="undefined")return;
+    const observer=new ResizeObserver(measure);
+    observer.observe(element);
+    return()=>observer.disconnect();
+  },[host]);
   useEffect(()=>{
     if(!host.current)return;
     const element=host.current;
@@ -50,7 +61,7 @@ function TimelineFrames({root,path,identity,start,end,fallback,host}:{root?:stri
   useEffect(()=>{
     let cancelled=false;
     if(!visible||!root||!path||!Number.isFinite(start)||!Number.isFinite(end)||end<=start){setFrames([]);return;}
-    const count=4;
+    const count=frameCount;
     const timestamps=Array.from({length:count},(_,i)=>start+(end-start)*(i+.5)/count);
     setFrames(Array(count).fill(""));
     const fetch=async()=>{
@@ -69,6 +80,6 @@ function TimelineFrames({root,path,identity,start,end,fallback,host}:{root?:stri
       }
     };
     void fetch();return()=>{cancelled=true;};
-  },[visible,root,path,identity,start,end,fallback]);
-  return <span ref={host} className="editor-poster editor-filmstrip" aria-hidden="true"><span className="editor-filmstrip-frames">{[0,1,2,3].map((index)=><img key={index} src={frames[index]||fallback||undefined} alt="" loading="lazy"/>)}</span></span>;
+  },[visible,root,path,identity,start,end,fallback,frameCount]);
+  return <span ref={host} className="editor-poster editor-filmstrip" aria-hidden="true"><span className="editor-filmstrip-frames">{Array.from({length:frameCount},(_,index)=><img key={index} style={{flexBasis:`${100/frameCount}%`,width:`${100/frameCount}%`}} src={frames[index]||fallback||undefined} alt="" loading="lazy"/>)}</span></span>;
 }
