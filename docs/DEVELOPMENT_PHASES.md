@@ -1,6 +1,8 @@
 # Development phases
 
-## 0.56.26 filmstrip scheduling checkpoint
+## 0.56.27 Phase G viewport checkpoint
+
+Library grid virtualization now measures the actual scroll viewport height instead of assuming 700px, while retaining overscan. Further Phase G work remains: thumbnail queueing, list virtualization, large-workspace profiling, and stale-work cancellation.\n\n## 0.56.26 filmstrip scheduling checkpoint
 
 Actual timeline frames now use a shared two-request queue and a short resize/zoom debounce. Obsolete queued jobs are skipped; in-flight native extraction remains bounded and validated.\n\n## 0.56.25 adaptive filmstrip checkpoint
 
@@ -13,7 +15,7 @@ Automatic AI indexing/counters/failures/folder policy (R2), viewer width/zoom/Li
 Remaining order: installed short-media AI/viewer acceptance and signed upgrade gate; G large-library work; H maps; remaining I text/audio/transitions; J music. Vault R5/R6 remains separately gated on a security/storage design, and is not implemented. Long-form work remains in 1.x and physical-drive checks before v1.0.
 
 
-Baseline: 0.56.26 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.27 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 ## October 30 feedback — implementation checkpoint
 
