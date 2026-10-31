@@ -1225,6 +1225,7 @@ pub fn run() {
             read_iphone_media,
             media_stream::video_source,
             video_poster::video_poster,
+            video_poster::video_timeline_frame,
             video_probe::inspect_video,
             video_engine::video_engine_status,
             video_preview::start_video_preview,
