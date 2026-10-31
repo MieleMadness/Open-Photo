@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current source update — 0.56.31
+## Current source update — 0.56.32
+
+0.56.32 fixes the scroll reset race and makes the virtual-row test frame-aware.
 
 0.56.31 coalesces Library virtualization scroll updates to animation frames.
 
