@@ -13,7 +13,7 @@ function pump(){
 }
 
 /** Lazy, bounded posters never start a decoder for every item in the media bin at once. */
-export function EditorPoster({root,path,identity,filmstrip=false,photo=false}:{root?:string;path?:string;identity:string;filmstrip?:boolean;photo?:boolean}){
+export function EditorPoster({root,path,identity,filmstrip=false,photo=false,clipStart=0,clipEnd=0}:{root?:string;path?:string;identity:string;filmstrip?:boolean;photo?:boolean;clipStart?:number;clipEnd?:number}){
   const host=useRef<HTMLSpanElement>(null),[source,setSource]=useState("");
   useEffect(()=>{
     setSource("");if(!root||!path)return;
@@ -31,5 +31,44 @@ export function EditorPoster({root,path,identity,filmstrip=false,photo=false}:{r
     if(observer&&host.current)observer.observe(host.current);else start();
     return()=>{job.cancelled=true;observer?.disconnect();};
   },[root,path,identity,photo]);
+  if(filmstrip&&!photo)return <TimelineFrames root={root} path={path} identity={identity} start={clipStart} end={clipEnd} fallback={source} host={host}/>;
   return <span ref={host} className={filmstrip?"editor-poster editor-filmstrip":"editor-poster"} aria-hidden="true">{source?(filmstrip?<span className="editor-filmstrip-frames">{[0,1,2,3].map(frame=><img key={frame} src={source} alt="" loading="lazy"/>)}</span>:<img src={source} alt="" loading="lazy"/>):photo?<ImageIcon size={24}/>:<Film size={24}/>}</span>;
+}
+
+/** One request lane for visible timeline clips; hidden/unmounted clips don't queue more work. */
+const frameCache=new Map<string,string>();
+function TimelineFrames({root,path,identity,start,end,fallback,host}:{root?:string;path?:string;identity:string;start:number;end:number;fallback:string;host:React.RefObject<HTMLSpanElement|null>}){
+  const [frames,setFrames]=useState<string[]>([]);
+  const [visible,setVisible]=useState(false);
+  useEffect(()=>{
+    if(!host.current)return;
+    const element=host.current;
+    if(typeof IntersectionObserver==="undefined"){setVisible(true);return;}
+    const observer=new IntersectionObserver(entries=>setVisible(entries.some(e=>e.isIntersecting)),{rootMargin:"100px"});
+    observer.observe(element);return()=>observer.disconnect();
+  },[host]);
+  useEffect(()=>{
+    let cancelled=false;
+    if(!visible||!root||!path||!Number.isFinite(start)||!Number.isFinite(end)||end<=start){setFrames([]);return;}
+    const count=4;
+    const timestamps=Array.from({length:count},(_,i)=>start+(end-start)*(i+.5)/count);
+    setFrames(Array(count).fill(""));
+    const fetch=async()=>{
+      const values:string[]=[];
+      for(const timestamp of timestamps){
+        if(cancelled)return;
+        const key=JSON.stringify([root,path,identity,Math.round(timestamp*1000)]);
+        let result=frameCache.get(key);
+        if(!result){
+          try{result=await invoke<string>("video_timeline_frame",{root,path,seconds:timestamp});}
+          catch{result="";}
+          if(result){frameCache.set(key,result);while(frameCache.size>96)frameCache.delete(frameCache.keys().next().value!);}
+        }
+        values.push(result||fallback);
+        if(!cancelled)setFrames([...values]);
+      }
+    };
+    void fetch();return()=>{cancelled=true;};
+  },[visible,root,path,identity,start,end,fallback]);
+  return <span ref={host} className="editor-poster editor-filmstrip" aria-hidden="true"><span className="editor-filmstrip-frames">{[0,1,2,3].map((index)=><img key={index} src={frames[index]||fallback||undefined} alt="" loading="lazy"/>)}</span></span>;
 }
