@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current source update — 0.56.33
+## Current source update — 0.56.34
+
+0.56.34 shares identical in-flight Library preview work between subscribed tiles.
 
 0.56.33 replaces count-only Library thumbnail caching with tested memory-bounded LRU eviction.
 
