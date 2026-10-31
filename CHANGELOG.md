@@ -1,3 +1,10 @@
+# 0.56.29 — Phase G: virtualized Library list view
+
+- List view now renders only rows near the actual scroll viewport (plus overscan) instead of mounting the entire result set.
+- Use stable 64px row geometry and preserve row order, media selection, filtering, and thumbnail controls.
+- Continue using bounded thumbnail requests from 0.56.28; no original-media or project/export changes.
+- Real 10k+ library installed-app profiling and accessibility review remain outstanding.
+
 # 0.56.28 — Phase G: bounded Library thumbnail requests
 
 - Queue normal JPEG/PNG/video Library previews through a shared three-request scheduler instead of starting all visible native jobs together.
