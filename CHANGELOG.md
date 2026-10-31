@@ -1,3 +1,10 @@
+# 0.56.24 — Actual timeline video frame previews
+
+- Video timeline clips now display four frames sampled from their actual trimmed source interval instead of four copies of a poster.
+- Reuse bounded read-only FFmpeg frame extraction with path verification, source-freshness checks, cache keys that include timestamps and source metadata, and one native library decoder lane.
+- Lazy frontend requests stop scheduling after unmount and retain poster fallback for failed/unsupported frames. Photo clips retain their existing still previews.
+- No edits to original media, timeline schemas, or render/export behavior.
+
 # 0.56.23 — Automatic AI, video discovery and expanded viewers
 
 - Start/resume durable local AI indexing when enabled; add per-workspace folder exclusions, source-file counters, searchable/paged failures and retry. Keep folder Sync manual, preserve reviewed names, and pause immediately when AI is switched off.
