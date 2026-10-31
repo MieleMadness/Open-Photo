@@ -1,0 +1,25 @@
+import {cleanup,fireEvent,render,screen} from "@testing-library/react";
+import {afterEach,beforeEach,expect,it,vi} from "vitest";
+import {Images,Settings} from "lucide-react";
+import {AppSidebar} from "./AppSidebar";
+import {saveSetting} from "./userData";
+vi.mock("./userData",()=>({saveSetting:vi.fn((key:string,value:string)=>localStorage.setItem(key,value))}));
+beforeEach(()=>{localStorage.clear();vi.clearAllMocks();});
+afterEach(cleanup);
+it("remembers the menu width while keeping workspace, navigation and appearance accessible",()=>{
+  const onWorkspace=vi.fn(),onCreateWorkspace=vi.fn(),onNavigate=vi.fn(),onTheme=vi.fn();
+  const props={items:[{id:"library",title:"Library",icon:Images},{id:"settings",title:"Settings",icon:Settings}],view:"library",onNavigate,workspaces:[{id:"a",name:"Family",root:"A"},{id:"b",name:"Travel",root:"B"}],workspace:"a",onWorkspace,onCreateWorkspace,theme:"light",onTheme,version:"0.56.12"};
+  const first=render(<AppSidebar {...props}/>);
+  expect(screen.getByRole("button",{name:"Collapse menu"}).getAttribute("aria-expanded")).toBe("true");
+  fireEvent.click(screen.getByRole("button",{name:"Collapse menu"}));
+  expect(screen.getByRole("button",{name:"Expand menu"}).getAttribute("aria-expanded")).toBe("false");
+  expect(saveSetting).toHaveBeenLastCalledWith("openphoto.sidebarCollapsed","true");
+  fireEvent.change(screen.getByRole("combobox",{name:"Active workspace"}),{target:{value:"b"}});expect(onWorkspace).toHaveBeenCalledWith("b");
+  fireEvent.change(screen.getByRole("combobox",{name:"Active workspace"}),{target:{value:"__new__"}});expect(onCreateWorkspace).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole("button",{name:"Settings"}));expect(onNavigate).toHaveBeenCalledWith("settings");
+  fireEvent.click(screen.getByRole("button",{name:"Dark"}));expect(onTheme).toHaveBeenCalledWith("dark");
+  expect(screen.getByRole("button",{name:"Library"}).getAttribute("aria-current")).toBe("page");
+  first.unmount();render(<AppSidebar {...props}/>);
+  expect(screen.getByRole("button",{name:"Expand menu"})).toBeTruthy();
+  fireEvent.click(screen.getByRole("button",{name:"Expand menu"}));expect(saveSetting).toHaveBeenLastCalledWith("openphoto.sidebarCollapsed","false");
+});

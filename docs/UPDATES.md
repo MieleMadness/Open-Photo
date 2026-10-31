@@ -1,0 +1,70 @@
+# Open-Photo signed update channels
+
+## Preview support — 0.56.23 source update
+
+Settings offers **Stable / Preview**. Native code persists the choice and only checks a fixed HTTPS endpoint for that channel. Stable retains newer `N.0.0` releases; Preview accepts strictly newer numeric MAJOR.MINOR.PATCH versions. Neither channel permits downgrade, signature bypass, overlapping downloads or installation during protected work. Switching is blocked while an update is ready/downloading/installing. Unsigned development builds still explain that a signed bootstrap installation is required.
+
+Preview endpoint: `https://github.com/MieleMadness/Open-Photo/releases/download/preview-channel/latest.json`. Versioned signed installers use `preview-vVERSION` releases; replacing the fixed channel manifest is the final publication step, after tests and asset publication. The channel selector does not publish releases or download AI from a remote service.
+
+The manual **Publish signed Preview update** workflow (`preview-release.yml`) accepts an exact version/notes from main or the maintained desktop feature branch. It checks out the dispatch commit, requires configured signing secrets, repeats frontend/native checks, builds with `OPENPHOTO_UPDATE_CHANNEL=preview`, verifies optimized export and installed lifecycle, then publishes signed assets and the channel manifest. Ordinary source pushes do not dispatch it. The Stable workflow remains separate.
+
+Before using it: complete the one-time signing setup below, verify the tested source version and explicitly authorize publication. Install a signed bootstrap built with the trusted public key for existing unsigned/disabled-updater installations. Verify a real signed upgrade between two Preview versions, including preservation of projects, folders, tags, indexes and exclusions, offline behavior, bad signatures, channel isolation and active-work blocking. Local mocked updater tests do not verify this gate. **No signing keys were generated, secrets changed, workflow dispatched or channel published by the 0.56.23 coding pass.**
+
+## Stable channel
+
+Open-Photo uses Tauri's signed updater for deliberately published major releases.
+
+## Release policy
+
+The installed app accepts only a newer `N.0.0` release.
+
+- `1.0.0`, `2.0.0`, `3.0.0`, and later major releases are valid.
+- `0.56.0`, `1.1.0`, `1.0.1`, prereleases, PR builds, and branch builds are not valid stable updater releases.
+- A stable update must be built from `main` by the manual **Publish major stable update** workflow.
+- The rule is enforced twice: the release workflow rejects non-major versions, and the Rust updater comparator rejects any remote release that is not a newer `N.0.0`.
+
+## One-time signing setup
+
+Tauri requires updater signatures and does not allow signature verification to be disabled. Generate the updater key pair on a trusted machine:
+
+```powershell
+npm run tauri signer generate -- -w "$HOME/.tauri/open-photo.key"
+```
+
+Store the private key securely outside the repository. Losing it prevents existing installations from trusting future updates.
+
+Add these GitHub Actions secrets before the first public stable release:
+
+- `OPENPHOTO_UPDATER_PUBLIC_KEY`
+- `TAURI_SIGNING_PRIVATE_KEY`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if the key uses a password
+
+Normal PR and development builds do not receive these values, so the stable updater is disabled in those builds.
+
+## Publishing 1.0.0, 2.0.0, etc.
+
+1. Finish testing the release candidate.
+2. Merge the tested code to `main`.
+3. Set the repository version files to the intended major release, for example `1.0.0`, and let normal CI pass on `main`.
+4. Open GitHub Actions and run **Publish major stable update** from `main`.
+5. Enter the exact version and release notes.
+6. The workflow repeats tests, builds the signed NSIS updater, verifies the installed app, creates `latest.json`, and publishes the GitHub Release.
+7. Existing signed public installs discover the release on startup or when the user chooses **Check for updates**.
+
+Minor and patch GitHub Releases may exist for testing or manual distribution, but they must never be uploaded to the `stable-channel` release. The app also independently rejects any manifest whose version is not `N.0.0`.
+
+## Manifest
+
+Signed public builds check:
+
+`https://github.com/MieleMadness/Open-Photo/releases/download/stable-channel/latest.json`
+
+The `stable-channel` release is a fixed machine-readable channel whose `latest.json` asset is replaced only by the major-release workflow. This keeps ordinary GitHub Releases from changing the updater endpoint. The manifest contains the release version, notes, Windows installer URL, and exact Tauri signature. Signed-version verification requires the signature to match the version announced by the manifest.
+
+## Active-work protection (0.56.2)
+
+Startup checking waits for the installed version and enabled channel, schedules one check per app session/version, and does not consume that check if React cancels the pending timer. Pending replies after unmount close their update resource. Checks, downloads, and installation cannot overlap.
+
+Restart & install uses the same protection boundary as normal window closure. It blocks an active or starting video export and saves all pending project revisions before invoking the native installer. A failed save or blocked export leaves the downloaded update ready to retry. Signature verification and the major-only release policy remain unchanged. Hook tests use mocked updater events; a genuinely signed public release still requires release-channel acceptance.
+
+The native check configures 15-second connection and 30-second stalled-read deadlines. Downloads have no fixed total transfer deadline, allowing the bundled-AI installer to complete on slower links while stalled connections fail. The check itself retains a 15-second total deadline. The native check returns Tauri update-resource metadata; the stock JavaScript SDK still downloads, verifies signatures, installs, and releases resources. The deliberate signed-release workflow now also runs optimized video export acceptance before publication.

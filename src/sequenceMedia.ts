@@ -1,0 +1,10 @@
+import type {VideoInfo} from "./VideoDetails";
+import type {VideoProject} from "./videoProject";
+export type Geometry=Pick<VideoInfo,"width"|"height">&Partial<Pick<VideoInfo,"sample_aspect_ratio"|"rotation_degrees">>;
+export type SequenceAsset=Omit<VideoProject["asset"],"info">&{media:{kind:"video";info:VideoInfo}|{kind:"photo";width:number;height:number}};
+export const videoInfo=(a:SequenceAsset)=>a.media.kind==="video"?a.media.info:null;
+export const assetGeometry=(a:SequenceAsset):Geometry=>a.media.kind==="video"?a.media.info:{width:a.media.width,height:a.media.height};
+export const assetTimeBase=(a:SequenceAsset)=>videoInfo(a)?.time_base||"1/1000000";
+export const assetDuration=(a:SequenceAsset)=>videoInfo(a)?.duration_seconds??3;
+export const hasAudio=(a:SequenceAsset)=>!!videoInfo(a)?.audio.length;
+export const usesFrameClock=(clips:{asset_id:string}[],assets:SequenceAsset[])=>clips.length>1||clips.some(c=>assets.find(a=>a.id===c.asset_id)?.media.kind==="photo");
