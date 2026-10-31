@@ -1,6 +1,8 @@
 # Development phases
 
-## 0.56.24 timeline filmstrip checkpoint
+## 0.56.25 adaptive filmstrip checkpoint
+
+The timeline requests 1–8 representative frames based on clip width, including when zoom changes. Native frame work stays bounded and cached; installed Windows acceptance is still required. The 0.56.24 Rust formatting check is also corrected.\n\n## 0.56.24 timeline filmstrip checkpoint
 
 Real timeline filmstrips sample four distinct timestamps within each trimmed video interval. Native frame extraction reuses validated bounded cached poster infrastructure; preview failures fall back to the source poster. Larger adaptive filmstrips and installed performance checks remain follow-up work.\n\n## 0.56.23 implementation checkpoint
 
@@ -9,7 +11,7 @@ Automatic AI indexing/counters/failures/folder policy (R2), viewer width/zoom/Li
 Remaining order: installed short-media AI/viewer acceptance and signed upgrade gate; G large-library work; H maps; remaining I text/audio/transitions; J music. Vault R5/R6 remains separately gated on a security/storage design, and is not implemented. Long-form work remains in 1.x and physical-drive checks before v1.0.
 
 
-Baseline: 0.56.24 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
+Baseline: 0.56.25 source update (latest release baseline 0.56.22). This supersedes conflicting future direction in the older feedback roadmap. Keep the current working library; do not add a dashboard redesign.
 
 ## October 30 feedback — implementation checkpoint
 
