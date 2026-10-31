@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current source update — 0.56.30
+## Current source update — 0.56.31
+
+0.56.31 coalesces Library virtualization scroll updates to animation frames.
 
 0.56.30 adds shared grid/list viewport-bound calculations and tests for large result sets.
 
