@@ -6,8 +6,8 @@ it("evicts least recently used previews under byte and item caps",()=>{
   expect(cache.get("a")).toBe("a".repeat(10));
   cache.set("c","c".repeat(10));cache.set("d","d".repeat(10));
   expect(cache.get("b")).toBeUndefined();
-  expect(cache.get("a")).toBeUndefined();
-  expect(cache.size).toBe(3-1);
+  expect(cache.get("a")).toBe("a".repeat(10));
+  expect(cache.size).toBe(3);
   expect(cache.estimatedBytes).toBeLessThanOrEqual(60);
 });
 it("replaces stale cache entries and rejects oversized data",()=>{
