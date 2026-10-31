@@ -1,3 +1,9 @@
+# 0.56.31 — Phase G: animation-frame virtual scrolling
+
+- Coalesce rapid Library grid/list scroll events into at most one virtual-row state update per animation frame.
+- Cancel obsolete pending scroll updates to avoid unnecessary React work during fast navigation and unmount.
+- Retain both virtualization modes, thumbnail queueing, source safety and existing media behavior.
+
 # 0.56.30 — Phase G: shared virtual-row regression tests
 
 - Extract grid/list visible-row window calculations into one tested helper.
