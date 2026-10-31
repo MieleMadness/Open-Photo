@@ -1,47 +1,638 @@
+File Details includes a location map below metadata for GPS-tagged JPEG/TIFF photos. Map imagery requires internet; coordinates remain visible offline.
+
+> Development update: **0.56.32** adds automatic local AI indexing with counters/failures/folder exclusions, video-content search with matching times, expanded zoomable previews and a fullscreen library filmstrip. Signed Preview update support is prepared; channel publication and installed upgrade acceptance remain pending.
+
+Turn Local AI on in Settings to index known workspace media automatically; use manual **Sync** to discover new/changed files. The AI dashboard shows progress and failed files, with retries and **Don't index** per folder. Counters count source files (a Live still and motion can count separately). Video sampling can miss brief content; HEIC AI and HDR conversion remain unsupported. See [AI indexing](docs/AUTOMATIC_AI_INDEXING.md).
+
+In File Details, scroll over an image to zoom, drag to pan, or use **+ / − / 0** and **Fit**. **100% preview** refers to the decoded preview, not original resolution. Fullscreen has side navigation and a remembered **Hide filmstrip** control; **Play Live image** uses the shared stage. See [viewer controls](docs/MEDIA_VIEWER.md).
+
+See [update channels](docs/UPDATES.md) for signing/bootstrap requirements and [0.56.23 handoff](docs/LOCAL_HANDOFF_0_56_23.md) for verification and remaining acceptance.
+
+
+
+
+
 # Open-Photo
 
-**An offline-first photo organizer for Windows, built for portable metadata and optional Immich compatibility.**
+**Open-Photo is a privacy-first Windows photo organizer for local photo and video libraries.**
 
-> Early development: this repository is a project foundation, not a functional photo manager yet.
+It is designed to work directly with folders you already own, keep original media read-only, store rebuildable indexes locally, and make optional AI features run on the computer instead of sending photos to a cloud recognition service.
 
-## Project goals
+> **Development status:** Open-Photo is actively developed as a 0.x project. Many library-management features are working today, while People/face grouping, OCR, GPU validation, full RAW support, and Immich synchronization are still unfinished. Do not use Open-Photo as the only copy of important photos or metadata.
 
-- Browse and organize photos on local drives without a cloud account.
-- Preserve originals: scanning must be read-only, and metadata writes must require an explicit preview and confirmation.
-- Prefer portable XMP sidecar metadata for keywords, hierarchical tags, captions, ratings, and compatible face regions.
-- Detect faces locally, allow people to be named and reviewed, and export standardized region metadata where supported.
-- Offer optional Immich synchronization in a later milestone. Importing face names does **not** guarantee that they match an existing Immich person, so this requires version-specific testing.
-- Respect privacy: never send photos, face data, thumbnails, or metadata to remote services without a deliberate opt-in.
+## Interface polish
 
-## Planned stack
+Open-Photo uses one shared visual system across the photo library, settings, local AI, metadata tools, and video editing:
 
-- Tauri 2 desktop shell with React + TypeScript frontend
-- Rust for filesystem access and background indexing
-- SQLite for rebuildable indexes and task history
-- ExifTool for metadata reading/writing after evaluating deployment and licensing
-- Local face detection/recognition as an opt-in later phase
+- Consistent control heights, spacing, corner radii, focus states, and typography hierarchy.
+- Primary actions use the filled accent treatment; secondary actions use the same neutral bordered treatment throughout the app.
+- Cards, grids, list rows, tags, editor panels, and export surfaces share the same spacing and elevation rules.
+- Hover and selected states are intentionally subtle so large photo/video libraries remain easy to scan.
+- Drawers and floating panels use short transitions; users who enable **Reduce motion** in Windows receive explicit reduced-motion behavior.
+- Keyboard focus uses the same visible accent ring across photo, video, form, and navigation controls.
 
-## Development roadmap
+### Browsing and editing
 
-| Milestone | Scope |
-| --- | --- |
-| 0.1.0 | Bootstrap desktop application, automated Windows build and demo UI |
-| 0.2.0 | Local folder selection, safe scanning, photo grid, EXIF inspection |
-| 0.3.0 | Portable XMP tags and descriptions, write previews, atomic file updates |
-| 0.4.0 | Local face detection and people review, XMP region export |
-| 0.5.0 | Immich compatibility test suite and optional connector |
+- The **Media library** opens with thumbnails. Use **Search library** for ranked discovery. Expand **Search and library tools** for duplicate review, organization filters and local indexing controls.
+- Select videos and choose **Create video from selection…** to place them in one ordered project. **Open video editor…** reopens saved projects. Projects accept videos across the current workspace’s folders and can preview/export the assembled sequence as one continuous MP4. **Previous saves and recovery** creates a new copy from a retained revision, keeping the current project. Photo clips will use this same timeline in the later mixed-media milestone.
+- Select media to reveal tagging actions. Folder management remains under **Folders**; **By date** browses capture months.
+- **Full-screen viewer** gives media the available window. When viewing a video, choose **Open video editor** to resume a workspace-owned project in the shared timeline. Trim, transform, audio, brightness/contrast, crop, canvas, and one-clip preview/export remain available there.
+- Workspace, collection, rule, and person naming use labeled forms with cancellation and validation. Invalid video numeric input remains visible and must be corrected before export.
+- Dialogs contain keyboard focus and restore it on close. Export/save notices occupy their own area instead of covering the working surface.
+- See [DESIGN.md](DESIGN.md) for the shared visual and interaction contract and [design verification](docs/DESIGN_AUDIT_FIXES.md) for coverage and limits.
 
-## Security and file safety
+## What works today
 
-1. The application must never directly edit an Immich database or its managed storage.
-2. No silent deletion or file mutation. Deletion must be off by default and use a deliberate confirmation flow.
-3. Sidecar changes need a recoverable backup or atomic write with verification.
-4. Scan untrusted files defensively; prevent path traversal and symbolic-link escapes.
-5. Exclude API keys, private photos, databases, embeddings, and thumbnail caches from version control.
-6. Test against synthetic or licensed images. Do not commit real family photos.
+| Area | Status | Notes |
+| --- | --- | --- |
+| Windows desktop app | ✅ Working | Tauri 2 + React/TypeScript + Rust |
+| Local folder scanning | ✅ Working | Recursive, read-only source scan with path validation |
+| Multiple workspace folders | ✅ Working | One workspace can include multiple local roots |
+| Persistent media index | ✅ Working | SQLite index under local app data |
+| Incremental folder updates | ✅ Working | Native watcher plus safe full-scan fallback |
+| Manual and periodic sync | ✅ Working | Manual Sync Now and optional 2-minute auto-sync |
+| Grid/list library views | ✅ Working | Unified ranked search, media filters, sorting, thumbnail-size control |
+| Local thumbnail cache | ✅ Working | Bounded disk cache; originals are not changed |
+| Ratings and favorites | ✅ Working | 1–5 stars stored as local Open-Photo state; 5 stars acts as Favorite |
+| Virtual collections | ✅ Working | Workspace-scoped collections without moving files |
+| Smart collections | ✅ Working | Rating, size, media type, recent media, memories, unrated and similar presets |
+| Timeline | ✅ Working | Prefers EXIF still-image and QuickTime MOV/MP4/M4V capture dates, falls back to filesystem modified time, and month entries filter the Library |
+| Memories | ✅ Working | Dedicated On This Day view groups past-year matches by year and links into date-based Library filters |
+| GPS map | ✅ Working with privacy note | Reads EXIF GPS locally; map tiles are loaded from OpenStreetMap |
+| Full-screen viewer | ✅ Working | Keyboard navigation and larger local preview |
+| XMP keyword sidecars | ✅ Working, guarded | Creates/merges Open-Photo-managed keywords, reads them back into a hierarchical Tags browser, and leaves foreign XMP untouched |
+| Exact duplicate detection | ✅ Working | SHA-256 based review across workspace roots |
+| Visual near-duplicate review | ✅ Working | Local CPU dHash grouping; review only, no automatic deletion |
+| Preferred duplicate copy | ✅ Working | User choice is stored locally and does not move/delete files |
+| iPhone HEIC/HEIF previews | ✅ Partial | Decoded locally; embedded EXIF capture dates are now indexed when present |
+| Live Photo pairing | ✅ Improved | Prefers Apple's shared content identifier; falls back to same-folder + filename stem when metadata is missing |
+| Local ONNX inference | ✅ Working foundation | CPU-first ONNX Runtime integration |
+| Bundled local AI | ✅ Included | Seven pinned assets installed with the app; one on/off switch; CPU inference contracts verified |
+| Persistent semantic image embeddings | ✅ Working | Stored locally in SQLite and model/pipeline-versioned |
+| Incremental AI indexing | ✅ Working foundation | Selected or full-library indexing; already-current embeddings are skipped |
+| AI photo-to-photo similarity | ✅ Working | Cosine similarity over locally stored embeddings |
+| Natural-language semantic search | 🧪 Experimental | Included in the unified Library search with the exact supported OpenCLIP bundle; AI accuracy and installed hardware acceptance remain experimental |
+| Face recognition / People | 🧪 Experimental | YuNet detection + SFace embeddings + local suggested groups; manual naming is local-only |
+| OCR | 🧪 Experimental | English-first PP-OCR detector + recognizer, local text index and photo-text search |
+| GPU acceleration | 🧪 Windows foundation | Automatic mode prefers DirectML when available and safely falls back to CPU |
+| RAW support | 🧪 Partial | NEF/ARW embedded JPEG previews work; DNG/CR2/NEF/ARW plus CR3/RAF/IIQ can be indexed for metadata; full sensor-data development is not implemented |
+| Immich synchronization | 🚧 Not implemented | Architecture planning only; no API bridge is active |
+| Non-destructive photo editing/export | 🧪 Experimental | Live preview, crop, resize, rotate, flip, brightness and contrast; always saves a new copy |
+| Original photo deletion | 🚫 Not implemented | Open-Photo does not delete original media |
 
-See [architecture](docs/ARCHITECTURE.md), [first milestone](docs/MILESTONES.md), and [contributing](CONTRIBUTING.md).
+See [CHANGELOG.md](CHANGELOG.md) for the version history.
 
-## License
+## Core safety model
 
-The project is currently **private and not yet licensed for public reuse**. A public open-source license will be chosen before any public release. Keeping the repository private does not prevent development.
+Open-Photo treats your source media as protected content.
+
+- Original photos and videos are scanned and previewed read-only.
+- File paths are canonicalized before media commands are allowed to read them.
+- Commands reject media outside the selected library root.
+- Symlink escapes are not followed during normal scanning.
+- Deletion and original-media editing are not implemented.
+- XMP keyword writing is explicit and creates a **new missing sidecar only**. Existing XMP sidecars are not overwritten.
+- AI models, indexes, embeddings, ratings and other application state live outside the original photo folders unless you explicitly create an XMP sidecar.
+- A truncated or inaccessible scan is handled conservatively so an unavailable drive is not treated as a reason to purge source media.
+
+## Getting started as a tester
+
+Open-Photo does not yet have a formal public release channel. Windows installers are produced by the **Windows Desktop Build** GitHub Actions workflow after formatting, frontend build, Rust lint, regression tests and the Tauri installer build all pass.
+
+For a test build:
+
+1. Open the latest **green** Windows Desktop Build workflow.
+2. Download the generated Windows artifact.
+3. Extract the artifact and run the NSIS installer.
+4. Treat 0.x builds as development software and keep normal backups of your photo library.
+
+A red workflow means that development version should **not** be treated as the current verified build.
+
+## Basic library workflow
+
+### 1. Create or open a workspace
+
+Use **Open Folder** or **Add folder** from the Library view.
+
+A workspace can contain more than one local folder. Open-Photo records the folder references; it does not import or relocate the files.
+
+### 2. Sync the library
+
+Use **Sync Now** to refresh the local SQLite index.
+
+You can also enable **Auto-sync every 2 minutes**. Open-Photo additionally listens for native filesystem events and applies bounded incremental updates when possible. If an event cannot be handled safely, it falls back to a normal indexed scan.
+
+The sync summary reports added, updated, unchanged and removed index entries. Removing an item from the index is not the same as deleting a source file.
+
+### Capture dates
+
+Open-Photo reads embedded capture time during library scans. JPEG/TIFF-family still images use the existing EXIF path. HEIC/HEIF/AVIF and additional RAW containers (CR3, RAF and IIQ) use a pure-Rust metadata fallback that can read EXIF without decoding image pixels. The preferred order is original capture time, then creation/digitized time, then modified metadata time.
+
+Most EXIF camera timestamps do not include a reliable timezone, so Open-Photo stores the value as a local camera date/time rather than inventing an offset. Timeline, newest/oldest sorting, Last 30 Days, On This Day, and This Month prefer this capture date and fall back to file modified time.
+
+QuickTime MOV/MP4/M4V files now read the movie-header creation timestamp from the local file. QuickTime timestamps use the UTC-based 1904 epoch, so Open-Photo stores them with a UTC `Z` suffix while EXIF camera dates remain timezone-less local camera time. The media details panel explicitly identifies which source is being used for the displayed date.
+
+### 3. Browse and filter
+
+The Library view supports:
+
+- Grid and list views
+- Ranked Library search across names, paths, managed XMP tags and ratings, with optional indexed OCR/People/image-content evidence
+- Photo / video filtering
+- Newest, oldest, name, largest and smallest sorting
+- Adjustable thumbnail size
+- Folder filters
+- Favorites and rated-photo filters
+- Smart collection filters
+
+Select a photo to open the details viewer. Use the full-screen control for a larger preview.
+
+The details panel shows the date Open-Photo is actually using and labels its source as **EXIF metadata**, **QuickTime metadata**, or **File modified fallback**. When embedded capture metadata exists, both the embedded capture value and the filesystem modified value are shown so the fallback behavior is visible rather than hidden.
+
+Timeline month entries now open the Library filtered to that exact capture month. The active month is shown above the Library with a **Show all months** control. Timeline month filtering is intentionally cleared when a smart collection, custom smart rule, or virtual collection takes over, so hidden filters do not stack unexpectedly.
+
+### Memories
+
+Memories is a dedicated **On This Day** view in the main navigation. It groups matching photos and videos by past year, shows how many years ago each group was captured, and lets you open individual items directly. Use **Open all On This Day** to review every matching item in the Library, or **This month in past years** for a broader date-based view.
+
+Each year group also includes **Browse all media from YEAR**. That opens the Library filtered to the selected capture year. The Library shows a visible **Memory year** chip with a **Show all years** control, and the year filter is cleared when Timeline, smart collections, or virtual collections take over so hidden filters do not stack.
+
+Memories also includes an **All years** browser built from the current workspace index. Every capture year is listed with its media count, so you can jump into any year even when there is no On This Day match.
+
+Each year also shows capture-date coverage: how many items use **EXIF metadata**, **QuickTime metadata**, or the **file modified fallback**. This makes it easier to spot years where organization depends heavily on filesystem dates rather than embedded capture metadata.
+
+Memories uses the same capture-date rules as Timeline: EXIF for supported still images, QuickTime metadata for MOV/MP4/M4V, and filesystem modified time only as a fallback.
+
+### 4. Ratings and favorites
+
+Open a photo and choose 1–5 stars.
+
+Ratings are Open-Photo application state and currently do **not** write into the original file or an XMP sidecar. A 5-star rating is treated as a Favorite by the current Favorites filter.
+
+### 5. Virtual collections
+
+Virtual collections group existing file paths without moving or copying source media.
+
+Collections are workspace-scoped. Workspace/collection metadata can be exported with **Export Workspace JSON** from Settings.
+
+### 6. Smart collections
+
+Open-Photo includes dynamic filters such as:
+
+- Last 30 days
+- On This Day
+- This month in previous years
+- Large media
+- Unrated media
+
+You can also create workspace-scoped smart rules based on rating, media type and minimum file size.
+
+Date-based smart filters now prefer embedded EXIF capture dates for supported still images and QuickTime movie-header capture dates for MOV/MP4/M4V, then fall back to filesystem modification time when capture metadata is unavailable.
+
+## Edit & Export
+
+The first Phase 4 editor is intentionally non-destructive.
+
+Open a supported photo and use **Edit & Export** to preview and apply:
+
+- 90° rotation
+- Horizontal flip
+- Vertical flip
+- Brightness from -100 to +100
+- Contrast from -100 to +100
+- Independent crop from the left, right, top and bottom
+- Centered crop presets for Original / Free, 1:1, 4:3 and 16:9
+- Resize by width, height, or exact width + height
+- Grayscale
+- Hue rotation from -180° to +180°
+- Blur from 0.0 to 10.0
+- Sharpen from 0.0 to 10.0 with threshold 0–100
+
+Use **Show original / Show edits** in the preview to compare the current edit against the source without changing the file.
+
+Choose **Save edited copy** and select a new destination filename.
+
+Safety behavior:
+
+- The source photo is opened read-only.
+- The export command rejects a destination that resolves to the original source.
+- Existing destination files are never overwritten; choose a new filename instead.
+- If encoding or final disk sync fails, the partial output is removed.
+- The live preview is generated by the same Rust edit pipeline used for export, so preview and export use the same edit order.
+- Crop controls allow 0–45% per edge and always keep at least 10% of the image.
+- Crop presets use the decoded source dimensions and current 90° rotation to calculate a centered crop; applying Original / Free clears all crop edges.
+- Resize dimensions must be whole numbers from 1–20,000 pixels per side. Invalid, fractional, zero or out-of-range values are rejected before preview/export. Supplying only one dimension preserves aspect ratio.
+- Edited output is capped at **100 megapixels** before resize allocation to reduce accidental memory exhaustion.
+- The editor shows the calculated final width, height and megapixel count before export.
+- Live preview uses the same crop/rotation/resize geometry and adjustment order at a bounded preview resolution, so large export targets do not require equally large preview allocations.
+- Hue rotation is limited to -180° through +180°.
+- Blur and sharpen strengths are limited to 0.0–10.0. Sharpen threshold is limited to 0–100.
+- JPEG exports support an explicit quality setting from 40–100; the default is 92.
+- JPEG quality is ignored for PNG, WebP, BMP and TIFF exports.
+- Edited copies preserve the source file's modified timestamp by default. Turn **Preserve source modified date** off to use the export time instead.
+- Timestamp preservation applies only to the new copy and never changes the source file.
+- Photo export is currently limited to JPG/JPEG, PNG, WebP, BMP and TIFF. Video projects have a separate MP4 export workflow.
+- The editor currently supports JPG/JPEG, PNG, WebP, TIFF, BMP and AVIF sources. Animated GIF editing is intentionally disabled so Open-Photo does not silently flatten an animation to a single frame.
+- HEIC/HEIF and RAW editing remain excluded until dedicated decode/export handling is validated. Video editing uses the separate saved-project workflow. NEF/ARW can now show their camera-embedded JPEG preview in the viewer, but editing still does not operate on RAW sensor data.
+- Metadata preservation is not yet guaranteed for edited exports; treat an edited copy as a newly rendered image.
+
+## XMP keyword sidecars
+
+Open-Photo can create keyword sidecars for selected media.
+
+1. Select one or more files.
+2. Enter comma-separated tags in the selection toolbar.
+3. Choose **Add tags to new sidecars**.
+
+Important behavior:
+
+- Maximum batch: 1,000 selected files.
+- Maximum tags per operation: 50.
+- Maximum tag length: 128 characters.
+- The sidecar is stored next to the source using the source filename plus .xmp.
+- New sidecars created by Open-Photo are marked with `xmp:CreatorTool="Open-Photo"`.
+- Open-Photo can merge additional keywords into sidecars carrying that ownership marker.
+- Existing keywords are preserved and duplicate keywords are matched case-insensitively.
+- Foreign or unknown XMP sidecars are skipped and never overwritten.
+- Managed sidecar replacement uses a temporary file and rollback backup rather than truncating the existing file in place.
+- The original photo/video is never edited.
+- Hierarchical tag browsing is supported using `/` as the level separator, for example `People/Family/Marc` or `Places/Florida/Tampa`.
+- The Tags view reads only Open-Photo-managed sidecars and builds branch counts from actual tagged media.
+- Selecting a tag branch filters the Library to that branch and all descendants.
+- Captions, ratings, face regions and full sidecar undo/history are still incomplete.
+
+## Duplicate tools
+
+Open-Photo has two different duplicate systems.
+
+### Exact duplicates
+
+**Find Exact Duplicates** compares local media using SHA-256-backed indexed duplicate detection. It can inspect media across workspace roots.
+
+### Visually similar photos
+
+**Find Similar Photos** uses a local CPU dHash comparison to group likely near-duplicates.
+
+Both tools are review-only:
+
+- Preview each candidate.
+- Optionally mark a preferred copy.
+- Open-Photo does not automatically delete, move or replace anything.
+- The preferred-copy choice is local application state, not embedded metadata.
+
+The newer AI semantic similarity feature is separate from dHash and requires AI embeddings.
+
+## Map and location privacy
+
+The Map view reads GPS metadata from supported photos and displays those points on a Leaflet map.
+
+**Privacy note:** photo files and EXIF data are processed locally, but opening the Map view or File Details for a GPS-tagged photo requests map tiles from **OpenStreetMap** at https://tile.openstreetmap.org. The requested tile coordinates necessarily correspond to the visible map area. If you require a fully offline workflow, disconnect from the internet before viewing maps; coordinates remain available but map imagery may be unavailable until offline tiles are supported.
+
+## iPhone media notes
+
+Open-Photo has partial iPhone compatibility.
+
+### HEIC / HEIF
+
+HEIC/HEIF images can be read from the selected library and decoded locally for preview. Embedded EXIF capture dates are also indexed when present, so iPhone still images can participate in Timeline and Memories without relying only on filesystem modified time.
+
+### Live Photos
+
+Open-Photo now prefers Apple's shared Live Photo content identifier when pairing a still image with its motion clip. The still identifier is read from Apple MakerNote tag 0x0011, while the MOV/MP4/M4V identifier is read from QuickTime metadata key `com.apple.quicktime.content.identifier`.
+
+Some exports and third-party tools strip one side of this metadata. For unmatched files, Open-Photo conservatively falls back to the older rule: same folder, same filename stem, and exactly one still + one MOV candidate.
+
+The Library reports how many pairs were matched by Apple asset ID versus filename fallback. Pairing is presentation-only; the original image and movie remain separate read-only files.
+
+### Motion video
+
+MOV/MP4/M4V motion can be previewed inline when the Windows/WebView2 codec stack supports it. A fallback action opens the video in the default Windows media player.
+
+For Timeline and date sorting, Open-Photo now reads the QuickTime movie-header creation timestamp without decoding the video or loading the entire file into memory. Corrupt or unsupported containers safely fall back to filesystem modified time.
+
+Special limitations:
+
+- Inline iPhone media reads are bounded; very large motion clips may need the external player.
+- HEVC playback depends on Windows/WebView2 codec availability.
+- HDR/color behavior has not been exhaustively validated.
+- RAW + Live Photo combinations are not a finished workflow.
+
+## Local AI
+
+The Windows installer includes the verified image/text search, People, and English OCR models. Open Settings and turn **Local AI** on; no model download or import is required. New installations start with AI off. Models and media stay local.
+
+Choose an indexing action when ready. Turning AI off stops subsequent batches and retains existing indexes and person names; a batch in progress may finish. Diagnostics and the optional CPU setting are under the collapsed AI diagnostics section. See [bundled AI assets and validation](docs/AI_MODEL_BUNDLE.md).
+
+The model contracts below document the assets shipped by the installer. AI results remain experimental until accuracy and GPU behavior have been evaluated on representative libraries.
+
+### Unified search — 0.56.11
+
+Use **Search library** for one ranked result list. Filenames, paths and managed XMP tags filter live. With **Local AI** on, existing OCR text and named People are also searched; press **Search** or **Enter** to add image-content results. Indexing remains a separate explicit action under **Search and library tools**. Results show their strongest reason; File Details shows all reasons. Partial provider failures retain metadata matches and explain unavailable sources.
+
+Examples: `is:favorite`, `rating:>=4`, `type:video`, `tag:family`, `person:"Alex Lee"`, or `path:"C:\Media\Holiday"`. Existing media/folder/collection filters still apply. Relevance is selected when starting a query; clearing it restores the browsing sort. Model inference and all indexes remain local. Video-content sampling and matching timestamps are Phase F, not implemented by this update. See [unified search architecture and limits](docs/UNIFIED_SEARCH.md).
+
+### Supported OCR model bundle
+
+The first OCR milestone is intentionally **English-first** and uses RapidOCR/PaddleOCR-compatible mobile ONNX models:
+
+| Open-Photo slot | Upstream model | Required SHA-256 |
+| --- | --- | --- |
+| ocr | en_PP-OCRv3_det_mobile.onnx | ea07c15d38ac40cd69da3c493444ec75b44ff23840553ff8ba102c1219ed39c2 |
+| ocr_recognizer | en_PP-OCRv4_rec_mobile.onnx | e8770c967605983d1570cdf5352041dfb68fa0c21664f49f47b155abd3e0e318 |
+
+The installer includes both pinned assets. Open-Photo validates their identities before inference.
+
+Current OCR behavior:
+- Runs locally on CPU or DirectML using the existing AI processing preference.
+- Detects text regions from a PP-OCR probability map.
+- Uses conservative rectangular connected components for the first implementation rather than permanently storing unverified polygons.
+- Recognizes text with a fixed 48×320 English PP-OCR input pipeline and CTC decoding.
+- Stores extracted text and region metadata in `ai-ocr.sqlite` under local app data.
+- Skips already-current photos when the source timestamp and model pair are unchanged.
+- Lets Library users index the current workspace for OCR and search indexed photo text locally.
+- Never writes OCR text into original photos or XMP automatically.
+
+This first OCR pass is experimental. Curved text, rotated text, dense documents, handwriting and non-English languages need later model/post-processing work.
+
+### Supported People model bundle
+
+People indexing uses two pinned OpenCV Zoo models:
+
+| Open-Photo slot | Upstream file | Required SHA-256 | License |
+| --- | --- | --- | --- |
+| faces | face_detection_yunet_2026may.onnx | ebafce4e3c118d6554634be5c27ab333b4c047a9a8c3faf1d7cf93101c22f0f0 | MIT |
+| face_embedder | face_recognition_sface_2021dec.onnx | 0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79 | Apache-2.0 |
+
+The installer includes these exact assets and their licenses. Turn on Local AI in Settings; no separate downloads or imports are needed.
+
+The current pipeline:
+- resizes and pads photos locally for YuNet detection;
+- decodes bounding boxes and five facial landmarks locally;
+- aligns faces to the standard 112×112 ArcFace five-landmark template;
+- generates normalized 128-value SFace embeddings;
+- stores boxes, embeddings and model provenance in `ai-faces.sqlite` under local app data;
+- skips photos that are already current for the same source modification time and model pair;
+- creates local suggested People groups by embedding similarity;
+- lets the user apply local display names to suggested groups.
+
+Suggested groups are intentionally advisory. Open-Photo does not write face regions or names into original media or XMP yet, and it does not automatically merge identities permanently.
+
+### Supported semantic model bundle
+
+The current semantic pipeline is explicitly built around:
+
+**OpenCLIP ViT-B/32 — LAION-2B, split ONNX export**  
+Source: https://huggingface.co/amikos/openclip-vit-b-32-laion2b-s34b-b79k-onnx
+
+The installer includes these exact files:
+
+| Open-Photo slot | Upstream file | Required SHA-256 |
+| --- | --- | --- |
+| semantic | vision_model.onnx | 7e14f76233d0c840c0621b1ef68f5877efe9357850782b1bbaf0c01693f73b43 |
+| semantic_text | text_model.onnx | 252b86e0ef1fc95b22cfd52fbf647142727fdbecc152556ffe0fba0b10a80370 |
+| semantic_tokenizer | tokenizer.json | b556ac8c99757ffb677208af34bc8c6721572114111a6e0aaf5fa69ff0b8d842 |
+
+The upstream bundle is roughly 600 MB combined. The installer retains its model card, license, and attribution notices. Semantic search should be considered experimental until it has been tested against representative real-world photo libraries.
+
+### Enabling the semantic bundle
+
+All three semantic assets are installed with Open-Photo. Turn on Local AI in Settings, then choose an indexing or search action. If verification reports missing or incompatible files, repair/reinstall the application. Manual import APIs remain available for legacy developer tooling, but are not part of the standard setup UI.
+
+### Index photos with AI
+
+For one photo:
+
+1. Open the photo details panel.
+2. Choose **Index this photo**.
+
+For multiple photos:
+
+1. Select files in the Library.
+2. Choose **Index selected with AI**.
+
+For the current workspace:
+
+1. Choose **Index library with AI**.
+2. Open-Photo groups photos by workspace root and indexes each root locally.
+3. Files whose modification time, model/preprocessing key and 512-value embedding are already current are skipped instead of recomputed.
+
+The backend accepts up to 5,000 photos per batch, and the Library UI chunks larger root groups automatically. One ONNX vision session is reused for each batch rather than reloading the model for every image. The heavy batch command runs off the main UI thread.
+
+The image model creates a normalized 512-value embedding for each supported image. Embeddings are stored locally and are tied to the supported model/preprocessing pipeline so incompatible or older embeddings can be detected as stale.
+
+Current AI-decodable library indexing is limited to JPG/JPEG, PNG, WebP, GIF, TIFF, BMP and AVIF. HEIC/HEIF, RAW formats and video can still exist in the library, but the semantic image pipeline does not currently index them.
+
+Multi-folder workspace semantic text search now queries each workspace root and merges the best local matches. This still needs representative end-to-end runtime testing with the verified model bundle.
+
+### Find AI-similar photos
+
+After photos have current embeddings:
+
+1. Open an indexed photo.
+2. Choose **Find AI-similar photos**.
+3. Open-Photo compares local 512-value embeddings with cosine similarity.
+4. Results are ranked locally.
+
+This is different from the non-AI dHash similar-photo tool.
+
+### Natural-language semantic search
+
+The 0.25.x development line introduced the text-query path, with 0.26.x adding incremental library-scale indexing and multi-root search orchestration. Example queries include:
+
+- dog at the beach
+- sunset over water
+- birthday cake
+- people hiking in the woods
+
+The text encoder and image encoder are validated as one compatible OpenCLIP bundle and produce aligned 512-value embeddings.
+
+**Status:** experimental. The code path still requires a green build and end-to-end testing with the verified bundle before it should be considered a finished user feature.
+
+If the image preprocessing/model contract changes, re-index the affected photos rather than mixing old and new embeddings.
+
+## Local data locations
+
+Open-Photo stores its durable preferences, folder references, ratings, collections, AI indexes, reviewed names, and video drafts in six SQLite databases under `%LOCALAPPDATA%/Open-Photo`. Browser storage is a working cache hydrated from durable preferences before the app opens; clearing browser storage alone does not reset the durable database.
+
+Installed AI assets and notices live under `bundled-ai` in the installation directory. Legacy manually imported copies may remain under the private `ai-models` data folder. Preview caches are app-private and pruned. Original media and exported copies remain in the user-selected locations.
+
+Uninstall retains app data by default. The new uninstaller's **Delete the application data** checkbox also clears the known Open-Photo databases/caches, including local saved edits and organization. Updates always retain data. To hide a source folder without clearing metadata or deleting files, use **Remove from library**. See [application-data behavior and lifecycle acceptance](docs/APPLICATION_DATA.md).
+
+## Supported media
+
+The scanner currently recognizes common desktop, iPhone, RAW and video extensions including:
+
+**Images:** JPG/JPEG, PNG, WebP, GIF, TIFF, BMP, HEIC/HEIF, AVIF, DNG, CR2, NEF, ARW  
+**Video:** MOV, MP4, M4V, AVI, MKV, WebM
+
+Recognition by the scanner does not guarantee that every format can be decoded for thumbnails, AI indexing or inline playback. RAW preview support is especially incomplete.
+
+## Library health check
+
+Settings includes a read-only **Library health check**.
+
+It reports indexed, available, missing, inaccessible and modified items without deleting files or index records.
+
+If the selected root itself is offline/unavailable, the command can return an unavailable-root error rather than treating the entire library as deleted. This is intentional safety behavior.
+
+## Features still in development
+
+The following should not be described as finished:
+
+- Face detection and recognition
+- People grouping, person merge/review and portable face regions
+- OCR and text-in-image search
+- GPU / DirectML / CUDA acceleration
+- Background AI queue with pause/resume/progress and smart incremental scheduling
+- Automatic AI model download/catalog management
+- Full EXIF/QuickTime capture-date timeline
+- Full RAW rendering and RAW-specific color handling
+- Complete hierarchical XMP editing/merging
+- Non-destructive photo editing and export presets
+- Safe deletion/trash workflows
+- Fully offline map tiles
+- Metadata-based Apple Live Photo asset pairing
+- Immich API synchronization and person mapping
+
+## Development setup
+
+Open-Photo is built with Tauri 2, React 19, TypeScript, Rust and SQLite.
+
+Recommended Windows development environment:
+
+- Windows 10/11
+- Node.js 22 (matches CI)
+- Rust stable with rustfmt and Clippy
+- Tauri 2 Windows prerequisites, including the Microsoft C++ build tools and WebView2 runtime
+
+Clone and install:
+
+~~~powershell
+git clone https://github.com/MieleMadness/Open-Photo.git
+cd Open-Photo
+npm install
+npm run tauri dev
+~~~
+
+Useful validation commands:
+
+~~~powershell
+npm run build
+cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path src-tauri/Cargo.toml
+npm run tauri build
+~~~
+
+The Windows CI runs these gates before publishing the installer artifact.
+
+## Version policy
+
+During 0.x development:
+
+- If the previous build is **green**, feature work advances the **minor** version.
+- If the previous build is **red**, the repair advances the **patch** version.
+- A major release is reserved for an explicitly approved main release.
+
+The version must match in package.json, src-tauri/Cargo.toml and src-tauri/tauri.conf.json.
+
+## Privacy and network behavior
+
+Open-Photo does not require an account.
+
+Local library scanning, thumbnails, indexes, ratings, duplicate checks and AI inference are designed to stay on the computer.
+
+Known network-sensitive behavior:
+
+- The Map view loads OpenStreetMap tiles when opened.
+- AI model files are downloaded manually by the user from their chosen source; Open-Photo does not currently fetch them itself.
+- Future Immich integration is not implemented.
+
+## Repository and licensing status
+
+The GitHub repository is currently **private** and GitHub reports **no repository license**. The project is being developed toward an open-source release, but public reuse rights should not be assumed until a license file is deliberately added.
+
+Third-party dependencies and AI model assets retain their own licenses and usage terms.
+
+## Additional documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Historical milestone plan](docs/MILESTONES.md)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+
+The Windows installer includes the linked DirectML and Microsoft C++ runtime files beside the app, avoiding a separate runtime setup step. See [bundled AI packaging](docs/AI_MODEL_BUNDLE.md).
+
+### Video release checks in 0.56.2
+
+Updater installation now waits for project saves and refuses to interrupt an active or starting video export. Phase 6 also has a separate full-recording acceptance mode for one continuous hour-scale export, rather than only distant short windows. See [video acceptance](docs/VIDEO_ACCEPTANCE.md) and [update protection](docs/UPDATES.md). These development changes do not publish a public signed updater release.
+
+Workspace activation now clears the prior library’s scan summary and invalidates its pending scan/AI results. The sidebar reads the actual installed version instead of a hard-coded preview label.
+
+Generated video exports and compatible previews now include regular H.264 keyframes so long recordings can seek without decoding from the beginning. Original source files remain unchanged.
+
+### One timeline for one or many videos — 0.56.8
+
+Open a video's **Edit** action, or select several videos in the Library and choose **Create video from selection…**. Both open the same editor. Add videos from any registered folder in the current workspace with **Add videos…**. Each workspace can keep several named editing projects; each project contains one assembled sequence, not separate edits per video. The workspace dropdown stays at the top left.
+
+Select a timeline clip to trim, rotate, flip, crop, adjust brightness/contrast or change its original audio gain/mute. Split at the playhead, drag to reorder (or use Move earlier/later), delete with the gap closed, or append a source again. Undo/redo and revision-safe autosave retain these edits. Previous saves can be recovered as a new copy. Portable project copies reference originals; missing sources require verified relinking.
+
+**Preview project edits** builds one continuous video in the preview stage. Its playback and timeline playhead are linked. **Show original source** returns to source playback. Changing edits invalidates the compiled preview. **Export project MP4…** creates a new H.264 SDR MP4 with linked original audio; silent/muted intervals remain silent. Multi-track sources require explicit first-track acknowledgement for export. Existing files are never overwritten.
+
+One clip preserves source frame timing. Joined clips use 30 or 60 fps. Choose a source/project, landscape, portrait or square canvas and fit/fill, then an independent Project / up to 1080p / up to 4K resolution preset. Presets keep the project shape and do not enlarge a smaller canvas; enlarging a canvas cannot add source detail. HDR/wide-gamut conversion, photos, overlays, music and transitions are not yet available. See [project instructions](docs/VIDEO_PROJECTS.md) and [rendering architecture](docs/VIDEO_SEQUENCE_RENDERING.md).
+
+Development tests now use short media. Hour-scale stress checks remain available only when explicitly requested; further long-form work is deferred to 1.x. Physical drive-removal and actual disk-full checks remain on the pre-v1.0 release checklist.
+
+### Compact navigation and viewer — 0.56.12
+
+Use **Collapse menu** beside the Open-Photo name to switch to an icon rail; **Expand menu** restores labels. Your choice is saved. Workspace selection stays at the top left in both modes; hover or focus navigation icons for labels. On short windows, scroll the navigation list to reach its remaining sections. Rows keep compact spacing on tall windows.
+
+Green labels above page titles identify each section. File Details uses **Edit** to open the shared video editor, **Fullscreen** to enlarge viewing and **Restore** to return. The full filename stays in the summary below the toolbar. Map sizing adapts when menu width changes.
+
+### Desktop editing layout — 0.56.13
+
+Open the Library video editor or choose **Edit** on a video. Import additional videos into the left media panel, search their filenames, select a source and use **Add clip** to append it. Select a timeline clip to trim, rotate, crop or adjust its linked audio in the right inspector. The timeline stays below the preview while panels scroll independently.
+
+Use the two panel buttons near **Export** to show/hide media and clip controls. On narrower windows they open beside/over the preview; the timeline stays visible. **Project** contains project switching, portable copies, previous saves and recovery. Escape or clicking outside closes that menu.
+
+**Source preview** shows the original. **Preview project edits** builds the continuous edited sequence in the same stage. Editing invalidates an older compiled preview. Extra source-player tools remain under expandable sections. **Export** creates a new MP4 using the canvas/export settings in the inspector; invalid drafts are revealed and must be corrected first.
+
+This patch establishes the layout. Timeline filmstrips/trim handles, photo clips, audio waveforms and later social tools remain follow-up work. See [the editor layout guide](docs/EDITOR_LAYOUT.md).
+
+### Timeline navigation — 0.56.14
+
+Drag the time ruler to seek, or focus it and use the arrow keys. Labels adapt to timeline zoom. Clip thumbnails identify original sources; they are poster images, not frame-by-frame filmstrips. Each clip labels linked, muted or silent original audio. Drag onto the left/right half of another clip to insert before/after it; a marker shows the destination. Unchanged drops do not create undo steps. Move earlier/later and numeric trims remain available in the inspector.
+
+### Timeline trim handles — 0.56.15
+
+Select a timeline clip, then drag its left/right edge to change its source start/end. A temporary outline and time readout show the pending range. Releasing commits the trim and closes the sequence gap; one Undo restores the entire gesture. Escape, pointer cancellation, focus loss or a changed project discards the pending trim.
+
+Focus a handle and use Left/Right for small adjustments, Shift+Left/Right for ten steps, or Home/End for the available limits. Source boundaries and the minimum kept duration are enforced. Numeric trim fields remain available for precise entry, particularly for very narrow clips; zoom in to make handles easier to grab. The original media stays unchanged. Preview remains explicitly source versus rendered project output.
+
+### Resize the editor — 0.56.16
+
+Drag the horizontal divider above the timeline upward for more timeline space, or downward for a larger preview. Your preference is saved and adapts to the available window space. Focus the divider and use Up/Down (Shift for larger changes), Home/End for limits, or double-click to reset. Escape cancels an active drag. Window changes and notices keep the areas within the available space. Resizing changes the layout only; it does not modify project edits or undo history.
+
+### Inspector tasks — 0.56.20
+
+Use **Clip** for the selected timeline clip and **Canvas & export** for project shape, fit, frame rate and export resolution. The top **Canvas** button opens and focuses those settings directly. Left/Right and Home/End navigate the tabs. Selecting a timeline clip returns to Clip controls. Switching tabs or hiding controls preserves unfinished numeric entries. Export reveals the Clip tab and focuses any invalid clip entry before proceeding.
+
+
+### Photos in a continuous video — 0.56.21
+
+JPEG, PNG, BMP and TIFF photos use the same timeline, autosave, history, relinking and safe export as video clips. New photos start at three seconds; select a photo and change **Photo duration (seconds)** or drag its trim handles. Split, reorder, repeat and ripple-delete photos like other clips. Rotate, flip, crop, brightness and contrast apply to stills; photo clips have no original audio controls. **Preview project edits** shows the assembled result. The source stage shows the original photo.
+
+Photo-only and mixed sequences use the project's 30/60 fps clock. Original video audio stays linked to its clip; photo intervals are silent. MP4/H.264 remains the tested output. Transparent pixels render against black and embedded photo orientation is honored. Still clips support 0.04–600 seconds within the existing 50-source/200-clip/two-hour project bounds. Timeline photos are bounded to 250 MB, 50 megapixels and 20,000 pixels per edge. HEIC, GIF, WebP and animated PNG timeline imports are not supported yet; existing Library support is unchanged. Older video projects load through a validated schema migration; portable references and fingerprints remain intact.
+
+Fresh installations now start video playback at normal volume. A deliberately saved zero-volume setting is still honored. Text, music, transitions, real sampled filmstrips and installed Windows acceptance remain future work. Long-form optimization stays deferred to 1.x.
+
+
+### Browsing and search — 0.56.22
+
+- **Library:** search sits in the compact toolbar; **Filters & sort** contains rating, media-type and sort choices. Thumbnail size is just above the grid on the right. Search tips and the old Search and library tools section are removed. Image / Live image / Video labels stay visible; match reasons remain available on hover and in File Details.
+- **Edits:** use the left navigation to create or resume a video project. Select media in Library to reveal **Create video from selection…**; photo/video projects still share one continuous editor.
+- **Sync:** startup and workspace switching restore saved index contents without scanning source folders. Click **Sync** in Library or **Sync now** in Folders to discover filesystem changes. Adding a folder explicitly imports it. Automatic sync timers and watcher-driven updates are disabled, including old saved Auto-sync settings. An empty saved index needs a manual Sync. Offline/failed folders retain known media during a partial refresh; no original is changed.
+- **Folders / Collections:** use **List / Tiles**. Each section remembers its view per workspace. **Find Exact Duplicates** and **Find Similar Photos** are under Folders → Library cleanup; review never deletes media. Existing manual AI/text indexing tools are under Settings → Local content indexes.
+- **Search:** after about 400ms without typing, the full query runs, including local semantic matches when AI is enabled. Enter/Search starts immediately. Previous results stay visible with an updating state until the new query finishes; changing workspace or AI state discards incompatible evidence. **Clear search** restores browsing. Provider failures leave metadata matches available.
+
+Automatic AI indexing, durable indexing counters/folder exclusions, viewer zoom/fullscreen improvements, the private vault and signed Preview updates remain planned in [the feedback roadmap](docs/AI_VIEWER_VAULT_ROADMAP.md). This release still uses the existing installer/update policy.

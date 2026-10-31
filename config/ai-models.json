@@ -1,0 +1,12 @@
+{
+  "bundle": "openphoto-ai-v1",
+  "models": [
+    {"kind":"semantic","name":"semantic.onnx","sha256":"7e14f76233d0c840c0621b1ef68f5877efe9357850782b1bbaf0c01693f73b43","url":"https://huggingface.co/amikos/openclip-vit-b-32-laion2b-s34b-b79k-onnx/resolve/248a2ed76a7189fc080e654e36930171331ef085/vision_model.onnx","license":"MIT"},
+    {"kind":"semantic_text","name":"semantic-text.onnx","sha256":"252b86e0ef1fc95b22cfd52fbf647142727fdbecc152556ffe0fba0b10a80370","url":"https://huggingface.co/amikos/openclip-vit-b-32-laion2b-s34b-b79k-onnx/resolve/248a2ed76a7189fc080e654e36930171331ef085/text_model.onnx","license":"MIT"},
+    {"kind":"semantic_tokenizer","name":"semantic-tokenizer.json","sha256":"b556ac8c99757ffb677208af34bc8c6721572114111a6e0aaf5fa69ff0b8d842","url":"https://huggingface.co/amikos/openclip-vit-b-32-laion2b-s34b-b79k-onnx/resolve/248a2ed76a7189fc080e654e36930171331ef085/tokenizer.json","license":"MIT"},
+    {"kind":"faces","name":"faces-yunet.onnx","sha256":"ebafce4e3c118d6554634be5c27ab333b4c047a9a8c3faf1d7cf93101c22f0f0","url":"https://media.githubusercontent.com/media/opencv/opencv_zoo/48b10fa505aeb51fbd127fc60a5c660040e823b7/models/face_detection_yunet/face_detection_yunet_2026may.onnx","license":"MIT"},
+    {"kind":"face_embedder","name":"faces-sface.onnx","sha256":"0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79","url":"https://media.githubusercontent.com/media/opencv/opencv_zoo/48b10fa505aeb51fbd127fc60a5c660040e823b7/models/face_recognition_sface/face_recognition_sface_2021dec.onnx","license":"Apache-2.0"},
+    {"kind":"ocr","name":"ocr-detector.onnx","sha256":"ea07c15d38ac40cd69da3c493444ec75b44ff23840553ff8ba102c1219ed39c2","url":"https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv4/det/en_PP-OCRv3_det_mobile.onnx","license":"Apache-2.0"},
+    {"kind":"ocr_recognizer","name":"ocr-recognizer.onnx","sha256":"e8770c967605983d1570cdf5352041dfb68fa0c21664f49f47b155abd3e0e318","url":"https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv4/rec/en_PP-OCRv4_rec_mobile.onnx","license":"Apache-2.0"}
+  ]
+}

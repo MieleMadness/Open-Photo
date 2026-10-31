@@ -1,0 +1,1415 @@
+# 0.56.32 — Phase G: scroll reset regression fix
+
+- Cancel pending animation-frame scroll updates when sort, query, filter or layout changes reset the Library viewport.
+- Wait for the scheduled frame in the Library lifecycle regression test rather than asserting against stale rows immediately after a scroll event.
+- Retain smooth grid/list scrolling, virtualization, thumbnail limits and media-source safety.
+
+# 0.56.31 — Phase G: animation-frame virtual scrolling
+
+- Coalesce rapid Library grid/list scroll events into at most one virtual-row state update per animation frame.
+- Cancel obsolete pending scroll updates to avoid unnecessary React work during fast navigation and unmount.
+- Retain both virtualization modes, thumbnail queueing, source safety and existing media behavior.
+
+# 0.56.30 — Phase G: shared virtual-row regression tests
+
+- Extract grid/list visible-row window calculations into one tested helper.
+- Cover 10,000-row data, scrolled-to-bottom boundaries, negative offsets and varying viewport heights.
+- Maintain bounded overscan and avoid mounting all Library items; source media and exports are unchanged.
+
+# 0.56.29 — Phase G: virtualized Library list view
+
+- List view now renders only rows near the actual scroll viewport (plus overscan) instead of mounting the entire result set.
+- Use stable 64px row geometry and preserve row order, media selection, filtering, and thumbnail controls.
+- Continue using bounded thumbnail requests from 0.56.28; no original-media or project/export changes.
+- Real 10k+ library installed-app profiling and accessibility review remain outstanding.
+
+# 0.56.28 — Phase G: bounded Library thumbnail requests
+
+- Queue normal JPEG/PNG/video Library previews through a shared three-request scheduler instead of starting all visible native jobs together.
+- Skip queued previews after their tiles unmount during rapid scrolling, and use an 80-entry cache keyed by source path, file metadata and requested size.
+- Preserve existing HEIC handling, Live Photo hover playback, source read-only protections and search behavior.
+- Further Phase G work remains: virtualized list mode, persistent thumbnail cache tuning, and installed 10k+ media performance checks.
+
+# 0.56.27 — Phase G: viewport-aware Library rows
+
+- Measure actual Library gallery height alongside width using the existing ResizeObserver.
+- Size the rendered virtual row window to the visible gallery viewport rather than an assumed 700px height; retain small overscan for smooth scrolling.
+- Reduce unnecessary thumbnail mounts in compact windows and avoid undersized windows in taller layouts.
+- Preserve filters, selection, saved snapshots, source files and decoder behavior.
+
+# 0.56.26 — Bounded timeline frame scheduling
+
+- Debounce timeline frame requests while the user rapidly resizes the editor or changes timeline zoom.
+- Schedule at most two active frame requests across visible clips; skip queued requests after a clip becomes hidden, changes, or unmounts.
+- Reuse cached timestamp-specific frames, preserve still-poster fallback, and avoid changing source media or edit/export semantics.
+- Add a regression test for cancelling work before the debounce completes.
+
+# 0.56.25 — Adaptive timeline thumbnail density
+
+- Timeline video frame count follows measured clip width as zoom changes, from 1 to 8 sampled frames; compact clips avoid unnecessary decoding.
+- Keep timestamp sampling within each trimmed source interval, cached frames, visibility-based demand, and a still poster fallback.
+- Correct Rust formatting failures found in 0.56.24 CI. No changes to project files, original media, or render/export semantics.
+
+# 0.56.24 — Actual timeline video frame previews
+
+- Video timeline clips now display four frames sampled from their actual trimmed source interval instead of four copies of a poster.
+- Reuse bounded read-only FFmpeg frame extraction with path verification, source-freshness checks, cache keys that include timestamps and source metadata, and one native library decoder lane.
+- Lazy frontend requests stop scheduling after unmount and retain poster fallback for failed/unsupported frames. Photo clips retain their existing still previews.
+- No edits to original media, timeline schemas, or render/export behavior.
+
+# 0.56.23 — Automatic AI, video discovery and expanded viewers
+
+- Start/resume durable local AI indexing when enabled; add per-workspace folder exclusions, source-file counters, searchable/paged failures and retry. Keep folder Sync manual, preserve reviewed names, and pause immediately when AI is switched off.
+- Reuse existing model sessions and inference services with foreground-search priority, source/generation fences, offline-folder handling and bounded preprocessing.
+- Index bounded representative video frames locally with deduplication, resumable private staging and atomic publication. Rank image/video evidence together, retain matching timestamps and project verified Live motion evidence to its still. Add Play near actions.
+- Expand File Details and photo editing width, add taller padded previews and display-only wheel zoom/pan. Simplify Live/video viewing to one player with native controls.
+- Add a fullscreen library filmstrip with remembered visibility, bounded thumbnail rendering and side navigation.
+- Add Stable/Preview selection and a manually dispatched signed Preview publication workflow. Stable stays major-only; signatures, no-downgrade and active-work protections remain. Signing/bootstrap and a real two-version upgrade are still required before claiming Preview distribution works.
+- Add queue, search, viewer, updater and short-video regression coverage. Document local verification and outstanding installed-app acceptance. No installer/release publication is included in this source update.
+
+# 0.56.22 — Content-first browsing and automatic search
+
+- Simplify Library, move search into its toolbar, put thumbnail sizing above the grid on the right, and consolidate filters/sort in a dismissible disclosure.
+- Add Edits navigation; keep multi-media project creation contextual to Library selection.
+- Add independent workspace-persisted List/Tiles views for Browse folders and Collections.
+- Move duplicate/similar review into Folders → Library cleanup and manual AI/text tools into Settings; remove search tips and the old tools disclosure.
+- Replace automatic folder refresh with manual Sync. Restore saved SQLite media snapshots without scanning folders, disable timers/watchers and ignore old enabled Auto-sync preferences.
+- Preserve known media for failed/incomplete roots during a partial refresh; retain source-file safety and stale-work protection.
+- Run complete search after 400ms idle, retain the previous completed view during updates, and keep Image / Live image / Video identity distinct from match evidence.
+- Add regression coverage for manual sync, offline snapshot restore, view persistence, partial failures, automatic semantic queries and stale-result handling. Record the remaining feedback roadmap without implementing its security/indexing/update-channel expansions.
+
+# 0.56.21 — Photos in the shared timeline
+
+- Add typed photo assets to the shared project/editor with JPEG, PNG, BMP and TIFF import, source previews, adjustable duration, split/reorder/undo and shared crop/transform adjustments.
+- Render mixed and photo-only timelines through the same bounded continuous preview/export pipeline, honoring orientation and transparency and preserving linked video audio with silent photo intervals.
+- Migrate older video documents to schema 3 while retaining revision-safe saves, history, verified relinking, portable references and non-destructive output protections.
+- Fix first-run playback starting silently when no volume preference exists; explicitly saved zero remains valid.
+- Add short native rendering, migration, persistence, frontend interaction and stale-preview regressions.
+- Add a compact GPS map and coordinates below file metadata with the existing JPEG/TIFF reader.
+- Handle missing GPS, unsupported formats, read failures/retry, and stale responses when switching files.
+- Disable map wheel zoom in details to preserve panel scrolling.
+
+# 0.56.20 — CI alignment for timeline-only trimming
+
+- Update remaining frontend regression tests that still expected removed numeric/player trim controls.
+- Validate rational trim endpoints through timeline handle state instead of deleted spinboxes.
+- Validate selected-clip trimming through timeline slider/handle interactions and undo/autosave.
+- Keep 0.56.19 global volume, Library hover previews, and accent palettes unchanged.
+- No runtime feature, renderer, export, AI, or source-media behavior changes.
+
+# 0.56.19 — Remembered video volume, hover motion previews, and accent colors
+
+- Remember the last video-player volume globally and restore it when switching videos, reopening details, or using the assembled project preview.
+- Add lazy muted hover playback for Library video tiles; decoding/playback starts only after hover.
+- Add Live Photo hover motion by using the paired motion clip while the still image remains the default tile preview.
+- Add five persisted Settings accent choices: Purple, Blue, Teal, Green, and Rose. Accent selection updates buttons, focus states, selected items, and highlights in both light and dark themes.
+- Keep hover previews muted so browsing never changes the saved playback volume or surprises users with audio.
+- No project schema, renderer, export, or AI-index behavior changes.
+
+# 0.56.18 — Timeline-first trimming and editor resizing
+
+- Remove duplicate source trim controls from the editor preview; trimming now lives on the timeline's left/right clip handles.
+- Remove the editor-only custom Play, ±5 second, scrubber, source-details, and playback-options UI while retaining native video playback controls.
+- Keep compatibility preview access as a small editor action instead of a separate playback-options section.
+- Fix the preview/timeline divider so ResizeObserver updates no longer cancel an active drag and make the divider snap back.
+- Let the source preview grow and shrink with the divider instead of being capped at 35vh, and allow a smaller timeline minimum for more preview space.
+- Replace the timeline zoom dropdown with direct Zoom out, Fit, and Zoom in controls with a visible zoom level.
+- Show filmstrip-style thumbnail bands inside timeline clips using the existing bounded poster cache; true sampled-frame filmstrips remain a later native enhancement.
+- Make crop and image-adjustment controls visible by default in the Clip inspector; saved crop remains nondestructive.
+- Keep project schema, rendering, export, source safety, and native media behavior unchanged.
+
+# 0.56.17 — Clearer clip and output controls
+
+- Separate Clip and Canvas & export inspector tasks with accessible tabs and keyboard navigation.
+- Add a direct Canvas button that opens and focuses project output settings without scrolling through clip controls.
+- Keep panels mounted so unfinished numeric drafts survive task changes. Output validation opens the Clip tab and highlights invalid values.
+- Preserve shared project state, trim/divider behavior and export safety; add tab/draft regression coverage.
+
+# 0.56.16 — Adjustable preview/timeline divider
+
+- Add a draggable horizontal divider with remembered app-level sizing and a usable preview/timeline range.
+- Add keyboard Up/Down, Shift, Home/End, double-click reset and Escape/pointer/focus-loss cancellation.
+- Recalculate limits when the window or notice area changes. Preserve the preferred ratio without saving temporary clamped values or repeated unchanged boundary actions.
+- Keep resizing outside project state, autosave and undo history. Add gesture/persistence/boundary tests and short-fixture browser checks.
+- Filmstrips and photo clips remain follow-up work.
+
+# 0.56.15 — Draggable timeline trimming
+
+- Add start/end handles to the selected timeline clip with a temporary outline/time readout. Freeze the drag scale and commit one shared trim command on release.
+- Keep each gesture one undo/autosave transaction. Escape, pointer cancellation, lost capture/focus and project/selection changes discard drafts; stale gestures cannot overwrite a newer edit.
+- Support arrow/Shift-arrow and Home/End adjustments, source bounds and minimum duration. Keep numeric trims and original source safety.
+- Keep clip captions clear of handles and constrain poster images to the timeline row so their content remains visible.
+- Add gesture, cancellation, boundary, shared-save and undo regression coverage. Real filmstrips, adjustable pane splits and photo clips remain follow-ups.
+
+# 0.56.14 — Clearer timeline navigation
+
+- Add zoom-aware ruler labels and native pointer/keyboard seeking, with bounded tick generation.
+- Add clip poster thumbnails using the existing lazy bounded cache, plus linked/muted/silent audio labels. These are source posters, not filmstrips or waveforms.
+- Show before/after reorder markers, support dropping after the last clip and skip no-op reorder history entries. Keep keyboard/button alternatives.
+- Preserve full timeline visibility at minimum window size. Keep project-copy controls disabled during source operations.
+- Add ruler-boundary and drag-order/undo regression tests. Photo clips, true filmstrips and drag trim handles remain follow-ups.
+
+# 0.56.13 — Desktop video-editor layout
+
+- Arrange the existing shared editor into media, preview, clip-inspector and persistent-timeline regions inspired by the supplied Clipchamp layout.
+- Replace the tall editor page heading with a compact project/save bar and top-right Export. Keep workspace selection and the user's app-menu width.
+- Add searchable thumbnail media, lazy poster requests bounded to two native jobs, a small identity-keyed cache, and cancellation of queued obsolete work.
+- Add independent media/inspector toggles and narrow-window panels without resetting selection, timeline state or numeric drafts.
+- Move clip controls beside the preview using the same timeline commands, session, autosave and history. Keep project switching, portable copies and recovery in a dismissible Project menu.
+- Keep one preview/export owner and clear source/edited modes. Expandable source tools preserve playback/trim/compatibility controls; invalid hidden clip drafts are revealed before output.
+- Consolidate editor styling in its own stylesheet. Source verification, original media, project schema and export safety are unchanged.
+- Filmstrips/trim handles, photo clips and social/audio extensions remain follow-ups; this release does not claim those capabilities.
+
+# 0.56.12 — Compact navigation and clearer viewing
+
+- Restore compact left-menu rows: fixed 42px rows and 4px gaps stop navigation stretching with window height.
+- Restore green section labels across the Library, editor, folders, map, collections, date, memories, People, tags and Settings.
+- Add an accessible Collapse menu / Expand menu button with a saved preference. Workspace selection remains at the top left; icons retain labels/tooltips and keyboard access.
+- Simplify File Details actions to Edit and Fullscreen / Restore; retain previous/next/close and keep long filenames in the summary below.
+- Resize the existing map after menu changes and initialize its view once, preventing a lingering startup zoom when navigating away quickly.
+- Add regression coverage for remembered menu width, workspace/theme/navigation access, section labels, viewer actions and map resize/teardown. Preserve existing media, AI, search and editing behavior.
+
+# 0.56.11 — Phase E unified ranked search
+
+- Replace disconnected filename/OCR/semantic text searches with one Library search and result model. Combine names, paths, managed XMP keywords, ratings/favorites and optional indexed text, named People and image-content evidence.
+- Add relevance ordering, visible match reasons, quoted values and explicit tag/person/path/rating/favorite/type filters. Keep normal Library filters/sort controls and restore the browsing sort after clearing a relevance search.
+- Run cached content lookup as you type; run meaning inference only on Search/Enter, with one query vector across workspace roots. Keep current cached matches visible while it runs. Preserve AI opt-in, pinned model verification, local-only operation and explicit indexing.
+- Scope native providers to durable workspace roots and join current media metadata before caps so deleted, changed or other-workspace rows cannot crowd out current candidates. Open the attached media index read-only. Reject stale responses and protect new work from obsolete cancellation.
+- Fix the legacy OCR query's scope-before-limit behavior and literal backslash/wildcard escaping. Disclose unavailable or bounded providers without hiding valid metadata matches.
+- Retain the 0.56.9/0.56.10 UI polish, synchronize workflow naming with all manifests, and repair escaped-newline milestone text. Document the review and architecture. Phase F video frame embeddings remain next; this patch does not claim video semantic indexing.
+- Validation: 123 frontend tests, TypeScript/build, native formatting/lint and 140 Rust tests passed (6 acceptance modes ignored). Rendered search fixtures passed light/dark and minimum-window checks. Existing bundle-size warnings remain. Pushed CI and installed-app/AI-quality checks are separate gates.
+
+# 0.56.10 — Accessibility and destructive-action semantics
+
+- Add the missing tooltip to the File Details close control.
+- Give smart-collection removal, manual-collection removal, and folder-reference removal the shared destructive treatment so removal actions no longer look like ordinary neutral commands.
+- Clarify through tooltips that removing a library folder reference or collection does not delete original media.
+- Mark local AI progress text as a status region for assistive technology.
+- Keep this patch presentation/accessibility-only; no media, project, renderer, indexing, or export behavior changes.
+
+# 0.56.9 — UI polish and design-system completion
+
+- Standardize Map, By date, Memories, People, Tags, and Settings on the shared page-heading structure so every major destination starts with the same title/subtitle rhythm.
+- Improve the Phase 7 timeline action hierarchy with consistent Lucide icons for undo/redo, append, reorder, split, reset, and delete commands without changing timeline semantics.
+- Add a dedicated destructive-action style for ripple deletion so project-reference removal is visually distinct from ordinary editing commands while original media remains untouched.
+- Refine selected clips, empty timeline presentation, inspector framing, hover/focus behavior, and reduced-motion handling using the existing design tokens.
+- Normalize Map, Tags, Settings, Local AI, and video-editor status/error presentation around the existing shared feedback styles.
+- Give the reusable placeholder screen the same page-heading structure and improve the Map no-data state without changing GPS behavior.
+- Remove dead top-bar, breadcrumb, and retired workspace-create CSS left behind by earlier navigation changes.
+- Keep this patch presentation-only: no search-index, renderer, project schema, native media, or export behavior changes.
+
+# 0.56.8 — Continuous multi-video preview and export
+
+- Render one continuous hard-cut sequence from the shared workspace editor, including trims, transforms, crop, color adjustments, mixed source geometry/frame rates, repeated clips and linked original audio.
+- Compile preview and export from the same saved revision. Connect assembled playback to the timeline playhead and release the previous decoder when switching sources, avoiding overlapping audio.
+- Use a cumulative 30/60 fps clock for joined clips, preserve one-clip source timing, retain audio offsets/gain/mute, and encode one continuous AAC track with silence where required.
+- Separate export resolution presets from saved edit decisions: Project, up to 1080p and up to 4K, including portrait/square canvases without preset upscaling.
+- Bound decoding to one source at a time; verify space, output streams/frame counts, full decode and unchanged originals before staged no-overwrite publication. Clean temporary parts on failure/cancellation. Recovery retains a current verified relink for the same original.
+- Keep the workspace selector at top left and editing entry in the Library. Photo clips and other social editing extensions remain planned for the same editor; no separate Video Projects navigation tab is added.
+- Validation: 111 frontend tests and 131 Rust tests passed (6 explicit acceptance modes ignored), plus TypeScript/build, native formatting and warnings-as-errors lint. Short native cases cover audio offsets/mute/gain, repeated cuts, 4K/portrait/square, preview/export agreement, cancellation, unavailable space, changed sources and destination races. Edge played and sought the real native preview; light/dark/minimum-window checks passed. Existing bundle-size warnings remain. Pushed GitHub Actions and installed WebView2 GUI acceptance are separate gates.
+
+# 0.56.7 — Workspace-owned editing projects and recovery
+
+- Store projects under the saved workspace instead of a source folder. Combine videos from different registered folders, and retain editable projects when folders are offline or removed.
+- Keep per-asset verified root bindings in local storage; portable project files contain no absolute-path access grants. Relinking and imports require matching original bytes inside registered workspace folders.
+- Copy legacy single-video and multi-video drafts and their last 20 previous saves into workspace-owned projects once, transactionally, without modifying the old drafts. Retain unknown historical dates/revisions as unavailable. Report unreadable older drafts while leaving other projects available.
+- Add bounded previous-save history and revision-safe recovery into a new project copy; reject cross-workspace, cross-project, and stale recovery attempts.
+- Wait for workspace settings to finish saving before native project operations, and route playback through each asset’s own verified folder.
+- Route one-video editing and multi-video projects through the same timeline, session, selected-clip inspector, and output controls; remove the separate legacy single-video editor. Resume matching saved source projects, preserving existing trim, transform, crop, brightness/contrast, audio, canvas, preview, and one-clip export.
+- Render one-clip projects from an authoritative saved workspace revision through the proven native pipeline. Reject stale revisions and removed source folders; keep global export progress/cancel and staged no-overwrite publication.
+- Keep the first hard-cut timeline and top-left workspace navigation. Continuous multi-clip preview/export and photo clips remain upcoming.
+
+# 0.56.6 — First hard-cut timeline and restored workspace navigation
+
+- Document the current design system, remaining inconsistencies, product model, and ordered development phases before further UI work.
+- Restore the active workspace dropdown above the left navigation. Remove the separate Video Projects tab; open saved projects or create one from selected Library videos.
+- Add an ordered timeline with selected clips, drag reorder and accessible Move earlier/later controls, source-time trims, split at the project playhead, gap-closing deletion, repeated source instances, project/source durations, and horizontal zoom.
+- Store each timeline command as one undoable edit in the existing revision-safe autosave queue. Keep linked audio edits and exact shared split ticks. Allow saving an empty timeline without discarding its source bin.
+- Share numeric-field validation with the existing editor and preserve invalid drafts when delayed effects run; retain non-destructive source checks in native storage.
+- This is an incremental Phase 7 milestone: the player still previews original sources. Shared single/multi editing, workspace ownership, assembled preview/export, photo clips, and extended recovery UI remain upcoming. Long-form work stays deferred to 1.x.
+
+# 0.56.5 — Design audit fixes and editing workspace
+
+- Put media ahead of statistics and maintenance controls. Show tagging after selection, disclose search/index/duplicate tools together, add clear-filter recovery, and use accurate media/count/size/safety wording.
+- Remove generic sticky-toolbar behavior that covered adjacent controls. Give the gallery its remaining working space and observe width changes when resizing the app.
+- Separate full-screen viewing and video editing from the inspector layout. Keep source/edited-preview labels explicit and group numeric edits by task without changing project documents or export settings.
+- Use native modal dialogs with keyboard focus containment/restoration and recoverable workspace, collection, smart-rule, and person-name forms.
+- Preserve invalid video numeric drafts, explain valid ranges, and block export until invalid fields are corrected. Accept exact rational trim endpoints, including container durations rounded slightly below the final source tick.
+- Separate accent-fill, accent-text, on-accent, and success-text theme colors, consolidate tokens, repair compact navigation branding, distinguish date navigation, and reserve thumbnail captions in shared virtual-row geometry.
+- Add reusable error/retry surfaces and styled startup recovery; dock save/export notices so they do not cover library/editor controls. Respect reduced motion per component.
+- Add regression coverage for focus, form validation, stale numeric export prevention, and the new workspace-creation flow. Validate layouts with short sample projects, both themes, and normal/minimum window sizes.
+- Keep multi-clip timeline editing and combined export for the next Phase 7 milestone. Long-form work remains deferred to 1.x, and drive-failure acceptance remains a separate pre-v1.0 task.
+
+# 0.56.4 — Feedback pass: navigation, folders, viewer, and video controls
+
+- Remove the redundant top breadcrumb bar so page content begins with the page heading; move light/dark controls into the left navigation.
+- Move workspace selection and source-folder management to the Folders page. Photo Library now links to Manage folders and focuses on media browsing.
+- Reorder the Folders page so its page header appears before all management content and add workspace creation to the workspace selector.
+- Add previous/next controls and a compact file summary to the details viewer, widen the standard detail panel, and improve spacing.
+- Move technical video details below playback, replace one-second skipping with five-second transport controls, remove Go to time, and rename marker controls to saved trim controls.
+- Use compact undo/redo icons in the video project editor and shorten Dismiss export to Dismiss.
+- Increase filename/filmstrip bottom spacing and refine folder-management layout.
+- Prevent Leaflet world copies and gray over-pan areas by constraining the photo map to one world.
+- Add docs/FEEDBACK_ROADMAP.md to separate direct UI work, Codex-scale tasks, and existing Phase 7 scope.
+
+# 0.56.3 — Phase 7 multi-video project media bin
+
+- Add Video projects with folder-scoped multi-video drafts, multi-file import, a selectable media bin, original-source previews, and duplicate detection by verified content hash.
+- Add a version-2 document with stable asset/clip identities, rational source times, a shared canvas, and explicit project frame rate. Validate bounds, identities, references, and every source using existing single-video rules.
+- Import single-video project files as separate multi-video drafts without changing their original files or saved Phase 6 drafts; retain trims, transforms, audio settings, and canvas.
+- Save/reopen projects with revision checks and bounded previous-save storage. Save portable project copies without overwriting existing files; relink each video only to identical original contents; remove project references without deleting media.
+- Share the durable save queue and app-close/updater protection across both document types, including save-error retry and unsaved-copy recovery.
+- Keep assembled timeline editing/preview and combined export for subsequent Phase 7 updates. This first milestone supports videos inside one selected library folder, including subfolders.
+- Use short media for development acceptance. Keep hour-scale regression execution opt-in and defer further long-form work to 1.x. Keep physical drive and disk-full acceptance on the pre-v1.0 checklist.
+
+# 0.56.2 — Protected update installation and continuous-recording acceptance
+
+- Fix automatic update checks being cancelled during channel initialization and React StrictMode replay. Mark the session check only when its timer starts the request; close late update resources and serialize check/download/install operations.
+- Configure updater HTTP requests with a 15-second connection timeout and 30-second stalled-read timeout; remove the two-minute total download deadline that could cut off a progressing bundled-AI installer. Preserve Tauri resource ownership and signature verification.
+- Route updater installation and normal window closure through one protection boundary: block running or starting video exports, flush pending project saves, and keep a downloaded update ready if installation is blocked or saving fails. Do not discard edits to install an update.
+- Fix long-output seekability: request timestamp-based H.264 keyframes about every two seconds in exports and compatible previews. A 64-minute real export exposed only three keyframes under the previous encoder defaults. Validate access-point gaps independently, including flat scenes where automatic scene changes cannot help.
+- Add opt-in full-recording acceptance for one continuous hour-scale SDR export, full output decode, independent stream validation, source preservation, and beginning/middle/end decoded timestamp checks against that single output. Keep the existing short-window test distinct.
+- Keep rational decoded-frame time bases intact until the final division in acceptance inspection. This prevents a rounded reciprocal from excluding an exact boundary frame in hour-scale media; add a regression without changing export timing or frame-count tolerances.
+- Exercise the continuous-export assertions on a short synthetic VFR/audio fixture in regular native tests. Keep real footage and reports local.
+- Run the optimized video export gate in the deliberate signed-release workflow before publishing, matching the normal Windows installer checks.
+- Fix new/changed workspace activation so previous scans and AI results cannot populate an empty workspace; clear old scan counts/timestamps and display the actual installed version in the sidebar.
+- Retain the newer interface and major-only signed updater channel. Align development versioning guidance with the owner's patch-per-update instruction.
+
+# 0.56.1 — Dedicated major-release updater channel
+
+- Move in-app update checks from GitHub's generic latest-release alias to a dedicated `stable-channel` release asset.
+- Keep the signed installer on its versioned major release while replacing only `stable-channel/latest.json` when a tested `N.0.0` release is deliberately published from main.
+- Prevent unrelated minor, patch, preview, or manual GitHub Releases from disrupting the updater endpoint.
+- Preserve the independent app-side major-only comparator and cryptographic signature verification as defense in depth.
+
+# 0.56.0 — Signed major-release in-app updater
+
+- Add the Tauri updater foundation with automatic update checks, download progress, a Settings update card, and a lightweight update-available notification.
+- Restrict the stable updater channel to newer major releases only: the app accepts N.0.0 releases and rejects minor/patch releases even if a manifest is published accidentally.
+- Keep development, pull-request, preview, and maintenance builds off the stable updater channel. The updater is enabled only in signed public builds compiled with the release public key.
+- Require signed-version verification and disallow updater downgrades.
+- Add a separate manual stable-release workflow that runs only from main, validates an N.0.0 version, runs the full test/build gates, creates signed updater artifacts, generates latest.json, and publishes the GitHub Release.
+- Keep normal CI installers unchanged; updater artifacts are generated only by the deliberate stable-release workflow.
+- Add release documentation for the one-time signing-key setup. The private updater key is never committed to the repository.
+
+# 0.55.1 — Final interface rhythm and interaction polish
+
+- Tighten the global spacing rhythm and normalize control heights across buttons, icon buttons, form fields, toolbars, settings, editor controls, and video controls.
+- Refine typography hierarchy and readable line lengths while keeping dense metadata and secondary copy visually subordinate.
+- Add a restrained active-navigation indicator, clearer keyboard focus treatment, sticky bulk-selection actions, and more consistent selected/hover states.
+- Polish gallery tiles, folder rows, chips, settings diagnostics, media details, video transport controls, filmstrips, editor fieldsets, and export status so newer features match the core Library design language.
+- Add a subtle page-settle transition, preserve the existing reduced-motion behavior, and keep motion short enough to support navigation rather than decorate it.
+- Improve narrow-window behavior for video time controls and action groups.
+- Normalize app version metadata to 0.55.1, including the lockfile that had remained on 0.54.12.
+- Presentation and interaction only; photo, video, AI, metadata, and project behavior are unchanged.
+
+# 0.55.0 — Interface polish and cohesive design system
+
+- Standardized buttons, selects, inputs, cards, panels, grids, list rows, and navigation around one spacing/radius/control-height system.
+- Refined typography hierarchy so page titles, section titles, supporting copy, metadata, and microcopy read consistently across Library, Settings, AI, and video editing.
+- Added subtle hover elevation, selected states, press feedback, smoother drawer/export-panel transitions, and polished focus states without introducing distracting motion.
+- Added Windows/OS reduced-motion support so animations and smooth scrolling collapse to near-instant transitions when requested.
+- Unified newer video/project/AI surfaces with the established Library visual language, including fieldsets, transport controls, folders, export status, and settings cards.
+- Improved mobile/narrow-window behavior for action buttons and settings cards.
+- Fixed the video player keyboard focus ring to use the shared accent token instead of an undefined style variable.
+- This milestone changes presentation and interaction styling only; media, metadata, project, and AI behavior are unchanged.
+
+# 0.54.12 — Library restoration, folder management, and bundled AI
+
+- Restore the saved active workspace and scan its folders on startup, including legacy single-root workspaces. Show a clear source-folder list with Remove from library. Invalidate older scans and AI work when membership changes; removing a folder never deletes its media or saved edits.
+- Connect the uninstaller's existing Delete application data checkbox to the known Open-Photo databases and caches. Keep data by default and during updates; never traverse library paths or recursively remove the old app-data parent. Explicit /PURGEAPPDATA=1 supports isolated lifecycle testing.
+- Include the linked DirectML and Microsoft C++ runtime DLLs beside the installed app; verify hashes and execute AI acceptance from the install directory with a restricted dependency search path.
+- Ship all seven pinned AI assets, model provenance, licenses, and notices in the installer. Verify downloads at build time and installed files in CI. Runtime uses the installed assets without downloads or another per-user copy.
+- Replace manual model setup with one Local AI switch; retain diagnostics and CPU selection. Turning off stops subsequent indexing batches while retaining indexes and names.
+- Share one process-wide ONNX environment across all AI sessions. Fix repeated/cross-feature inference failing with “only one environment is allowed per process.” Verify every model through synthetic CPU inference.
+- Add startup/removal/stale-scan and AI-off integration coverage, bundle/manifest contracts, concurrent runtime reuse, and a hosted Windows installed-model/default-keep/update-keep/explicit-cleanup lifecycle gate. Actual GUI behavior, AI accuracy, and GPU validation remain separate acceptance work.
+
+# 0.54.11 — Video posters and playback fallback
+
+- Automatically load the player when opening a standalone video, without another Play click. Show its poster and controls without starting audio automatically; retain manual Live Photo motion and remember playback intent through codec fallback.
+- Route video library thumbnails through a dedicated bundled-video decoder instead of the photo decoder and its 75 MB input limit. Generate bounded, cached PNG posters with source identity checks, library authorization, fixed decoder limits, and separate library/player work slots.
+- Show a still before playback and retain it as the player's poster. Allow starting or retrying preview from the still rather than leaving an unexplained blank area.
+- Make the explicit Play action request playback after loading, rather than only fetching metadata. Keep native controls available if browser autoplay policy requires another user gesture.
+- Automatically attempt one compatible preview after original-format decode/unsupported errors, retaining playback position. Keep streaming errors distinct, disclose conversion, and show media error details if a compatible preview also fails. Preserve HDR rejection and Windows-player fallback.
+- Detect loaded media with no decodable video dimensions, covering audio-only browser playback that otherwise shows a blank player without firing a media error.
+- Add poster cache invalidation, large-source/source-protection and malformed/out-of-library coverage, plus poster display, automatic fallback, position restoration, no-loop, and streaming-error UI checks.
+- Installed WebView playback of the reported files remains a user acceptance check; native extraction and synthetic UI event tests cannot establish that every Windows codec/GPU setup works.
+
+# 0.54.10 — Video brightness and contrast
+
+- Replace intermittent empty FFprobe interval-frame inspection in acceptance tests with strict source decoding and streamed frame CRC timestamps. Preserve original time bases, VFR ordering, preroll, bounded memory, and cancellation; reject incomplete or malformed timestamp records. Keep full reference-frame count/time assertions.
+- Add saved brightness and contrast controls, each from -100 to 100, with neutral defaults, undo/redo, autosave, and a dedicated reset that preserves other edits.
+- Apply identical full-range RGB lookup tables in edited preview and export before canvas padding. Neutral settings skip the conversion, preserving existing rendering. Use filters supported by the pinned LGPL engine.
+- Load older project files, drafts, and history without adjustment fields at neutral settings. Validate integer ranges in both the editor and native backend. New adjustment fields require this version or newer when opening project copies.
+- Verify decoded pixels against the adjustment formula at positive/negative settings and extremes, preview/export agreement, frame timing, black borders, source protection, legacy loading, durable storage, and UI reset/undo.
+- Installed-app playback, complete long-export/perceptual synchronization, drive-failure, and whole-app performance acceptance remain open. Phase 7 remains planned.
+
+# 0.54.9 — Previous-save recovery for video projects
+
+- Anchor reference-frame inspection between earlier random-access points, with no initial seek when there is insufficient preroll information. Add keyframe-boundary regressions and actionable empty-window diagnostics.
+- Freeze completed frame-inspection windows so buffered/partial output during probe termination cannot alter reference counts. Add cancellation-tail regression coverage.
+- Update checkout, Node setup, and artifact upload actions to verified Node 24 releases; keep the app build Node version pinned.
+
+- Browse up to 20 prior automatic saves with available save number/time, title, trim range, and canvas dimensions. Open a selected version as a separate recovered draft and return to the previous draft.
+- Preserve the current draft and its history. Carry forward the current verified source identity and relink path while recovering historical edit settings. Missing sources remain explicitly unavailable until relinked.
+- Check library/project ownership, snapshot identity, and the current save revision inside a write transaction. Reject stale, pruned, oversized, or incompatible snapshots instead of replacing current work.
+- Migrate existing history storage atomically and idempotently. Preserve legacy saves with unknown number/time rather than inventing metadata; record those fields for subsequent saves. Keep recovered Unicode titles within editor limits.
+- Add migration, retention/reopen, exact edit recovery, relink, conflict/ownership, source protection, UI recovery/return, empty-history, and failure coverage. Preserve editing during pending previews; only recovery locks edit controls.
+- Installed-app playback, complete long-export/perceptual synchronization, drive-failure, and whole-app performance acceptance remain open. Phase 7 remains planned.
+
+# 0.54.8 — Long-video navigation and seek acceptance
+
+- Add Go to time for seconds, minutes:seconds, and hours:minutes:seconds with millisecond precision. Validate malformed and out-of-range entries before seeking; keep browser seeking explicitly approximate.
+- Add a synthetic hour-scale source test that exports short windows near the beginning, middle, and end, checks decoded frame counts/timestamps against the source, validates independent audio/video spans, fully decodes outputs, and verifies the source hash.
+- Extend opt-in real-footage acceptance with -LongRecording, saving three separate test edits, portable projects, and a local report. Stream decoded frame timestamps until the presentation range is complete, preserving buffered B-frames, with timeout and frame/line limits.
+- Keep complete hour-long export, perceptual audio/video synchronization, installed-app playback, drive failures, and whole-app performance as separate acceptance gates.
+
+# 0.54.7 — UHD and source-resolution video export
+
+- Add explicit UHD landscape (3840×2160), UHD portrait (2160×3840), and supported source-resolution canvas choices. Preserve ultra-wide source geometry, square-pixel aspect, and source rotation when choosing source resolution; retain imported canvases.
+- Scale the target video bitrate from 12 Mbps at 1080p to 48 Mbps at UHD, bounded to that range. Use the same resolution policy for conservative destination-space estimates. Keep the 1080p export limit and smaller-preview policy intact.
+- Add actual UHD landscape/portrait/1080p-limit export tests and editor/source-canvas coverage.
+- Add opt-in real-footage export acceptance, with source hashes, full decode, publication, separate source-resolution/UHD test files, portable project copies, and local reports. A UHD canvas does not add detail to lower-resolution footage.
+- Pin the workflow run name to the source release version so a stale PR title cannot mislabel a build.
+- Installed-app/real-media playback, hour-scale synchronization, actual drive failures, and whole-app performance remain acceptance gates.
+
+# 0.54.6 — Repeatable release video acceptance
+
+- Add an opt-in optimized-build acceptance test using an eight-second 1080p/audio fixture, non-frame-grid trimming, crop, rotation, gain, and the real export/publication pipeline.
+- Record export wall time, processing rate, stage start times, output properties, and the maximum individual native child peak working set. Memory instrumentation exists only in test builds; this does not measure whole-app memory.
+- Save a machine-labeled environment report without personal library paths or host identifiers. Fresh output directories and report creation prevent reuse of stale results.
+- Run the acceptance test in the Windows installer job and publish JSON reports alongside the installer. Keep real-media/GUI, hour-scale synchronization, actual drive failures, startup/seek performance, and whole-app memory as open Phase 6 gates.
+
+# 0.54.5 — Phase 6 export hardening
+
+- Validate video and audio spans independently, so longer audio cannot hide truncated video. Preserve legitimately unequal source tracks and omit audio when the kept range has none.
+- Inspect packet timing with bounded streaming reads when source containers omit stream durations. Require timing metadata on generated MP4 tracks and cap video timing tolerance at 100 ms.
+- Prevent delayed or out-of-order export-status responses from clearing a newly started job or regressing completed progress.
+- Add the directory separator required by Windows free-space checks for UNC shares.
+- Add timing and status-race regression coverage. Installed-app GUI, real-footage/hardware, and measured performance/memory acceptance remain incomplete.
+
+# 0.54.4 — Phase 6.4: Validated video export
+
+- Export saved single-video edits to a new SDR H.264/AAC MP4 using the same trim/crop/rotation/flip/audio/canvas graph as edited previews. Offer the project canvas or an orientation-aware 1080p limit.
+- Export an immutable saved snapshot, with explicit first-audio/stereo policy and confirmation for multiple source tracks. Drop subtitles, chapters, and source metadata intentionally; reject detected HDR until tone mapping is tested.
+- Add an app-wide progress/elapsed/cancellation panel. Exports survive editor closure, and normal app closure waits for exports to finish or be cancelled. Serialize native processing with preview jobs.
+- Check destination space, stage beside the destination, validate streams/timing/geometry/size, fully decode output, reverify source identity, then publish without overwrite. Cancel/failure cleans only the job's temporary file; racing destination files survive.
+- Fix timestamp quantization in compatible previews and edited render/export by carrying source encoder time bases and a finer movie clock. Add jittered-VFR and non-frame-grid trim coverage.
+- Add decoded-output, preview/export pixel/timestamp/audio comparisons, a 90-second VFR/audio fixture, portrait 1080p, cancellation/commit race, corrupt-output, changed-source, disk-space, overwrite, and UI lifecycle tests.
+- Real-media/hardware/performance acceptance remains required before Phase 6 can be considered complete. HDR tone mapping and waveform UI remain deferred.
+
+# 0.54.3 — Phase 6.3: Saved single-video edits
+
+- Add versioned projects with stable asset/clip IDs, relative source paths, full SHA-256 fingerprints, rational source-time trim ranges, transform/audio settings, and output canvas settings.
+- Save drafts in SQLite with revision checks and bounded previous-document history. Serialize/coalesce autosaves, retain pending saves when switching media, block window closure while saving, and surface failure/retry/recovery-copy options.
+- Add recent drafts, session undo/redo/reset, non-overwriting portable project copies, strict project-file validation, and fingerprint-verified relinking.
+- Persist trim, crop (free and common aspect presets), quarter-turn rotation, flips, mute/gain, and fit/fill canvas choices. Generate cancellable edited previews through a shared validated processing graph, rather than CSS transforms.
+- Check source fingerprints before/after rendering. Add decoded-pixel, audio-gain/mute, VFR-trim, persistence/conflict/relink, copy protection, queue recovery, and close-guard tests.
+- Correct video details sizing so long player/editor controls scroll instead of being clipped inside a photo preview box.
+- Export, HDR tone mapping, waveform UI, and real-media/hardware acceptance remain incomplete Phase 6 work.
+
+# 0.54.2 — Phase 6.2: Playback and compatible previews
+
+- Add play/pause, a scrubber, time display, keyboard seeking, clickable filmstrip frames, and temporary in/out markers with marked-range playback.
+- Preserve preview marks as integer source ticks; switching between original and compatible playback retains the selection and playhead. These markers do not yet save or trim a video.
+- Add serialized, cancellable background jobs for filmstrips and compatible SDR H.264/AAC previews. Apply rotation and square-pixel scaling while preserving variable frame timing and relative audio offsets.
+- Keep original media read-only and stream video bytes. Bound derivative size, duration, dimensions, runtime, and thumbnail output; surface errors while retaining original/Windows playback options.
+- Give native video processes Windows job ownership so app exit terminates native work. Clean session-owned derivatives on release and retry abandoned-cache cleanup after a day.
+- Prevent seeking shortcuts from navigating to another library item; ignore stale jobs and cancel work on player closure/source changes.
+- Add real-media timing/rotation/audio/large-file/source-preservation tests, process ownership and cancellation cleanup tests, and player/marker lifecycle coverage.
+- HDR proxy conversion, saved editing projects, undo/redo, and export remain incomplete Phase 6 work.
+
+# 0.54.1 — Phase 6.1: Local video inspection
+
+- Bundle a fixed, checksum-verified LGPL FFmpeg/ffprobe engine and its shared libraries/licenses in the Windows installer.
+- Show video duration, dimensions, codec, exact frame rate, rotation, HDR/color information, audio tracks, and inspection warnings alongside existing playback.
+- Inspect canonical local media paths in bounded background jobs, with timeout, superseded-job cancellation, bounded diagnostics, and network/playlist input rejection.
+- Expose bundled decoder/encoder inventories for subsequent editing milestones.
+- Add real-engine MP4/MOV, Unicode-path, audio/silent, rotation, HDR, variable-timing, corrupt-input, and process-lifecycle tests.
+- Add a reproducible local check script and persist the user's development instructions in AGENTS.md.
+- Video editing controls, proxies, project persistence, and export remain incomplete Phase 6 work.
+
+# 0.54.0 — Library integrity and editing foundations
+
+- Fixed the Tags initialization crash, complete metadata batching, active-filter invalidation, and partial tag-write reporting.
+- XMP keyword merges preserve existing XML properties and use namespace-aware parsing. Conflicting external edits are detected before replacement; Windows replacement is atomic with a recovery copy.
+- Incomplete scans retain previous index snapshots, with visible read errors.
+- Shared image decode normalizes EXIF orientation and applies explicit allocation/pixel limits. Editor jobs run off the UI thread, serialize allocations, and drop superseded queued previews.
+- Editor previews use export-scale blur/sharpen semantics and a bounded normalized-source cache. Completed exports publish atomically without overwriting another file.
+- Inline video uses scoped range-aware local streaming rather than whole-file base64; decoder-dependent fallback remains available.
+- Organizational data migrates into local SQLite with previous-value history; startup load failures do not replace saved data. Settings can export a separate JSON metadata backup.
+- People IDs and names persist independently of filenames; named identities are never automatically merged with new suggestions. Existing compatible legacy names migrate when their original group is available.
+- Fixed save-dialog permissions and incremental Live Photo metadata loss.
+- Added dependency lockfiles, pinned toolchains, frontend regression tests, independent frontend/Rust checks, and gated installer packaging.
+- Added an authoritative Phase 6/7 roadmap. Video editing itself remains planned.
+
+# Changelog
+
+This file records the major Open-Photo feature milestones, important add-ons, safety changes, and notable build repairs.
+
+Open-Photo is still in **0.x active development**. During this phase:
+
+- a green predecessor advances to the next **minor** version for feature work;
+- a red build is repaired with a **patch** version;
+- patch releases often contain formatting, lint, regression, or compatibility fixes rather than new user-facing features.
+
+The detailed Git commit history remains the source of truth for every individual change.
+
+## 0.53.1 — 2026-10-27
+
+### Fixed
+- Applied the exact Rust formatter change required by CI for the managed tag read regression test.
+- No hierarchical tag behavior, filtering, XMP ownership rules, or safety behavior changed.
+
+## 0.53.0 — 2026-10-27
+
+### Added
+- Added read-back of keywords from Open-Photo-managed XMP sidecars.
+- Replaced the Tags placeholder with a real hierarchical Tags browser.
+- Tags use `/` as the hierarchy separator, such as `People/Family/Marc`.
+- Parent branches are generated automatically and show unique tagged-media counts.
+- Selecting a branch opens the Library filtered to that branch and all descendant tags.
+- Added a visible active-tag filter chip and a Refresh tags action.
+- Added regression coverage proving tag reads ignore foreign/unknown XMP sidecars.
+
+### Changed
+- Major date/smart/collection filters clear an active tag filter so organization filters do not stack invisibly.
+
+### Safety
+- Tag indexing is read-only and only parses XMP sidecars carrying the Open-Photo ownership marker.
+- Foreign/unknown sidecars remain ignored and untouched.
+- Managed sidecar reads are capped at 256 KB and 5,000 media paths per request.
+
+## 0.52.1 — 2026-10-27
+
+### Fixed
+- Applied the exact Rust formatter changes required by CI for the managed XMP merge implementation.
+- No XMP behavior, ownership rules, limits, or source-media safety behavior changed.
+
+## 0.52.0 — 2026-10-27
+
+### Added
+- Added safe keyword merging for XMP sidecars created and owned by Open-Photo.
+- New Open-Photo sidecars are marked with `xmp:CreatorTool="Open-Photo"`.
+- Existing Open-Photo keywords are preserved while new tags are merged case-insensitively.
+- The tagging UI now reports created, updated and skipped sidecars separately.
+- Added regression coverage proving foreign XMP files remain untouched and managed sidecars merge tags without modifying source media.
+
+### Changed
+- Foreign or unknown XMP sidecars are still skipped rather than overwritten.
+- Managed sidecar replacement now uses a temporary file plus rollback backup instead of truncating an existing XMP file in place.
+
+### Safety
+- Original photos and videos are never edited by the tagging workflow.
+- XMP sidecars larger than 256 KB or not carrying the Open-Photo ownership marker are skipped.
+- Managed sidecars are limited to 200 keywords.
+
+## 0.51.0 — 2026-10-27
+
+### Added
+- Added local embedded-preview support for Nikon NEF and Sony ARW RAW files.
+- The Library grid, list thumbnails and full viewer can now use the largest embedded JPEG preview available in supported NEF/ARW files.
+- RAW preview orientation is applied from the camera metadata before the image is shown.
+
+### Changed
+- RAW files can use a larger bounded source-file limit for preview extraction because the preview reader seeks to embedded JPEG data instead of decoding the RAW sensor payload.
+- Full RAW sensor-data development/editing remains intentionally out of scope for this milestone.
+
+### Safety
+- RAW preview extraction is read-only.
+- The preview library applies bounded directory/preview limits and does not decode raw sensor data.
+- Open-Photo caps supported RAW source files at 250 MB for this preview path.
+
+## 0.50.0 — 2026-10-27
+
+### Added
+- Added Apple Live Photo content-identifier extraction for supported still images and MOV/MP4/M4V motion clips.
+- Added persistent `live_asset_id` indexing for full scans and incremental updates.
+- Live Photo pairing now prefers exact shared Apple asset IDs.
+- The Library reports metadata-matched versus filename-fallback pair counts.
+- Added regression coverage for Apple MakerNote tag 0x0011 parsing.
+
+### Changed
+- Same-folder + same-filename-stem pairing remains as a conservative fallback only when Apple asset metadata is absent or stripped by an exporter.
+
+### Safety
+- Live Photo identifier extraction reads metadata only; it never modifies source stills or movies.
+- Movie identifier parsing skips large media payloads and bounds the in-memory `moov` metadata read to 16 MB.
+- Ambiguous asset-ID groups are not paired automatically.
+
+## 0.49.0 — 2026-10-27
+
+### Added
+- Added pure-Rust metadata fallback support for HEIC/HEIF, AVIF, Canon CR3, Fujifilm RAF and Phase One IIQ containers.
+- HEIC/HEIF capture dates can now participate in Timeline, Memories and date sorting when embedded EXIF capture metadata is present.
+- Added CR3, RAF and IIQ to supported library indexing for metadata-focused workflows.
+- Added regression coverage for timezone-less and timezone-aware extended metadata date normalization.
+
+### Changed
+- Existing JPEG/TIFF EXIF parsing and the verified MOV/MP4/M4V QuickTime parser remain unchanged.
+- RAW metadata indexing is now broader, but full RAW pixel previewing is still a separate unfinished feature.
+
+### Safety
+- Extended metadata parsing is read-only and does not decode or rewrite source image pixels.
+- Invalid or missing metadata safely falls back to filesystem modified time.
+
+## 0.48.0 — 2026-10-27
+
+### Added
+- Added capture-date coverage counts to each year in the Memories **All years** browser.
+- Each year now reports how many items use **EXIF metadata**, **QuickTime metadata**, or **file modified fallback**.
+
+### Changed
+- Memories makes date-source quality visible before users rely on year-based organization, helping identify libraries that still depend heavily on filesystem timestamps.
+
+### Safety
+- Coverage counts are derived from already-indexed metadata and do not trigger additional source-file reads.
+- No source media or metadata is moved, copied, renamed, or modified.
+
+## 0.47.0 — 2026-10-27
+
+### Added
+- Added an **All years** browser to Memories.
+- Every capture year in the current workspace is listed with its indexed media count.
+- Any year can be opened directly in the Library using the existing Memory year filter, even when there is no On This Day match.
+
+### Changed
+- Memories now remains useful on dates with zero On This Day results by providing full year-based navigation from the same view.
+
+### Safety
+- Year counts are derived from the already-loaded local index and do not trigger additional source-file reads.
+- No source media or metadata is moved, copied, renamed, or modified.
+
+## 0.46.0 — 2026-10-27
+
+### Added
+- Added **Browse all media from YEAR** to each Memories year group.
+- Added a dedicated Memory year filter to the Library with a visible **Show all years** control.
+- Year filtering uses the same capture-date preference as Memories and Timeline.
+
+### Changed
+- Memory year, Timeline month, smart collection, custom smart rule, and virtual collection filters are kept mutually exclusive to avoid hidden filter stacking.
+
+### Safety
+- Year browsing is a presentation-only filter over the existing local index.
+- No source media or metadata is moved, copied, renamed, or modified.
+
+## 0.45.0 — 2026-10-27
+
+### Added
+- Added a dedicated **Memories** view to the main navigation.
+- On This Day matches are grouped by capture year and labeled by how many years ago they were captured.
+- Individual memories can be opened directly from the Memories view.
+- Added one-click actions for **Open all On This Day** and **This month in past years**.
+
+### Changed
+- Memories now uses the same verified EXIF / QuickTime / modified-date fallback rules as Timeline and smart collections instead of being discoverable only as a smart filter.
+
+### Safety
+- Memories is a read-only presentation layer over the existing local index.
+- No source media or metadata is moved, copied, renamed, or modified.
+
+## 0.44.0 — 2026-10-27
+
+### Added
+- Timeline month entries now open the Library filtered to that exact year/month.
+- The Library shows the active Timeline month with a **Show all months** control.
+- Added a stable internal `YYYY-MM` month key so localized display labels do not drive filtering logic.
+
+### Changed
+- Timeline month filtering uses the same EXIF / QuickTime / modified-date fallback logic as sorting and smart collections.
+- Timeline month filtering is cleared when a smart collection, custom smart rule, or virtual collection is selected to avoid hidden filter stacking.
+
+### Safety
+- Timeline filtering is presentation-only and does not move, rename, copy, or modify source media.
+
+## 0.43.0 — 2026-10-27
+
+### Added
+- Added explicit date provenance to the media details panel.
+- The active date source is labeled as **EXIF metadata**, **QuickTime metadata**, or **File modified fallback**.
+- When embedded capture metadata exists, the details panel also shows both the embedded capture value and the filesystem modified value.
+
+### Changed
+- Timeline help text now reflects the verified EXIF + QuickTime capture-date behavior instead of describing QuickTime dates as planned.
+
+### Safety
+- Provenance is derived from already-indexed metadata and does not trigger additional file reads.
+- No source media or metadata is modified.
+
+## 0.42.1 — 2026-10-27
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the QuickTime capture-date parser and tests.
+- No QuickTime parsing, timestamp conversion, timeline, sorting, or smart-filter behavior was changed.
+
+## 0.42.0 — 2026-10-27
+
+### Added
+- Added read-only QuickTime movie-header capture-date extraction for MOV, MP4 and M4V media.
+- The parser walks ISO base-media/QuickTime box headers to find `moov → mvhd` without decoding video frames or loading the full file into memory.
+- Supports both version 0 (32-bit) and version 1 (64-bit) `mvhd` creation timestamps.
+- Added regression coverage for the QuickTime 1904 epoch and a minimal movie-header container.
+
+### Changed
+- Timeline, newest/oldest sorting and date-based smart collections can now use QuickTime video capture time before falling back to filesystem modified time.
+- QuickTime timestamps are stored as UTC ISO strings with a `Z` suffix; EXIF timestamps remain timezone-less camera-local values.
+
+### Safety
+- Invalid box sizes, unsupported movie-header versions and corrupt containers return no capture date and safely fall back to modified time.
+- Video files are opened read-only and never rewritten.
+- Capture-date parsing seeks over large media payloads instead of buffering them into memory.
+
+## 0.41.4 — 2026-10-27
+
+### Fixed
+- Added explicit calendar/time range checks after EXIF parsing so impossible values such as month 13 or hour 25 are rejected.
+- This fixes the capture-date regression test while keeping the EXIF library parser for structural parsing.
+- No source media is modified.
+
+## 0.41.3 — 2026-10-27
+
+### CI
+- Pinned the Windows CI job to the supported `windows-2022` hosted runner pool after repeated `windows-latest` jobs failed before step execution and produced no logs.
+- Application and capture-date behavior are unchanged.
+
+## 0.41.2 — 2026-10-27
+
+### Fixed
+- Replaced manual EXIF timestamp splitting with the kamadak-exif `DateTime::from_ascii` parser already used by the project.
+- Capture timestamps are now validated by the EXIF library before being stored.
+- No source files are modified.
+
+## 0.41.1 — 2026-10-27
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the capture-date foundation.
+- No EXIF parsing, SQLite indexing, timeline, sorting, or smart-filter behavior was changed.
+
+## 0.41.0 — 2026-10-27
+
+### Added
+- Added EXIF capture-date extraction during library scans for supported JPEG/TIFF-family still images.
+- Capture date preference order is **DateTimeOriginal → DateTimeDigitized → DateTime**.
+- Added persistent `capture_local` storage to the SQLite media index with an in-place schema migration.
+- Incremental file updates now refresh capture-date metadata as well.
+
+### Changed
+- Timeline now prefers capture date and falls back to file modified date.
+- Newest/oldest sorting and date-based smart collections now use the same capture-date-first behavior.
+- File details now show both **Captured** and **Modified** dates.
+
+### Safety
+- Camera timestamps without a trustworthy timezone are stored as local date/time strings; Open-Photo does not invent a timezone.
+- Capture-date extraction is read-only and does not modify media.
+- QuickTime/iPhone video capture dates are not yet claimed as supported.
+
+## 0.40.0 — 2026-10-27
+
+### Added
+- Added centered crop presets for **Original / Free**, **1:1**, **4:3** and **16:9**.
+- Crop presets use the decoded source dimensions returned by the existing preview request.
+- Preset calculations account for the current 90° rotation before determining the centered crop.
+
+### Changed
+- Crop sliders now use 0.1% precision so preset-generated crop values can be adjusted without being rounded to whole percentages.
+
+### Safety
+- Crop presets still use the existing 0–45% per-edge bounds and preserve the existing minimum-image-area validation.
+- No additional source-file read or write is performed for crop preset calculation.
+- Original media remains read-only.
+
+## 0.39.0 — 2026-10-27
+
+### Changed
+- Centralized the frontend editor source-format list so preview visibility and export availability use the same contract.
+- Added strict whole-number resize parsing before preview and export requests.
+- Animated GIF is no longer offered to the Phase 4 editor because the current image pipeline would otherwise render only a decoded still frame.
+
+### Safety
+- Invalid, fractional, zero, negative and over-20,000 resize values are rejected before they reach the Rust edit pipeline.
+- Backend preview and export now both validate the same supported source extensions.
+- Original media remains read-only.
+
+## 0.38.1 — 2026-10-27
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the bounded-preview geometry helpers and regression tests.
+- No preview, geometry, sizing, or export behavior was changed.
+
+## 0.38.0 — 2026-10-27
+
+### Changed
+- Refactored editor geometry so rotation, crop and resize dimensions are calculated through shared backend helpers.
+- Live preview now uses a bounded preview-size resize instead of allocating the full requested export dimensions first.
+- Final export width and height are still calculated from the exact requested edit geometry and reported unchanged.
+
+### Safety
+- Large but valid export targets no longer require equally large live-preview resize buffers.
+- The 100-megapixel final-output limit remains enforced before preview or export work proceeds.
+- Original media remains read-only.
+
+## 0.37.1 — 2026-10-27
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the 100-megapixel regression test.
+- No output-size validation, preview, or export behavior was changed.
+
+## 0.37.0 — 2026-10-26
+
+### Added
+- Added backend-reported final edited output dimensions to the live preview.
+- Added visible width × height and megapixel count before export.
+- Added a hard **100 megapixel** edited-output limit.
+
+### Safety
+- The pixel cap is enforced before resize allocation, reducing the risk of accidental extremely large image allocations.
+- Preview and export share the same output-dimension validation.
+- Original media remains read-only.
+
+## 0.36.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the export-date preservation regression test.
+- No timestamp-preservation, preview, or export behavior was changed.
+
+## 0.36.0 — 2026-10-26
+
+### Added
+- Added **Preserve source modified date** for edited exports, enabled by default.
+- Added an opt-out so users can use the export time instead.
+- Export confirmation now reports when the source date was preserved.
+
+### Fixed
+- Removed duplicated editor reset state when switching photos.
+- Reset Edits now restores all current editor/export controls to their defaults.
+
+### Safety
+- Timestamp preservation changes only the new edited copy.
+- If the requested source timestamp cannot be applied, the new export is removed and the operation reports an error.
+- Original media remains read-only.
+
+## 0.35.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the JPEG encoder import.
+- No before/after comparison, JPEG quality, preview, or export behavior was changed.
+
+## 0.35.0 — 2026-10-26
+
+### Added
+- Added **Show original / Show edits** comparison directly in the photo preview.
+- Added explicit JPEG export quality from 40–100 with a default of 92.
+- Added backend validation for JPEG quality.
+- Added regression coverage for JPEG quality bounds.
+
+### Fixed
+- Reset Edits now clears grayscale, hue, blur, sharpen and sharpen-threshold controls too.
+- Removed duplicated advanced-adjustment resets when switching photos.
+
+### Safety
+- Before/after comparison is read-only.
+- JPEG quality only changes newly rendered JPEG copies; originals remain untouched.
+
+## 0.34.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the advanced-adjustment regression tests.
+- No grayscale, hue, blur, sharpen, preview, or export behavior was changed.
+
+## 0.34.0 — 2026-10-26
+
+### Added
+- Added grayscale editing with live preview.
+- Added hue rotation from -180° to +180°.
+- Added blur from 0.0 to 10.0.
+- Added sharpening from 0.0 to 10.0 with a 0–100 threshold.
+- Added backend validation and regression tests for the new adjustment limits.
+
+### Safety
+- All new adjustments use the existing shared preview/export pipeline.
+- Original media remains read-only and export remains create-new only.
+
+## 0.33.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the new crop/resize regression tests.
+- No Phase 4 crop, resize, preview, or export behavior was changed.
+
+## 0.33.0 — 2026-10-26
+
+### Added
+- Added **live edit preview** generated by the same Rust pipeline used for final export.
+- Added independent crop controls for left, right, top and bottom edges.
+- Added resize by width, height, or exact dimensions.
+- Added aspect-ratio-preserving resize when only one dimension is supplied.
+- Added **Reset edits** for the complete edit state.
+- Added regression tests for crop/resize dimensions and excessive-crop rejection.
+
+### Safety
+- Crop settings are bounded to 0–45% per edge and must leave at least 10% of the image.
+- Resize dimensions are limited to 20,000 pixels per side.
+- Export remains create-new only; originals and existing destination files are never overwritten.
+
+## 0.32.2 — 2026-10-26
+
+### Fixed
+- Replaced the eight-argument edited-export command with a typed `EditOptions` request object to satisfy strict Clippy without suppressing lint rules.
+- Updated the frontend export call to use the typed edit-options payload.
+- No Phase 4 editing functionality was removed.
+
+## 0.32.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the new non-destructive edited-export backend.
+- No Phase 4 editing functionality was removed or rolled back.
+
+## 0.32.0 — 2026-10-26
+
+### Added
+- Started **Phase 4** with a non-destructive **Edit & Export** workflow.
+- Added 90° rotation, horizontal/vertical flip, brightness and contrast adjustments.
+- Added an explicit save dialog for exporting a new edited copy.
+- Added backend export validation that prevents overwriting the original source or any existing destination.
+- Added cleanup of partial exports if encoding or disk sync fails.
+- Added regression tests for edit limits and quarter-turn dimensions.
+
+### Safety
+- Original media remains read-only.
+- Edited output is always a new file chosen by the user.
+- Existing files are never silently overwritten.
+
+### Limitations
+- First-pass editing supports common locally decodable still-image formats; HEIC/HEIF, RAW and video editing remain excluded.
+- Export supports JPG/JPEG, PNG, WebP, BMP and TIFF.
+- Metadata preservation is not yet guaranteed for rendered edited copies.
+
+## 0.31.0 — 2026-10-26
+
+### Added
+- Added a backend **Phase 3 AI self-check** report.
+- Added Settings UI to run the self-check and report Semantic Search, People and OCR bundle readiness.
+- Added DirectML availability and CPU-fallback status to the self-check.
+- Added tests that distinguish missing from incompatible model slots.
+
+### Changed
+- Photo-details semantic AI actions are now disabled until the verified OpenCLIP bundle is ready.
+- Documentation now distinguishes **Phase 3 core implementation complete** from **real-world validation still required**.
+
+### Phase 3 validation still required
+- Representative real-library testing for semantic search, People and OCR.
+- CPU-vs-DirectML comparison on real Windows hardware.
+- People grouping threshold tuning and OCR post-processing refinement.
+- Stronger pause/resume behavior if very long AI indexing jobs require persistent queues.
+
+## 0.30.0 — 2026-10-26
+
+### Added
+- Added backend-provided compatibility metadata for every supported AI model slot.
+- Added Settings readiness states for **Semantic Search**, **People**, and **OCR**.
+- Added model-level **verified / missing / incompatible** status in the Local AI inventory.
+- Added a regression test that every known AI slot has a valid pinned SHA-256 contract.
+
+### Changed
+- Removed the duplicated checksum table from the React frontend; Rust is now the single source of truth for supported AI assets.
+- Model imports now use the backend-provided expected checksum.
+- Semantic Search, People, and OCR actions are disabled until their complete verified model bundles are ready.
+
+### Phase 3 status
+- Core implementation now exists for semantic search, DirectML-first execution with CPU fallback, People/face grouping, and English-first OCR.
+- These AI features remain experimental until representative real-library and real-hardware validation is complete.
+
+## 0.29.2 — 2026-10-26
+
+### Fixed
+- Added the missing `serde_json` dependency required to persist OCR region metadata in local application data.
+- No OCR functionality was removed or rolled back.
+
+## 0.29.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter output required by CI for the new OCR pipeline and OCR model guards.
+- No OCR functionality was removed or rolled back.
+
+## 0.29.0 — 2026-10-26
+
+### Added
+- Added the first working **OCR** pipeline for local photo-text indexing and search.
+- Pinned the English PP-OCRv3 mobile detector by SHA-256.
+- Pinned the English PP-OCRv4 mobile recognizer by SHA-256.
+- Added local detector preprocessing, probability-map region extraction and conservative text-region bounding boxes.
+- Added local English CTC text recognition using the pinned PP-OCR character contract.
+- Added persistent OCR text and region metadata in `ai-ocr.sqlite`.
+- Added incremental OCR indexing that skips photos already current for the same source timestamp and model pair.
+- Added a Library toolbar for **Index library text** and **Search photo text**.
+- Reused the existing DirectML-first / CPU-fallback AI processing preference.
+
+### Safety
+- OCR never modifies original media.
+- Extracted text remains local application data unless the user later chooses an explicit export/write workflow.
+
+### Limitations
+- The first OCR release is English-first.
+- Text-region post-processing uses conservative rectangular connected components rather than full DB polygon reconstruction.
+- Rotated, curved, handwritten and dense document text still need validation and refinement.
+
+## 0.28.2 — 2026-10-26
+
+### Fixed
+- Reworked ArcFace landmark packing to satisfy the strict Clippy iterator rule.
+- Switched People-group ordering to `sort_by_key(Reverse(...))` as required by the Windows lint gate.
+- No People recognition functionality was removed or rolled back.
+
+## 0.28.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter output required by the Windows CI gate for the new People pipeline and face-model import guard.
+- No People functionality was removed or rolled back.
+
+## 0.28.0 — 2026-10-26
+
+### Added
+- Added the first working **People** pipeline using pinned OpenCV Zoo models.
+- Added exact YuNet 2026may face-detector enforcement (MIT weights, SHA-256 pinned).
+- Added exact SFace 2021dec face-embedder enforcement (Apache-2.0 weights, SHA-256 pinned).
+- Added local YuNet preprocessing, 12-head output decoding, confidence filtering and non-maximum suppression.
+- Added five-landmark ArcFace alignment to 112×112 crops before SFace inference.
+- Added normalized 128-value face embeddings and a separate local `ai-faces.sqlite` index.
+- Added per-photo model provenance and source-modification tracking so current People results can be skipped safely.
+- Added multi-photo People indexing with shared ONNX sessions per batch.
+- Replaced the People placeholder with local suggested groups, index status and manual local naming.
+- Added automatic use of Open-Photo's pinned checksums for known AI model imports.
+
+### Safety
+- People indexing never modifies original photos.
+- Suggested identity groups are advisory and are not permanently auto-merged.
+- Face embeddings remain local application data and are not exported by default.
+
+### Notes
+- People grouping is experimental and still needs representative real-library validation and threshold tuning.
+- OCR remains unfinished.
+
+## 0.27.2 — 2026-10-26
+
+### Fixed
+- Kept the DirectML-aware ONNX session builders mutable through model commit for both semantic image and semantic text inference.
+- This resolves the Rust Clippy/compile error introduced by the 0.27.0 GPU-provider integration.
+
+## 0.27.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter layout required by the Windows CI fail-fast gate for the new DirectML-aware semantic image/text commands.
+- No Phase 3 functionality was removed or rolled back.
+
+## 0.27.0 — 2026-10-26
+
+### Added
+- Added Windows **DirectML-first** ONNX execution for Automatic AI processing mode with safe CPU fallback.
+- Added local AI runtime status reporting so Settings can show whether DirectML is available.
+- Added visible semantic indexing progress in bounded 64-photo batches.
+- Added safe cancellation between AI indexing batches; embeddings completed before cancellation remain stored and reusable.
+
+### Changed
+- Routed semantic image indexing and natural-language text inference through the selected AI processing preference.
+- Updated the Settings copy so GPU behavior is explicit instead of being labeled as future support.
+- Updated the in-app version display to 0.27.0.
+
+### Phase 3 guardrails
+- Face recognition and OCR model slots remain intentionally non-executable until Open-Photo pins supported model contracts (preprocessing, output shape, checksums, licensing and regression fixtures). Arbitrary ONNX files are not treated as compatible merely because they import successfully.
+- DirectML still requires real-hardware validation against the CPU path before semantic search is considered production-ready.
+
+## 0.26.2 — 2026-10-26
+
+### Fixed
+- Made the AI Library toolbar callbacks explicitly null-safe so TypeScript does not lose the surrounding `result` guard when those callbacks execute later.
+
+## 0.26.1 — 2026-10-26
+
+### Fixed
+- Applied the exact Rust formatter output to the incremental semantic indexing path so the Phase 3 library-indexing milestone can reach compile, lint, regression-test and installer validation.
+
+## 0.26.0 — 2026-10-26
+
+### Added
+- Added **Index library with AI** for the current workspace.
+- Added multi-root AI indexing orchestration in the Library UI.
+- Added multi-root natural-language semantic search that merges and ranks matches across workspace folders.
+- Added explicit batch failure counts separate from safe already-current skips.
+
+### Performance
+- Semantic batch indexing now reuses one ONNX vision session per batch instead of loading the model once per photo.
+- Heavy batch inference runs on Tauri's blocking worker pool rather than the main UI thread.
+- Existing embeddings are skipped when the source modification time, semantic pipeline key and 512-value dimension are already current.
+- Raised the backend batch limit to 5,000 photos; the UI chunks larger root groups.
+
+### Notes
+- Full cancellable queue/progress/pause/resume support is still planned.
+- Semantic search remains experimental until the verified OpenCLIP bundle is exercised end-to-end on representative photo libraries.
+
+## 0.25.3 — 2026-10-26
+
+### Fixed
+- Disabled the optional `tokenizers` `esaxx_fast` C++ acceleration feature on Windows builds to avoid duplicate MSVC C++ runtime symbols when the tokenizer and ONNX Runtime are linked into the same Rust regression-test binary.
+- Kept the tokenizer's Oniguruma regex backend enabled, so CLIP tokenization functionality remains available without the conflicting C++ helper path.
+
+## 0.25.2 — 2026-10-26
+
+### Fixed
+- Rounded OpenCLIP normalization constants to valid f32 precision so Rust 1.99 Clippy does not reject the semantic preprocessing module.
+
+### Documentation
+- Replaced the original project-foundation README with a current end-user and developer guide.
+- Documented working features, limitations, privacy behavior, local data locations, iPhone support, duplicate tools, XMP sidecars, AI setup, supported semantic model files, and unfinished work.
+- Corrected the in-app File Safety note so it accurately states that original media is read-only while explicit create-only XMP sidecar writes are supported.
+- Added this changelog.
+
+## 0.25.0–0.25.1 — Natural-language semantic search
+
+### Added
+- Added the text side of the OpenCLIP semantic-search pipeline.
+- Added a dedicated semantic text-model slot and tokenizer slot.
+- Added local tokenizer support through the Rust tokenizers crate.
+- Added 77-token CLIP text input handling.
+- Added 512-dimensional normalized text embeddings.
+- Added natural-language semantic search over locally stored image embeddings.
+- Added Library UI for queries such as “dog at the beach.”
+- Added exact compatibility checks for one supported OpenCLIP ViT-B/32 LAION-2B split ONNX bundle.
+- Added strict SHA-256 validation for:
+  - vision_model.onnx
+  - text_model.onnx
+  - tokenizer.json
+- Added tokenizer JSON import support.
+
+### Changed
+- Replaced the earlier generic 224×224 image preprocessing with model-correct OpenCLIP preprocessing:
+  - resize/center crop to 224×224;
+  - RGB channel-first tensor;
+  - OpenCLIP mean/std normalization.
+- Normalized semantic image embeddings before storage/search.
+- Versioned semantic embeddings by the supported model/preprocessing pipeline so older incompatible embeddings can be marked stale.
+- Semantic slots now reject unrelated ONNX/tokenizer assets rather than accepting arbitrary files.
+
+### Notes
+- Natural-language semantic search remains experimental until the exact bundle has been exercised end-to-end against representative real photo libraries.
+- GPU acceleration is not part of this milestone.
+
+## 0.24.0–0.24.2 — Semantic photo similarity
+
+### Added
+- Added local cosine-similarity search over stored semantic image embeddings.
+- Added photo-to-photo semantic similarity lookup.
+- Added ranked similarity scores in the photo details UI.
+- Added embedding decoding and cosine-similarity regression tests.
+
+### Fixed
+- Updated embedding decoding for current Rust/Clippy requirements.
+- Applied formatting and lint repairs required by the Windows CI gate.
+
+## 0.23.0–0.23.1 — Batch AI indexing
+
+### Added
+- Added multi-photo semantic indexing.
+- Added a bounded batch size of 500 files.
+- Added selected-photo batch indexing controls in the Library.
+- Added indexed/skipped/error result reporting.
+
+### Notes
+- Batch indexing is local and does not modify original photos.
+- AI indexing remains root-scoped and needs more multi-folder end-to-end testing than the normal library scanner.
+
+## 0.22.0–0.22.2 — Persistent semantic embeddings
+
+### Added
+- Added ai-embeddings.sqlite under local application data.
+- Added persistent semantic image embeddings.
+- Added model fingerprint tracking for embedding invalidation.
+- Added per-photo “Index this photo” UI.
+- Added embedding serialization regression coverage.
+
+### Changed
+- Refactored semantic inference so the embedding indexer can reuse the same local model execution path.
+
+### Fixed
+- Corrected syntax and formatting issues discovered by Windows CI.
+
+## 0.21.0–0.21.2 — Local ONNX inference
+
+### Added
+- Added ONNX Runtime through the Rust ort crate.
+- Added CPU-first local semantic image inference.
+- Added model loading from Open-Photo’s confined local AI model directory.
+- Added input/output validation and embedding-size safety checks.
+
+### Fixed
+- Updated the implementation to the current ort environment/session API.
+- Fixed formatting issues before the milestone reached a green Windows build.
+
+## 0.20.0–0.20.2 — AI image preprocessing
+
+### Added
+- Added deterministic local image preprocessing for AI inference.
+- Added a diagnostic Tauri command for prepared image tensors.
+- Added regression tests for tensor shape/layout.
+
+### Changed
+- Refactored preprocessing so inference can operate on an internal Rust tensor instead of requiring a round trip through the frontend.
+
+### Fixed
+- Rust formatting and unused-import lint repairs.
+
+## 0.19.0 — Local AI model removal
+
+### Added
+- Added explicit removal of installed local AI model slots.
+- Added confirmation before deleting a stored model asset.
+- Kept model removal confined to Open-Photo’s private application-data model directory.
+
+### Safety
+- Removing a model never deletes original photos.
+
+## 0.18.0–0.18.1 — Local AI model inventory/import
+
+### Added
+- Added offline AI model inventory.
+- Added semantic, face, and OCR model slots.
+- Added manual local ONNX import.
+- Added mandatory SHA-256 verification before installation.
+- Added a 2 GB per-model safety limit.
+- Added create-new behavior so existing model slots are not silently overwritten.
+- Added Settings UI for local AI model inspection/import.
+
+### Notes
+- This milestone created the model-management foundation only; it did not make face recognition or OCR functional.
+
+## 0.17.0 — Custom smart collections
+
+### Added
+- Added workspace-scoped custom smart rules.
+- Rules can filter by:
+  - minimum star rating;
+  - media type;
+  - minimum file size.
+- Smart rules are stored locally and recompute dynamically.
+
+## 0.16.0 — Persistent duplicate review preference
+
+### Added
+- Preferred-copy choices from duplicate review now persist locally between sessions.
+
+### Safety
+- Preferred-copy state is advisory only; no file is moved or deleted.
+
+## 0.15.0 — Guided duplicate review
+
+### Added
+- Added a non-destructive duplicate-review workflow.
+- Added Preview for each candidate.
+- Added “Mark to keep” preferred-copy selection.
+- Combined exact duplicate and visually similar review results.
+
+## 0.14.0 — Expanded smart memories
+
+### Added
+- Added Unrated media smart filter.
+- Added This Month in Past Years memory filter.
+
+## 0.13.0 — Dynamic smart collections / memories
+
+### Added
+- Added dynamic read-only smart collections.
+- Added Last 30 Days.
+- Added On This Day.
+- Added Large Media.
+- Added reusable organization filtering without moving media.
+
+### Notes
+- Date-based filters currently use filesystem modification timestamps rather than a complete EXIF/QuickTime capture-date index.
+
+## 0.12.0 — Full-screen viewer and CI improvements
+
+### Added
+- Added a full-screen photo details viewer.
+- Added keyboard left/right navigation.
+- Added Escape-to-close behavior.
+- Expanded preview sizing in full-screen mode.
+
+### CI
+- Added version-aware workflow run names.
+- Added cancellation of superseded workflow runs.
+- Added npm cache use to reduce repeated dependency work.
+
+## 0.11.0 — Privacy-first local AI opt-in
+
+### Added
+- Added Local AI preference controls.
+- AI is off by default.
+- Added Automatic/future-GPU and CPU-only preference choices.
+- Stored AI preferences locally.
+
+### Notes
+- This release added user consent/settings only; inference was not active yet.
+
+## 0.10.0 — Ratings and favorites
+
+### Added
+- Added local 1–5 star ratings.
+- Added Favorites filter using 5-star ratings.
+- Added Rated filter.
+
+### Safety
+- Ratings are Open-Photo local application state and do not alter original media.
+
+## 0.9.0–0.9.1 — Library health check
+
+### Added
+- Added a read-only indexed-library health report.
+- Added counts for:
+  - indexed;
+  - available;
+  - missing;
+  - inaccessible;
+  - modified.
+- Added Settings UI for the health check.
+
+### Safety
+- Health checks never delete source files or index rows.
+- An unavailable root is treated conservatively rather than as a mass-delete signal.
+
+## 0.8.0–0.8.1 — iPhone media compatibility baseline
+
+### Added
+- Added bounded local reading for HEIC/HEIF and common iPhone motion formats.
+- Added local HEIC decoding.
+- Added inline motion-video preview when supported.
+- Added external Windows media-player fallback.
+- Added filename-based Live Photo pairing.
+- Added Live Photo labeling and motion preview in details.
+
+### Limitations
+- Pairing is based on same folder + filename stem, not Apple asset identifiers.
+- HEVC playback depends on Windows/WebView2 codecs.
+- Large motion clips may require the external player.
+- HDR/color/orientation and RAW combinations are not fully validated.
+
+## 0.7.0–0.7.1 — Incremental-index safety regression coverage
+
+### Added
+- Added regression tests for missing folders and directory events in incremental indexing.
+
+### Safety
+- Strengthened protection against treating unavailable folder events as valid file deletions.
+
+## 0.6.0 — Inaccessible-storage protection
+
+### Fixed
+- Prevented inaccessible/stat-failed storage from causing indexed media to be purged.
+
+## 0.5.0 — Watcher event serialization
+
+### Fixed
+- Serialized incremental event batches.
+- Preserved filesystem events that arrive while an update is already in progress.
+
+## 0.4.0–0.4.1 — Incremental file indexing
+
+### Added
+- Added per-file SQLite index updates for filesystem events.
+- Added bounded incremental library updates with full-scan fallback.
+- Added changed-path event handling.
+
+### Fixed
+- Applied Windows rustfmt repairs required for the green build.
+
+## 0.3.0 — Sync observability
+
+### Added
+- Added unchanged-media counts to indexed sync summaries.
+- Expanded sync reporting for added, updated, unchanged and removed entries.
+
+## 0.2.0 — Indexed-scan performance
+
+### Changed
+- Reworked indexed snapshot comparison to compare the complete snapshot in memory instead of querying SQLite once per file.
+
+## 0.1.0–0.1.1 — Desktop foundation and first functional library
+
+This early development line grew well beyond the original scaffold before the project adopted the current green-minor/red-patch versioning policy.
+
+### Desktop foundation
+- Created the Tauri 2 + React + TypeScript Windows application.
+- Added reproducible app-icon generation.
+- Added Windows GitHub Actions installer builds.
+- Added enforced Rust formatting, Clippy and regression tests.
+
+### Local browsing
+- Added safe recursive local folder scanning.
+- Added local thumbnail and detail previews.
+- Added grid/list views, sorting and thumbnail zoom.
+- Added preview path-boundary regression tests.
+- Added virtualized photo tiles and multi-select.
+
+### XMP
+- Added explicit create-only XMP keyword sidecars.
+- Added bounded tag validation.
+- Added protection against overwriting existing sidecars or modifying originals.
+
+### Workspaces and organization
+- Added separate workspaces.
+- Added multiple folder roots per workspace.
+- Added folder/media filters.
+- Added workspace-scoped virtual collections.
+- Added timeline navigation.
+- Added workspace metadata JSON export.
+
+### Map and video
+- Added EXIF GPS extraction.
+- Added Leaflet/OpenStreetMap photo map.
+- Added common desktop/iPhone video indexing.
+- Added safe “Open in Windows player” action.
+
+### Durable indexing
+- Added SQLite media index.
+- Added safe indexed rescans.
+- Added exact duplicate detection across workspace roots.
+- Added SHA-256 dependency for exact duplicate detection.
+- Added persistent local PNG thumbnail cache.
+
+### Sync and watchers
+- Added per-sync added/updated/removed summaries.
+- Added native recursive filesystem watchers.
+- Added debounced indexed rescans with polling fallback.
+- Added overlap/stale-scan protection.
+- Added optional periodic auto-sync.
+
+### Similar-photo and Live Photo foundations
+- Added CPU dHash visual near-duplicate grouping.
+- Added exact/visual duplicate review UI.
+- Added filename-based likely iPhone Live Photo companion matching.
+- Added paired-rename handling to retain virtual collection membership.
+
+### Versioning policy introduced
+- Added the current development rule:
+  - green build → next minor version for feature work;
+  - red build → patch repair;
+  - major version reserved for approved main release.
+- Added CI validation that package.json, Cargo.toml and tauri.conf.json use the same version.
+
+## Planned / not yet completed
+
+The following remain active roadmap items and should not be represented as finished:
+
+- local face detection and recognition;
+- People review, merge and naming;
+- XMP face-region export;
+- OCR;
+- GPU acceleration;
+- background AI queue/progress/pause/resume;
+- full EXIF/QuickTime capture-date timeline;
+- complete RAW preview pipeline;
+- hierarchical XMP editing/merging and broader metadata portability;
+- non-destructive photo editing/export presets;
+- safe delete/trash workflows;
+- offline map tiles;
+- metadata-based Apple Live Photo pairing;
+- Immich API synchronization and person mapping;
+- formal public licensing/release.
