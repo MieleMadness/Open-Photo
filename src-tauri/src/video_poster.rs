@@ -41,12 +41,22 @@ pub(crate) fn poster(
     frame_at(engine, root, path, max_edge, None)
 }
 
-fn frame_at(engine: &Path, root: &str, path: &str, max_edge: u32, requested: Option<f64>) -> Result<String,String> {
+fn frame_at(
+    engine: &Path,
+    root: &str,
+    path: &str,
+    max_edge: u32,
+    requested: Option<f64>,
+) -> Result<String, String> {
     let source = media_stream::validated_video(root, path)?;
     let before = signature(&source)?;
     let edge = max_edge.clamp(64, 640);
-    if requested.is_some_and(|s| !s.is_finite() || s < 0.0 || s > 7200.0) { return Err("Invalid filmstrip timestamp".into()); }
-    let time_key = requested.map(|s| format!("{:.3}",s)).unwrap_or_else(|| "poster".into());
+    if requested.is_some_and(|s| !s.is_finite() || s < 0.0 || s > 7200.0) {
+        return Err("Invalid filmstrip timestamp".into());
+    }
+    let time_key = requested
+        .map(|s| format!("{s:.3}"))
+        .unwrap_or_else(|| "poster".into());
     let key = format!(
         "video-frame-v2:{}:{}:{}:{}:{edge}:{time_key}",
         video_engine::VERSION,
@@ -66,10 +76,52 @@ fn frame_at(engine: &Path, root: &str, path: &str, max_edge: u32, requested: Opt
         {
             return Err("Video poster exceeds duration or frame-size limits".into());
         }
-        let seconds=requested.unwrap_or((info.duration_seconds*0.1).min(5.0)).min((info.duration_seconds - 0.001).max(0.0));
-        let args:Vec<OsString>=["-nostdin","-v","error","-xerror","-threads","2","-filter_threads","1","-max_alloc","268435456","-protocol_whitelist","file,pipe","-format_whitelist","mov,matroska,webm,avi","-ss"].into_iter().map(Into::into).chain([
-            format!("{seconds:.6}").into(),"-i".into(),source.clone().into(),"-map".into(),format!("0:{}",info.video_stream).into(),"-an".into(),"-sn".into(),"-dn".into(),"-frames:v".into(),"1".into(),"-vf".into(),format!("scale={edge}:{edge}:force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1").into(),"-pix_fmt".into(),"rgb24".into(),"-c:v".into(),"png".into(),"-threads:v".into(),"1".into(),"-f".into(),"image2pipe".into(),"pipe:1".into()
-        ]).collect();
+        let seconds = requested
+            .unwrap_or((info.duration_seconds * 0.1).min(5.0))
+            .min((info.duration_seconds - 0.001).max(0.0));
+        let args: Vec<OsString> = [
+            "-nostdin",
+            "-v",
+            "error",
+            "-xerror",
+            "-threads",
+            "2",
+            "-filter_threads",
+            "1",
+            "-max_alloc",
+            "268435456",
+            "-protocol_whitelist",
+            "file,pipe",
+            "-format_whitelist",
+            "mov,matroska,webm,avi",
+            "-ss",
+        ]
+        .into_iter()
+        .map(Into::into)
+        .chain([
+            format!("{seconds:.6}").into(),
+            "-i".into(),
+            source.clone().into(),
+            "-map".into(),
+            format!("0:{}", info.video_stream).into(),
+            "-an".into(),
+            "-sn".into(),
+            "-dn".into(),
+            "-frames:v".into(),
+            "1".into(),
+            "-vf".into(),
+            format!("scale={edge}:{edge}:force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1").into(),
+            "-pix_fmt".into(),
+            "rgb24".into(),
+            "-c:v".into(),
+            "png".into(),
+            "-threads:v".into(),
+            "1".into(),
+            "-f".into(),
+            "image2pipe".into(),
+            "pipe:1".into(),
+        ])
+        .collect();
         let borrowed: Vec<&OsStr> = args.iter().map(OsString::as_os_str).collect();
         let bytes = video_engine::run(
             &video_engine::tool(engine, "ffmpeg")?,
@@ -121,9 +173,27 @@ pub async fn video_poster(
 
 /// Timeline-only frame lookup: path scoped, bounded, cached, and read-only.
 #[tauri::command]
-pub async fn video_timeline_frame(app: tauri::AppHandle, jobs: tauri::State<'_, PosterJobs>, root:String, path:String, seconds:f64) -> Result<String,String> {
-    if !seconds.is_finite() || !(0.0..=7200.0).contains(&seconds) { return Err("Invalid filmstrip timestamp".into()); }
-    let engine=video_engine::directory(&app)?;
-    let permit=jobs.library.clone().acquire_owned().await.map_err(|e|e.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || { let _permit=permit;frame_at(&engine,&root,&path,160,Some(seconds)) }).await.map_err(|e|e.to_string())?
+pub async fn video_timeline_frame(
+    app: tauri::AppHandle,
+    jobs: tauri::State<'_, PosterJobs>,
+    root: String,
+    path: String,
+    seconds: f64,
+) -> Result<String, String> {
+    if !seconds.is_finite() || !(0.0..=7200.0).contains(&seconds) {
+        return Err("Invalid filmstrip timestamp".into());
+    }
+    let engine = video_engine::directory(&app)?;
+    let permit = jobs
+        .library
+        .clone()
+        .acquire_owned()
+        .await
+        .map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        frame_at(&engine, &root, &path, 160, Some(seconds))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
