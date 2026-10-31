@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current source update — 0.56.23
+## Current source update — 0.56.26
+
+0.56.26 adds bounded, debounced timeline frame scheduling and skips obsolete queued requests after zoom/resize or unmount. 0.56.25 added adaptive sample density, and 0.56.24 added timestamp-specific sampled frames. Windows installer acceptance is still required.
 
 Requested groups 1/2/3/4/6 are implemented: native automatic AI queue/dashboard/exclusions, expanded zoomable details and simplified Live playback, fullscreen library filmstrip, signed Preview channel code/workflow, and bounded video semantic indexing with ranked timestamps. Source media stay read-only; folder Sync stays manual. See [handoff](LOCAL_HANDOFF_0_56_23.md), [AI architecture](AUTOMATIC_AI_INDEXING.md) and [viewer controls](MEDIA_VIEWER.md).
 
