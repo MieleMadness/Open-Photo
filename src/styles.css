@@ -2554,3 +2554,16 @@ select {
 .viewer-neighbor[aria-current="true"] { border-color:var(--primary); box-shadow:inset 0 0 0 1px var(--primary); }
 .viewer-neighbor .photo-image,.viewer-neighbor .photo-fallback { width:100%; height:54px; min-height:0; object-fit:cover; }
 .viewer-neighbor>span { font-size:var(--type-caption); width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Fullscreen viewer: allow video to reclaim every pixel released by the filmstrip. */
+.details-fullscreen .detail-preview.detail-preview-video { flex:1 1 0; min-height:0; overflow:hidden; display:flex; flex-direction:column; }
+.details-fullscreen .detail-preview-video .video-player { flex:1 1 0; height:100%; min-height:0; display:flex; flex-direction:column; align-items:stretch; justify-content:center; }
+.details-fullscreen .detail-preview-video .video-player>video { flex:1 1 auto; min-height:0; width:100%; height:100%; max-height:100%; object-fit:contain; }
+.details-fullscreen .detail-preview-video .video-player>.video-poster { flex:1 1 0; min-height:0; }
+.viewer-filmstrip-scroll { scrollbar-width:auto; cursor:grab; overscroll-behavior-x:contain; }
+.viewer-filmstrip-scroll:active { cursor:grabbing; }
+.viewer-filmstrip-scroll::-webkit-scrollbar { height:16px; }
+.viewer-filmstrip-scroll::-webkit-scrollbar-thumb { background:var(--muted); border:4px solid var(--surface); border-radius:999px; }
+.viewer-filmstrip-scroll::-webkit-scrollbar-track { background:var(--surface-muted); border-radius:999px; }
+.viewer-filmstrip-scroll .viewer-neighbor { touch-action:pan-y; }
+@media(prefers-reduced-motion:no-preference) { .details-fullscreen .detail-preview-video { transition:flex-grow 180ms ease; } }
