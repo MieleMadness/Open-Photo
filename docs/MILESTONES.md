@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current source update — 0.56.28
+## Current source update — 0.56.29
+
+0.56.29 virtualizes Library list rows with viewport-aware overscan and stable 64px geometry.
 
 0.56.28 adds bounded, cache-aware Library thumbnail requests and skips stale queued thumbnails when users scroll quickly.
 
