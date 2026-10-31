@@ -1,3 +1,9 @@
+# 0.56.34 — Phase G: shared Library thumbnail requests
+
+- Deduplicate identical in-flight Library thumbnail requests by source metadata, requested size and preview command.
+- Fan out successful results to active tiles; skip queued jobs when every subscriber leaves before decoding starts.
+- Preserve the three-request scheduler, memory-bounded LRU cache, Live Photo hover preview and read-only media protections.
+
 # 0.56.33 — Phase G: bounded Library thumbnail memory
 
 - Replace count-only preview caching with an LRU cache limited to 80 items and a conservative 24 MiB estimate of in-memory data URL strings.
