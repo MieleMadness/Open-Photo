@@ -1,6 +1,8 @@
 # Milestones and validation status
 
-## Current source update — 0.56.32
+## Current source update — 0.56.33
+
+0.56.33 replaces count-only Library thumbnail caching with tested memory-bounded LRU eviction.
 
 0.56.32 fixes the scroll reset race and makes the virtual-row test frame-aware.
 
