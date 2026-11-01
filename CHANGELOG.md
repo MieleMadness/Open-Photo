@@ -1,3 +1,10 @@
+# 0.56.43 — Stable map interactions
+
+- Keep the current Leaflet map zoom and pan while selecting photos or videos, even when parent UI state changes.
+- Use the current selection handler without remounting the map for each render.
+- Describe mixed photo and video GPS markers as media items in the map interface.
+- Retain 0.56.42 HEIC/HEIF and MOV/MP4 GPS extraction; real iPhone metadata acceptance remains pending.
+
 # 0.56.42 — iPhone GPS map support
 
 - Read GPS from HEIC/HEIF EXIF and MOV/MP4 QuickTime metadata using the existing read-only nom-exif library.
