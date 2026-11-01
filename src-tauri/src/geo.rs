@@ -16,7 +16,11 @@ fn coordinate(value: &Value) -> Option<f64> {
         return None;
     }
     let x = |i: usize| values[i].num as f64 / values[i].denom as f64;
-    Some(x(0) + x(1) / 60.0 + x(2) / 3600.0)
+    let (degrees, minutes, seconds) = (x(0), x(1), x(2));
+    if !(0.0..60.0).contains(&minutes) || !(0.0..60.0).contains(&seconds) {
+        return None;
+    }
+    Some(degrees + minutes / 60.0 + seconds / 3600.0)
 }
 fn reference(value: &Value) -> Option<String> {
     match value {
@@ -84,6 +88,42 @@ pub fn gps_for_photos(root: String, paths: Vec<String>) -> Result<Vec<GeoPoint>,
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rejects_invalid_exif_minutes_and_seconds() {
+        let valid = Value::Rational(vec![
+            exif::Rational { num: 27, denom: 1 },
+            exif::Rational { num: 59, denom: 1 },
+            exif::Rational { num: 599, denom: 10 },
+        ]);
+        let invalid_minutes = Value::Rational(vec![
+            exif::Rational { num: 27, denom: 1 },
+            exif::Rational { num: 60, denom: 1 },
+            exif::Rational { num: 0, denom: 1 },
+        ]);
+        let invalid_seconds = Value::Rational(vec![
+            exif::Rational { num: 27, denom: 1 },
+            exif::Rational { num: 0, denom: 1 },
+            exif::Rational { num: 60, denom: 1 },
+        ]);
+        assert!(coordinate(&valid).is_some());
+        assert!(coordinate(&invalid_minutes).is_none());
+        assert!(coordinate(&invalid_seconds).is_none());
+    }
+    #[test]
+    fn rejects_zero_denominators_and_incomplete_gps() {
+        assert!(coordinate(&Value::Rational(vec![
+            exif::Rational { num: 1, denom: 1 },
+            exif::Rational { num: 2, denom: 0 },
+            exif::Rational { num: 3, denom: 1 },
+        ])).is_none());
+        assert!(coordinate(&Value::Rational(vec![
+            exif::Rational { num: 1, denom: 1 },
+        ])).is_none());
+    }
+    #[test]
+    fn accepts_padded_exif_hemisphere_references() {
+        assert_eq!(reference(&Value::Ascii(vec![b"S \\0".to_vec()])), Some("S".into()));
+    }
     #[test]
     fn rejects_excessive_map_batch() {
         assert!(gps_for_photos(".".into(), vec![String::new(); 5001]).is_err());
