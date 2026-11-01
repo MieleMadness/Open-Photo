@@ -89,7 +89,10 @@ pub fn gps_for_photos(root: String, paths: Vec<String>) -> Result<Vec<GeoPoint>,
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
-        if !matches!(ext.as_str(), "jpg" | "jpeg" | "tif" | "tiff" | "heic" | "heif" | "mov" | "mp4") {
+        if !matches!(
+            ext.as_str(),
+            "jpg" | "jpeg" | "tif" | "tiff" | "heic" | "heif" | "mov" | "mp4"
+        ) {
             continue;
         }
         let location = if matches!(ext.as_str(), "jpg" | "jpeg" | "tif" | "tiff") {
