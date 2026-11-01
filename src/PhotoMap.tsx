@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
-import {groupNearbyLocations} from "./mapLocationGroups";
+import {clusterMapLocations} from "./mapZoomClusters";
 import "leaflet/dist/leaflet.css";
 export type PhotoLocation = {path:string;lat:number;lon:number};
 export default function PhotoMap({points,onChoose,compact=false}:{points:PhotoLocation[];onChoose:(path:string)=>void;compact?:boolean}) {
@@ -14,20 +14,24 @@ export default function PhotoMap({points,onChoose,compact=false}:{points:PhotoLo
     const initialResize=window.setTimeout(resize,0);
     const observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(resize):null;
     observer?.observe(container.current);
-    const bounds:L.LatLngExpression[] = [];
-    for(const group of groupNearbyLocations(points)) {
-      const location:L.LatLngExpression=[group.lat,group.lon];
-      bounds.push(location);
-      let nextPhoto=0;
-      const count=group.photos.length;
-      const marker=L.circleMarker(location,{radius:count>1?11:7,color:"#6727ad",fillColor:"#28b678",fillOpacity:.85,weight:2}).addTo(map);
-      marker.bindTooltip(count===1?(group.photos[0].path.split(/[\\/]/).pop()||"Photo"):`${count} photos · Click to browse`);
-      marker.on("click",()=>{onChoose(group.photos[nextPhoto%count].path);nextPhoto++;});
-    }
+    const bounds:L.LatLngExpression[]=points.filter(point=>Number.isFinite(point.lat)&&Number.isFinite(point.lon)&&Math.abs(point.lat)<=90&&Math.abs(point.lon)<=180).map(point=>[point.lat,point.lon]);
+    const markers=L.layerGroup().addTo(map);
+    const renderMarkers=()=>{
+      markers.clearLayers();
+      for(const group of clusterMapLocations(points,map.getZoom())){
+        const count=group.photos.length;
+        let nextPhoto=0;
+        const marker=L.circleMarker([group.lat,group.lon],{radius:count>1?Math.min(19,9+Math.log2(count)*2):7,color:"#6727ad",fillColor:"#28b678",fillOpacity:.85,weight:2}).addTo(markers);
+        marker.bindTooltip(count===1?(group.photos[0].path.split(/[\\/]/).pop()||"Photo"):`${count} photos · Click to browse`);
+        marker.on("click",()=>{onChoose(group.photos[nextPhoto%count].path);nextPhoto++;});
+      }
+    };
     // Initialize the view once; a second setView can leave a zoom running during teardown.
     if(bounds.length) map.fitBounds(L.latLngBounds(bounds),{padding:[48,48],maxZoom:15,animate:false});
     else map.setView([27.95,-82.46],6);
-    return ()=>{window.clearTimeout(initialResize);observer?.disconnect();map.remove();};
+    renderMarkers();
+    map.on("zoomend",renderMarkers);
+    return ()=>{window.clearTimeout(initialResize);observer?.disconnect();map.off("zoomend",renderMarkers);map.remove();};
   },[points,onChoose,compact]);
   return <div ref={container} className="photo-location-map" aria-label="Photo locations map"/>;
 }
