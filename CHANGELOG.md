@@ -1,3 +1,10 @@
+# 0.56.39 — Polar GPS map bounds
+
+- Clamp valid polar GPS coordinates to Leaflet's supported ±85° display latitude when fitting map bounds and drawing markers.
+- Reuse centralized GPS validation for map bounds so malformed paths and coordinates cannot affect the initial view.
+- Preserve original GPS metadata, unchanged media files and per-photo marker selection.
+- Add regression coverage for both geographic poles; real-media Windows testing remains pending.
+
 # 0.56.38 — Global video volume synchronization
 
 - Keep volume consistent between already-open video players as well as videos opened later, using the existing local preference.
