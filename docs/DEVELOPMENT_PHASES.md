@@ -1,3 +1,7 @@
+## 0.56.35 Phase H kickoff — GPS correctness
+
+Phase G source optimizations are checkpointed; user-deferred real-world Windows testing with 10,000+ items is a **required pre-1.0 acceptance gate**, documented in [PRE_1_0_ACCEPTANCE.md](PRE_1_0_ACCEPTANCE.md). Phase H begins with validated map markers and signed/boundary coordinate regression tests. Next: GPS extraction edge cases, larger map marker sets, and media/date/workspace map filters.
+
 # Development phases
 
 ## 0.56.34 Phase G deduplication checkpoint
