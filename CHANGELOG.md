@@ -1,3 +1,10 @@
+# 0.56.36 — Phase H: overlapping GPS locations
+
+- Group photos at approximately the same GPS coordinates into one map marker, with a larger marker and photo count tooltip.
+- Repeated marker clicks cycle through available photos at that location, without hiding them behind overlapping markers.
+- Add grouping and malformed-coordinate regression coverage. No original media or GPS metadata is changed.
+- Real 10,000+ media Windows acceptance remains mandatory before 1.0.
+
 # 0.56.35 — Phase H: GPS validation and 1.0 gates
 
 - Begin Phase H by validating GPS coordinates before Leaflet marker placement; reject malformed nonfinite and out-of-range points and empty paths.
