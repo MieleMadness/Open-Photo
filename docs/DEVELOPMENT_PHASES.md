@@ -1,3 +1,7 @@
+## 0.56.37 Phase H zoom-aware clustering
+
+Photo location markers now group in viewport-scale buckets and redraw on zoom changes. Individual photos remain selectable from groups. HEIC/MOV GPS parsing and installed map acceptance remain follow-up work. The real Windows test with 10,000+ items remains a mandatory pre-1.0 acceptance gate.
+
 ## 0.56.36 Phase H overlapping-location checkpoint
 
 Photos whose GPS coordinates round to the same approximately metre-scale location use one marker; repeated clicks browse individual photos, with regression coverage. Map-wide clustering and HEIC/MOV extraction remain separate work. Pre-1.0 acceptance still includes real 10k+ Windows library testing.
