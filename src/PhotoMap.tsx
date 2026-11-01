@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
+import {validMapLocations} from "./mapLocations";
 import "leaflet/dist/leaflet.css";
 export type PhotoLocation = {path:string;lat:number;lon:number};
 export default function PhotoMap({points,onChoose,compact=false}:{points:PhotoLocation[];onChoose:(path:string)=>void;compact?:boolean}) {
@@ -14,8 +15,7 @@ export default function PhotoMap({points,onChoose,compact=false}:{points:PhotoLo
     const observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(resize):null;
     observer?.observe(container.current);
     const bounds:L.LatLngExpression[] = [];
-    for(const point of points) {
-      if(!Number.isFinite(point.lat)||!Number.isFinite(point.lon)) continue;
+    for(const point of validMapLocations(points)) {
       const location:L.LatLngExpression=[point.lat,point.lon];
       bounds.push(location);
       L.circleMarker(location,{radius:7,color:"#6727ad",fillColor:"#28b678",fillOpacity:.85,weight:2}).addTo(map)
