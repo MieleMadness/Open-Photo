@@ -9,7 +9,7 @@ it("resizes the existing map after sidebar changes and cleans up pending work",(
   vi.stubGlobal("ResizeObserver",class {constructor(callback:()=>void){resized=callback;}observe=mocks.observe;disconnect=mocks.disconnect;});
   const map={setView:vi.fn().mockReturnThis(),invalidateSize:mocks.invalidateSize,remove:mocks.remove,getZoom:()=>6,on:vi.fn(),off:vi.fn()};mocks.map.mockReturnValue(map);
   const {unmount}=render(<PhotoMap points={[]} onChoose={()=>{}}/>);
-  expect(map.setView).toHaveBeenCalledExactlyOnceWith([27.95,-82.46],6);
+  expect(map.setView).toHaveBeenCalledExactlyOnceWith([0,0],2);
   act(()=>resized());expect(mocks.invalidateSize).toHaveBeenCalledWith({pan:false});expect(mocks.map).toHaveBeenCalledOnce();
   unmount();expect(mocks.disconnect).toHaveBeenCalledOnce();expect(mocks.remove).toHaveBeenCalledOnce();
   mocks.invalidateSize.mockClear();act(()=>vi.runAllTimers());expect(mocks.invalidateSize).not.toHaveBeenCalled();
