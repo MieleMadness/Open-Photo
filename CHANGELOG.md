@@ -1,3 +1,10 @@
+# 0.56.38 — Global video volume synchronization
+
+- Keep volume consistent between already-open video players as well as videos opened later, using the existing local preference.
+- Ignore invalid non-finite volume updates instead of corrupting the saved preference.
+- Add regression tests for live synchronization, clamping and invalid input.
+- No source photos, videos or existing edit projects are modified.
+
 # 0.56.37 — Phase H: zoom-aware map clusters
 
 - Group nearby GPS photos into zoom-dependent Web Mercator map buckets, updating markers after zoom without recreating the map.
