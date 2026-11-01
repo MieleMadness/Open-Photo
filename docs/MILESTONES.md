@@ -1,6 +1,10 @@
 # Milestones and validation status
 
-## Current source update — 0.56.35
+## Current source update — 0.56.36
+
+0.56.36 groups overlapping photo map pins and allows cycling through their individual photos. The 10k+ media acceptance test remains a pre-1.0 gate.
+
+## Previous source update — 0.56.35
 
 Phase H begins: map coordinates are validated before marker placement. The deferred 10,000+ media Windows test is required before 1.0; see docs/PRE_1_0_ACCEPTANCE.md.
 
