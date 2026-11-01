@@ -1,3 +1,9 @@
+# 0.56.40 — Stable GPS cluster centers
+
+- Place grouped map markers at the mean location of their constituent media, rather than the first indexed file.
+- Prevent marker positions shifting when media scan order changes; original coordinates, files and selection order remain unchanged.
+- Add order-independence and midpoint regression coverage; installed Windows acceptance is still pending.
+
 # 0.56.39 — Polar GPS map bounds
 
 - Clamp valid polar GPS coordinates to Leaflet's supported ±85° display latitude when fitting map bounds and drawing markers.
