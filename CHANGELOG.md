@@ -1,3 +1,10 @@
+# 0.56.37 — Phase H: zoom-aware map clusters
+
+- Group nearby GPS photos into zoom-dependent Web Mercator map buckets, updating markers after zoom without recreating the map.
+- At closer zoom levels nearby photos separate into individual markers; grouped markers retain click-to-cycle selection of each photo.
+- Add clustering regression tests and update Leaflet tests for the new marker layer.
+- Actual Windows acceptance and HEIC/MOV GPS parsing remain outstanding. The 10k+ real library test remains a pre-1.0 gate.
+
 # 0.56.36 — Phase H: overlapping GPS locations
 
 - Group photos at approximately the same GPS coordinates into one map marker, with a larger marker and photo count tooltip.
