@@ -1,3 +1,9 @@
+# 0.56.42 — iPhone GPS map support
+
+- Read GPS from HEIC/HEIF EXIF and MOV/MP4 QuickTime metadata using the existing read-only nom-exif library.
+- Include those media formats in map discovery alongside JPEG/TIFF and reject invalid latitude/longitude values.
+- Add coordinate validation regression coverage. Real iPhone media and installed Windows map acceptance are still pending.
+
 # 0.56.41 — Strict GPS EXIF validation
 
 - Reject malformed degree-minute-second GPS values where minutes or seconds are 60 or greater, instead of mapping potentially incorrect locations.
