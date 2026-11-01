@@ -13,6 +13,10 @@ export function clusterMapLocations(points:readonly MapLocation[],zoom:number):Z
     const key=`${Math.floor(x/cell)}:${Math.floor(y/cell)}`;
     let group=groups.get(key);
     if(!group){group={lat,lon:point.lon,photos:[]};groups.set(key,group);}
+    // Incremental centroid: the marker represents the whole group, not whichever file was scanned first.
+    const count=group.photos.length;
+    group.lat=(group.lat*count+lat)/(count+1);
+    group.lon=(group.lon*count+point.lon)/(count+1);
     group.photos.push(point);
   }
   return [...groups.values()];
