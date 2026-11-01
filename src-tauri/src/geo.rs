@@ -26,7 +26,7 @@ fn reference(value: &Value) -> Option<String> {
     match value {
         Value::Ascii(values) => Some(
             String::from_utf8_lossy(values.first()?)
-                .trim_end_matches('\0')
+                .trim_end_matches(['\0', ' ', '\t', '\r', '\n'])
                 .to_ascii_uppercase(),
         ),
         _ => None,
@@ -93,7 +93,10 @@ mod tests {
         let valid = Value::Rational(vec![
             exif::Rational { num: 27, denom: 1 },
             exif::Rational { num: 59, denom: 1 },
-            exif::Rational { num: 599, denom: 10 },
+            exif::Rational {
+                num: 599,
+                denom: 10,
+            },
         ]);
         let invalid_minutes = Value::Rational(vec![
             exif::Rational { num: 27, denom: 1 },
@@ -115,14 +118,16 @@ mod tests {
             exif::Rational { num: 1, denom: 1 },
             exif::Rational { num: 2, denom: 0 },
             exif::Rational { num: 3, denom: 1 },
-        ])).is_none());
-        assert!(coordinate(&Value::Rational(vec![
-            exif::Rational { num: 1, denom: 1 },
-        ])).is_none());
+        ]))
+        .is_none());
+        assert!(coordinate(&Value::Rational(vec![exif::Rational { num: 1, denom: 1 },])).is_none());
     }
     #[test]
     fn accepts_padded_exif_hemisphere_references() {
-        assert_eq!(reference(&Value::Ascii(vec![b"S \\0".to_vec()])), Some("S".into()));
+        assert_eq!(
+            reference(&Value::Ascii(vec![b"S \0".to_vec()])),
+            Some("S".into())
+        );
     }
     #[test]
     fn rejects_excessive_map_batch() {
