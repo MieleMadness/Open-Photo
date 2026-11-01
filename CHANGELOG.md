@@ -1,3 +1,10 @@
+# 0.56.41 — Strict GPS EXIF validation
+
+- Reject malformed degree-minute-second GPS values where minutes or seconds are 60 or greater, instead of mapping potentially incorrect locations.
+- Accept common trailing whitespace padding in EXIF N/S/E/W reference strings without weakening hemisphere validation.
+- Add Rust regression tests for invalid component ranges, missing components, zero denominators and padded hemisphere references.
+- Keep original media and metadata read-only; HEIC/MOV extraction and real-photo Windows map acceptance remain pending.
+
 # 0.56.40 — Stable GPS cluster centers
 
 - Place grouped map markers at the mean location of their constituent media, rather than the first indexed file.
