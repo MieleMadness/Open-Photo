@@ -12,7 +12,7 @@ export function clusterMapLocations(points:readonly MapLocation[],zoom:number):Z
     const y=(0.5-Math.log((1+sin)/(1-sin))/(4*Math.PI))*scale;
     const key=`${Math.floor(x/cell)}:${Math.floor(y/cell)}`;
     let group=groups.get(key);
-    if(!group){group={lat:point.lat,lon:point.lon,photos:[]};groups.set(key,group);}
+    if(!group){group={lat,lon:point.lon,photos:[]};groups.set(key,group);}
     group.photos.push(point);
   }
   return [...groups.values()];
