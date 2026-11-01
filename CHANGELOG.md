@@ -1,3 +1,10 @@
+# 0.56.44 — Honest map empty state
+
+- When no GPS points are found, show a clear empty state instead of an unrelated default map location.
+- Keep map creation conditional on actual GPS results and show scanning feedback while loading.
+- Make the internal map fallback neutral at 0°/0° with a world-scale zoom; update the existing component regression test.
+- Original media remains untouched. Real iPhone GPS and 10,000-item library acceptance remain open gates.
+
 # 0.56.43 — Stable map interactions
 
 - Keep the current Leaflet map zoom and pan while selecting photos or videos, even when parent UI state changes.
