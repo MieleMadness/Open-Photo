@@ -1,3 +1,10 @@
+# 0.56.35 — Phase H: GPS validation and 1.0 gates
+
+- Begin Phase H by validating GPS coordinates before Leaflet marker placement; reject malformed nonfinite and out-of-range points and empty paths.
+- Add regression tests for N/S/E/W hemisphere signs and world boundaries.
+- Record deferred **real Windows 10,000+ media library testing** as a mandatory pre-1.0 acceptance gate in docs/PRE_1_0_ACCEPTANCE.md; the test is not waived or reported as completed.
+- Continue preserving media read-only behavior; map tiles still require network access.
+
 # 0.56.34 — Phase G: shared Library thumbnail requests
 
 - Deduplicate identical in-flight Library thumbnail requests by source metadata, requested size and preview command.
