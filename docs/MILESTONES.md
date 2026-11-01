@@ -1,6 +1,10 @@
 # Milestones and validation status
 
-## Current source update — 0.56.36
+## Current source update — 0.56.37
+
+0.56.37 adds zoom-dependent clustering and preserves individual photo selection. The 10k+ Windows test remains a pre-1.0 gate.
+
+## Previous source update — 0.56.36
 
 0.56.36 groups overlapping photo map pins and allows cycling through their individual photos. The 10k+ media acceptance test remains a pre-1.0 gate.
 
