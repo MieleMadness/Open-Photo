@@ -1,6 +1,10 @@
 # Milestones and validation status
 
-## Current source update — 0.56.34
+## Current source update — 0.56.35
+
+Phase H begins: map coordinates are validated before marker placement. The deferred 10,000+ media Windows test is required before 1.0; see docs/PRE_1_0_ACCEPTANCE.md.
+
+## Previous source update — 0.56.34
 
 0.56.34 shares identical in-flight Library preview work between subscribed tiles.
 
