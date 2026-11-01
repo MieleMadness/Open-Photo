@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import {clusterMapLocations} from "./mapZoomClusters";
+import {validMapLocations} from "./mapLocations";
 import "leaflet/dist/leaflet.css";
 export type PhotoLocation = {path:string;lat:number;lon:number};
 export default function PhotoMap({points,onChoose,compact=false}:{points:PhotoLocation[];onChoose:(path:string)=>void;compact?:boolean}) {
@@ -14,7 +15,7 @@ export default function PhotoMap({points,onChoose,compact=false}:{points:PhotoLo
     const initialResize=window.setTimeout(resize,0);
     const observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(resize):null;
     observer?.observe(container.current);
-    const bounds:L.LatLngExpression[]=points.filter(point=>Number.isFinite(point.lat)&&Number.isFinite(point.lon)&&Math.abs(point.lat)<=90&&Math.abs(point.lon)<=180).map(point=>[point.lat,point.lon]);
+    const bounds:L.LatLngExpression[]=validMapLocations(points).map(point=>[Math.max(-85,Math.min(85,point.lat)),point.lon]);
     const markers=L.layerGroup().addTo(map);
     const renderMarkers=()=>{
       markers.clearLayers();
