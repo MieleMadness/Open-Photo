@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
-import {validMapLocations} from "./mapLocations";
+import {groupNearbyLocations} from "./mapLocationGroups";
 import "leaflet/dist/leaflet.css";
 export type PhotoLocation = {path:string;lat:number;lon:number};
 export default function PhotoMap({points,onChoose,compact=false}:{points:PhotoLocation[];onChoose:(path:string)=>void;compact?:boolean}) {
@@ -15,11 +15,14 @@ export default function PhotoMap({points,onChoose,compact=false}:{points:PhotoLo
     const observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(resize):null;
     observer?.observe(container.current);
     const bounds:L.LatLngExpression[] = [];
-    for(const point of validMapLocations(points)) {
-      const location:L.LatLngExpression=[point.lat,point.lon];
+    for(const group of groupNearbyLocations(points)) {
+      const location:L.LatLngExpression=[group.lat,group.lon];
       bounds.push(location);
-      L.circleMarker(location,{radius:7,color:"#6727ad",fillColor:"#28b678",fillOpacity:.85,weight:2}).addTo(map)
-        .bindTooltip(point.path.split(/[\\/]/).pop()||"Photo").on("click",()=>onChoose(point.path));
+      let nextPhoto=0;
+      const count=group.photos.length;
+      const marker=L.circleMarker(location,{radius:count>1?11:7,color:"#6727ad",fillColor:"#28b678",fillOpacity:.85,weight:2}).addTo(map);
+      marker.bindTooltip(count===1?(group.photos[0].path.split(/[\\/]/).pop()||"Photo"):`${count} photos · Click to browse`);
+      marker.on("click",()=>{onChoose(group.photos[nextPhoto%count].path);nextPhoto++;});
     }
     // Initialize the view once; a second setView can leave a zoom running during teardown.
     if(bounds.length) map.fitBounds(L.latLngBounds(bounds),{padding:[48,48],maxZoom:15,animate:false});
