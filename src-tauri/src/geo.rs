@@ -1,4 +1,5 @@
 use exif::{In, Reader, Tag, Value};
+use nom_exif::{read_exif, MediaParser, MediaSource};
 use serde::Serialize;
 use std::{fs::File, io::BufReader, path::Path};
 
@@ -53,6 +54,22 @@ fn read_point(path: &Path) -> Option<(f64, f64)> {
     (lat.is_finite() && lon.is_finite() && lat.abs() <= 90.0 && lon.abs() <= 180.0)
         .then_some((lat, lon))
 }
+// The existing nom-exif dependency supports HEIC EXIF and QuickTime track locations.
+// Parse in memory and keep the source files read-only.
+fn valid_point(lat: f64, lon: f64) -> Option<(f64, f64)> {
+    (lat.is_finite() && lon.is_finite() && lat.abs() <= 90.0 && lon.abs() <= 180.0)
+        .then_some((lat, lon))
+}
+fn read_iphone_point(path: &Path, extension: &str) -> Option<(f64, f64)> {
+    let gps = if matches!(extension, "heic" | "heif") {
+        read_exif(path).ok()?.gps_info()?.clone()
+    } else {
+        let mut parser = MediaParser::new();
+        let source = MediaSource::open(path).ok()?;
+        parser.parse_track(source).ok()?.gps_info()?.clone()
+    };
+    valid_point(gps.latitude_decimal()?, gps.longitude_decimal()?)
+}
 #[tauri::command]
 pub fn gps_for_photos(root: String, paths: Vec<String>) -> Result<Vec<GeoPoint>, String> {
     if paths.len() > 5000 {
@@ -72,10 +89,15 @@ pub fn gps_for_photos(root: String, paths: Vec<String>) -> Result<Vec<GeoPoint>,
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
-        if !matches!(ext.as_str(), "jpg" | "jpeg" | "tif" | "tiff") {
+        if !matches!(ext.as_str(), "jpg" | "jpeg" | "tif" | "tiff" | "heic" | "heif" | "mov" | "mp4") {
             continue;
         }
-        if let Some((lat, lon)) = read_point(&path) {
+        let location = if matches!(ext.as_str(), "jpg" | "jpeg" | "tif" | "tiff") {
+            read_point(&path)
+        } else {
+            read_iphone_point(&path, &ext)
+        };
+        if let Some((lat, lon)) = location {
             points.push(GeoPoint {
                 path: original,
                 lat,
@@ -128,6 +150,13 @@ mod tests {
             reference(&Value::Ascii(vec![b"S \0".to_vec()])),
             Some("S".into())
         );
+    }
+    #[test]
+    fn validates_iphone_gps_coordinate_bounds() {
+        assert_eq!(valid_point(27.95, -82.46), Some((27.95, -82.46)));
+        assert!(valid_point(91.0, 0.0).is_none());
+        assert!(valid_point(0.0, -181.0).is_none());
+        assert!(valid_point(f64::NAN, 1.0).is_none());
     }
     #[test]
     fn rejects_excessive_map_batch() {
