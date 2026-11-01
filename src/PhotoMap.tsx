@@ -32,7 +32,7 @@ export default function PhotoMap({points,onChoose,compact=false}:{points:PhotoLo
     };
     // Initialize the view once; a second setView can leave a zoom running during teardown.
     if(bounds.length) map.fitBounds(L.latLngBounds(bounds),{padding:[48,48],maxZoom:15,animate:false});
-    else map.setView([27.95,-82.46],6);
+    else map.setView([0,0],2);
     renderMarkers();
     map.on("zoomend",renderMarkers);
     return ()=>{window.clearTimeout(initialResize);observer?.disconnect();map.off("zoomend",renderMarkers);map.remove();};
