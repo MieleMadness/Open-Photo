@@ -23,6 +23,9 @@ pub struct Snapshot {
 impl Snapshot {
     pub fn validate(&self) -> Result<(), String> {
         crate::video_sequence::validate(&self.project)?;
+        if !self.project.audio_sources.is_empty() {
+            return Err("Independent audio sources must be bound to verified local files before rendering".into());
+        }
         if self.project.clips.is_empty() {
             return Err("Append a clip before rendering this project".into());
         }
