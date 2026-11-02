@@ -259,7 +259,10 @@ pub(crate) fn parse_audio_only_probe(bytes: &[u8]) -> Result<AudioOnlyInfo, Stri
         .filter(|n| (8000..=192000).contains(n))
         .ok_or("Unsupported audio sample rate")?;
     let codec = string(audio, "codec_name").ok_or("Audio codec missing")?;
-    if !matches!(codec.as_str(), "mp3" | "pcm_s16le" | "pcm_s24le" | "pcm_f32le" | "flac" | "aac") {
+    if !matches!(
+        codec.as_str(),
+        "mp3" | "pcm_s16le" | "pcm_s24le" | "pcm_f32le" | "flac" | "aac"
+    ) {
         return Err("Unsupported audio codec".into());
     }
     Ok(AudioOnlyInfo {
@@ -403,9 +406,12 @@ mod tests {
         bad["streams"][0]["sample_rate"] = serde_json::json!("0");
         assert!(parse_audio_only_probe(&serde_json::to_vec(&bad).unwrap()).is_err());
         let mut bad = data;
-        bad["streams"].as_array_mut().unwrap().push(serde_json::json!({
-            "index":1,"codec_type":"video","codec_name":"h264"
-        }));
+        bad["streams"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "index":1,"codec_type":"video","codec_name":"h264"
+            }));
         assert!(parse_audio_only_probe(&serde_json::to_vec(&bad).unwrap()).is_err());
     }
     #[test]
