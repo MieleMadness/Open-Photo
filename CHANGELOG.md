@@ -1,3 +1,9 @@
+# 0.56.45 — Phase H map filters and roadmap checkpoint
+
+- Add photo/video and capture-year map filters within the current workspace, with matching-location counts and filtered empty states.
+- Finish the planned Phase H feature scope and reconcile the historical roadmap statuses; real iPhone, privacy and installed-Windows performance acceptance remain open before 1.0.
+- Next feature phase: I (text overlays and local audio), then J (music); retain K vault design and 10,000-item release testing gates.
+
 # 0.56.44 — Honest map empty state
 
 - When no GPS points are found, show a clear empty state instead of an unrelated default map location.
