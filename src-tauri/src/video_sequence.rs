@@ -673,6 +673,17 @@ mod tests {
     #[test]
     fn audio_track_metadata_roundtrips_and_rejects_bad_timing() {
         let (root, mut p) = fixture();
+        if let Media::Video { info } = &mut p.assets[0].media {
+            info.audio.push(video_probe::AudioInfo {
+                stream: 1,
+                codec: "aac".into(),
+                sample_rate: Some("48000".into()),
+                channels: Some(2),
+                channel_layout: Some("stereo".into()),
+                start_time: None,
+                duration_seconds: Some(2.0),
+            });
+        }
         let mut legacy = serde_json::to_value(&p).unwrap();
         legacy.as_object_mut().unwrap().remove("audio_tracks");
         assert!(parse(&serde_json::to_vec(&legacy).unwrap())
