@@ -1,0 +1,31 @@
+import {type SequenceSession,type TitleOverlay} from "./videoSequence";
+import {projectDuration} from "./timelineCommands";
+
+/** Simple, always-visible controls; timeline title range is measured in project seconds. */
+export function SequenceTitles({session,disabled}:{session:SequenceSession;disabled:boolean}){
+  const project=session.history.present;
+  const titles=project.titles||[];
+  const duration=projectDuration(project);
+  function commit(next:TitleOverlay[]){session.commit({...project,titles:next});}
+  function update(id:string,change:Partial<TitleOverlay>){
+    commit(titles.map(title=>title.id===id?{...title,...change}:title));
+  }
+  return <section aria-label="Video text overlays" className="sequence-titles">
+    <div className="timeline-heading"><h2>Titles</h2><p>{titles.length} / 20</p></div>
+    <p className="timeline-help">Titles appear over video and photos during their selected time range. Timing uses the full project timeline.</p>
+    <fieldset disabled={disabled||duration<=0}>
+      <button className="secondary-button" type="button" disabled={titles.length>=20||duration<=0} onClick={()=>{
+        const start=0,end=Math.min(duration,3);
+        commit([...titles,{id:crypto.randomUUID(),text:"Your title",start_seconds:start,end_seconds:end,x_percent:50,y_percent:50}]);
+      }}>Add title</button>
+      {titles.map(title=><div key={title.id} className="sequence-title-fields">
+        <label>Title text<input aria-label="Title text" value={title.text} maxLength={100} required onChange={event=>update(title.id,{text:event.target.value})}/></label>
+        <label>Start (seconds)<input aria-label="Title start" type="number" min={0} max={Math.max(0,title.end_seconds-.01)} step=".01" value={title.start_seconds} onChange={event=>{const value=Number(event.target.value);if(Number.isFinite(value)&&value>=0&&value<title.end_seconds)update(title.id,{start_seconds:value});}}/></label>
+        <label>End (seconds)<input aria-label="Title end" type="number" min={title.start_seconds+.01} max={duration} step=".01" value={title.end_seconds} onChange={event=>{const value=Number(event.target.value);if(Number.isFinite(value)&&value>title.start_seconds&&value<=duration)update(title.id,{end_seconds:value});}}/></label>
+        <label>Horizontal placement<select aria-label="Title horizontal position" value={title.x_percent} onChange={event=>update(title.id,{x_percent:Number(event.target.value)})}><option value={10}>Left</option><option value={50}>Center</option><option value={90}>Right</option></select></label>
+        <label>Vertical placement<select aria-label="Title vertical position" value={title.y_percent} onChange={event=>update(title.id,{y_percent:Number(event.target.value)})}><option value={10}>Top</option><option value={50}>Middle</option><option value={90}>Bottom</option></select></label>
+        <button className="secondary-button" type="button" aria-label="Remove title" onClick={()=>commit(titles.filter(item=>item.id!==title.id))}>Remove title</button>
+      </div>)}
+    </fieldset>
+  </section>;
+}
