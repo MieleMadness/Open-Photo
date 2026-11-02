@@ -848,6 +848,22 @@ mod tests {
         .unwrap()
     }
     #[test]
+    fn timed_titles_are_rendered_by_the_bundled_windows_video_engine() {
+        let (fixture, mut snapshot) = fixture();
+        snapshot.project.titles.push(crate::video_sequence::TitleOverlay {
+            id: "test-title".into(),
+            text: "Open Photo".into(),
+            start_seconds: 0.05,
+            end_seconds: 0.24,
+            x_percent: 50,
+            y_percent: 50,
+        });
+        let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
+        assert!(Path::new(&preview.source).exists());
+        assert_eq!(preview.info.frame_count, Some(15));
+    }
+
+    #[test]
     fn photos_join_videos_and_still_only_output_uses_the_same_validated_frame_clock() {
         let (fixture, mut snapshot) = fixture();
         let path = fixture.0.join("yellow still 世界.png");
