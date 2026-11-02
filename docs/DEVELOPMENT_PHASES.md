@@ -1,3 +1,7 @@
+## 0.56.49 — Design-engineering polish checkpoint
+
+Applied the project's Emil Kowalski skill to the shared editor: inspector tab focus/hover and deliberately brief transitions, reduced-motion opt-out, and consistent CSS-owned safe-area guide styles. This is a targeted UI pass, not Phase I completion. Title compositing, audio and transitions remain pending.
+
 ## 0.56.48 — Phase I: timed-title schema foundation
 
 Added serializable, validated timed titles to the shared project document with backward-compatible defaults and frontend validation. Native preview/export deliberately rejects populated title records until actual title compositing is implemented; this is a foundational increment, not a completed title feature. Next: implement matching native preview/export rendering and accessible title controls, then local audio and tested transitions.
