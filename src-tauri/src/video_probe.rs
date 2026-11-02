@@ -213,6 +213,105 @@ pub(crate) fn probe(
     )?)
 }
 
+/// Audio-only media inspection does not require or invent a video stream.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct AudioOnlyInfo {
+    pub duration_seconds: f64,
+    pub stream: usize,
+    pub codec: String,
+    pub channels: u32,
+    pub sample_rate: u32,
+}
+
+pub(crate) fn parse_audio_only_probe(bytes: &[u8]) -> Result<AudioOnlyInfo, String> {
+    let doc: Value =
+        serde_json::from_slice(bytes).map_err(|_| "Invalid audio inspection response")?;
+    let streams = doc["streams"]
+        .as_array()
+        .ok_or("Audio inspection did not report streams")?;
+    if streams.iter().any(|stream| {
+        stream["codec_type"] == "video"
+            && stream["disposition"]["attached_pic"].as_u64().unwrap_or(0) == 0
+    }) {
+        return Err("Select an audio-only source rather than a video".into());
+    }
+    let audio = streams
+        .iter()
+        .find(|stream| stream["codec_type"] == "audio")
+        .ok_or("No playable audio stream found")?;
+    let duration = number(&doc["format"]["duration"])
+        .or_else(|| number(&audio["duration"]))
+        .ok_or("Audio duration unavailable")?;
+    if !(0.04..=7200.0).contains(&duration) {
+        return Err("Audio duration must be between 0.04 seconds and two hours".into());
+    }
+    let stream = audio["index"]
+        .as_u64()
+        .and_then(|n| usize::try_from(n).ok())
+        .ok_or("Audio stream index missing")?;
+    let channels = audio["channels"]
+        .as_u64()
+        .and_then(|n| u32::try_from(n).ok())
+        .filter(|n| (1..=8).contains(n))
+        .ok_or("Unsupported audio channel count")?;
+    let sample_rate = string(audio, "sample_rate")
+        .and_then(|s| s.parse::<u32>().ok())
+        .filter(|n| (8000..=192000).contains(n))
+        .ok_or("Unsupported audio sample rate")?;
+    let codec = string(audio, "codec_name").ok_or("Audio codec missing")?;
+    if !matches!(codec.as_str(), "mp3" | "pcm_s16le" | "pcm_s24le" | "pcm_f32le" | "flac" | "aac") {
+        return Err("Unsupported audio codec".into());
+    }
+    Ok(AudioOnlyInfo {
+        duration_seconds: duration,
+        stream,
+        codec,
+        channels,
+        sample_rate,
+    })
+}
+
+pub(crate) fn probe_audio_only(
+    engine: &Path,
+    source: &Path,
+    cancel: impl Fn() -> bool,
+) -> Result<AudioOnlyInfo, String> {
+    let extension = source
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !matches!(extension.as_str(), "mp3" | "wav" | "flac" | "m4a") {
+        return Err("Choose MP3, WAV, FLAC or M4A audio".into());
+    }
+    let tool = crate::video_engine::tool(engine, "ffprobe")?;
+    let args: Vec<&std::ffi::OsStr> = vec![
+        "-v".as_ref(),
+        "error".as_ref(),
+        "-max_alloc".as_ref(),
+        "268435456".as_ref(),
+        "-protocol_whitelist".as_ref(),
+        "file,pipe".as_ref(),
+        "-format_whitelist".as_ref(),
+        "mp3,wav,flac,mov".as_ref(),
+        "-probesize".as_ref(),
+        "10000000".as_ref(),
+        "-analyzeduration".as_ref(),
+        "10000000".as_ref(),
+        "-show_streams".as_ref(),
+        "-show_format".as_ref(),
+        "-of".as_ref(),
+        "json".as_ref(),
+        source.as_os_str(),
+    ];
+    parse_audio_only_probe(&crate::video_engine::run_until(
+        &tool,
+        &args,
+        Duration::from_secs(30),
+        cancel,
+    )?)
+}
+
 pub struct InspectionJobs {
     gate: std::sync::Arc<tokio::sync::Semaphore>,
     generation: std::sync::Arc<std::sync::atomic::AtomicU64>,
