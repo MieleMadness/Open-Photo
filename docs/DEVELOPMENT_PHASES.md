@@ -1,3 +1,7 @@
+## 0.56.51 — Title editing usability
+
+Title insertion uses the current timeline playhead and explicitly distinguishes raw source from rendered project preview. No change to exported video rendering; this update remains subject to CI and Windows acceptance.
+
 ## 0.56.50 — Phase I titles implementation checkpoint
 
 The shared editor now has timed title controls for full-project start/end and screen placement, saved via the existing validated local sequence schema. The normalized native sequence renderer draws them during preview and export, including the single-video-with-titles case. Font and filter support on the bundled Windows FFmpeg, actual output visuals, and installed Windows testing remain acceptance gates. Phase I audio, waveforms and transitions remain open.
