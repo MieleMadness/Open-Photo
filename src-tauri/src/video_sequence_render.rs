@@ -24,7 +24,9 @@ impl Snapshot {
     pub fn validate(&self) -> Result<(), String> {
         crate::video_sequence::validate(&self.project)?;
         if !self.project.titles.is_empty() {
-            return Err("Timed titles are saved but not yet supported by native preview/export".into());
+            return Err(
+                "Timed titles are saved but not yet supported by native preview/export".into(),
+            );
         }
         if self.project.clips.is_empty() {
             return Err("Append a clip before rendering this project".into());
