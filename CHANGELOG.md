@@ -1,3 +1,9 @@
+# 0.56.58 — Standalone audio project metadata foundation
+
+- Add optional independent-audio source metadata with validated identities, durations, sample rates and channels; existing projects default to no audio sources.
+- Audio tracks may reference independent audio metadata, but native export deliberately rejects audio sources without verified local bindings rather than silently dropping their sound.
+- Fix project initialization and frontend model synchronization. Native workspace audio import, source binding, relinking and mixing are still outstanding.
+
 # 0.56.57 — Audio source removal consistency
 
 - When removing an imported source video, automatically remove its dependent audio layers from the same workspace project mutation, preventing orphaned track references and failed saves.
