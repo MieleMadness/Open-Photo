@@ -312,6 +312,19 @@ pub(crate) fn probe_audio_only(
     )?)
 }
 
+#[tauri::command]
+pub async fn inspect_audio_only(
+    app: tauri::AppHandle,
+    root: String,
+    path: String,
+) -> Result<AudioOnlyInfo, String> {
+    let source = crate::safe_media_path(&root, &path)?;
+    let directory = crate::video_engine::directory(&app)?;
+    tauri::async_runtime::spawn_blocking(move || probe_audio_only(&directory, &source, || false))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 pub struct InspectionJobs {
     gate: std::sync::Arc<tokio::sync::Semaphore>,
     generation: std::sync::Arc<std::sync::atomic::AtomicU64>,
