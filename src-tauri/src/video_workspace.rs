@@ -207,6 +207,7 @@ fn new_record() -> Record {
             },
             frame_rate: 30,
             titles: vec![],
+            audio_tracks: vec![],
         },
         revision: 0,
         bindings: Bindings::new(),
