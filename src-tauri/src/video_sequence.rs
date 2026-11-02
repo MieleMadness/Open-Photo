@@ -661,6 +661,32 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
     #[test]
+    fn audio_track_metadata_roundtrips_and_rejects_bad_timing() {
+        let (root, mut p) = fixture();
+        let mut legacy = serde_json::to_value(&p).unwrap();
+        legacy.as_object_mut().unwrap().remove("audio_tracks");
+        assert!(parse(&serde_json::to_vec(&legacy).unwrap())
+            .unwrap()
+            .audio_tracks
+            .is_empty());
+        let track = AudioTrack {
+            id: video_project::id(),
+            asset_id: p.assets[0].id.clone(),
+            start_seconds: 0.0,
+            source_in_seconds: 0.0,
+            duration_seconds: 0.1,
+            gain_percent: 100,
+            fade_in_seconds: 0.01,
+            fade_out_seconds: 0.01,
+        };
+        p.audio_tracks.push(track);
+        validate(&p).unwrap();
+        assert_eq!(parse(&serde_json::to_vec(&p).unwrap()).unwrap(), p);
+        p.audio_tracks[0].fade_out_seconds = 0.2;
+        assert!(validate(&p).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
     fn migration_preserves_legacy_edits_ticks_and_source() {
         let (root, mut p) = fixture();
         p.clips[0].source_in = VideoTime::from_seconds(0.37, "1/90000").unwrap();
