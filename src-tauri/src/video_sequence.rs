@@ -31,6 +31,17 @@ pub struct Sequence {
     pub titles: Vec<TitleOverlay>,
     #[serde(default)]
     pub audio_tracks: Vec<AudioTrack>,
+    #[serde(default)]
+    pub audio_sources: Vec<AudioSource>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct AudioSource {
+    pub id: String,
+    pub relative_path: String,
+    pub sha256: String,
+    pub bytes: u64,
+    pub info: video_probe::AudioOnlyInfo,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -126,9 +137,31 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
     if p.audio_tracks.len() > 8 {
         return Err("Limit each project to eight audio tracks".into());
     }
+    if p.audio_sources.len() > 8 {
+        return Err("Limit each project to eight independent audio files".into());
+    }
+    let mut audio_source_ids = HashSet::new();
+    for source in &p.audio_sources {
+        video_project::validate_identity(
+            &p.id, &source.id, &p.title, &source.relative_path, &source.sha256, source.bytes,
+        )?;
+        if !audio_source_ids.insert(&source.id)
+            || source.info.duration_seconds < 0.04
+            || source.info.duration_seconds > 7200.0
+            || !source.info.duration_seconds.is_finite()
+            || !(1..=8).contains(&source.info.channels)
+            || !(8000..=192000).contains(&source.info.sample_rate)
+        {
+            return Err("Invalid independent audio source".into());
+        }
+    }
     let mut track_ids = HashSet::new();
     for track in &p.audio_tracks {
-        let referenced_video = p.assets.iter().any(|asset| {
+        let referenced_video = p.audio_sources.iter().any(|source| {
+            source.id == track.asset_id
+                && track.source_in_seconds + track.duration_seconds
+                    <= source.info.duration_seconds + 0.000001
+        }) || p.assets.iter().any(|asset| {
             if asset.id != track.asset_id {
                 return false;
             }
@@ -219,6 +252,7 @@ pub(crate) fn migrate(p: Project) -> Result<Sequence, String> {
         frame_rate: 30,
         titles: vec![],
         audio_tracks: vec![],
+        audio_sources: vec![],
     };
     validate(&next)?;
     Ok(next)
