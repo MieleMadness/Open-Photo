@@ -23,11 +23,6 @@ pub struct Snapshot {
 impl Snapshot {
     pub fn validate(&self) -> Result<(), String> {
         crate::video_sequence::validate(&self.project)?;
-        if !self.project.audio_tracks.is_empty() {
-            return Err(
-                "Audio tracks are saved but are not yet supported by native preview/export".into(),
-            );
-        }
         if self.project.clips.is_empty() {
             return Err("Append a clip before rendering this project".into());
         }
@@ -493,10 +488,11 @@ pub fn compile(
             };
             contexts.push(prepared);
         }
-        let audio = contexts
-            .iter()
-            .enumerate()
-            .any(|(i, p)| !snapshot.project.clips[i].edits.muted && p.audio_stream.is_some());
+        let audio = !snapshot.project.audio_tracks.is_empty()
+            || contexts
+                .iter()
+                .enumerate()
+                .any(|(i, p)| !snapshot.project.clips[i].edits.muted && p.audio_stream.is_some());
         if options.preview {
             let required = (duration
                 * (2.0 * bitrate as f64 / 8.0 * 1.25 + if audio { 384000.0 } else { 0.0 }))
@@ -665,7 +661,81 @@ pub fn compile(
             )
             .into(),
         ]);
-        if audio {
+        let mut extra_audio = Vec::new();
+        for track in &snapshot.project.audio_tracks {
+            let asset = snapshot
+                .project
+                .assets
+                .iter()
+                .find(|asset| asset.id == track.asset_id)
+                .ok_or("Audio track source missing")?;
+            let root = snapshot
+                .roots
+                .get(&asset.id)
+                .ok_or("Relink every audio track source before rendering")?;
+            let source = crate::sequence_media::source(root, asset, &cancel)?;
+            let info = video_probe::probe(engine, &source, &cancel)?;
+            let stream = info.audio.first().ok_or("Audio source contains no audio stream")?;
+            if track.source_in_seconds + track.duration_seconds > info.duration_seconds + 0.000001 {
+                return Err("Audio trim exceeds source duration".into());
+            }
+            let input_index = extra_audio.len() + 1;
+            args.extend([
+                "-format_whitelist".into(),
+                "mov,matroska,webm,avi".into(),
+                "-i".into(),
+                source.into(),
+            ]);
+            extra_audio.push((input_index, stream.stream, track));
+        }
+        if !extra_audio.is_empty() {
+            let mut filters = vec![
+                format!("[0:a:0]aformat=sample_fmts=flt:channel_layouts=stereo,aresample=48000:async=1:first_pts=0[original]")
+            ];
+            let mut inputs = String::from("[original]");
+            for (index, (input, stream, track)) in extra_audio.iter().enumerate() {
+                let label = format!("track{index}");
+                let fade_start = track.duration_seconds - track.fade_out_seconds;
+                let delay = (track.start_seconds * 1000.0).round() as u64;
+                let mut filter = format!(
+                    "[{input}:{stream}]atrim=start={:.6}:duration={:.6},asetpts=PTS-STARTPTS,aformat=sample_fmts=flt:channel_layouts=stereo,aresample=48000:async=1:first_pts=0,volume={:.4}",
+                    track.source_in_seconds,
+                    track.duration_seconds,
+                    f64::from(track.gain_percent) / 100.0
+                );
+                if track.fade_in_seconds > 0.0 {
+                    filter.push_str(&format!(",afade=t=in:st=0:d={:.6}", track.fade_in_seconds));
+                }
+                if track.fade_out_seconds > 0.0 {
+                    filter.push_str(&format!(
+                        ",afade=t=out:st={fade_start:.6}:d={:.6}",
+                        track.fade_out_seconds
+                    ));
+                }
+                filter.push_str(&format!(",adelay={delay}|{delay}[{label}]"));
+                filters.push(filter);
+                inputs.push_str(&format!("[{label}]"));
+            }
+            filters.push(format!(
+                "{inputs}amix=inputs={}:duration=longest:normalize=0,atrim=end_sample={},asetpts=N/SR/TB[mixed]",
+                extra_audio.len() + 1,
+                total_frames * 48000 / u64::from(fps)
+            ));
+            args.extend([
+                "-filter_complex".into(),
+                filters.join(";").into(),
+                "-map".into(),
+                "[mixed]".into(),
+                "-c:a".into(),
+                "aac".into(),
+                "-b:a".into(),
+                "192k".into(),
+                "-ar".into(),
+                "48000".into(),
+                "-ac".into(),
+                "2".into(),
+            ]);
+        } else if audio {
             args.extend([
                 "-map".into(),
                 "0:a:0".into(),
