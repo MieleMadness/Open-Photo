@@ -1,3 +1,9 @@
+# 0.56.54 — Audio track placement overview
+
+- Add a visual timing overview for layered video-source audio, with one lane per track and a project playhead marker.
+- Use existing editor tokens, precise numeric time labels and non-animated playhead feedback. The bars are placement guides, not waveforms, and do not change audio export.
+- Independent MP3/WAV import, waveforms and video transitions remain pending.
+
 # 0.56.53 — Layered audio from existing videos
 
 - Add editable timeline audio layers sourced from video assets already imported into the project, including source offset, position, volume, duration and fade-in/out.
