@@ -15,7 +15,7 @@ These must be completed before calling Open-Photo version 1.0 production-ready. 
 
 - [ ] Windows installed-build regression checks, including video editing, export and recovery from failed operations.
 - [ ] Validate signed Preview installation and upgrade between two real versions.
-- [ ] Phase H map testing on real JPEG/TIFF GPS images including N/S/E/W, malformed metadata and privacy behavior.
+- [ ] Phase H map testing on real JPEG/TIFF/HEIC/HEIF and MOV/MP4 GPS media (including Live Photo pairs), N/S/E/W and antimeridian/polar positions, malformed metadata, zoom clustering, filters, offline tiles/privacy and installed-Windows performance. Phase H feature code is complete; this acceptance is not waived.
 - [ ] Review and complete remaining roadmap milestones or explicitly document nonblocking exclusions from 1.0 scope.
 
 Owner decision: Phase G's 10,000-item real-library acceptance is deferred while Phase H development proceeds, **not waived**.
