@@ -1227,6 +1227,7 @@ pub fn run() {
             video_poster::video_poster,
             video_poster::video_timeline_frame,
             video_probe::inspect_video,
+            video_probe::inspect_audio_only,
             video_engine::video_engine_status,
             video_preview::start_video_preview,
             video_preview::video_preview_status,
