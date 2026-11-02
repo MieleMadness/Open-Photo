@@ -1,3 +1,9 @@
+# 0.56.51 — Title placement workflow
+
+- New timed titles begin at the current project playhead instead of always starting at zero.
+- The title editor explains that effects appear in rendered project previews and exports, not raw source previews, avoiding confusing preview expectations.
+- Phase I local audio tracks, waveforms and transitions remain outstanding; on-device title appearance testing remains recommended.
+
 # 0.56.50 — Phase I timed video titles
 
 - Add an editor inspector for up to 20 timed, positioned titles in the existing mixed-media project format.
