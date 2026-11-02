@@ -27,7 +27,20 @@ pub struct Sequence {
     pub clips: Vec<Clip>,
     pub output: Output,
     pub frame_rate: u32,
+    #[serde(default)]
+    pub titles: Vec<TitleOverlay>,
 }
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct TitleOverlay {
+    pub id: String,
+    pub text: String,
+    pub start_seconds: f64,
+    pub end_seconds: f64,
+    pub x_percent: u8,
+    pub y_percent: u8,
+}
+
 #[derive(Serialize)]
 pub struct SourceStatus {
     pub asset_id: String,
@@ -66,6 +79,12 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
         return Err(
             "A project needs 1–50 media files, at most 200 clips, and a 30 or 60 fps canvas".into(),
         );
+    }
+    if p.titles.len() > 20 { return Err("Limit each project to 20 titles".into()); }
+    let total_seconds: f64 = p.clips.iter().map(|c| Ok(c.source_out.seconds()? - c.source_in.seconds()?)).collect::<Result<Vec<_>,String>>()?.into_iter().sum();
+    let mut title_ids = HashSet::new();
+    for title in &p.titles {
+        if !video_project::valid_id(&title.id) || !title_ids.insert(&title.id) || title.text.trim().is_empty() || title.text.chars().count()>100 || title.text.chars().any(char::is_control) || !title.start_seconds.is_finite() || !title.end_seconds.is_finite() || title.start_seconds<0.0 || title.end_seconds<=title.start_seconds || title.end_seconds>total_seconds+0.000001 || title.x_percent>100 || title.y_percent>100 {return Err("Invalid title timing, position or text".into());}
     }
     let mut asset_ids = HashSet::new();
     let mut identities = HashSet::new();
@@ -123,6 +142,7 @@ pub(crate) fn migrate(p: Project) -> Result<Sequence, String> {
         clips: p.clips,
         output: p.output,
         frame_rate: 30,
+        titles: vec![],
     };
     validate(&next)?;
     Ok(next)
