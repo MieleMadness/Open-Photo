@@ -11,6 +11,14 @@ export function SequenceAudio({session,disabled,playhead}:{session:SequenceSessi
   return <section aria-label="Audio tracks" className="sequence-titles">
     <div className="timeline-heading"><h2>Audio tracks</h2><p>{tracks.length} / 8</p></div>
     <p className="timeline-help">Layer existing video audio over the project. Audio is included in rendered previews and exports. Independent MP3/WAV imports are coming later.</p>
+    {tracks.length>0&&duration>0&&<div className="sequence-audio-overview" role="group" aria-label="Audio track placement on project timeline">
+      <div className="sequence-audio-ruler"><span>0:00</span><span>{duration.toFixed(1)} s</span></div>
+      {tracks.map((track,index)=><div key={track.id} className="sequence-audio-lane" aria-label={`Audio track ${index+1}: starts at ${track.start_seconds.toFixed(1)} seconds, lasts ${track.duration_seconds.toFixed(1)} seconds`}>
+        <span className="sequence-audio-bar" style={{left:`${track.start_seconds/duration*100}%`,width:`${track.duration_seconds/duration*100}%`}} title={`Track ${index+1}: ${track.start_seconds.toFixed(2)}–${(track.start_seconds+track.duration_seconds).toFixed(2)} seconds`}>{index+1}</span>
+        <span className="sequence-audio-playhead" aria-hidden="true" style={{left:`${Math.min(100,Math.max(0,playhead/duration*100))}%`}}/>
+      </div>)}
+      <p className="sequence-audio-hint">Track bars show placement; use the controls below to edit timing. The vertical marker follows your playhead.</p>
+    </div>}
     <fieldset disabled={disabled||duration<=0}>
       <button className="secondary-button" type="button" disabled={tracks.length>=8||videos.length===0} onClick={()=>{
         const asset=videos[0];if(asset.media.kind!=="video")return;
