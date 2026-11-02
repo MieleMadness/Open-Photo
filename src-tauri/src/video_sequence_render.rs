@@ -293,7 +293,13 @@ fn part_args(
             "anullsrc=r=48000:cl=stereo".into(),
         ]);
     }
-    let filter=format!("trim=start=0:end={:.9},setpts=PTS-STARTPTS,fps=fps={fps}:start_time=0,tpad=stop_mode=clone:stop_duration={:.9},trim=end_frame={frames},setpts=N/({fps}*TB),{},scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setsar=1{}",prepared.duration,duration+1.0/f64::from(fps),prepared.filter,titles_filter);
+    let filter = format!(
+        "trim=start=0:end={:.9},setpts=PTS-STARTPTS,fps=fps={fps}:start_time=0,tpad=stop_mode=clone:stop_duration={:.9},trim=end_frame={frames},setpts=N/({fps}*TB),{},scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setsar=1{}",
+        prepared.duration,
+        duration + 1.0 / f64::from(fps),
+        prepared.filter,
+        titles_filter
+    );
     args.extend([
         "-map".into(),
         format!("0:{}", prepared.video_stream).into(),
@@ -567,7 +573,7 @@ pub fn compile(
             let length = *count as f64 / f64::from(fps);
             let before = completed as f64 / f64::from(fps);
             let notify = progress.clone();
-            video_engine::run_progress(
+            video_engine::run_progress_in(
                 &video_engine::tool(engine, "ffmpeg")?,
                 &args.iter().map(OsString::as_os_str).collect::<Vec<_>>(),
                 Duration::from_secs(21600),
@@ -577,6 +583,7 @@ pub fn compile(
                         ((before + p.seconds.clamp(0.0, length)) / duration).clamp(0.0, 1.0) * 0.75,
                     )
                 },
+                Some(&directory),
             )?;
             if let Some(path) = normalized_photo {
                 fs::remove_file(path).map_err(|e| e.to_string())?;
