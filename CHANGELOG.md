@@ -1,3 +1,9 @@
+# 0.56.46 — Phase I begins: social editing canvas presets
+
+- Add named social-video canvas presets for 16:9 landscape, 9:16 vertical, 4:5 portrait feed and 1:1 square, retaining 4K options.
+- Reuse existing persisted canvas/output controls and native rendering pipeline; add frontend tests for allowed preset geometry.
+- Phase I timed titles, imported audio, waveforms, transitions and social safe-area guidance are not yet implemented.
+
 # 0.56.45 — Phase H map filters and roadmap checkpoint
 
 - Add photo/video and capture-year map filters within the current workspace, with matching-location counts and filtered empty states.
