@@ -1,3 +1,9 @@
+# 0.56.53 — Layered audio from existing videos
+
+- Add editable timeline audio layers sourced from video assets already imported into the project, including source offset, position, volume, duration and fade-in/out.
+- Mix verified source audio with the original timeline during native preview and MP4 export, with bounded source timing and a Windows regression fixture.
+- Independent MP3/WAV import, waveforms and clip transitions remain incomplete. Installed Windows output verification is still required.
+
 # 0.56.52 — Phase I audio track persistence groundwork
 
 - Define a bounded optional audio-track array for saved multi-media sequences, with a zero-track default for backward compatibility.
