@@ -387,6 +387,28 @@ mod tests {
         serde_json::json!({"streams":[{"index":0,"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"avg_frame_rate":"30000/1001","r_frame_rate":"30000/1001","time_base":"1/90000","side_data_list":[{"rotation":-90}]}],"format":{"duration":"12.5"}})
     }
     #[test]
+    fn accepts_bounded_audio_only_sources_without_inventing_video() {
+        let data = serde_json::json!({
+            "streams":[{"index":0,"codec_type":"audio","codec_name":"mp3","channels":2,"sample_rate":"44100"}],
+            "format":{"duration":"12.5"}
+        });
+        let info = parse_audio_only_probe(&serde_json::to_vec(&data).unwrap()).unwrap();
+        assert_eq!(info.duration_seconds, 12.5);
+        assert_eq!(info.codec, "mp3");
+        assert_eq!(info.sample_rate, 44100);
+        let mut bad = data.clone();
+        bad["format"]["duration"] = serde_json::json!("8000");
+        assert!(parse_audio_only_probe(&serde_json::to_vec(&bad).unwrap()).is_err());
+        let mut bad = data.clone();
+        bad["streams"][0]["sample_rate"] = serde_json::json!("0");
+        assert!(parse_audio_only_probe(&serde_json::to_vec(&bad).unwrap()).is_err());
+        let mut bad = data;
+        bad["streams"].as_array_mut().unwrap().push(serde_json::json!({
+            "index":1,"codec_type":"video","codec_name":"h264"
+        }));
+        assert!(parse_audio_only_probe(&serde_json::to_vec(&bad).unwrap()).is_err());
+    }
+    #[test]
     fn preserves_rational_rates_rotation_and_silent_video() {
         let result = parse_probe(&serde_json::to_vec(&fixture()).unwrap()).unwrap();
         assert_eq!(result.frame_rate.as_deref(), Some("30000/1001"));
