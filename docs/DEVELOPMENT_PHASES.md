@@ -1,3 +1,11 @@
+## Current checkpoint — 0.56.45: Phase H implementation complete, acceptance open
+
+Phase H now includes validated JPEG/TIFF/HEIC/HEIF and MOV/MP4 GPS discovery; zoom-dependent Web Mercator clustering; stable map selection, marker cycling and empty states; and photo/video and capture-year filters within the active workspace. The existing Windows Desktop Build 0.56.44 (#906) was green. The 0.56.45 build needs independent validation.
+
+**H is feature-complete for the planned 0.x scope, not signed off for 1.0.** Test actual iPhone HEIC/MOV and Live Photo samples, malformed GPS, dateline/polar coordinates, map privacy/offline behavior and installed-Windows performance. The separate 10,000-item library gate remains mandatory before 1.0, not waived. Next active feature milestone: Phase I text overlays and local audio. Phase J music follows audio; Phase K vault design precedes implementation.
+
+Phase A–D core editing and app foundation: implemented, installed acceptance open. Phase E/F local search, People/OCR and video semantics: implemented experimentally; quality/hardware acceptance open. Phase G: virtualization, thumbnail limits, stale cancellation implemented; real 10,000-item acceptance open. Phase H: implemented, real media acceptance open. Phase I: photo clips implemented; text, local audio, transitions and social layouts remain. Phase J: music import/mixing remains. Phase K: threat model and encrypted vault remain. Signed Preview bootstrap and two-version installed upgrade remain release gates.
+
 ## 0.56.37 Phase H zoom-aware clustering
 
 Photo location markers now group in viewport-scale buckets and redraw on zoom changes. Individual photos remain selectable from groups. HEIC/MOV GPS parsing and installed map acceptance remain follow-up work. The real Windows test with 10,000+ items remains a mandatory pre-1.0 acceptance gate.
@@ -65,8 +73,8 @@ Before the next feature expansion, follow [AI, viewer and vault roadmap](AI_VIEW
 | D | Assembled preview and validated combined MP4/H.264 export, then project-independent export presets | Continuous output/presets implemented in 0.56.8; installed GUI acceptance remains |
 | E | Ranked unified discovery with match reasons and media/timestamp identity | Implemented in 0.56.11; installed GUI/AI quality acceptance remains |
 | F | Bounded local video frame sampling, deduplication, embeddings, matching timestamps | Implemented in 0.56.23; installed AI/quality acceptance remains |
-| G | Virtualized/lazy results, bounded thumbnail work, stale-work cancellation, scroll/memory checks | Planned |
-| H | Clustered map discovery, counts/empty states, safe phone-media GPS extraction | Planned |
+| G | Virtualized/lazy results, bounded thumbnail work, stale-work cancellation, scroll/memory checks | Implemented; installed 10k acceptance remains |
+| H | Clustered map discovery, counts/empty states, safe phone-media GPS extraction and filters | Implemented; real-media acceptance remains |
 | I | Photos, text, local audio, simple tested transitions and social layouts after hard cuts stabilize | Photo clips implemented in 0.56.21; text/music/transitions remain |
 | J | Import-your-own music first; provider-neutral source/license/attribution metadata | Planned |
 | K | Private encrypted vault with PIN, version triple-click entry, lock/recovery and index isolation | Planned — R5 security/storage design precedes R6 implementation |
