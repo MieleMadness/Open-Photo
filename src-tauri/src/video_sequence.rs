@@ -128,9 +128,10 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
     }
     let mut track_ids = HashSet::new();
     for track in &p.audio_tracks {
-        let referenced_video = p.assets.iter().any(|asset| {
-            asset.id == track.asset_id && matches!(asset.media, Media::Video { .. })
-        });
+        let referenced_video = p
+            .assets
+            .iter()
+            .any(|asset| asset.id == track.asset_id && matches!(asset.media, Media::Video { .. }));
         if !video_project::valid_id(&track.id)
             || !track_ids.insert(&track.id)
             || !referenced_video
