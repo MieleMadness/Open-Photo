@@ -535,6 +535,7 @@ pub async fn edit_workspace_video_project(
                     Action::Add { paths, .. } => add_files(&engine, &roots, &mut record, &paths)?,
                     Action::RemoveAsset { asset_id, .. } => {
                         record.project.clips.retain(|c| c.asset_id != asset_id);
+                        record.project.audio_tracks.retain(|track| track.asset_id != asset_id);
                         record.project.assets.retain(|a| a.id != asset_id);
                         record.bindings.remove(&asset_id);
                     }
