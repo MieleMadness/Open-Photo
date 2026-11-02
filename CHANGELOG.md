@@ -1,3 +1,10 @@
+# 0.56.52 — Phase I audio track persistence groundwork
+
+- Define a bounded optional audio-track array for saved multi-media sequences, with a zero-track default for backward compatibility.
+- Validate video-source identity, timeline and source offsets, track duration, volume gain, and fade bounds in Rust and TypeScript.
+- Explicitly reject native preview/export when nonempty audio tracks are present until real audio mixing is implemented; source audio on existing video clips remains unaffected.
+- This checkpoint does not yet offer local audio import, waveform controls or mixed music output. Those remain Phase I work.
+
 # 0.56.51 — Title placement workflow
 
 - New timed titles begin at the current project playhead instead of always starting at zero.
