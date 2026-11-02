@@ -1,3 +1,7 @@
+## 0.56.57 — Source lifecycle integrity
+
+Workspace removal now clears audio layers that refer to the removed source, preserving valid project persistence. Audio-only source binding/import, waveform editing and transitions remain open.
+
 ## 0.56.56 — Audio-only inspection groundwork
 
 Native inspection now recognizes validated audio-only files without requiring video metadata. Next steps: workspace-owned audio asset bindings, save/load/relink, actual mixer input mapping, UI import and waveform display. No end-to-end audio-only import yet.
