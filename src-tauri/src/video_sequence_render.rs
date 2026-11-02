@@ -23,6 +23,11 @@ pub struct Snapshot {
 impl Snapshot {
     pub fn validate(&self) -> Result<(), String> {
         crate::video_sequence::validate(&self.project)?;
+        if !self.project.audio_tracks.is_empty() {
+            return Err(
+                "Audio tracks are saved but are not yet supported by native preview/export".into(),
+            );
+        }
         if self.project.clips.is_empty() {
             return Err("Append a clip before rendering this project".into());
         }
