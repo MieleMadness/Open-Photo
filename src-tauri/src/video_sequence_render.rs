@@ -731,6 +731,7 @@ mod tests {
                     fit: "fit".into(),
                 },
                 frame_rate: 30,
+                titles: vec![],
             },
             roots: BTreeMap::new(),
         };
