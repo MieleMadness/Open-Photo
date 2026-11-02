@@ -1,3 +1,10 @@
+# 0.56.48 — Phase I timed-title persistence groundwork
+
+- Define bounded, persisted timed-title records in the shared sequence schema, defaulting to an empty array for older project files.
+- Match native title-validation rules in the frontend project session.
+- Explicitly reject native preview/export for projects containing titles until the renderer supports them, preventing a silent text-loss export.
+- This release does **not** include a title editor or rendered title effects. Local audio, transitions and music remain unfinished.
+
 # 0.56.47 — Phase I framing guide
 
 - Add a toggleable, non-interactive safe-area overlay in the shared editor preview stage for checking social framing.
