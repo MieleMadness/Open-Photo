@@ -364,6 +364,7 @@ pub async fn create_video_sequence(
             },
             frame_rate: 30,
             titles: vec![],
+            audio_tracks: vec![],
         };
         add_files(&engine, &root, &mut p, &paths)?;
         let revision = store(&database()?, &root, &p, None)?;
