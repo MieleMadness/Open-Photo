@@ -647,20 +647,6 @@ pub fn compile(
         .collect();
         // FFmpeg URL joining misreads Windows verbatim paths. Keep this list local to the job.
         args.push("sequence.ffconcat".into());
-        args.extend([
-            "-map".into(),
-            "0:v:0".into(),
-            "-c:v".into(),
-            "copy".into(),
-            "-bsf:v".into(),
-            format!(
-                "setts=pts=N*{}:dts=N*{}:duration={}:time_base=1/90000:prescale=1",
-                90000 / fps,
-                90000 / fps,
-                90000 / fps
-            )
-            .into(),
-        ]);
         let mut extra_audio = Vec::new();
         for track in &snapshot.project.audio_tracks {
             let asset = snapshot
@@ -691,6 +677,20 @@ pub fn compile(
             ]);
             extra_audio.push((input_index, stream.stream, track));
         }
+        args.extend([
+            "-map".into(),
+            "0:v:0".into(),
+            "-c:v".into(),
+            "copy".into(),
+            "-bsf:v".into(),
+            format!(
+                "setts=pts=N*{}:dts=N*{}:duration={}:time_base=1/90000:prescale=1",
+                90000 / fps,
+                90000 / fps,
+                90000 / fps
+            )
+            .into(),
+        ]);
         if !extra_audio.is_empty() {
             let mut filters = vec![String::from(
                 "[0:a:0]aformat=sample_fmts=flt:channel_layouts=stereo,aresample=48000:async=1:first_pts=0[original]",
