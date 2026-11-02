@@ -930,6 +930,25 @@ mod tests {
         .unwrap()
     }
     #[test]
+    fn audio_track_mixes_into_native_project_preview() {
+        let (fixture, mut snapshot) = fixture();
+        let source = &snapshot.project.assets[0];
+        assert!(!source.video().unwrap().info.audio.is_empty());
+        snapshot.project.audio_tracks.push(crate::video_sequence::AudioTrack {
+            id: video_project::id(),
+            asset_id: source.id.clone(),
+            start_seconds: 0.2,
+            source_in_seconds: 0.0,
+            duration_seconds: 0.2,
+            gain_percent: 60,
+            fade_in_seconds: 0.04,
+            fade_out_seconds: 0.04,
+        });
+        let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
+        assert_eq!(preview.info.audio.len(), 1);
+        assert!(Path::new(&preview.source).exists());
+    }
+    #[test]
     fn timed_titles_are_rendered_by_the_bundled_windows_video_engine() {
         let (fixture, mut snapshot) = fixture();
         snapshot
