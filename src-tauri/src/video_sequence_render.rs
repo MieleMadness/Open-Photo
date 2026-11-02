@@ -23,11 +23,6 @@ pub struct Snapshot {
 impl Snapshot {
     pub fn validate(&self) -> Result<(), String> {
         crate::video_sequence::validate(&self.project)?;
-        if !self.project.titles.is_empty() {
-            return Err(
-                "Timed titles are saved but not yet supported by native preview/export".into(),
-            );
-        }
         if self.project.clips.is_empty() {
             return Err("Append a clip before rendering this project".into());
         }
@@ -233,6 +228,7 @@ struct PartOptions<'a> {
     bitrate: u64,
     output: &'a Path,
     max_bytes: u64,
+    titles_filter: String,
 }
 fn part_args(
     prepared: &PartSource,
@@ -246,6 +242,7 @@ fn part_args(
         bitrate,
         output,
         max_bytes,
+        titles_filter,
     } = options;
     let duration = frames as f64 / f64::from(fps);
     let samples = frames * 48000 / u64::from(fps);
@@ -296,7 +293,7 @@ fn part_args(
             "anullsrc=r=48000:cl=stereo".into(),
         ]);
     }
-    let filter=format!("trim=start=0:end={:.9},setpts=PTS-STARTPTS,fps=fps={fps}:start_time=0,tpad=stop_mode=clone:stop_duration={:.9},trim=end_frame={frames},setpts=N/({fps}*TB),{},scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setsar=1",prepared.duration,duration+1.0/f64::from(fps),prepared.filter);
+    let filter=format!("trim=start=0:end={:.9},setpts=PTS-STARTPTS,fps=fps={fps}:start_time=0,tpad=stop_mode=clone:stop_duration={:.9},trim=end_frame={frames},setpts=N/({fps}*TB),{},scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setsar=1{}",prepared.duration,duration+1.0/f64::from(fps),prepared.filter,titles_filter);
     args.extend([
         "-map".into(),
         format!("0:{}", prepared.video_stream).into(),
@@ -394,7 +391,7 @@ pub fn compile(
     progress: impl Fn(f64) + Send + Sync + 'static,
 ) -> Result<Compiled, String> {
     snapshot.validate()?;
-    if snapshot.project.clips.len() == 1 && !snapshot.has_photos() {
+    if snapshot.project.clips.len() == 1 && !snapshot.has_photos() && snapshot.project.titles.is_empty() {
         let (root, p) = snapshot.single(0)?;
         return Ok(Compiled {
             plan: video_render::plan(engine, &root, &p, output, options, cancel)?,
@@ -534,6 +531,26 @@ pub fn compile(
                 None
             };
             let part = directory.join(format!("clip-{index:04}.mkv"));
+            let clip_start = completed as f64 / f64::from(fps);
+            let clip_end = clip_start + *count as f64 / f64::from(fps);
+            let mut titles_filter = String::new();
+            for (title_index, title) in snapshot.project.titles.iter().enumerate() {
+                let start = (title.start_seconds - clip_start).max(0.0);
+                let end = (title.end_seconds - clip_start).min(clip_end - clip_start);
+                if end <= start {
+                    continue;
+                }
+                // Text is carried in a private local text file, never interpolated into FFmpeg syntax.
+                let text_path = directory.join(format!("title-{index:04}-{title_index:03}.txt"));
+                fs::write(&text_path, &title.text).map_err(|e| e.to_string())?;
+                let filename = text_path.file_name().ok_or("Title file name unavailable")?.to_string_lossy();
+                // Relative paths avoid Windows drive-colon escaping in FFmpeg's filter parser.
+                let x = f64::from(title.x_percent) / 100.0;
+                let y = f64::from(title.y_percent) / 100.0;
+                titles_filter.push_str(&format!(
+                    ",drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf':textfile={filename}:fontcolor=white:fontsize=h/18:x=(w-text_w)*{x:.3}:y=(h-text_h)*{y:.3}:borderw=2:bordercolor=black:enable='between(t,{start:.6},{end:.6})'"
+                ));
+            }
             let args = part_args(
                 &prepared,
                 &snapshot.project.clips[index].edits,
@@ -544,6 +561,7 @@ pub fn compile(
                     bitrate,
                     output: &part,
                     max_bytes,
+                    titles_filter,
                 },
             );
             let length = *count as f64 / f64::from(fps);
