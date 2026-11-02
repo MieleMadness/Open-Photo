@@ -397,7 +397,10 @@ pub fn compile(
     progress: impl Fn(f64) + Send + Sync + 'static,
 ) -> Result<Compiled, String> {
     snapshot.validate()?;
-    if snapshot.project.clips.len() == 1 && !snapshot.has_photos() && snapshot.project.titles.is_empty() {
+    if snapshot.project.clips.len() == 1
+        && !snapshot.has_photos()
+        && snapshot.project.titles.is_empty()
+    {
         let (root, p) = snapshot.single(0)?;
         return Ok(Compiled {
             plan: video_render::plan(engine, &root, &p, output, options, cancel)?,
@@ -549,7 +552,10 @@ pub fn compile(
                 // Text is carried in a private local text file, never interpolated into FFmpeg syntax.
                 let text_path = directory.join(format!("title-{index:04}-{title_index:03}.txt"));
                 fs::write(&text_path, &title.text).map_err(|e| e.to_string())?;
-                let filename = text_path.file_name().ok_or("Title file name unavailable")?.to_string_lossy();
+                let filename = text_path
+                    .file_name()
+                    .ok_or("Title file name unavailable")?
+                    .to_string_lossy();
                 // Relative paths avoid Windows drive-colon escaping in FFmpeg's filter parser.
                 let x = f64::from(title.x_percent) / 100.0;
                 let y = f64::from(title.y_percent) / 100.0;
@@ -850,14 +856,17 @@ mod tests {
     #[test]
     fn timed_titles_are_rendered_by_the_bundled_windows_video_engine() {
         let (fixture, mut snapshot) = fixture();
-        snapshot.project.titles.push(crate::video_sequence::TitleOverlay {
-            id: "test-title".into(),
-            text: "Open Photo".into(),
-            start_seconds: 0.05,
-            end_seconds: 0.24,
-            x_percent: 50,
-            y_percent: 50,
-        });
+        snapshot
+            .project
+            .titles
+            .push(crate::video_sequence::TitleOverlay {
+                id: "test-title".into(),
+                text: "Open Photo".into(),
+                start_seconds: 0.05,
+                end_seconds: 0.24,
+                x_percent: 50,
+                y_percent: 50,
+            });
         let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
         assert!(Path::new(&preview.source).exists());
         assert_eq!(preview.info.frame_count, Some(15));
