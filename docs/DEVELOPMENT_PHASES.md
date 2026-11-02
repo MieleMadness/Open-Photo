@@ -1,3 +1,7 @@
+## 0.56.52 — Audio-track schema foundation
+
+Added compatible, strictly validated audio-track metadata to multi-media sequence documents with empty defaults for older projects and new projects. Rendering intentionally refuses nonempty track metadata until mixing can be implemented and tested; no misleading "audio supported" claims. Next: independent local audio import with verified file bindings, export/preview mixer, then waveform/fade editing and transitions.
+
 ## 0.56.51 — Title editing usability
 
 Title insertion uses the current timeline playhead and explicitly distinguishes raw source from rendered project preview. No change to exported video rendering; this update remains subject to CI and Windows acceptance.
