@@ -1,3 +1,10 @@
+# 0.56.56 — Dedicated audio-only inspection foundation
+
+- Add a native audio-only FFprobe inspection command for MP3, WAV, FLAC and M4A sources under registered local roots.
+- Validate codec, sample rate, channels and duration without inventing a video stream; reject files containing actual video.
+- Add regression tests for normal audio and invalid metadata.
+- This is an inspection foundation only: audio-only files cannot yet be added to saved projects or mixed on the timeline. Independent import and waveforms remain to be implemented.
+
 # 0.56.55 — Reliable audio source selection
 
 - Allow choosing which imported video's audio is used before adding a track, instead of silently using the first source.
