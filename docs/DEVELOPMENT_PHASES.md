@@ -1,3 +1,7 @@
+## 0.56.58 — Standalone audio source project model
+
+Added optional independent source metadata to multi-media sequence documents and mirrored it in TypeScript. The full workspace import-and-bind pipeline and mixer remain pending; unbound audio-only sources are explicitly blocked from rendering.
+
 ## 0.56.57 — Source lifecycle integrity
 
 Workspace removal now clears audio layers that refer to the removed source, preserving valid project persistence. Audio-only source binding/import, waveform editing and transitions remain open.
