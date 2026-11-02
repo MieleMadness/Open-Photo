@@ -1,3 +1,7 @@
+## 0.56.56 — Audio-only inspection groundwork
+
+Native inspection now recognizes validated audio-only files without requiring video metadata. Next steps: workspace-owned audio asset bindings, save/load/relink, actual mixer input mapping, UI import and waveform display. No end-to-end audio-only import yet.
+
 ## 0.56.55 — Phase I audio source selection
 
 Audio layering supports choosing a specific video source before insertion and safely adapting duration/fades on source changes. This is an incremental usability and integrity improvement to the 0.56.53 mixer; audio-only import and waveforms remain planned.
