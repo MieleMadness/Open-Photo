@@ -1051,3 +1051,7 @@
 .sequence-audio-bar { position:absolute; inset-block:3px; display:flex; align-items:center; padding-inline:6px; min-width:2px; overflow:hidden; border-radius:var(--radius-sm); background:var(--primary-soft); color:var(--accent-text); border:1px solid var(--accent-text); font-size:var(--type-caption); font-weight:700; font-variant-numeric:tabular-nums; }
 .sequence-audio-playhead { position:absolute; top:0; bottom:0; width:2px; background:var(--text); pointer-events:none; }
 .sequence-audio-hint { margin:var(--space-2) 0 0; color:var(--muted); font-size:var(--type-caption); line-height:1.45; }
+
+/* Keep audio-source selection aligned with the editor's compact inspector form. */
+.sequence-audio-source-picker { display:flex; flex-direction:column; gap:var(--space-1); margin:var(--space-3) 0; color:var(--text); font-size:var(--type-caption); }
+.sequence-audio-source-picker select { width:100%; min-width:0; }
