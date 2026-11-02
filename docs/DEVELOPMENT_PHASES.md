@@ -1,3 +1,7 @@
+## 0.56.53 — Phase I layered audio (video sources)
+
+Audio layers may reference verified video sources in the project and are composed with original timeline sound using FFmpeg. The inspector can place, trim, gain and fade those layers. Separate audio-only import, waveform views, transitions, and manual on-device export listening remain open.
+
 ## 0.56.52 — Audio-track schema foundation
 
 Added compatible, strictly validated audio-track metadata to multi-media sequence documents with empty defaults for older projects and new projects. Rendering intentionally refuses nonempty track metadata until mixing can be implemented and tested; no misleading "audio supported" claims. Next: independent local audio import with verified file bindings, export/preview mixer, then waveform/fade editing and transitions.
