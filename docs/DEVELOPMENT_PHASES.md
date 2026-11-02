@@ -1,3 +1,7 @@
+## 0.56.50 — Phase I titles implementation checkpoint
+
+The shared editor now has timed title controls for full-project start/end and screen placement, saved via the existing validated local sequence schema. The normalized native sequence renderer draws them during preview and export, including the single-video-with-titles case. Font and filter support on the bundled Windows FFmpeg, actual output visuals, and installed Windows testing remain acceptance gates. Phase I audio, waveforms and transitions remain open.
+
 ## 0.56.49 — Design-engineering polish checkpoint
 
 Applied the project's Emil Kowalski skill to the shared editor: inspector tab focus/hover and deliberately brief transitions, reduced-motion opt-out, and consistent CSS-owned safe-area guide styles. This is a targeted UI pass, not Phase I completion. Title compositing, audio and transitions remain pending.
