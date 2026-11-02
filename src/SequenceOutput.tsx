@@ -10,7 +10,7 @@ import {ErrorNotice} from "./Ui";
 export type ProjectPreviewState={source:string;busy:boolean;warnings:string[]};
 export const emptyProjectPreview=():ProjectPreviewState=>({source:"",busy:false,warnings:[]});
 export type SequenceOutputParts={settings:ReactNode;previewControls:ReactNode;exportControl:ReactNode;notices:ReactNode;feedback:ReactNode};
-const canvases=[{width:1920,height:1080,label:"1080p landscape"},{width:1080,height:1920,label:"1080p portrait"},{width:1080,height:1080,label:"Square"},{width:3840,height:2160,label:"4K landscape"},{width:2160,height:3840,label:"4K portrait"}];
+const canvases=[{width:1920,height:1080,label:"16:9 · YouTube / landscape"},{width:1080,height:1920,label:"9:16 · Reels / TikTok / Shorts"},{width:1080,height:1350,label:"4:5 · Portrait feed"},{width:1080,height:1080,label:"1:1 · Square feed"},{width:3840,height:2160,label:"4K · Landscape"},{width:2160,height:3840,label:"4K · Vertical"}];
 /** The stage has one owner: original playback or a compiled project, never two audio players. */
 export function SequenceOutput({session,loaded,disabled,host,previewState,onPreviewState,stopRef,children,onInvalidDraft}:{session:SequenceSession;loaded:LoadedSequence;disabled:boolean;host:RefObject<HTMLElement|null>;previewState:ProjectPreviewState;onPreviewState:Dispatch<SetStateAction<ProjectPreviewState>>;stopRef:RefObject<(()=>void)|null>;children?:(parts:SequenceOutputParts)=>ReactNode;onInvalidDraft?:()=>void}){
   const project=session.history.present,used=project.clips.map(c=>({clip:c,asset:project.assets.find(a=>a.id===c.asset_id)!}));
