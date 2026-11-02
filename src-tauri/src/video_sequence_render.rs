@@ -675,7 +675,10 @@ pub fn compile(
                 .ok_or("Relink every audio track source before rendering")?;
             let source = crate::sequence_media::source(root, asset, &cancel)?;
             let info = video_probe::probe(engine, &source, &cancel)?;
-            let stream = info.audio.first().ok_or("Audio source contains no audio stream")?;
+            let stream = info
+                .audio
+                .first()
+                .ok_or("Audio source contains no audio stream")?;
             if track.source_in_seconds + track.duration_seconds > info.duration_seconds + 0.000001 {
                 return Err("Audio trim exceeds source duration".into());
             }
@@ -934,16 +937,19 @@ mod tests {
         let (fixture, mut snapshot) = fixture();
         let source = &snapshot.project.assets[0];
         assert!(!source.video().unwrap().info.audio.is_empty());
-        snapshot.project.audio_tracks.push(crate::video_sequence::AudioTrack {
-            id: video_project::id(),
-            asset_id: source.id.clone(),
-            start_seconds: 0.2,
-            source_in_seconds: 0.0,
-            duration_seconds: 0.2,
-            gain_percent: 60,
-            fade_in_seconds: 0.04,
-            fade_out_seconds: 0.04,
-        });
+        snapshot
+            .project
+            .audio_tracks
+            .push(crate::video_sequence::AudioTrack {
+                id: video_project::id(),
+                asset_id: source.id.clone(),
+                start_seconds: 0.2,
+                source_in_seconds: 0.0,
+                duration_seconds: 0.2,
+                gain_percent: 60,
+                fade_in_seconds: 0.04,
+                fade_out_seconds: 0.04,
+            });
         let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
         assert_eq!(preview.info.audio.len(), 1);
         assert!(Path::new(&preview.source).exists());
