@@ -1,3 +1,9 @@
+# 0.56.47 — Phase I framing guide
+
+- Add a toggleable, non-interactive safe-area overlay in the shared editor preview stage for checking social framing.
+- Explicitly keep the guide out of exported video; title rendering, local audio, waveforms and transitions are not yet implemented.
+- Preserve the existing canvas presets and read-only source safety.
+
 # 0.56.46 — Phase I begins: social editing canvas presets
 
 - Add named social-video canvas presets for 16:9 landscape, 9:16 vertical, 4:5 portrait feed and 1:1 square, retaining 4K options.
