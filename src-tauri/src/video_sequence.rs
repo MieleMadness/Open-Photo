@@ -296,6 +296,7 @@ pub async fn create_video_sequence(
                 fit: "fit".into(),
             },
             frame_rate: 30,
+            titles: vec![],
         };
         add_files(&engine, &root, &mut p, &paths)?;
         let revision = store(&database()?, &root, &p, None)?;
