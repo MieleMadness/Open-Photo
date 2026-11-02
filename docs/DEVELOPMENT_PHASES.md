@@ -1,3 +1,9 @@
+## 0.56.46 — Phase I started: social output presets
+
+The shared editor now offers named social output canvases (16:9, 9:16, 4:5 and 1:1, plus 4K) using the existing persisted output dimensions and validated native export path. Unit tests cover supported even dimensions and unique presets.
+
+**Phase I is not complete.** Remaining implementation: persist and render timed text overlays; safely import/mix local audio on the shared timeline with waveform and fades; preview/export-equivalent basic transitions; social safe-area guides and installed Windows media acceptance. These features require explicit schema migration and native preview/export synchronization and must not be described as shipping until both sides are implemented and verified. Phase J background music is still separate. The 10,000-item and Phase H real-media acceptance gates remain open.
+
 ## Current checkpoint — 0.56.45: Phase H implementation complete, acceptance open
 
 Phase H now includes validated JPEG/TIFF/HEIC/HEIF and MOV/MP4 GPS discovery; zoom-dependent Web Mercator clustering; stable map selection, marker cycling and empty states; and photo/video and capture-year filters within the active workspace. The existing Windows Desktop Build 0.56.44 (#906) was green. The 0.56.45 build needs independent validation.
