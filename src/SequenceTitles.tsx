@@ -14,7 +14,7 @@ function TitleTextInput({title,onCommit}:{title:TitleOverlay;onCommit:(text:stri
 }
 
 /** Simple, always-visible controls; timeline title range is measured in project seconds. */
-export function SequenceTitles({session,disabled}:{session:SequenceSession;disabled:boolean}){
+export function SequenceTitles({session,disabled,playhead}:{session:SequenceSession;disabled:boolean;playhead:number}){
   const project=session.history.present;
   const titles=project.titles||[];
   const duration=projectDuration(project);
@@ -24,10 +24,11 @@ export function SequenceTitles({session,disabled}:{session:SequenceSession;disab
   }
   return <section aria-label="Video text overlays" className="sequence-titles">
     <div className="timeline-heading"><h2>Titles</h2><p>{titles.length} / 20</p></div>
-    <p className="timeline-help">Titles appear over video and photos during their selected time range. Timing uses the full project timeline.</p>
+    <p className="timeline-help">Add a title at the playhead. Titles appear in the rendered project preview and export, not the original-source preview.</p>
     <fieldset disabled={disabled||duration<=0}>
       <button className="secondary-button" type="button" disabled={titles.length>=20||duration<=0} onClick={()=>{
-        const start=0,end=Math.min(duration,3);
+        const start=Math.min(Math.max(0,playhead),Math.max(0,duration-0.04));
+        const end=Math.min(duration,start+3);
         commit([...titles,{id:crypto.randomUUID(),text:"Your title",start_seconds:start,end_seconds:end,x_percent:50,y_percent:50}]);
       }}>Add title</button>
       {titles.map(title=><div key={title.id} className="sequence-title-fields">
