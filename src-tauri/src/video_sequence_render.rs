@@ -689,9 +689,9 @@ pub fn compile(
             extra_audio.push((input_index, stream.stream, track));
         }
         if !extra_audio.is_empty() {
-            let mut filters = vec![
-                format!("[0:a:0]aformat=sample_fmts=flt:channel_layouts=stereo,aresample=48000:async=1:first_pts=0[original]")
-            ];
+            let mut filters = vec![String::from(
+                "[0:a:0]aformat=sample_fmts=flt:channel_layouts=stereo,aresample=48000:async=1:first_pts=0[original]",
+            )];
             let mut inputs = String::from("[original]");
             for (index, (input, stream, track)) in extra_audio.iter().enumerate() {
                 let label = format!("track{index}");
