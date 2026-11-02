@@ -554,7 +554,7 @@ pub fn compile(
                 let x = f64::from(title.x_percent) / 100.0;
                 let y = f64::from(title.y_percent) / 100.0;
                 titles_filter.push_str(&format!(
-                    ",drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf':textfile={filename}:fontcolor=white:fontsize=h/18:x=(w-text_w)*{x:.3}:y=(h-text_h)*{y:.3}:borderw=2:bordercolor=black:enable='between(t,{start:.6},{end:.6})'"
+                    ",drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf':textfile={filename}:expansion=none:fontcolor=white:fontsize=h/18:x=(w-text_w)*{x:.3}:y=(h-text_h)*{y:.3}:borderw=2:bordercolor=black:enable='between(t,{start:.6},{end:.6})'"
                 ));
             }
             let args = part_args(
