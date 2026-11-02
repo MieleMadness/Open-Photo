@@ -1,3 +1,7 @@
+## 0.56.47 — Phase I social framing guide
+
+The shared editor adds an optional preview-only social safe-area frame, alongside 0.56.46's social output presets. This is a framing aid, **not** a rendered text effect or an exact platform UI safe-area guarantee. Titles, timed text, local audio waveforms/mixing and transitions still require end-to-end saved-project and native export support; Phase I remains in progress.
+
 ## 0.56.46 — Phase I started: social output presets
 
 The shared editor now offers named social output canvases (16:9, 9:16, 4:5 and 1:1, plus 4K) using the existing persisted output dimensions and validated native export path. Unit tests cover supported even dimensions and unique presets.
