@@ -1,3 +1,4 @@
+import {useState} from "react";
 import {type SequenceSession,type AudioTrack} from "./videoSequence";
 import {projectDuration} from "./timelineCommands";
 
@@ -6,6 +7,7 @@ export function SequenceAudio({session,disabled,playhead}:{session:SequenceSessi
   const tracks=project.audio_tracks||[];
   const duration=projectDuration(project);
   const videos=project.assets.filter(asset=>asset.media.kind==="video"&&asset.media.info.audio.length>0);
+  const [chosenSource,setChosenSource]=useState("");
   function commit(next:AudioTrack[]){session.commit({...project,audio_tracks:next});}
   function update(id:string,changes:Partial<AudioTrack>){commit(tracks.map(track=>track.id===id?{...track,...changes}:track));}
   return <section aria-label="Audio tracks" className="sequence-titles">
@@ -20,8 +22,9 @@ export function SequenceAudio({session,disabled,playhead}:{session:SequenceSessi
       <p className="sequence-audio-hint">Track bars show placement; use the controls below to edit timing. The vertical marker follows your playhead.</p>
     </div>}
     <fieldset disabled={disabled||duration<=0}>
+      {videos.length>0&&<label className="sequence-audio-source-picker">Audio source<select aria-label="Choose video sound for new track" value={videos.some(video=>video.id===chosenSource)?chosenSource:videos[0].id} onChange={event=>setChosenSource(event.target.value)}>{videos.map(video=><option key={video.id} value={video.id}>{video.relative_path}</option>)}</select></label>}
       <button className="secondary-button" type="button" disabled={tracks.length>=8||videos.length===0} onClick={()=>{
-        const asset=videos[0];if(asset.media.kind!=="video")return;
+        const asset=videos.find(video=>video.id===chosenSource)||videos[0];if(asset.media.kind!=="video")return;
         const start=Math.min(Math.max(0,playhead),Math.max(0,duration-.04));
         const length=Math.min(3,asset.media.info.duration_seconds,duration-start);
         if(length<.04)return;
@@ -32,7 +35,9 @@ export function SequenceAudio({session,disabled,playhead}:{session:SequenceSessi
         return <div key={track.id} className="sequence-title-fields">
           <label>Audio source<select value={track.asset_id} aria-label="Audio source" onChange={event=>{
             const next=videos.find(a=>a.id===event.target.value);if(!next||next.media.kind!=="video")return;
-            update(track.id,{asset_id:next.id,source_in_seconds:0,duration_seconds:Math.min(track.duration_seconds,next.media.info.duration_seconds)});
+            const nextDuration=Math.min(track.duration_seconds,next.media.info.duration_seconds);
+            const fadeIn=Math.min(track.fade_in_seconds,nextDuration);
+            update(track.id,{asset_id:next.id,source_in_seconds:0,duration_seconds:nextDuration,fade_in_seconds:fadeIn,fade_out_seconds:Math.min(track.fade_out_seconds,nextDuration-fadeIn)});
           }}>{videos.map(a=><option key={a.id} value={a.id}>{a.relative_path}</option>)}</select></label>
           <label>Start (seconds)<input aria-label="Audio start" type="number" min={0} max={Math.max(0,duration-track.duration_seconds)} step=".01" value={track.start_seconds} onChange={event=>{const n=Number(event.target.value);if(Number.isFinite(n)&&n>=0&&n+track.duration_seconds<=duration)update(track.id,{start_seconds:n});}}/></label>
           <label>Source offset (seconds)<input aria-label="Audio source offset" type="number" min={0} max={Math.max(0,(asset?.media.kind==="video"?asset.media.info.duration_seconds:0)-track.duration_seconds)} step=".01" value={track.source_in_seconds} onChange={event=>{const n=Number(event.target.value);if(Number.isFinite(n)&&n>=0&&asset?.media.kind==="video"&&n+track.duration_seconds<=asset.media.info.duration_seconds)update(track.id,{source_in_seconds:n});}}/></label>
