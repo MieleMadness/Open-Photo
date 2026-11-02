@@ -1,5 +1,17 @@
+import {useEffect,useState} from "react";
 import {type SequenceSession,type TitleOverlay} from "./videoSequence";
 import {projectDuration} from "./timelineCommands";
+
+/** Edit locally until blur so temporarily blank text does not invalidate a saved project. */
+function TitleTextInput({title,onCommit}:{title:TitleOverlay;onCommit:(text:string)=>void}){
+  const [draft,setDraft]=useState(title.text);
+  useEffect(()=>setDraft(title.text),[title.id,title.text]);
+  function finish(){
+    if(draft.trim()&&draft.length<=100&&!/[\\x00-\\x1f\\x7f]/.test(draft))onCommit(draft);
+    else setDraft(title.text);
+  }
+  return <input aria-label="Title text" value={draft} maxLength={100} required onChange={event=>setDraft(event.target.value)} onBlur={finish} onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();event.currentTarget.blur();}if(event.key==="Escape"){setDraft(title.text);event.currentTarget.blur();}}}/>;
+}
 
 /** Simple, always-visible controls; timeline title range is measured in project seconds. */
 export function SequenceTitles({session,disabled}:{session:SequenceSession;disabled:boolean}){
@@ -19,7 +31,7 @@ export function SequenceTitles({session,disabled}:{session:SequenceSession;disab
         commit([...titles,{id:crypto.randomUUID(),text:"Your title",start_seconds:start,end_seconds:end,x_percent:50,y_percent:50}]);
       }}>Add title</button>
       {titles.map(title=><div key={title.id} className="sequence-title-fields">
-        <label>Title text<input aria-label="Title text" value={title.text} maxLength={100} required onChange={event=>update(title.id,{text:event.target.value})}/></label>
+        <label>Title text<TitleTextInput title={title} onCommit={text=>update(title.id,{text})}/></label>
         <label>Start (seconds)<input aria-label="Title start" type="number" min={0} max={Math.max(0,title.end_seconds-.01)} step=".01" value={title.start_seconds} onChange={event=>{const value=Number(event.target.value);if(Number.isFinite(value)&&value>=0&&value<title.end_seconds)update(title.id,{start_seconds:value});}}/></label>
         <label>End (seconds)<input aria-label="Title end" type="number" min={title.start_seconds+.01} max={duration} step=".01" value={title.end_seconds} onChange={event=>{const value=Number(event.target.value);if(Number.isFinite(value)&&value>title.start_seconds&&value<=duration)update(title.id,{end_seconds:value});}}/></label>
         <label>Horizontal placement<select aria-label="Title horizontal position" value={title.x_percent} onChange={event=>update(title.id,{x_percent:Number(event.target.value)})}><option value={10}>Left</option><option value={50}>Center</option><option value={90}>Right</option></select></label>
