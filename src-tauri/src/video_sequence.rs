@@ -143,7 +143,12 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
     let mut audio_source_ids = HashSet::new();
     for source in &p.audio_sources {
         video_project::validate_identity(
-            &p.id, &source.id, &p.title, &source.relative_path, &source.sha256, source.bytes,
+            &p.id,
+            &source.id,
+            &p.title,
+            &source.relative_path,
+            &source.sha256,
+            source.bytes,
         )?;
         if !audio_source_ids.insert(&source.id)
             || source.info.duration_seconds < 0.04
