@@ -1019,3 +1019,27 @@
 @media (prefers-reduced-motion:reduce) {
   .editor-inspector-tab { transition:none; }
 }
+
+/* Timed titles use the same inspector geometry and focus conventions as clip edits. */
+.sequence-titles {
+  padding:var(--space-4) 0;
+  border-bottom:1px solid var(--line);
+}
+.sequence-titles .timeline-heading { align-items:center; justify-content:space-between; }
+.sequence-titles .timeline-help { margin:var(--space-2) 0 var(--space-3); }
+.sequence-titles fieldset { min-width:0; margin:0; padding:0; border:0; }
+.sequence-title-fields {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:var(--space-3);
+  padding:var(--space-3) 0;
+  border-bottom:1px solid var(--line);
+}
+.sequence-title-fields label { min-width:0; display:flex; flex-direction:column; gap:var(--space-1); }
+.sequence-title-fields label:first-child { grid-column:1/-1; }
+.sequence-title-fields input,.sequence-title-fields select { width:100%; min-width:0; }
+.sequence-title-fields button { justify-self:start; align-self:end; }
+@media (max-width:700px) {
+  .sequence-title-fields { grid-template-columns:minmax(0,1fr); }
+  .sequence-title-fields label:first-child { grid-column:auto; }
+}
