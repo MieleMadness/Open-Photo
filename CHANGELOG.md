@@ -1,3 +1,10 @@
+# 0.56.50 — Phase I timed video titles
+
+- Add an editor inspector for up to 20 timed, positioned titles in the existing mixed-media project format.
+- Compose title text with the native FFmpeg preview/export sequence pipeline, using scratch-owned UTF-8 title files rather than interpolating user text into filter expressions.
+- Use the same full-project timeline coordinates for title timing across photos and video clips.
+- Native Windows rendering, font availability and final preview/export equivalence require CI and installed-app verification; audio tracks and transitions remain planned.
+
 # 0.56.49 — Design-engineering editor polish
 
 - Applied the installed Emil Kowalski design engineering review to editor inspector tabs and preview safe-area controls.
