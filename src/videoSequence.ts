@@ -24,7 +24,7 @@ export function validSequence(project:SequenceProject){
   for(const track of tracks){
     if(!/^[a-zA-Z0-9-]{1,120}$/.test(track.id)
       ||trackIds.has(track.id)
-      ||!project.assets.some(asset=>asset.id===track.asset_id&&asset.media.kind==="video")
+      ||!project.assets.some(asset=>asset.id===track.asset_id&&asset.media.kind==="video"&&(asset.media.info.audio?.length||0)>0&&track.source_in_seconds+track.duration_seconds<=asset.media.info.duration_seconds+.000001)
       ||![track.start_seconds,track.source_in_seconds,track.duration_seconds,track.fade_in_seconds,track.fade_out_seconds].every(Number.isFinite)
       ||track.start_seconds<0||track.source_in_seconds<0||track.duration_seconds<.04
       ||track.start_seconds+track.duration_seconds>total+.000001
