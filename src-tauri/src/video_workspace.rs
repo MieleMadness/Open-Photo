@@ -206,6 +206,7 @@ fn new_record() -> Record {
                 fit: "fit".into(),
             },
             frame_rate: 30,
+            titles: vec![],
         },
         revision: 0,
         bindings: Bindings::new(),
