@@ -1,3 +1,8 @@
+# 0.56.57 — Audio source removal consistency
+
+- When removing an imported source video, automatically remove its dependent audio layers from the same workspace project mutation, preventing orphaned track references and failed saves.
+- Continue the audio-only import integration preparation; independent audio-only files remain inspection-only and are not yet attachable to projects.
+
 # 0.56.56 — Dedicated audio-only inspection foundation
 
 - Add a native audio-only FFprobe inspection command for MP3, WAV, FLAC and M4A sources under registered local roots.
