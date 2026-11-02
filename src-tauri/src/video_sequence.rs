@@ -29,7 +29,22 @@ pub struct Sequence {
     pub frame_rate: u32,
     #[serde(default)]
     pub titles: Vec<TitleOverlay>,
+    #[serde(default)]
+    pub audio_tracks: Vec<AudioTrack>,
 }
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct AudioTrack {
+    pub id: String,
+    pub asset_id: String,
+    pub start_seconds: f64,
+    pub source_in_seconds: f64,
+    pub duration_seconds: f64,
+    pub gain_percent: u16,
+    pub fade_in_seconds: f64,
+    pub fade_out_seconds: f64,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct TitleOverlay {
@@ -108,6 +123,34 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
             return Err("Invalid title timing, position or text".into());
         }
     }
+    if p.audio_tracks.len() > 8 {
+        return Err("Limit each project to eight audio tracks".into());
+    }
+    let mut track_ids = HashSet::new();
+    for track in &p.audio_tracks {
+        let referenced_video = p.assets.iter().any(|asset| {
+            asset.id == track.asset_id && matches!(asset.media, Media::Video { .. })
+        });
+        if !video_project::valid_id(&track.id)
+            || !track_ids.insert(&track.id)
+            || !referenced_video
+            || !track.start_seconds.is_finite()
+            || !track.source_in_seconds.is_finite()
+            || !track.duration_seconds.is_finite()
+            || !track.fade_in_seconds.is_finite()
+            || !track.fade_out_seconds.is_finite()
+            || track.start_seconds < 0.0
+            || track.source_in_seconds < 0.0
+            || track.duration_seconds < 0.04
+            || track.start_seconds + track.duration_seconds > total_seconds + 0.000001
+            || track.gain_percent > 200
+            || track.fade_in_seconds < 0.0
+            || track.fade_out_seconds < 0.0
+            || track.fade_in_seconds + track.fade_out_seconds > track.duration_seconds
+        {
+            return Err("Invalid audio track source, timing, gain or fades".into());
+        }
+    }
     let mut asset_ids = HashSet::new();
     let mut identities = HashSet::new();
     for asset in &p.assets {
@@ -165,6 +208,7 @@ pub(crate) fn migrate(p: Project) -> Result<Sequence, String> {
         output: p.output,
         frame_rate: 30,
         titles: vec![],
+        audio_tracks: vec![],
     };
     validate(&next)?;
     Ok(next)
