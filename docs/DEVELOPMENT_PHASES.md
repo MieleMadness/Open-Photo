@@ -1,3 +1,7 @@
+## 0.56.55 — Phase I audio source selection
+
+Audio layering supports choosing a specific video source before insertion and safely adapting duration/fades on source changes. This is an incremental usability and integrity improvement to the 0.56.53 mixer; audio-only import and waveforms remain planned.
+
 ## 0.56.54 — Audio lane overview
 
 Added editor audio placement bars synchronized to the project playhead. Audio processing is unchanged from the green 0.56.53 mixer; native audio-only import, waveform decoding and transitions still need implementation.
