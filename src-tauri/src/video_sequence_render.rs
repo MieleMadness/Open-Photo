@@ -842,6 +842,8 @@ mod tests {
                 frame_rate: 30,
                 titles: vec![],
                 audio_tracks: vec![],
+                audio_sources: vec![],
+            audio_sources: vec![],
             },
             roots: BTreeMap::new(),
         };
