@@ -1,3 +1,10 @@
+# 0.56.49 — Design-engineering editor polish
+
+- Applied the installed Emil Kowalski design engineering review to editor inspector tabs and preview safe-area controls.
+- Added small, property-specific transitions for mouse interaction, a clear keyboard focus indicator, and reduced-motion support; the timeline scrubber remains instant.
+- Replaced inline safe-area styling with shared editor classes. No changes to rendering, project data or export semantics.
+- Real installed-Windows visual review remains outstanding.
+
 # 0.56.48 — Phase I timed-title persistence groundwork
 
 - Define bounded, persisted timed-title records in the shared sequence schema, defaulting to an empty array for older project files.
