@@ -1,3 +1,7 @@
+## 0.56.54 — Audio lane overview
+
+Added editor audio placement bars synchronized to the project playhead. Audio processing is unchanged from the green 0.56.53 mixer; native audio-only import, waveform decoding and transitions still need implementation.
+
 ## 0.56.53 — Phase I layered audio (video sources)
 
 Audio layers may reference verified video sources in the project and are composed with original timeline sound using FFmpeg. The inspector can place, trim, gain and fade those layers. Separate audio-only import, waveform views, transitions, and manual on-device export listening remain open.
