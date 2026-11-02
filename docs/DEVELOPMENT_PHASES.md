@@ -1,3 +1,7 @@
+## 0.56.48 — Phase I: timed-title schema foundation
+
+Added serializable, validated timed titles to the shared project document with backward-compatible defaults and frontend validation. Native preview/export deliberately rejects populated title records until actual title compositing is implemented; this is a foundational increment, not a completed title feature. Next: implement matching native preview/export rendering and accessible title controls, then local audio and tested transitions.
+
 ## 0.56.47 — Phase I social framing guide
 
 The shared editor adds an optional preview-only social safe-area frame, alongside 0.56.46's social output presets. This is a framing aid, **not** a rendered text effect or an exact platform UI safe-area guarantee. Titles, timed text, local audio waveforms/mixing and transitions still require end-to-end saved-project and native export support; Phase I remains in progress.
