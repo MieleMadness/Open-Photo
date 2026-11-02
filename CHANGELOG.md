@@ -1,3 +1,10 @@
+# 0.56.55 — Reliable audio source selection
+
+- Allow choosing which imported video's audio is used before adding a track, instead of silently using the first source.
+- When changing the source of an existing audio track, clamp trim duration and fades to valid source bounds, preventing invalid saved edits.
+- Keep the audio controls aligned with the existing editor's compact spacing and accessibility patterns.
+- Independent audio-only MP3/WAV import and waveforms are not yet implemented.
+
 # 0.56.54 — Audio track placement overview
 
 - Add a visual timing overview for layered video-source audio, with one lane per track and a project playhead marker.
