@@ -1026,26 +1026,32 @@ mod tests {
         let info = video_probe::probe_audio_only(&engine(), &audio, || false).unwrap();
         let (bytes, sha256) = video_project::fingerprint(&audio, || false).unwrap();
         let id = video_project::id();
-        snapshot.project.audio_sources.push(crate::video_sequence::AudioSource {
-            id: id.clone(),
-            relative_path: "music standalone 世界.wav".into(),
-            sha256,
-            bytes,
-            info,
-        });
+        snapshot
+            .project
+            .audio_sources
+            .push(crate::video_sequence::AudioSource {
+                id: id.clone(),
+                relative_path: "music standalone 世界.wav".into(),
+                sha256,
+                bytes,
+                info,
+            });
         snapshot
             .roots
             .insert(id.clone(), fixture.0.to_string_lossy().into_owned());
-        snapshot.project.audio_tracks.push(crate::video_sequence::AudioTrack {
-            id: video_project::id(),
-            asset_id: id.clone(),
-            start_seconds: 0.1,
-            source_in_seconds: 0.0,
-            duration_seconds: 0.3,
-            gain_percent: 75,
-            fade_in_seconds: 0.05,
-            fade_out_seconds: 0.05,
-        });
+        snapshot
+            .project
+            .audio_tracks
+            .push(crate::video_sequence::AudioTrack {
+                id: video_project::id(),
+                asset_id: id.clone(),
+                start_seconds: 0.1,
+                source_in_seconds: 0.0,
+                duration_seconds: 0.3,
+                gain_percent: 75,
+                fade_in_seconds: 0.05,
+                fade_out_seconds: 0.05,
+            });
         let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
         assert_eq!(preview.info.audio.len(), 1);
         assert!(Path::new(&preview.source).exists());
