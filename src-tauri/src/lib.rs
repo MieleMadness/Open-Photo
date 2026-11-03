@@ -9,6 +9,9 @@ mod ai_runtime;
 mod ai_text;
 mod ai_validation;
 mod cache_disk;
+// Crossfade renderer foundation: compile and parity-test only, no active export path.
+#[cfg(test)]
+mod crossfade_clock;
 mod edit_export;
 mod geo;
 mod image_decode;
