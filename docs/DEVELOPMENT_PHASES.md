@@ -1,3 +1,7 @@
+## 0.56.60 — Standalone audio verification and relink UX
+
+Added a native standalone-WAV mixer regression test and a compact source-health/relink interface for imported music. Existing source binding and fingerprint protections remain enforced. Run CI and validate audio playback on Windows before marking standalone audio complete.
+
 ## 0.56.59 — Phase I standalone audio import and mixing
 
 Integrated registered-workspace audio-only imports (MP3/WAV/FLAC/M4A), durable source bindings, audio-track editor selection and FFmpeg mixing. Native preview and export verify source fingerprints and audio metadata. CI and on-device playback validation remain prerequisites; waveform visualization and video transitions are next.
