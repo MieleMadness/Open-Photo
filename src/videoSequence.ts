@@ -1,3 +1,4 @@
+import {validateCutTransitions,type CutTransition} from "./cutTransitions";
 import {DurableProjectSession} from "./projectSession";
 import {defaultEdits,validProject,validEdits,type VideoProject} from "./videoProject";
 import {markSeconds,markTime} from "./videoTime";
@@ -7,7 +8,7 @@ import {flushSettings} from "./userData";
 export type TitleOverlay={id:string;text:string;start_seconds:number;end_seconds:number;x_percent:number;y_percent:number};
 export type AudioTrack={id:string;asset_id:string;start_seconds:number;source_in_seconds:number;duration_seconds:number;gain_percent:number;fade_in_seconds:number;fade_out_seconds:number};
 export type AudioOnlySource={id:string;relative_path:string;sha256:string;bytes:number;info:{duration_seconds:number;stream:number;codec:string;channels:number;sample_rate:number}};
-export type SequenceProject={titles?:TitleOverlay[];audio_tracks?:AudioTrack[];audio_sources?:AudioOnlySource[];schema_version:3;id:string;title:string;assets:SequenceAsset[];clips:VideoProject["clips"];output:VideoProject["output"];frame_rate:30|60};
+export type SequenceProject={transitions?:CutTransition[];titles?:TitleOverlay[];audio_tracks?:AudioTrack[];audio_sources?:AudioOnlySource[];schema_version:3;id:string;title:string;assets:SequenceAsset[];clips:VideoProject["clips"];output:VideoProject["output"];frame_rate:30|60};
 export type LoadedSequence={project:SequenceProject;revision:number;sources:{asset_id:string;path:string|null;root?:string|null;status:string}[]};
 export function validSequence(project:SequenceProject){
   if(!project.title.trim()||project.title.length>200)return "Enter a project name of up to 200 characters.";
@@ -51,6 +52,8 @@ export function validSequence(project:SequenceProject){
   }
   for(const asset of project.assets){const error=validateClip(asset,{id:"validation",asset_id:asset.id,source_in:markTime(0,assetTimeBase(asset)),source_out:markTime(assetDuration(asset),assetTimeBase(asset)),edits:defaultEdits()});if(error)return error;}
   for(const clip of project.clips){const asset=project.assets.find(a=>a.id===clip.asset_id);if(!asset)return "A clip refers to missing media.";const error=validateClip(asset,clip);if(error)return error;}
+  const transitionError=validateCutTransitions(project.clips.map(clip=>({id:clip.id,duration:markSeconds(clip.source_out)-markSeconds(clip.source_in)})),project.transitions||[],project.frame_rate);
+  if(transitionError)return transitionError;
   if(project.clips.reduce((total,clip)=>total+markSeconds(clip.source_out)-markSeconds(clip.source_in),0)>7200)return "Keep this project within two hours.";
   return "";
 }
