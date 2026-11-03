@@ -1024,6 +1024,26 @@ mod tests {
         )
         .unwrap();
         let info = video_probe::probe_audio_only(&engine(), &audio, || false).unwrap();
+        let peaks = video_probe::decoded_waveform(
+            &engine(),
+            &audio,
+            info.stream,
+            0.0,
+            0.3,
+            "mp3,wav,flac,mov",
+        )
+        .unwrap();
+        assert_eq!(peaks.len(), 64);
+        assert!(peaks.iter().any(|peak| *peak > 0));
+        assert!(video_probe::decoded_waveform(
+            &engine(),
+            &audio,
+            info.stream,
+            0.0,
+            121.0,
+            "mp3,wav,flac,mov",
+        )
+        .is_err());
         let (bytes, sha256) = video_project::fingerprint(&audio, || false).unwrap();
         let id = video_project::id();
         snapshot
