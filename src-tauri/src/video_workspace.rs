@@ -646,31 +646,54 @@ pub async fn edit_workspace_video_project(
                     }
                     Action::Relink { asset_id, path, .. } => {
                         let (root, file) = root_for_file(&roots, &path)?;
-                        let asset = record
-                            .project
-                            .assets
-                            .iter_mut()
-                            .find(|a| a.id == asset_id)
-                            .ok_or("Video no longer in project")?;
-                        asset.relative_path = file
+                        let relative_path = file
                             .strip_prefix(&root)
                             .map_err(|e| e.to_string())?
                             .to_string_lossy()
                             .replace('\\', "/");
-                        record
-                            .bindings
-                            .insert(asset_id.clone(), root.to_string_lossy().into_owned());
-                        source(
-                            &roots,
-                            &record.project,
-                            &record.bindings,
+                        if let Some(asset) = record
+                            .project
+                            .assets
+                            .iter_mut()
+                            .find(|a| a.id == asset_id)
+                        {
+                            asset.relative_path = relative_path;
                             record
+                                .bindings
+                                .insert(asset_id.clone(), root.to_string_lossy().into_owned());
+                            source(
+                                &roots,
+                                &record.project,
+                                &record.bindings,
+                                record
+                                    .project
+                                    .assets
+                                    .iter()
+                                    .find(|a| a.id == asset_id)
+                                    .unwrap(),
+                            )?;
+                        } else {
+                            let asset = record
                                 .project
-                                .assets
-                                .iter()
+                                .audio_sources
+                                .iter_mut()
                                 .find(|a| a.id == asset_id)
-                                .unwrap(),
-                        )?;
+                                .ok_or("Source no longer in project")?;
+                            asset.relative_path = relative_path;
+                            record
+                                .bindings
+                                .insert(asset_id.clone(), root.to_string_lossy().into_owned());
+                            standalone_audio_source(
+                                &roots,
+                                &record.bindings,
+                                record
+                                    .project
+                                    .audio_sources
+                                    .iter()
+                                    .find(|a| a.id == asset_id)
+                                    .unwrap(),
+                            )?;
+                        }
                     }
                     _ => unreachable!(),
                 }
