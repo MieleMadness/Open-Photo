@@ -1,3 +1,10 @@
+# 0.56.63 — Accessible waveform scrubbing
+
+- Make decoded audio waveforms interactive with a native pointer/keyboard seek control tied to the global project playhead.
+- Preserve non-destructive source and track timings: waveform seeking never changes the imported file, track offset, gain or fades; use End at playhead to commit a trim.
+- Respect the existing 120-second waveform excerpt limit and display the limitation for longer clips.
+- Add waveform navigation and component tests covering project-time mapping, clamping, accessibility and unavailable sources.
+
 # 0.56.62 — Measured standalone audio waveform foundation
 
 - Decode up to 120 seconds of verified local standalone audio to mono 8 kHz PCM and return 64 actual amplitude peaks per audio track. The source file remains untouched.
