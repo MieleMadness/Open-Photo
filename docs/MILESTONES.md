@@ -1,3 +1,5 @@
+> **Status correction (2026-11-03):** This is a historical milestone log, not a current-version banner. Latest reviewed development source is 0.56.63 with standalone audio import/mixing, verified waveform excerpts and seeking. The old "Current source update — 0.56.37" below is historical. See [current status](CURRENT_STATUS_2026_11_03.md) and [development phases](DEVELOPMENT_PHASES.md). CI and installed-Windows acceptance are separate gates.
+
 # Milestones and validation status
 
 ## Current source update — 0.56.37
