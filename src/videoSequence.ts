@@ -58,6 +58,7 @@ export type WorkspaceProjectAction=
   |{type:"open_source";path:string}
   |{type:"create";paths:string[]}|{type:"load";id:string}|{type:"import";path:string}
   |{type:"add";id:string;paths:string[];expected_revision:number}
+  |{type:"add_audio";id:string;paths:string[];expected_revision:number}
   |{type:"remove_asset";id:string;asset_id:string;expected_revision:number}
   |{type:"relink";id:string;asset_id:string;path:string;expected_revision:number}
   |{type:"recover";id:string;history_id:number;expected_revision:number};
