@@ -1104,6 +1104,25 @@ mod tests {
         snapshot.project.audio_sources[0].sha256 = altered;
     }
     #[test]
+    fn dip_to_black_preserves_project_frame_count_and_fades_the_cut() {
+        let (fixture, mut snapshot) = fixture();
+        snapshot.project.transitions.push(crate::video_sequence::CutTransition {
+            from_clip_id: snapshot.project.clips[0].id.clone(),
+            to_clip_id: snapshot.project.clips[1].id.clone(),
+            kind: crate::video_sequence::CutTransitionKind::DipToBlack,
+            duration_seconds: 0.16,
+        });
+        crate::video_sequence::validate(&snapshot.project).unwrap();
+        let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
+        assert_eq!(preview.info.frame_count, Some(15));
+        // First clip ends around 0.2 s; incoming clip starts dark, then returns to blue.
+        let near_cut = pixel(Path::new(&preview.source), "0.200");
+        let after = pixel(Path::new(&preview.source), "0.400");
+        assert!(near_cut.iter().all(|channel| *channel < 85), "cut was not dark: {near_cut:?}");
+        assert!(after[2] > 90, "blue clip did not fade back in: {after:?}");
+    }
+
+    #[test]
     fn timed_titles_are_rendered_by_the_bundled_windows_video_engine() {
         let (fixture, mut snapshot) = fixture();
         snapshot
