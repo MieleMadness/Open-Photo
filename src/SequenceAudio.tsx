@@ -2,6 +2,7 @@ import {useState} from "react";
 import {type SequenceSession,type AudioTrack} from "./videoSequence";
 import {projectDuration} from "./timelineCommands";
 import {AudioWaveform} from "./AudioWaveform";
+import {AudioTrimHandles} from "./AudioTrimHandles";
 import {placeAudioAtPlayhead,trimAudioEndAtPlayhead} from "./audioTimeline";
 
 export function SequenceAudio({session,disabled,playhead,onImport,onRelink,sourceStatuses,onSeek}:{session:SequenceSession;disabled:boolean;playhead:number;onImport:()=>void;onRelink:(id:string)=>void;onSeek:(seconds:number)=>void;sourceStatuses:{asset_id:string;path:string|null;status:string}[]}){
@@ -29,10 +30,10 @@ export function SequenceAudio({session,disabled,playhead,onImport,onRelink,sourc
     {tracks.length>0&&duration>0&&<div className="sequence-audio-overview" role="group" aria-label="Audio track placement on project timeline">
       <div className="sequence-audio-ruler"><span>0:00</span><span>{duration.toFixed(1)} s</span></div>
       {tracks.map((track,index)=><div key={track.id} className="sequence-audio-lane" aria-label={`Audio track ${index+1}: starts at ${track.start_seconds.toFixed(1)} seconds, lasts ${track.duration_seconds.toFixed(1)} seconds`}>
-        <span className="sequence-audio-bar" style={{left:`${track.start_seconds/duration*100}%`,width:`${track.duration_seconds/duration*100}%`}} title={`Track ${index+1}: ${track.start_seconds.toFixed(2)}–${(track.start_seconds+track.duration_seconds).toFixed(2)} seconds`}>{index+1}</span>
+        <span className="sequence-audio-bar" style={{left:`${track.start_seconds/duration*100}%`,width:`${track.duration_seconds/duration*100}%`}} title={`Track ${index+1}: ${track.start_seconds.toFixed(2)}–${(track.start_seconds+track.duration_seconds).toFixed(2)} seconds`}>{index+1}{sources.find(source=>source.id===track.asset_id)&&<AudioTrimHandles track={track} trackNumber={index+1} sourceDuration={sources.find(source=>source.id===track.asset_id)!.duration} projectDuration={duration} disabled={disabled} onCommit={next=>update(track.id,next)}/>}</span>
         <span className="sequence-audio-playhead" aria-hidden="true" style={{left:`${Math.min(100,Math.max(0,playhead/duration*100))}%`}}/>
       </div>)}
-      <p className="sequence-audio-hint">Track bars show placement. Use the playhead actions below to move a track, set its end, or preview the cut.</p>
+      <p className="sequence-audio-hint">Drag the audio bar edges to trim without changing originals; use arrow keys for precise nudges. The playhead actions below can also move, trim, or preview a track.</p>
     </div>}
     <fieldset disabled={disabled||duration<=0}>
       {sources.length>0&&<label className="sequence-audio-source-picker">Audio source<select aria-label="Choose audio source for new track" value={sources.some(video=>video.id===chosenSource)?chosenSource:sources[0].id} onChange={event=>setChosenSource(event.target.value)}>{sources.map(video=><option key={video.id} value={video.id}>{video.label}</option>)}</select></label>}
