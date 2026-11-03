@@ -1,3 +1,7 @@
+## 0.56.61 — Playhead-aligned audio trim controls
+
+Added accessible, non-destructive audio placement and end-trim actions driven by the shared project playhead, with endpoint preview and unit tests. Waveform generation, direct drag gestures and transitions remain outstanding.
+
 ## 0.56.60 — Standalone audio verification and relink UX
 
 Added a native standalone-WAV mixer regression test and a compact source-health/relink interface for imported music. Existing source binding and fingerprint protections remain enforced. Run CI and validate audio playback on Windows before marking standalone audio complete.
