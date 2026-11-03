@@ -267,6 +267,7 @@ fn new_record() -> Record {
             titles: vec![],
             audio_tracks: vec![],
             audio_sources: vec![],
+            transitions: vec![],
         },
         revision: 0,
         bindings: Bindings::new(),
@@ -656,6 +657,19 @@ pub async fn edit_workspace_video_project(
                     }
                     Action::RemoveAsset { asset_id, .. } => {
                         record.project.clips.retain(|c| c.asset_id != asset_id);
+                        // A removed source may delete the clip on either side of a cut.
+                        // Retain only transition pairs that remain exactly adjacent.
+                        let adjacent: Vec<(String, String)> = record
+                            .project
+                            .clips
+                            .windows(2)
+                            .map(|pair| (pair[0].id.clone(), pair[1].id.clone()))
+                            .collect();
+                        record.project.transitions.retain(|transition| {
+                            adjacent.iter().any(|(from, to)| {
+                                from == &transition.from_clip_id && to == &transition.to_clip_id
+                            })
+                        });
                         record
                             .project
                             .audio_tracks

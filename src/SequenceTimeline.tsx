@@ -68,6 +68,14 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
               <button type="button" draggable={!disabled} className="timeline-clip" aria-label={`Clip ${i+1}: ${source.relative_path.split("/").at(-1)}`} aria-pressed={selected===item.clip.id} onClick={()=>choose(item.clip.id)} onDragStart={e=>{dragging.current=item.clip.id;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",item.clip.id);}} onDragEnd={()=>{dragging.current="";setDrop(null);}}>
                 <strong title={source.relative_path}>{i+1}. {source.relative_path.split("/").at(-1)}</strong><EditorPoster root={binding?.root||undefined} path={binding?.path||undefined} identity={source.sha256} photo={source.media.kind==="photo"} filmstrip={source.media.kind==="video"} clipStart={markSeconds(item.clip.source_in)} clipEnd={markSeconds(item.clip.source_out)}/><span className="timeline-clip-duration">{clockTime(item.duration)}</span><small className="timeline-linked-audio" data-muted={item.clip.edits.muted||!hasAudio(source)}>{source.media.kind==="photo"?"Still image":item.clip.edits.muted?"Audio muted":hasAudio(source)?"Linked original audio":"Silent source"}</small>
               </button>
+              {i<entries.length-1&&<button type="button" className="timeline-transition-button"
+                aria-label={`Toggle video dip to black between clips ${i+1} and ${i+2}`}
+                aria-pressed={(project.transitions||[]).some(t=>t.from_clip_id===item.clip.id&&t.to_clip_id===entries[i+1].clip.id)}
+                disabled={disabled}
+                title="Video dip to black at this cut (0.4 seconds total). Project duration and audio remain unchanged."
+                onClick={()=>command({type:"transition",fromClipId:item.clip.id,toClipId:entries[i+1].clip.id,enabled:!(project.transitions||[]).some(t=>t.from_clip_id===item.clip.id&&t.to_clip_id===entries[i+1].clip.id),durationSeconds:0.4})}>
+                {(project.transitions||[]).some(t=>t.from_clip_id===item.clip.id&&t.to_clip_id===entries[i+1].clip.id)?"Dip on":"Add dip"}
+              </button>}
               <TimelineTrimHandles range={{start:markSeconds(item.clip.source_in),end:markSeconds(item.clip.source_out)}} limit={Math.max((videoInfo(source)?.duration_seconds||600),markSeconds(item.clip.source_out))} minimum={0.04+sourceTick} step={Math.max(1/project.frame_rate,sourceTick)} selected={selected===item.clip.id} disabled={disabled} token={project} index={i} pixelsPerSecond={()=>(track.current?.getBoundingClientRect().width||0)/duration} onCommit={range=>command({type:"trim",clipId:item.clip.id,...range})}/>
             </li>;
           })}</ol>
@@ -78,7 +86,7 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
 
     </fieldset>
     {error&&<p role="alert" className="field-error">{error}</p>}
-    <p className="timeline-help">Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap and keeps its original in the media bin. Joined clips use the project frame clock; source trim marks retain their original timing.</p>
+    <p className="timeline-help">Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap and keeps its original in the media bin. Joined clips use the project frame clock; source trim marks retain their original timing. Add dip applies a short video-only fade to black and back at an adjacent cut without changing project duration or audio.</p>
   </section>;
 }
 

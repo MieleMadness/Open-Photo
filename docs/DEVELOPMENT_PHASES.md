@@ -1,3 +1,15 @@
+## Next development patch — audio track trim handles (draft, unverified)
+
+The shared audio placement lanes now expose direct start/end trim handles alongside the existing waveform seek control. Drag interactions preview locally and commit one project-history edit on pointer release; Escape, window blur, cancelled/stale gestures discard the draft. Arrow keys nudge by 0.01 seconds (Shift: 0.1 seconds). Start trims update both source in-point and timeline start while holding the opposite edge fixed. End trims only change duration. Bounds respect source and project lengths, fade lengths are clamped, and original media remain read-only.
+
+This is a proposed development increment **on a separate feature branch**, not a verified 0.56.64 release. New model and component regression tests are included; TypeScript, Rust, installer and installed Windows acceptance for this commit have **not** been executed or claimed. Review the feature PR and run the full Windows Desktop Build against its exact head SHA before promotion.
+
+## Draft Phase I transition increment — video dip to black (unverified)
+
+A separate development branch introduces saved, validated `dip_to_black` transitions between exact neighboring clip IDs. Each side fades to/from black within its existing normalized video interval, preserving the original hard-cut clock, project duration, title placements and source offsets. Timeline controls add/remove a 0.4-second video dip at an adjacent cut; undo/redo use the shared project session. Moved/deleted clip boundaries discard stale transition pairs. Durations and adjacent fade envelopes are validated in TypeScript and Rust.
+
+**Scope:** video only. Original and layered audio retain their existing mix and do not crossfade; this is **not** a crossfade or a complete video transition system. Actual overlapping crossfades require separate frame/audio timeline architecture. Native rendered-preview tests and source validator tests are included. This branch has not yet passed CI or installed-Windows acceptance; do not present the effect as shipping until exact-commit green validation and a manual video playback/export review.
+
 ## 0.56.63 — Waveform seeking on the editor playhead
 
 Wire the actual sampled waveform to an accessible range input for click, drag and keyboard scrubbing, synchronized to project time. End at playhead remains the explicit non-destructive trim action. Long-form full-resolution waveforms, waveform caching and drag trim handles remain pending.
