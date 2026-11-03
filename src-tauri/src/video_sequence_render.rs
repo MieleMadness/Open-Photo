@@ -580,6 +580,34 @@ pub fn compile(
                     ",drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf':textfile={filename}:expansion=none:fontcolor=white:fontsize=h/18:x=(w-text_w)*{x:.3}:y=(h-text_h)*{y:.3}:borderw=2:bordercolor=black:enable='between(t,{start:.6},{end:.6})'"
                 ));
             }
+            // Dip-to-black fades are applied to normalized clip frames before concat.
+            // Each side fades for half the saved duration; no overlapping frames or timing shift.
+            // This first transition type is video-only: linked and layered audio remain untouched.
+            let entering = snapshot
+                .project
+                .transitions
+                .iter()
+                .find(|transition| transition.to_clip_id == snapshot.project.clips[index].id)
+                .map(|transition| transition.duration_seconds / 2.0)
+                .unwrap_or(0.0);
+            let exiting = snapshot
+                .project
+                .transitions
+                .iter()
+                .find(|transition| transition.from_clip_id == snapshot.project.clips[index].id)
+                .map(|transition| transition.duration_seconds / 2.0)
+                .unwrap_or(0.0);
+            let normalized_seconds = *count as f64 / f64::from(fps);
+            if entering + exiting + 1.0 / f64::from(fps) > normalized_seconds {
+                return Err("Normalized clip is too short for video dip-to-black".into());
+            }
+            if entering > 0.0 {
+                titles_filter.push_str(&format!(",fade=t=in:st=0:d={entering:.6}"));
+            }
+            if exiting > 0.0 {
+                let start = normalized_seconds - exiting;
+                titles_filter.push_str(&format!(",fade=t=out:st={start:.6}:d={exiting:.6}"));
+            }
             let args = part_args(
                 &prepared,
                 &snapshot.project.clips[index].edits,
@@ -890,6 +918,7 @@ mod tests {
                 titles: vec![],
                 audio_tracks: vec![],
                 audio_sources: vec![],
+                transitions: vec![],
             },
             roots: BTreeMap::new(),
         };
@@ -1080,6 +1109,93 @@ mod tests {
         assert!(build_preview(&engine(), &snapshot, &fixture.0, || false).is_err());
         snapshot.project.audio_sources[0].sha256 = altered;
     }
+    #[test]
+    fn dip_to_black_preserves_project_frame_count_and_fades_the_cut() {
+        let (fixture, mut snapshot) = fixture();
+        let from_clip_id = snapshot.project.clips[0].id.clone();
+        let to_clip_id = snapshot.project.clips[1].id.clone();
+        snapshot
+            .project
+            .transitions
+            .push(crate::video_sequence::CutTransition {
+                from_clip_id,
+                to_clip_id,
+                kind: crate::video_sequence::CutTransitionKind::DipToBlack,
+                duration_seconds: 0.16,
+            });
+        crate::video_sequence::validate(&snapshot.project).unwrap();
+        let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
+        assert_eq!(preview.info.frame_count, Some(15));
+        // First clip ends around 0.2 s; incoming clip starts dark, then returns to blue.
+        let near_cut = pixel(Path::new(&preview.source), "0.200");
+        let after = pixel(Path::new(&preview.source), "0.400");
+        assert!(
+            near_cut.iter().all(|channel| *channel < 85),
+            "cut was not dark: {near_cut:?}"
+        );
+        assert!(after[2] > 90, "blue clip did not fade back in: {after:?}");
+    }
+
+    #[test]
+    fn dip_to_black_preview_and_export_share_video_frames_and_audio_timing() {
+        let (fixture, mut snapshot) = fixture();
+        let left = snapshot.project.clips[0].id.clone();
+        let right = snapshot.project.clips[1].id.clone();
+        snapshot
+            .project
+            .transitions
+            .push(crate::video_sequence::CutTransition {
+                from_clip_id: left,
+                to_clip_id: right,
+                kind: crate::video_sequence::CutTransitionKind::DipToBlack,
+                duration_seconds: 0.16,
+            });
+        let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
+        let output = fixture.0.join("dip-parity.mp4");
+        let mut compiled = compile(
+            &engine(),
+            &snapshot,
+            &output,
+            RenderOptions {
+                preview: false,
+                size: ExportSize::Project,
+                acknowledge_first_audio: false,
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        video_render::encode(&engine(), &compiled.plan, || false, |_| {}).unwrap();
+        let info =
+            video_render::validate_output(&engine(), &compiled.plan, &output, || false).unwrap();
+        video_render::decode_check(&engine(), &output, || false, |_| {}).unwrap();
+        assert_eq!(info.frame_count, preview.info.frame_count);
+        assert_eq!(info.frame_count, Some(15));
+        assert_eq!(info.audio.len(), preview.info.audio.len());
+        // Both output paths normalize frames identically before the sequence concat.
+        for time in ["0.100", "0.200", "0.400"] {
+            let from_preview = pixel(Path::new(&preview.source), time);
+            let from_export = pixel(&output, time);
+            for channel in 0..3 {
+                let difference =
+                    (i32::from(from_preview[channel]) - i32::from(from_export[channel])).abs();
+                assert!(
+                    difference <= 20,
+                    "preview/export pixel mismatch at {time}, channel {channel}: {from_preview:?} vs {from_export:?}"
+                );
+            }
+        }
+        let at_cut = pixel(&output, "0.200");
+        let after_cut = pixel(&output, "0.400");
+        assert!(at_cut.iter().all(|channel| *channel < 85), "{at_cut:?}");
+        assert!(after_cut[2] > 90, "{after_cut:?}");
+        // Video-only transitions must not shift the source-linked audio timeline.
+        assert!(rms(&output, "0.04") > 0.02);
+        assert!(rms(&output, "0.30") < 0.002);
+        snapshot.revalidate(|| false).unwrap();
+        compiled.close().unwrap();
+    }
+
     #[test]
     fn timed_titles_are_rendered_by_the_bundled_windows_video_engine() {
         let (fixture, mut snapshot) = fixture();
