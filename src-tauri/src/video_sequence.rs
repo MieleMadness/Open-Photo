@@ -150,7 +150,11 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
             &source.sha256,
             source.bytes,
         )?;
-        if !audio_source_ids.insert(&source.id)
+        if p.assets.iter().any(|asset| asset.id == source.id)
+            || p.assets.iter().any(|asset| {
+                asset.bytes == source.bytes && asset.sha256 == source.sha256
+            })
+            || !audio_source_ids.insert(&source.id)
             || source.info.duration_seconds < 0.04
             || source.info.duration_seconds > 7200.0
             || !source.info.duration_seconds.is_finite()
