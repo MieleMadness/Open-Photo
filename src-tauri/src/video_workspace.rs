@@ -138,6 +138,27 @@ pub(crate) fn source(
     )?;
     Ok((root, file))
 }
+fn standalone_audio_source(
+    roots: &[String],
+    bindings: &Bindings,
+    asset: &video_sequence::AudioSource,
+) -> Result<(PathBuf, PathBuf), String> {
+    let root = registered_root(
+        roots,
+        bindings
+            .get(&asset.id)
+            .ok_or("Relink this project's original audio")?,
+    )?;
+    let path = crate::safe_media_path(
+        root.to_str().ok_or("Unsupported folder path")?,
+        &root.join(&asset.relative_path).to_string_lossy(),
+    )?;
+    let (bytes, hash) = video_project::fingerprint(&path, || false)?;
+    if bytes != asset.bytes || hash != asset.sha256 {
+        return Err("Audio file differs from its saved fingerprint".into());
+    }
+    Ok((root, path))
+}
 fn loaded(roots: &[String], record: Record) -> Loaded {
     let sources = record
         .project
@@ -159,6 +180,22 @@ fn loaded(roots: &[String], record: Record) -> Loaded {
                 },
             },
         )
+        .chain(record.project.audio_sources.iter().map(|asset| {
+            match standalone_audio_source(roots, &record.bindings, asset) {
+                Ok((root, path)) => Source {
+                    asset_id: asset.id.clone(),
+                    root: Some(root.to_string_lossy().into_owned()),
+                    path: Some(path.to_string_lossy().into_owned()),
+                    status: "ready".into(),
+                },
+                Err(status) => Source {
+                    asset_id: asset.id.clone(),
+                    root: None,
+                    path: None,
+                    status,
+                },
+            }
+        }))
         .collect();
     Loaded {
         project: record.project,
@@ -662,7 +699,9 @@ pub async fn save_workspace_video_project(
         user_data::workspace_roots(&workspace_id)?;
         let db = database()?;
         let before = read(&db, &workspace_id, &project.id)?;
-        if before.project.assets != project.assets {
+        if before.project.assets != project.assets
+            || before.project.audio_sources != project.audio_sources
+        {
             return Err("Change source videos through Add, Remove or Relink".into());
         }
         store(
