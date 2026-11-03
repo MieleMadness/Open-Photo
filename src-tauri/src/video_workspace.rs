@@ -214,10 +214,7 @@ fn root_for_file(roots: &[String], path: &str) -> Result<(PathBuf, PathBuf), Str
     crate::safe_media_path(root.to_str().ok_or("Unsupported folder path")?, path)?;
     Ok((root, file))
 }
-fn root_for_audio_file(
-    roots: &[String],
-    path: &str,
-) -> Result<(PathBuf, PathBuf), String> {
+fn root_for_audio_file(roots: &[String], path: &str) -> Result<(PathBuf, PathBuf), String> {
     let file = fs::canonicalize(path).map_err(|_| "Audio file is unavailable")?;
     let root = roots
         .iter()
@@ -225,10 +222,7 @@ fn root_for_audio_file(
         .filter(|entry| file.starts_with(entry))
         .max_by_key(|entry| entry.components().count())
         .ok_or("Choose audio inside this workspace's folders")?;
-    let file = video_probe::safe_audio_path(
-        root.to_str().ok_or("Unsupported folder path")?,
-        path,
-    )?;
+    let file = video_probe::safe_audio_path(root.to_str().ok_or("Unsupported folder path")?, path)?;
     Ok((root, file))
 }
 fn bind_import(roots: &[String], project: &Sequence) -> Bindings {
