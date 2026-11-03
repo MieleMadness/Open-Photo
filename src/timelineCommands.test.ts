@@ -59,3 +59,18 @@ it("rejects invalid edits atomically including tiny splits, source overflow and 
   ] as const){expect(()=>editTimeline(p,action)).toThrow();expect(p).toEqual(before);}
   p.clips=[];p.title=" ";expect(validSequence(p)).not.toBe("");
 });
+
+
+it("toggles video dip transitions without shifting clip timing and drops invalid boundaries after reorder",()=>{
+  const p=project();
+  const beforeDuration=projectDuration(p);
+  const dipped=editTimeline(p,{type:"transition",fromClipId:"one",toClipId:"two",enabled:true,durationSeconds:.4});
+  expect(dipped.transitions).toEqual([{from_clip_id:"one",to_clip_id:"two",kind:"dip_to_black",duration_seconds:.4}]);
+  expect(projectDuration(dipped)).toBe(beforeDuration);
+  expect(p.transitions).toBeUndefined();
+  const removed=editTimeline(dipped,{type:"transition",fromClipId:"one",toClipId:"two",enabled:false,durationSeconds:.4});
+  expect(removed.transitions).toEqual([]);
+  expect(editTimeline(dipped,{type:"move",clipId:"two",index:0}).transitions).toEqual([]);
+  expect(()=>editTimeline(p,{type:"transition",fromClipId:"two",toClipId:"one",enabled:true,durationSeconds:.4})).toThrow(/adjacent/);
+  expect(()=>editTimeline(p,{type:"transition",fromClipId:"one",toClipId:"two",enabled:true,durationSeconds:5})).toThrow();
+});
