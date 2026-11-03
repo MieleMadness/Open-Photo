@@ -646,6 +646,33 @@ mod tests {
         let legacy = video_project::new_project(root.to_str().unwrap(), &file, info).unwrap();
         (root.clone(), migrate(legacy).unwrap())
     }
+    #[test]
+    fn video_cut_transitions_preserve_old_projects_and_require_adjacent_safe_fades() {
+        let (root, mut project) = fixture();
+        let mut second = project.clips[0].clone();
+        second.id = video_project::id();
+        project.clips.push(second);
+        let left = project.clips[0].id.clone();
+        let right = project.clips[1].id.clone();
+        project.transitions.push(CutTransition {
+            from_clip_id: left.clone(),
+            to_clip_id: right.clone(),
+            kind: CutTransitionKind::DipToBlack,
+            duration_seconds: 0.4,
+        });
+        validate(&project).unwrap();
+        let encoded = serde_json::to_vec(&project).unwrap();
+        assert_eq!(parse(&encoded).unwrap(), project);
+        let mut old: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
+        old.as_object_mut().unwrap().remove("transitions");
+        assert!(parse(&serde_json::to_vec(&old).unwrap()).unwrap().transitions.is_empty());
+        project.transitions[0].to_clip_id = left.clone();
+        assert!(validate(&project).is_err());
+        project.transitions[0].to_clip_id = right;
+        project.transitions[0].duration_seconds = f64::INFINITY;
+        assert!(validate(&project).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
     #[cfg(windows)]
     #[test]
     fn short_media_batch_import_deduplicates_bytes_and_rolls_back_failed_batches() {
