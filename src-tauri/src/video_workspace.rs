@@ -774,7 +774,9 @@ fn render_snapshot(
     }
     let mut bindings = BTreeMap::new();
     for asset in &record.project.assets {
-        if !record.project.clips.iter().any(|c| c.asset_id == asset.id) {
+        if !record.project.clips.iter().any(|c| c.asset_id == asset.id)
+            && !record.project.audio_tracks.iter().any(|t| t.asset_id == asset.id)
+        {
             continue;
         }
         let root = registered_root(
