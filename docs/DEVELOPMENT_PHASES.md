@@ -1,3 +1,7 @@
+## 0.56.63 — Waveform seeking on the editor playhead
+
+Wire the actual sampled waveform to an accessible range input for click, drag and keyboard scrubbing, synchronized to project time. End at playhead remains the explicit non-destructive trim action. Long-form full-resolution waveforms, waveform caching and drag trim handles remain pending.
+
 ## 0.56.62 — Verified audio waveform excerpts
 
 Introduced a source-verified 64-column audio peak measurement pipeline (up to 120-second excerpts), displayed directly beside audio-track trim controls. Source files are read-only and workspace permissions remain enforced. Longer clips show the first 120 seconds only. Future milestones: optimized full-length/cached waveforms, interactive trim handles, video transitions.
