@@ -1074,3 +1074,13 @@
 .sequence-waveform-peak { flex:1; min-width:1px; border-radius:1px; background:var(--accent-text); opacity:.8; }
 .sequence-waveform-fallback { margin:0; color:var(--muted); font-size:var(--type-caption); }
 .sequence-waveform-container small { color:var(--muted); font-size:var(--type-caption); }
+
+/* The measured waveform is the background of a native keyboard-accessible seek control. */
+.sequence-waveform-seek { position:relative; min-width:0; }
+.sequence-waveform-seek .sequence-waveform { pointer-events:none; }
+.sequence-waveform-slider { position:absolute; inset:0; display:block; width:100%; height:100%; margin:0; padding:0; appearance:none; background:transparent; border:0; cursor:crosshair; }
+.sequence-waveform-slider::-webkit-slider-runnable-track { height:100%; background:transparent; }
+.sequence-waveform-slider::-moz-range-track { height:100%; background:transparent; }
+.sequence-waveform-slider::-webkit-slider-thumb { appearance:none; width:3px; height:44px; border:0; border-radius:2px; background:var(--text); box-shadow:0 0 0 1px var(--surface-muted); }
+.sequence-waveform-slider::-moz-range-thumb { width:3px; height:40px; border:0; border-radius:2px; background:var(--text); }
+.sequence-waveform-slider:focus-visible { outline:2px solid var(--accent-text); outline-offset:2px; border-radius:var(--radius-sm); }
