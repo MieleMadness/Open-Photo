@@ -10,19 +10,25 @@ $url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-1
 New-Item -ItemType Directory -Force -Path $cacheRoot,$engineRoot | Out-Null
 $archive = Join-Path $cacheRoot "$digest.zip"
 if (!(Test-Path -LiteralPath $archive)) {
+    Write-Output '[Video 1/5] Downloading pinned FFmpeg archive (first build/cache miss)'
     Invoke-WebRequest -Uri $url -OutFile $archive
+} else {
+    Write-Output '[Video 1/5] Using cached FFmpeg archive'
 }
+Write-Output '[Video 2/5] Verifying archive SHA256'
 if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $digest) {
     throw 'Video engine archive checksum mismatch. Remove the cached archive and retry.'
 }
 $expanded = Join-Path $cacheRoot $digest.Substring(0,12)
 $complete = Join-Path $expanded '.complete'
 if (!(Test-Path -LiteralPath $complete) -or (Get-Content -LiteralPath $complete -Raw).Trim() -ne $digest) {
+    Write-Output '[Video 3/5] Extracting verified FFmpeg archive'
     Expand-Archive -LiteralPath $archive -DestinationPath $expanded -Force
     [IO.File]::WriteAllText($complete, $digest, [Text.UTF8Encoding]::new($false))
 }
 $package = Get-ChildItem -LiteralPath $expanded -Directory | Select-Object -First 1
 if (!$package) { throw 'Video engine package is empty' }
+Write-Output '[Video 4/5] Copying packaged FFmpeg executables and libraries'
 foreach ($name in @('ffmpeg.exe','ffprobe.exe')) {
     Copy-Item -LiteralPath (Join-Path $package.FullName "bin/$name") -Destination $engineRoot -Force
 }
@@ -33,6 +39,7 @@ $files = Get-ChildItem -LiteralPath $engineRoot -File | Where-Object { $_.Extens
 }
 $manifest = @{version=$version;archive_sha256=$digest;source=$url;files=@($files)} | ConvertTo-Json -Depth 5 | Out-String
 [IO.File]::WriteAllText((Join-Path $engineRoot 'engine.json'), $manifest, [Text.UTF8Encoding]::new($false))
+Write-Output '[Video 5/5] Verifying LGPL license and writing manifest'
 $license = & (Join-Path $engineRoot 'ffmpeg.exe') -hide_banner -L 2>&1 | Out-String
 if ($LASTEXITCODE -ne 0 -or $license -notmatch 'Lesser General Public License') { throw 'Expected LGPL video engine' }
 [IO.File]::WriteAllText((Join-Path $engineRoot 'LICENSE-FFmpeg.txt'), $license, [Text.UTF8Encoding]::new($false))
