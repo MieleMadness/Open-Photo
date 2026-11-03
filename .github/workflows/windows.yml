@@ -43,6 +43,8 @@ jobs:
         with:
           toolchain: '1.99.1'
           components: rustfmt, clippy
+      - name: Rust formatting check (fail fast)
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
@@ -66,8 +68,6 @@ jobs:
       - name: Prepare bundled video engine (cached)
         run: npm run prepare:video
       - run: npm run tauri icon assets/app-icon.svg
-      - name: Rust formatting check
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
       - name: Rust lint (Clippy)
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
       - name: Native Rust regression tests
