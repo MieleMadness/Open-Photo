@@ -255,9 +255,14 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
     }
     let mut boundaries = HashSet::new();
     for transition in &p.transitions {
-        let index = p.clips.iter().position(|clip| clip.id == transition.from_clip_id)
+        let index = p
+            .clips
+            .iter()
+            .position(|clip| clip.id == transition.from_clip_id)
             .ok_or("Video transitions must join adjacent clips")?;
-        if p.clips.get(index + 1).is_none_or(|next| next.id != transition.to_clip_id)
+        if p.clips
+            .get(index + 1)
+            .is_none_or(|next| next.id != transition.to_clip_id)
             || !boundaries.insert(transition.from_clip_id.as_str())
             || !transition.duration_seconds.is_finite()
             || !(0.08..=1.5).contains(&transition.duration_seconds)
@@ -266,17 +271,24 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
         }
     }
     for (index, clip) in p.clips.iter().enumerate() {
-        let entering: f64 = p.transitions.iter()
+        let entering: f64 = p
+            .transitions
+            .iter()
             .filter(|transition| transition.to_clip_id == clip.id)
             .map(|transition| transition.duration_seconds / 2.0)
             .sum();
-        let exiting: f64 = p.transitions.iter()
+        let exiting: f64 = p
+            .transitions
+            .iter()
             .filter(|transition| transition.from_clip_id == clip.id)
             .map(|transition| transition.duration_seconds / 2.0)
             .sum();
         let clip_duration = clip.source_out.seconds()? - clip.source_in.seconds()?;
         if clip_duration < entering + exiting + 2.0 / f64::from(p.frame_rate) {
-            return Err(format!("Timeline clip {} is too short for its video transitions", index + 1));
+            return Err(format!(
+                "Timeline clip {} is too short for its video transitions",
+                index + 1
+            ));
         }
     }
     if duration > 7200.0 {
@@ -463,7 +475,7 @@ pub async fn create_video_sequence(
             titles: vec![],
             audio_tracks: vec![],
             audio_sources: vec![],
-        transitions: vec![],
+            transitions: vec![],
         };
         add_files(&engine, &root, &mut p, &paths)?;
         let revision = store(&database()?, &root, &p, None)?;
@@ -665,7 +677,10 @@ mod tests {
         assert_eq!(parse(&encoded).unwrap(), project);
         let mut old: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
         old.as_object_mut().unwrap().remove("transitions");
-        assert!(parse(&serde_json::to_vec(&old).unwrap()).unwrap().transitions.is_empty());
+        assert!(parse(&serde_json::to_vec(&old).unwrap())
+            .unwrap()
+            .transitions
+            .is_empty());
         project.transitions[0].to_clip_id = left.clone();
         assert!(validate(&project).is_err());
         project.transitions[0].to_clip_id = right;
