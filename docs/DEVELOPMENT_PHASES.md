@@ -1,3 +1,9 @@
+## Next development patch — audio track trim handles (draft, unverified)
+
+The shared audio placement lanes now expose direct start/end trim handles alongside the existing waveform seek control. Drag interactions preview locally and commit one project-history edit on pointer release; Escape, window blur, cancelled/stale gestures discard the draft. Arrow keys nudge by 0.01 seconds (Shift: 0.1 seconds). Start trims update both source in-point and timeline start while holding the opposite edge fixed. End trims only change duration. Bounds respect source and project lengths, fade lengths are clamped, and original media remain read-only.
+
+This is a proposed development increment **on a separate feature branch**, not a verified 0.56.64 release. New model and component regression tests are included; TypeScript, Rust, installer and installed Windows acceptance for this commit have **not** been executed or claimed. Review the feature PR and run the full Windows Desktop Build against its exact head SHA before promotion.
+
 ## 0.56.63 — Waveform seeking on the editor playhead
 
 Wire the actual sampled waveform to an accessible range input for click, drag and keyboard scrubbing, synchronized to project time. End at playhead remains the explicit non-destructive trim action. Long-form full-resolution waveforms, waveform caching and drag trim handles remain pending.
