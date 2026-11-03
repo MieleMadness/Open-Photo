@@ -1236,6 +1236,7 @@ pub fn run() {
             video_sequence::create_video_sequence,
             video_workspace::workspace_video_projects,
             video_workspace::edit_workspace_video_project,
+            video_workspace::workspace_audio_waveform,
             video_workspace::save_workspace_video_project,
             video_workspace::workspace_video_history,
             video_workspace::start_workspace_video_preview,
