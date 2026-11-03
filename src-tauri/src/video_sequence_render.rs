@@ -665,44 +665,56 @@ pub fn compile(
         args.push("sequence.ffconcat".into());
         let mut extra_audio = Vec::new();
         for track in &snapshot.project.audio_tracks {
-            let (source, stream_index, format) =
-                if let Some(asset) = snapshot.project.assets.iter().find(|asset| asset.id == track.asset_id) {
-                    let root = snapshot
-                        .roots
-                        .get(&asset.id)
-                        .ok_or("Relink every audio track source before rendering")?;
-                    let source = crate::sequence_media::source(root, asset, &cancel)?;
-                    let info = video_probe::probe(engine, &source, &cancel)?;
-                    let stream = info.audio.first().ok_or("Audio source contains no audio stream")?;
-                    if track.source_in_seconds + track.duration_seconds > info.duration_seconds + 0.000001 {
-                        return Err("Audio trim exceeds source duration".into());
-                    }
-                    (source, stream.stream, "mov,matroska,webm,avi")
-                } else {
-                    let asset = snapshot
-                        .project
-                        .audio_sources
-                        .iter()
-                        .find(|asset| asset.id == track.asset_id)
-                        .ok_or("Audio track source missing")?;
-                    let root = snapshot
-                        .roots
-                        .get(&asset.id)
-                        .ok_or("Relink independent audio source before rendering")?;
-                    let source = crate::safe_media_path(
-                        root,
-                        &Path::new(root).join(&asset.relative_path).to_string_lossy(),
-                    )?;
-                    let (bytes, hash) = video_project::fingerprint(&source, &cancel)?;
-                    if bytes != asset.bytes || hash != asset.sha256 {
-                        return Err("Independent audio source differs from the saved original".into());
-                    }
-                    let info = video_probe::probe_audio_only(engine, &source, &cancel)?;
-                    if info != asset.info || track.source_in_seconds + track.duration_seconds > info.duration_seconds + 0.000001 {
-                        return Err("Independent audio metadata or trim has changed".into());
-                    }
-                    (source, info.stream, "mp3,wav,flac,mov")
-                };
+            let (source, stream_index, format) = if let Some(asset) = snapshot
+                .project
+                .assets
+                .iter()
+                .find(|asset| asset.id == track.asset_id)
+            {
+                let root = snapshot
+                    .roots
+                    .get(&asset.id)
+                    .ok_or("Relink every audio track source before rendering")?;
+                let source = crate::sequence_media::source(root, asset, &cancel)?;
+                let info = video_probe::probe(engine, &source, &cancel)?;
+                let stream = info
+                    .audio
+                    .first()
+                    .ok_or("Audio source contains no audio stream")?;
+                if track.source_in_seconds + track.duration_seconds
+                    > info.duration_seconds + 0.000001
+                {
+                    return Err("Audio trim exceeds source duration".into());
+                }
+                (source, stream.stream, "mov,matroska,webm,avi")
+            } else {
+                let asset = snapshot
+                    .project
+                    .audio_sources
+                    .iter()
+                    .find(|asset| asset.id == track.asset_id)
+                    .ok_or("Audio track source missing")?;
+                let root = snapshot
+                    .roots
+                    .get(&asset.id)
+                    .ok_or("Relink independent audio source before rendering")?;
+                let source = crate::safe_media_path(
+                    root,
+                    &Path::new(root).join(&asset.relative_path).to_string_lossy(),
+                )?;
+                let (bytes, hash) = video_project::fingerprint(&source, &cancel)?;
+                if bytes != asset.bytes || hash != asset.sha256 {
+                    return Err("Independent audio source differs from the saved original".into());
+                }
+                let info = video_probe::probe_audio_only(engine, &source, &cancel)?;
+                if info != asset.info
+                    || track.source_in_seconds + track.duration_seconds
+                        > info.duration_seconds + 0.000001
+                {
+                    return Err("Independent audio metadata or trim has changed".into());
+                }
+                (source, info.stream, "mp3,wav,flac,mov")
+            };
             let input_index = extra_audio.len() + 1;
             args.extend([
                 "-format_whitelist".into(),
