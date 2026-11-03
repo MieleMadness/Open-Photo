@@ -1112,12 +1112,14 @@ mod tests {
     #[test]
     fn dip_to_black_preserves_project_frame_count_and_fades_the_cut() {
         let (fixture, mut snapshot) = fixture();
+        let from_clip_id = snapshot.project.clips[0].id.clone();
+        let to_clip_id = snapshot.project.clips[1].id.clone();
         snapshot
             .project
             .transitions
             .push(crate::video_sequence::CutTransition {
-                from_clip_id: snapshot.project.clips[0].id.clone(),
-                to_clip_id: snapshot.project.clips[1].id.clone(),
+                from_clip_id,
+                to_clip_id,
                 kind: crate::video_sequence::CutTransitionKind::DipToBlack,
                 duration_seconds: 0.16,
             });
