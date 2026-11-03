@@ -1,3 +1,11 @@
+# 0.56.59 — Independent audio import and native mixing
+
+- Import MP3, WAV, FLAC and M4A into a workspace project from registered local folders; validate audio metadata, source identity and fingerprint.
+- Persist audio source bindings separately from project documents, with transactional import and source removal cleanup.
+- Add standalone audio files to existing editor audio tracks, with timeline position, source offset, duration, gain and fades.
+- Resolve and revalidate standalone sources before preview/export and mix with the original timeline audio.
+- Windows CI and installed-app listening tests are required before considering the feature verified. Waveform display and transitions remain outstanding.
+
 # 0.56.58 — Standalone audio project metadata foundation
 
 - Add optional independent-audio source metadata with validated identities, durations, sample rates and channels; existing projects default to no audio sources.
