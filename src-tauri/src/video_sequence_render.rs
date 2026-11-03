@@ -583,11 +583,17 @@ pub fn compile(
             // Dip-to-black fades are applied to normalized clip frames before concat.
             // Each side fades for half the saved duration; no overlapping frames or timing shift.
             // This first transition type is video-only: linked and layered audio remain untouched.
-            let entering = snapshot.project.transitions.iter()
+            let entering = snapshot
+                .project
+                .transitions
+                .iter()
                 .find(|transition| transition.to_clip_id == snapshot.project.clips[index].id)
                 .map(|transition| transition.duration_seconds / 2.0)
                 .unwrap_or(0.0);
-            let exiting = snapshot.project.transitions.iter()
+            let exiting = snapshot
+                .project
+                .transitions
+                .iter()
                 .find(|transition| transition.from_clip_id == snapshot.project.clips[index].id)
                 .map(|transition| transition.duration_seconds / 2.0)
                 .unwrap_or(0.0);
@@ -1106,19 +1112,25 @@ mod tests {
     #[test]
     fn dip_to_black_preserves_project_frame_count_and_fades_the_cut() {
         let (fixture, mut snapshot) = fixture();
-        snapshot.project.transitions.push(crate::video_sequence::CutTransition {
-            from_clip_id: snapshot.project.clips[0].id.clone(),
-            to_clip_id: snapshot.project.clips[1].id.clone(),
-            kind: crate::video_sequence::CutTransitionKind::DipToBlack,
-            duration_seconds: 0.16,
-        });
+        snapshot
+            .project
+            .transitions
+            .push(crate::video_sequence::CutTransition {
+                from_clip_id: snapshot.project.clips[0].id.clone(),
+                to_clip_id: snapshot.project.clips[1].id.clone(),
+                kind: crate::video_sequence::CutTransitionKind::DipToBlack,
+                duration_seconds: 0.16,
+            });
         crate::video_sequence::validate(&snapshot.project).unwrap();
         let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
         assert_eq!(preview.info.frame_count, Some(15));
         // First clip ends around 0.2 s; incoming clip starts dark, then returns to blue.
         let near_cut = pixel(Path::new(&preview.source), "0.200");
         let after = pixel(Path::new(&preview.source), "0.400");
-        assert!(near_cut.iter().all(|channel| *channel < 85), "cut was not dark: {near_cut:?}");
+        assert!(
+            near_cut.iter().all(|channel| *channel < 85),
+            "cut was not dark: {near_cut:?}"
+        );
         assert!(after[2] > 90, "blue clip did not fade back in: {after:?}");
     }
 
