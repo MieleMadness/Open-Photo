@@ -1084,3 +1084,14 @@
 .sequence-waveform-slider::-webkit-slider-thumb { appearance:none; width:3px; height:44px; border:0; border-radius:2px; background:var(--text); box-shadow:0 0 0 1px var(--surface-muted); }
 .sequence-waveform-slider::-moz-range-thumb { width:3px; height:40px; border:0; border-radius:2px; background:var(--text); }
 .sequence-waveform-slider:focus-visible { outline:2px solid var(--accent-text); outline-offset:2px; border-radius:var(--radius-sm); }
+
+
+/* Non-destructive audio edge trims: same compact keyboard/pointer affordance as video timeline trims. */
+.sequence-audio-bar:has(.sequence-audio-trim-handle) { overflow:visible; padding-inline:12px; }
+.sequence-audio-trim-handle { position:absolute; top:0; bottom:0; width:11px; padding:0; border:0; border-radius:2px; background:var(--accent-text); cursor:ew-resize; touch-action:none; z-index:2; }
+.sequence-audio-trim-handle::after { content:""; display:block; width:2px; height:12px; margin:auto; background:var(--on-primary); }
+.sequence-audio-trim-handle.audio-trim-start { left:0; }
+.sequence-audio-trim-handle.audio-trim-end { right:0; }
+.sequence-audio-trim-handle:focus-visible { outline:2px solid var(--text); outline-offset:2px; z-index:3; }
+.sequence-audio-trim-handle:disabled { opacity:.45; cursor:not-allowed; }
+.sequence-audio-trim-feedback { position:absolute; bottom:calc(100% + 3px); left:0; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); color:var(--text); padding:2px 5px; white-space:nowrap; font-size:var(--type-caption); z-index:5; pointer-events:none; }
