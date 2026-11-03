@@ -25,3 +25,19 @@ export function validateCutTransitions(clips:CutClip[],transitions:CutTransition
 export function retainAdjacentTransitions(clips:CutClip[],transitions:CutTransition[]):CutTransition[]{
   return transitions.filter(t=>clips.some((clip,index)=>clip.id===t.from_clip_id&&clips[index+1]?.id===t.to_clip_id));
 }
+
+/** Maximum dip duration for this exact cut, considering neighboring saved half-fades.
+ * Both sides need two un-faded frames so the transition can't consume a whole clip.
+ */
+export function maxCutTransitionDuration(clips:CutClip[],transitions:CutTransition[],fromClipId:string,fps:number):number{
+  if(![30,60].includes(fps))return 0;
+  const index=clips.findIndex(clip=>clip.id===fromClipId);
+  if(index<0||index+1>=clips.length)return 0;
+  const first=clips[index],second=clips[index+1];
+  if(!Number.isFinite(first.duration)||!Number.isFinite(second.duration))return 0;
+  const previous=transitions.find(t=>t.to_clip_id===first.id)?.duration_seconds||0;
+  const following=transitions.find(t=>t.from_clip_id===second.id)?.duration_seconds||0;
+  const cap=Math.min(1.5,2*(first.duration-2/fps)-previous,2*(second.duration-2/fps)-following);
+  // Trim to hundredths to avoid floating-point overrun in the project validator.
+  return Math.max(0,Math.floor((cap+1e-8)*100)/100);
+}

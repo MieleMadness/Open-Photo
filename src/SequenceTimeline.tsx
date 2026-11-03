@@ -1,3 +1,4 @@
+import {maxCutTransitionDuration} from "./cutTransitions";
 import {useEffect,useId,useRef,useState} from "react";
 import {ArrowLeft,ArrowRight,Plus,RotateCcw,Scissors,Trash2,Undo2,Redo2,ZoomIn,ZoomOut,Maximize2} from "lucide-react";
 import {TimelineTrimHandles} from "./TimelineTrimHandles";
@@ -52,6 +53,8 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
             const source=project.assets.find(a=>a.id===item.clip.asset_id)!;
             const binding=sources.find(value=>value.asset_id===source.id);
             const [tickNumerator,tickDenominator]=item.clip.source_in.time_base.split("/").map(Number),sourceTick=tickNumerator/tickDenominator;
+            const dip=(project.transitions||[]).find(t=>t.from_clip_id===item.clip.id&&t.to_clip_id===entries[i+1]?.clip.id);
+            const maxDip=maxCutTransitionDuration(entries.map(e=>({id:e.clip.id,duration:markSeconds(e.clip.source_out)-markSeconds(e.clip.source_in)})),project.transitions||[],item.clip.id,project.frame_rate);
             return <li key={item.clip.id} style={{flexGrow:item.duration/duration}} data-drop={drop?.id===item.clip.id?(drop.after?"after":"before"):undefined} onDragOver={e=>{
               if(!dragging.current||disabled)return;e.preventDefault();
               const bounds=e.currentTarget.getBoundingClientRect(),after=e.clientX>=bounds.left+bounds.width/2;
@@ -70,11 +73,11 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
               </button>
               {i<entries.length-1&&<button type="button" className="timeline-transition-button"
                 aria-label={`Toggle video dip to black between clips ${i+1} and ${i+2}`}
-                aria-pressed={(project.transitions||[]).some(t=>t.from_clip_id===item.clip.id&&t.to_clip_id===entries[i+1].clip.id)}
-                disabled={disabled}
-                title="Video dip to black at this cut (0.4 seconds total). Project duration and audio remain unchanged."
-                onClick={()=>command({type:"transition",fromClipId:item.clip.id,toClipId:entries[i+1].clip.id,enabled:!(project.transitions||[]).some(t=>t.from_clip_id===item.clip.id&&t.to_clip_id===entries[i+1].clip.id),durationSeconds:0.4})}>
-                {(project.transitions||[]).some(t=>t.from_clip_id===item.clip.id&&t.to_clip_id===entries[i+1].clip.id)?"Dip on":"Add dip"}
+                aria-pressed={!!dip}
+                disabled={disabled||(!dip&&maxDip<0.08)}
+                title={maxDip<0.08?"Neighboring clips are too short for a dip.":`Video-only dip to black at this cut. Select the first clip to adjust duration (up to ${maxDip.toFixed(2)}s). Audio and project duration remain unchanged.`}
+                onClick={()=>command({type:"transition",fromClipId:item.clip.id,toClipId:entries[i+1].clip.id,enabled:!dip,durationSeconds:dip?.duration_seconds??Math.min(0.4,maxDip)})}>
+                {dip?`Dip ${dip.duration_seconds.toFixed(2)}s`:"Add dip"}
               </button>}
               <TimelineTrimHandles range={{start:markSeconds(item.clip.source_in),end:markSeconds(item.clip.source_out)}} limit={Math.max((videoInfo(source)?.duration_seconds||600),markSeconds(item.clip.source_out))} minimum={0.04+sourceTick} step={Math.max(1/project.frame_rate,sourceTick)} selected={selected===item.clip.id} disabled={disabled} token={project} index={i} pixelsPerSecond={()=>(track.current?.getBoundingClientRect().width||0)/duration} onCommit={range=>command({type:"trim",clipId:item.clip.id,...range})}/>
             </li>;
@@ -86,7 +89,7 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
 
     </fieldset>
     {error&&<p role="alert" className="field-error">{error}</p>}
-    <p className="timeline-help">Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap and keeps its original in the media bin. Joined clips use the project frame clock; source trim marks retain their original timing. Add dip applies a short video-only fade to black and back at an adjacent cut without changing project duration or audio.</p>
+    <p className="timeline-help">Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap and keeps its original in the media bin. Joined clips use the project frame clock; source trim marks retain their original timing. Add dip creates a video-only fade at an adjacent cut. Select the preceding clip to adjust its duration; audio and project duration are unchanged.</p>
   </section>;
 }
 
@@ -96,6 +99,9 @@ export function SequenceClipInspector({session,disabled,selected,onSelected,posi
   const project=session.history.present,entries=timelineEntries(project),entry=entries.find(e=>e.clip.id===selected);
   const clip=entry?.clip,asset=project.assets.find(a=>a.id===clip?.asset_id),index=entries.findIndex(e=>e.clip.id===selected),playhead=Math.min(position,projectDuration(project));
   const {command,error}=useTimelineActions(session,selected,onSelected);
+  const outgoing=clip&&entries[index+1]? (project.transitions||[]).find(t=>t.from_clip_id===clip.id&&t.to_clip_id===entries[index+1].clip.id):undefined;
+  const maximumDip=clip&&entries[index+1]?maxCutTransitionDuration(entries.map(e=>({id:e.clip.id,duration:markSeconds(e.clip.source_out)-markSeconds(e.clip.source_in)})),project.transitions||[],clip.id,project.frame_rate):0;
+
   return <section aria-label="Selected clip controls"><h2>Selected clip</h2><fieldset disabled={disabled}>
       {clip&&asset&&entry&&<div className="timeline-inspector" key={clip.id}>
         <p><strong>Selected clip {index+1}</strong> · {asset.media.kind==="photo"?"Still image":`Source duration ${clockTime(videoInfo(asset)!.duration_seconds)}`} · Project position {clockTime(entry.start)}–{clockTime(entry.end)}</p>
@@ -107,6 +113,11 @@ export function SequenceClipInspector({session,disabled,selected,onSelected,posi
           <button className="destructive-button" onClick={()=>command({type:"delete",clipId:clip.id})}><Trash2 size={16}/>Ripple delete clip</button>
           <button className="secondary-button" onClick={()=>command({type:"reset",clipId:clip.id})}><RotateCcw size={16}/>Reset selected clip</button>
         </div>
+        {outgoing&&entries[index+1]&&<div className="timeline-transition-inspector">
+          <h3>Video dip to black</h3>
+          <p>Cut between clip {index+1} and clip {index+2}. Video only; audio continues on its current timeline.</p>
+          <NumberField key={outgoing.from_clip_id+"-"+outgoing.to_clip_id} label="Dip duration (seconds)" value={outgoing.duration_seconds} min={0.08} max={maximumDip} step="any" onCommit={seconds=>command({type:"transition",fromClipId:outgoing.from_clip_id,toClipId:outgoing.to_clip_id,enabled:true,durationSeconds:seconds})}/>
+        </div>}
         <ClipEdits edits={clip.edits} info={assetGeometry(asset)} photo={asset.media.kind==="photo"} onChange={mutate=>{const edits=structuredClone(clip.edits);mutate(edits);return command({type:"edits",clipId:clip.id,edits});}}/>
       </div>}
     {!clip&&<p>Select a clip on the timeline to edit it.</p>}

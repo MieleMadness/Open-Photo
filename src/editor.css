@@ -1101,3 +1101,10 @@
 .sequence-audio-trim-handle:focus-visible { outline:2px solid var(--text); outline-offset:2px; z-index:3; }
 .sequence-audio-trim-handle:disabled { opacity:.45; cursor:not-allowed; }
 .sequence-audio-trim-feedback { position:absolute; bottom:calc(100% + 3px); left:0; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); color:var(--text); padding:2px 5px; white-space:nowrap; font-size:var(--type-caption); z-index:5; pointer-events:none; }
+
+/* Selected-cut duration inspector keeps the controls out of crowded timeline thumbnails. */
+.timeline-transition-inspector { display:grid; gap:var(--space-2); margin-block:var(--space-3); padding:var(--space-3); border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-muted); }
+.timeline-transition-inspector h3 { margin:0; font-size:var(--type-body); }
+.timeline-transition-inspector p { margin:0; color:var(--muted); font-size:var(--type-caption); }
+.timeline-transition-inspector label { display:grid; gap:var(--space-1); max-width:250px; }
+.timeline-transition-inspector input { min-width:0; width:100%; }
