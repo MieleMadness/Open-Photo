@@ -33,6 +33,21 @@ pub struct Sequence {
     pub audio_tracks: Vec<AudioTrack>,
     #[serde(default)]
     pub audio_sources: Vec<AudioSource>,
+    #[serde(default)]
+    pub transitions: Vec<CutTransition>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CutTransition {
+    pub from_clip_id: String,
+    pub to_clip_id: String,
+    pub kind: CutTransitionKind,
+    pub duration_seconds: f64,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum CutTransitionKind {
+    DipToBlack,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -235,6 +250,47 @@ pub fn validate(p: &Sequence) -> Result<(), String> {
         validate_clip(p, asset, clip)?;
         duration += clip.source_out.seconds()? - clip.source_in.seconds()?;
     }
+    if p.transitions.len() > p.clips.len().saturating_sub(1) {
+        return Err("Too many video transitions".into());
+    }
+    let mut boundaries = HashSet::new();
+    for transition in &p.transitions {
+        let index = p
+            .clips
+            .iter()
+            .position(|clip| clip.id == transition.from_clip_id)
+            .ok_or("Video transitions must join adjacent clips")?;
+        if p.clips
+            .get(index + 1)
+            .is_none_or(|next| next.id != transition.to_clip_id)
+            || !boundaries.insert(transition.from_clip_id.as_str())
+            || !transition.duration_seconds.is_finite()
+            || !(0.08..=1.5).contains(&transition.duration_seconds)
+        {
+            return Err("Invalid video transition boundary or duration".into());
+        }
+    }
+    for (index, clip) in p.clips.iter().enumerate() {
+        let entering: f64 = p
+            .transitions
+            .iter()
+            .filter(|transition| transition.to_clip_id == clip.id)
+            .map(|transition| transition.duration_seconds / 2.0)
+            .sum();
+        let exiting: f64 = p
+            .transitions
+            .iter()
+            .filter(|transition| transition.from_clip_id == clip.id)
+            .map(|transition| transition.duration_seconds / 2.0)
+            .sum();
+        let clip_duration = clip.source_out.seconds()? - clip.source_in.seconds()?;
+        if clip_duration < entering + exiting + 2.0 / f64::from(p.frame_rate) {
+            return Err(format!(
+                "Timeline clip {} is too short for its video transitions",
+                index + 1
+            ));
+        }
+    }
     if duration > 7200.0 {
         return Err("Project duration exceeds two hours".into());
     }
@@ -262,6 +318,7 @@ pub(crate) fn migrate(p: Project) -> Result<Sequence, String> {
         titles: vec![],
         audio_tracks: vec![],
         audio_sources: vec![],
+        transitions: vec![],
     };
     validate(&next)?;
     Ok(next)
@@ -418,6 +475,7 @@ pub async fn create_video_sequence(
             titles: vec![],
             audio_tracks: vec![],
             audio_sources: vec![],
+            transitions: vec![],
         };
         add_files(&engine, &root, &mut p, &paths)?;
         let revision = store(&database()?, &root, &p, None)?;
@@ -599,6 +657,36 @@ mod tests {
         let info=video_probe::parse_probe(br#"{"streams":[{"index":0,"codec_type":"video","codec_name":"h264","width":96,"height":64,"time_base":"1/90000"}],"format":{"duration":"2"}}"#).unwrap();
         let legacy = video_project::new_project(root.to_str().unwrap(), &file, info).unwrap();
         (root.clone(), migrate(legacy).unwrap())
+    }
+    #[test]
+    fn video_cut_transitions_preserve_old_projects_and_require_adjacent_safe_fades() {
+        let (root, mut project) = fixture();
+        let mut second = project.clips[0].clone();
+        second.id = video_project::id();
+        project.clips.push(second);
+        let left = project.clips[0].id.clone();
+        let right = project.clips[1].id.clone();
+        project.transitions.push(CutTransition {
+            from_clip_id: left.clone(),
+            to_clip_id: right.clone(),
+            kind: CutTransitionKind::DipToBlack,
+            duration_seconds: 0.4,
+        });
+        validate(&project).unwrap();
+        let encoded = serde_json::to_vec(&project).unwrap();
+        assert_eq!(parse(&encoded).unwrap(), project);
+        let mut old: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
+        old.as_object_mut().unwrap().remove("transitions");
+        assert!(parse(&serde_json::to_vec(&old).unwrap())
+            .unwrap()
+            .transitions
+            .is_empty());
+        project.transitions[0].to_clip_id = left.clone();
+        assert!(validate(&project).is_err());
+        project.transitions[0].to_clip_id = right;
+        project.transitions[0].duration_seconds = f64::INFINITY;
+        assert!(validate(&project).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
     #[cfg(windows)]
     #[test]

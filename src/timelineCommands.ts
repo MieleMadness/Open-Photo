@@ -1,3 +1,4 @@
+import {retainAdjacentTransitions,type CutTransition} from "./cutTransitions";
 import {assetTimeBase,assetDuration,usesFrameClock} from "./sequenceMedia";
 import {defaultEdits,type VideoProject} from "./videoProject";
 import {markSeconds,markTime} from "./videoTime";
@@ -12,7 +13,8 @@ export type TimelineCommand=
   |{type:"delete";clipId:string}
   |{type:"edits";clipId:string;edits:TimelineClip["edits"]}
   |{type:"reset";clipId:string}
-  |{type:"append";assetId:string;newId:string};
+  |{type:"append";assetId:string;newId:string}
+  |{type:"transition";fromClipId:string;toClipId:string;enabled:boolean;durationSeconds:number};
 
 /** Sequence order owns placement. Linked source audio is part of each clip's edits. */
 export function timelineEntries(project:SequenceProject):TimelineEntry[]{
@@ -24,7 +26,14 @@ export function projectDuration(project:SequenceProject):number{return timelineE
 /** Pure, atomic commands; callers commit the returned snapshot once to the shared save/history queue. */
 export function editTimeline(project:SequenceProject,command:TimelineCommand):SequenceProject{
   const next=structuredClone(project);
-  if(command.type==="append"){
+  if(command.type==="transition"){
+    const pairs=next.clips.map((clip,i)=>[clip.id,next.clips[i+1]?.id]);
+    if(!pairs.some(([from,to])=>from===command.fromClipId&&to===command.toClipId))throw Error("Choose two adjacent timeline clips.");
+    const existing=next.transitions||[];
+    const remaining=existing.filter(item=>!(item.from_clip_id===command.fromClipId&&item.to_clip_id===command.toClipId));
+    const transition:CutTransition={from_clip_id:command.fromClipId,to_clip_id:command.toClipId,kind:"dip_to_black",duration_seconds:command.durationSeconds};
+    next.transitions=command.enabled?[...remaining,transition]:remaining;
+  }else if(command.type==="append"){
     const asset=next.assets.find(a=>a.id===command.assetId);if(!asset)throw Error("Choose a video from this project's media bin.");
     next.clips.push({id:command.newId,asset_id:asset.id,source_in:markTime(0,assetTimeBase(asset)),source_out:markTime(assetDuration(asset),assetTimeBase(asset)),edits:defaultEdits()});
   }else{
@@ -51,6 +60,7 @@ export function editTimeline(project:SequenceProject,command:TimelineCommand):Se
       next.clips.splice(index+1,0,right);
     }
   }
+  next.transitions=retainAdjacentTransitions(next.clips.map(clip=>({id:clip.id,duration:markSeconds(clip.source_out)-markSeconds(clip.source_in)})),next.transitions||[]);
   const error=validSequence(next);if(error)throw Error(error);
   return next;
 }
