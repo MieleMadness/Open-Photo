@@ -1,3 +1,10 @@
+# 0.56.60 — Standalone audio verification and relink controls
+
+- Add native Windows regression coverage for generating a standalone WAV, importing it as verified audio metadata, rendering it through the layered mixer, and rejecting a changed fingerprint.
+- Show the readiness of imported standalone audio in the editor, with an explicit Relink action bound to registered workspace source verification.
+- Apply Rust formatting fixes after CI #1042 and preserve existing video-only audio bindings during render snapshots.
+- CI and installed-app playback validation remain pending; waveform editing and transitions have not started.
+
 # 0.56.59 — Independent audio import and native mixing
 
 - Import MP3, WAV, FLAC and M4A into a workspace project from registered local folders; validate audio metadata, source identity and fingerprint.
