@@ -8,10 +8,16 @@ $destinationRoot=Join-Path $projectRoot 'src-tauri/resources/ai-models'
 $cacheRoot=Join-Path $projectRoot 'src-tauri/target/ai-model-cache'
 New-Item -ItemType Directory -Force -Path $destinationRoot,$cacheRoot | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $projectRoot 'src-tauri/resources/native') | Out-Null
+$assetIndex=0
 foreach ($model in $manifest.models) {
+    $assetIndex++
+    Write-Output "[AI $assetIndex/$($manifest.models.Count)] Verifying $($model.kind) model"
     if ($model.sha256 -notmatch '^[a-f0-9]{64}$' -or [IO.Path]::GetFileName($model.name) -ne $model.name) {throw 'Invalid AI bundle manifest'}
     $destination=Join-Path $destinationRoot $model.name
-    if ((Test-Path -LiteralPath $destination) -and (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant() -eq $model.sha256) {continue}
+    if ((Test-Path -LiteralPath $destination) -and (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant() -eq $model.sha256) {
+        Write-Output "[AI $assetIndex/$($manifest.models.Count)] Already verified"
+        continue
+    }
     $cached=Join-Path $cacheRoot $model.sha256
     if (!(Test-Path -LiteralPath $cached) -or (Get-FileHash -LiteralPath $cached -Algorithm SHA256).Hash.ToLowerInvariant() -ne $model.sha256) {
         $temporary=Join-Path $cacheRoot ($model.sha256+'.'+[guid]::NewGuid().ToString('N')+'.tmp')
@@ -22,6 +28,7 @@ foreach ($model in $manifest.models) {
             Move-Item -LiteralPath $temporary -Destination $cached -Force
         } finally {if (Test-Path -LiteralPath $temporary) {Remove-Item -LiteralPath $temporary -Force}}
     }
+    Write-Output "[AI $assetIndex/$($manifest.models.Count)] Copying verified model into app resources"
     Copy-Item -LiteralPath $cached -Destination $destination -Force
     if ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant() -ne $model.sha256) {throw "Bundled AI copy failed verification: $($model.kind)"}
 }
