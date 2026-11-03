@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feature/desktop-v0.1.0, integration/audio-trim-and-video-dip-05665]
+    branches: [main, feature/desktop-v0.1.0, integration/audio-trim-and-video-dip-05665, feature/transition-duration-control-05666]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 permissions:

@@ -1137,6 +1137,66 @@ mod tests {
     }
 
     #[test]
+    fn dip_to_black_preview_and_export_share_video_frames_and_audio_timing() {
+        let (fixture, mut snapshot) = fixture();
+        let left = snapshot.project.clips[0].id.clone();
+        let right = snapshot.project.clips[1].id.clone();
+        snapshot
+            .project
+            .transitions
+            .push(crate::video_sequence::CutTransition {
+                from_clip_id: left,
+                to_clip_id: right,
+                kind: crate::video_sequence::CutTransitionKind::DipToBlack,
+                duration_seconds: 0.16,
+            });
+        let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
+        let output = fixture.0.join("dip-parity.mp4");
+        let mut compiled = compile(
+            &engine(),
+            &snapshot,
+            &output,
+            RenderOptions {
+                preview: false,
+                size: ExportSize::Project,
+                acknowledge_first_audio: false,
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        video_render::encode(&engine(), &compiled.plan, || false, |_| {}).unwrap();
+        let info =
+            video_render::validate_output(&engine(), &compiled.plan, &output, || false).unwrap();
+        video_render::decode_check(&engine(), &output, || false, |_| {}).unwrap();
+        assert_eq!(info.frame_count, preview.info.frame_count);
+        assert_eq!(info.frame_count, Some(15));
+        assert_eq!(info.audio.len(), preview.info.audio.len());
+        // Both output paths normalize frames identically before the sequence concat.
+        for time in ["0.100", "0.200", "0.400"] {
+            let from_preview = pixel(Path::new(&preview.source), time);
+            let from_export = pixel(&output, time);
+            for channel in 0..3 {
+                let difference =
+                    (i32::from(from_preview[channel]) - i32::from(from_export[channel])).abs();
+                assert!(
+                    difference <= 20,
+                    "preview/export pixel mismatch at {time}, channel {channel}: {from_preview:?} vs {from_export:?}"
+                );
+            }
+        }
+        let at_cut = pixel(&output, "0.200");
+        let after_cut = pixel(&output, "0.400");
+        assert!(at_cut.iter().all(|channel| *channel < 85), "{at_cut:?}");
+        assert!(after_cut[2] > 90, "{after_cut:?}");
+        // Video-only transitions must not shift the source-linked audio timeline.
+        assert!(rms(&output, "0.04") > 0.02);
+        assert!(rms(&output, "0.30") < 0.002);
+        snapshot.revalidate(|| false).unwrap();
+        compiled.close().unwrap();
+    }
+
+    #[test]
     fn timed_titles_are_rendered_by_the_bundled_windows_video_engine() {
         let (fixture, mut snapshot) = fixture();
         snapshot
