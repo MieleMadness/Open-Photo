@@ -1,7 +1,7 @@
 {
   "name": "open-photo",
   "private": true,
-  "version": "0.56.62",
+  "version": "0.56.63",
   "type": "module",
   "scripts": {
     "dev": "vite",
