@@ -296,7 +296,7 @@ pub(crate) fn safe_audio_path(root: &str, path: &str) -> Result<std::path::PathB
 /// A bounded 64-column peak envelope generated from actual decoded source PCM.
 /// Only the selected audio excerpt is decoded; no original media is modified.
 pub(crate) fn waveform_peaks(pcm: &[u8], columns: usize) -> Result<Vec<u8>, String> {
-    if columns == 0 || columns > 256 || pcm.len() % 2 != 0 {
+    if columns == 0 || columns > 256 || !pcm.len().is_multiple_of(2) {
         return Err("Invalid waveform samples".into());
     }
     let samples = pcm.len() / 2;
@@ -304,7 +304,7 @@ pub(crate) fn waveform_peaks(pcm: &[u8], columns: usize) -> Result<Vec<u8>, Stri
         return Err("Audio excerpt contains no waveform samples".into());
     }
     let mut peaks = vec![0_u8; columns];
-    for (index, sample) in pcm.chunks_exact(2).enumerate() {
+    for (index, sample) in pcm.as_chunks::<2>().0.iter().enumerate() {
         let amplitude = (i16::from_le_bytes([sample[0], sample[1]]) as i32).unsigned_abs();
         let column = index.saturating_mul(columns) / samples;
         let peak = ((amplitude * 100) / 32768).min(100) as u8;
