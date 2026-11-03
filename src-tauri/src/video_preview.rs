@@ -334,7 +334,7 @@ pub fn start_video_project_preview(
 
 enum ProjectPreview {
     Single(String, Box<crate::video_project::Project>),
-    Sequence(crate::video_sequence_render::Snapshot),
+    Sequence(Box<crate::video_sequence_render::Snapshot>),
 }
 pub(crate) fn start_sequence_preview(
     app: tauri::AppHandle,
@@ -347,7 +347,7 @@ pub(crate) fn start_sequence_preview(
         jobs,
         PathBuf::new(),
         true,
-        Some(ProjectPreview::Sequence(snapshot)),
+        Some(ProjectPreview::Sequence(Box::new(snapshot))),
     )
 }
 fn start_job(
