@@ -32,3 +32,8 @@ export function adjacentCutPosition(position:number,clipEnds:number[],direction:
   }
   return null;
 }
+
+/** Brackets are scoped to the focused timeline viewport; media/player shortcuts stay independent. */
+export function cutNavigationDirection(key:string):"previous"|"next"|null {
+  return key==="["?"previous":key==="]"?"next":null;
+}
