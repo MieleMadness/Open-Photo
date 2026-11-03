@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feature/desktop-v0.1.0, integration/audio-trim-and-video-dip-05665, feature/transition-duration-control-05666]
+    branches: [main, feature/desktop-v0.1.0, integration/audio-trim-and-video-dip-05665, feature/transition-duration-control-05666, test/transition-preview-export-parity-05667]
     types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 permissions:
@@ -80,15 +80,15 @@ jobs:
             '## Open-Photo Windows verification'
             ''
             "- **Run:** #${{ github.run_number }}"
-            "- **Commit:** \`${{ github.sha }}\`"
+            "- **Commit:** ${{ github.sha }}"
             '- **Frontend:** npm tests and production build'
             '- **Rust:** formatting, Clippy and native regression tests'
             ''
             '### Which checks ran?'
             '- Pull requests: frontend + native validation on every update'
-            '- Full installer, release video export, installed AI, and uninstall lifecycle: main branch, manual run, or PR label \`full-windows-ci\`'
+            '- Full installer, release video export, installed AI, and uninstall lifecycle: main branch, manual run, or PR label full-windows-ci'
             ''
-            'For a full installer on this PR, add the \`full-windows-ci\` label (or manually dispatch the workflow on its branch).'
+            'For a full installer on this PR, add the full-windows-ci label (or manually dispatch the workflow on its branch).'
           ) | Add-Content -Path $env:GITHUB_STEP_SUMMARY
 
 
@@ -115,8 +115,14 @@ jobs:
         with:
           path: src-tauri/target/ai-model-cache
           key: ai-models-v1-${{ hashFiles('config/ai-models.json') }}
-      - run: npm run prepare:models
-      - run: npm run prepare:video
+      - name: Verify bundled AI models (cached)
+        run: npm run prepare:models
+      - uses: actions/cache@v6.1.0
+        with:
+          path: src-tauri/target/ve
+          key: video-engine-windows-v1-${{ hashFiles('scripts/prepare-video-engine.ps1') }}
+      - name: Prepare bundled video engine (cached)
+        run: npm run prepare:video
       - run: npm run tauri icon assets/app-icon.svg
       - name: Build Windows desktop installer
         run: npm run tauri build -- -- --locked
