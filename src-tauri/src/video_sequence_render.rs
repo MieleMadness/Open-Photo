@@ -890,6 +890,7 @@ mod tests {
                 titles: vec![],
                 audio_tracks: vec![],
                 audio_sources: vec![],
+                transitions: vec![],
             },
             roots: BTreeMap::new(),
         };
