@@ -580,6 +580,28 @@ pub fn compile(
                     ",drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf':textfile={filename}:expansion=none:fontcolor=white:fontsize=h/18:x=(w-text_w)*{x:.3}:y=(h-text_h)*{y:.3}:borderw=2:bordercolor=black:enable='between(t,{start:.6},{end:.6})'"
                 ));
             }
+            // Dip-to-black fades are applied to normalized clip frames before concat.
+            // Each side fades for half the saved duration; no overlapping frames or timing shift.
+            // This first transition type is video-only: linked and layered audio remain untouched.
+            let entering = snapshot.project.transitions.iter()
+                .find(|transition| transition.to_clip_id == snapshot.project.clips[index].id)
+                .map(|transition| transition.duration_seconds / 2.0)
+                .unwrap_or(0.0);
+            let exiting = snapshot.project.transitions.iter()
+                .find(|transition| transition.from_clip_id == snapshot.project.clips[index].id)
+                .map(|transition| transition.duration_seconds / 2.0)
+                .unwrap_or(0.0);
+            let normalized_seconds = *count as f64 / f64::from(fps);
+            if entering + exiting + 1.0 / f64::from(fps) > normalized_seconds {
+                return Err("Normalized clip is too short for video dip-to-black".into());
+            }
+            if entering > 0.0 {
+                titles_filter.push_str(&format!(",fade=t=in:st=0:d={entering:.6}"));
+            }
+            if exiting > 0.0 {
+                let start = normalized_seconds - exiting;
+                titles_filter.push_str(&format!(",fade=t=out:st={start:.6}:d={exiting:.6}"));
+            }
             let args = part_args(
                 &prepared,
                 &snapshot.project.clips[index].edits,
