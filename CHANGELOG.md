@@ -1,3 +1,10 @@
+# 0.56.61 — Playhead-aligned audio editing
+
+- Add precise non-destructive audio-layer actions: move a track to the current playhead, trim its end to the playhead, and preview near its endpoint.
+- Keep source offsets and gain untouched; clamp fades when an audio trim becomes shorter; disable out-of-bounds actions instead of silently creating invalid tracks.
+- Add automated tests for timing bounds, trim results, fade clamping, and source preservation.
+- Waveform visualization remains an upcoming milestone; these timeline controls do not invent waveform data.
+
 # 0.56.60 — Standalone audio verification and relink controls
 
 - Add native Windows regression coverage for generating a standalone WAV, importing it as verified audio metadata, rendering it through the layered mixer, and rejecting a changed fingerprint.
