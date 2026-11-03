@@ -259,6 +259,55 @@ fn open_source(
     fresh.revision = store(db, workspace, &fresh.project, &fresh.bindings, None)?;
     Ok(fresh)
 }
+fn add_audio_files(
+    engine: &Path,
+    roots: &[String],
+    record: &mut Record,
+    paths: &[String],
+) -> Result<(), String> {
+    if paths.is_empty() || paths.len() > 8 {
+        return Err("Choose 1–8 independent audio files".into());
+    }
+    let mut project = record.project.clone();
+    let mut bindings = record.bindings.clone();
+    for path in paths {
+        let (root, file) = root_for_file(roots, path)?;
+        let safe = crate::safe_media_path(
+            root.to_str().ok_or("Unsupported folder path")?,
+            file.to_str().ok_or("Unsupported audio path")?,
+        )?;
+        let info = video_probe::probe_audio_only(engine, &safe, || false)?;
+        let (bytes, sha256) = video_project::fingerprint(&safe, || false)?;
+        if project
+            .audio_sources
+            .iter()
+            .any(|source| source.bytes == bytes && source.sha256 == sha256)
+        {
+            continue;
+        }
+        if project.audio_sources.len() >= 8 {
+            return Err("A project can contain up to eight independent audio files".into());
+        }
+        let id = video_project::id();
+        project.audio_sources.push(video_sequence::AudioSource {
+            id: id.clone(),
+            relative_path: safe
+                .strip_prefix(&root)
+                .map_err(|_| "Audio source is outside its workspace folder")?
+                .to_str()
+                .ok_or("Unsupported audio file name")?
+                .replace('\\', "/"),
+            sha256,
+            bytes,
+            info,
+        });
+        bindings.insert(id, root.to_string_lossy().into_owned());
+    }
+    video_sequence::validate(&project)?;
+    record.project = project;
+    record.bindings = bindings;
+    Ok(())
+}
 fn add_files(
     engine: &Path,
     roots: &[String],
@@ -448,6 +497,11 @@ pub enum Action {
         paths: Vec<String>,
         expected_revision: u64,
     },
+    AddAudio {
+        id: String,
+        paths: Vec<String>,
+        expected_revision: u64,
+    },
     RemoveAsset {
         id: String,
         asset_id: String,
@@ -517,6 +571,11 @@ pub async fn edit_workspace_video_project(
                         expected_revision,
                         ..
                     }
+                    | Action::AddAudio {
+                        id,
+                        expected_revision,
+                        ..
+                    }
                     | Action::RemoveAsset {
                         id,
                         expected_revision,
@@ -537,6 +596,9 @@ pub async fn edit_workspace_video_project(
                 }
                 match action {
                     Action::Add { paths, .. } => add_files(&engine, &roots, &mut record, &paths)?,
+                    Action::AddAudio { paths, .. } => {
+                        add_audio_files(&engine, &roots, &mut record, &paths)?
+                    }
                     Action::RemoveAsset { asset_id, .. } => {
                         record.project.clips.retain(|c| c.asset_id != asset_id);
                         record
