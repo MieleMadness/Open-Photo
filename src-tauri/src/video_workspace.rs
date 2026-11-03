@@ -826,6 +826,52 @@ fn render_snapshot(
     snapshot.validate()?;
     Ok(snapshot)
 }
+/// Return an actual decoded, bounded peak envelope for a saved audio excerpt.
+/// This command checks project ownership, revision and the original fingerprint.
+#[tauri::command]
+pub async fn workspace_audio_waveform(
+    app: tauri::AppHandle,
+    workspace_id: String,
+    id: String,
+    asset_id: String,
+    expected_revision: u64,
+    source_in_seconds: f64,
+    duration_seconds: f64,
+) -> Result<Vec<u8>, String> {
+    let engine = video_engine::directory(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let roots = user_data::workspace_roots(&workspace_id)?;
+        let record = read(&database()?, &workspace_id, &id)?;
+        if record.revision != expected_revision {
+            return Err("Project changed; reopen before generating the waveform".into());
+        }
+        let source = record
+            .project
+            .audio_sources
+            .iter()
+            .find(|audio| audio.id == asset_id)
+            .ok_or("Choose an imported standalone audio source")?;
+        if !source_in_seconds.is_finite()
+            || !duration_seconds.is_finite()
+            || source_in_seconds < 0.0
+            || duration_seconds < 0.04
+            || source_in_seconds + duration_seconds > source.info.duration_seconds + 0.000001
+        {
+            return Err("Waveform selection is outside the original audio".into());
+        }
+        let (_, path) = standalone_audio_source(&roots, &record.bindings, source)?;
+        video_probe::decoded_waveform(
+            &engine,
+            &path,
+            source.info.stream,
+            source_in_seconds,
+            duration_seconds.min(120.0),
+            "mp3,wav,flac,mov",
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
 #[tauri::command]
 pub fn start_workspace_video_preview(
     app: tauri::AppHandle,
