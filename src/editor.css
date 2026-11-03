@@ -1067,3 +1067,10 @@
 /* Playhead editing stays direct: frequent timeline commands have no entrance animation. */
 .sequence-audio-playhead-actions { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2); margin:var(--space-2) 0; }
 .sequence-audio-playhead-actions .secondary-button { flex:1 1 auto; }
+
+/* Real sampled amplitude, no invented waveform and no delay while scrubbing. */
+.sequence-waveform-container { min-width:0; display:grid; gap:var(--space-1); margin:var(--space-2) 0; }
+.sequence-waveform { height:44px; display:flex; align-items:center; gap:2px; padding:4px 6px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-muted); overflow:hidden; }
+.sequence-waveform-peak { flex:1; min-width:1px; border-radius:1px; background:var(--accent-text); opacity:.8; }
+.sequence-waveform-fallback { margin:0; color:var(--muted); font-size:var(--type-caption); }
+.sequence-waveform-container small { color:var(--muted); font-size:var(--type-caption); }
