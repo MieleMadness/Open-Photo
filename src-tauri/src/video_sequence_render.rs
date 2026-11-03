@@ -1003,6 +1003,58 @@ mod tests {
         assert!(Path::new(&preview.source).exists());
     }
     #[test]
+    fn standalone_wav_is_mixed_into_a_verified_project_preview() {
+        let (fixture, mut snapshot) = fixture();
+        let audio = fixture.0.join("music standalone 世界.wav");
+        video_engine::run(
+            &video_engine::tool(&engine(), "ffmpeg").unwrap(),
+            &[
+                "-nostdin".as_ref(),
+                "-v".as_ref(),
+                "error".as_ref(),
+                "-f".as_ref(),
+                "lavfi".as_ref(),
+                "-i".as_ref(),
+                "sine=frequency=440:sample_rate=48000:duration=0.5".as_ref(),
+                "-c:a".as_ref(),
+                "pcm_s16le".as_ref(),
+                audio.as_os_str(),
+            ],
+            Duration::from_secs(30),
+        )
+        .unwrap();
+        let info = video_probe::probe_audio_only(&engine(), &audio, || false).unwrap();
+        let (bytes, sha256) = video_project::fingerprint(&audio, || false).unwrap();
+        let id = video_project::id();
+        snapshot.project.audio_sources.push(crate::video_sequence::AudioSource {
+            id: id.clone(),
+            relative_path: "music standalone 世界.wav".into(),
+            sha256,
+            bytes,
+            info,
+        });
+        snapshot
+            .roots
+            .insert(id.clone(), fixture.0.to_string_lossy().into_owned());
+        snapshot.project.audio_tracks.push(crate::video_sequence::AudioTrack {
+            id: video_project::id(),
+            asset_id: id.clone(),
+            start_seconds: 0.1,
+            source_in_seconds: 0.0,
+            duration_seconds: 0.3,
+            gain_percent: 75,
+            fade_in_seconds: 0.05,
+            fade_out_seconds: 0.05,
+        });
+        let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
+        assert_eq!(preview.info.audio.len(), 1);
+        assert!(Path::new(&preview.source).exists());
+        let altered = snapshot.project.audio_sources[0].sha256.clone();
+        snapshot.project.audio_sources[0].sha256 = "0".repeat(64);
+        assert!(build_preview(&engine(), &snapshot, &fixture.0, || false).is_err());
+        snapshot.project.audio_sources[0].sha256 = altered;
+    }
+    #[test]
     fn timed_titles_are_rendered_by_the_bundled_windows_video_engine() {
         let (fixture, mut snapshot) = fixture();
         snapshot
