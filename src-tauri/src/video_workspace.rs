@@ -267,6 +267,7 @@ fn new_record() -> Record {
             titles: vec![],
             audio_tracks: vec![],
             audio_sources: vec![],
+                transitions: vec![],
         },
         revision: 0,
         bindings: Bindings::new(),
