@@ -274,6 +274,25 @@ pub(crate) fn parse_audio_only_probe(bytes: &[u8]) -> Result<AudioOnlyInfo, Stri
     })
 }
 
+/// Resolve audio files only from the chosen workspace root. Unlike the photo
+/// library validator, this deliberately accepts standalone sound formats.
+pub(crate) fn safe_audio_path(root: &str, path: &str) -> Result<std::path::PathBuf, String> {
+    let root = std::fs::canonicalize(root).map_err(|_| "Audio folder is unavailable")?;
+    let file = std::fs::canonicalize(path).map_err(|_| "Audio file is unavailable")?;
+    if !file.starts_with(&root) || !file.is_file() {
+        return Err("Audio file is outside the registered workspace folder".into());
+    }
+    let extension = file
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !matches!(extension.as_str(), "mp3" | "wav" | "flac" | "m4a") {
+        return Err("Choose MP3, WAV, FLAC or M4A audio".into());
+    }
+    Ok(file)
+}
+
 pub(crate) fn probe_audio_only(
     engine: &Path,
     source: &Path,
@@ -321,7 +340,7 @@ pub async fn inspect_audio_only(
     root: String,
     path: String,
 ) -> Result<AudioOnlyInfo, String> {
-    let source = crate::safe_media_path(&root, &path)?;
+    let source = safe_audio_path(&root, &path)?;
     let directory = crate::video_engine::directory(&app)?;
     tauri::async_runtime::spawn_blocking(move || probe_audio_only(&directory, &source, || false))
         .await
