@@ -83,7 +83,10 @@ fn store(
         || workspace.len() > 120
         || bindings
             .keys()
-            .any(|id| !project.assets.iter().any(|a| a.id == *id))
+            .any(|id| {
+                !project.assets.iter().any(|a| a.id == *id)
+                    && !project.audio_sources.iter().any(|a| a.id == *id)
+            })
     {
         return Err("Invalid project ownership or source references".into());
     }
@@ -540,6 +543,7 @@ pub async fn edit_workspace_video_project(
                             .project
                             .audio_tracks
                             .retain(|track| track.asset_id != asset_id);
+                        record.project.audio_sources.retain(|a| a.id != asset_id);
                         record.project.assets.retain(|a| a.id != asset_id);
                         record.bindings.remove(&asset_id);
                     }
@@ -650,6 +654,16 @@ fn render_snapshot(
                 .ok_or("Relink every timeline source before rendering")?,
         )?;
         bindings.insert(asset.id.clone(), root.to_string_lossy().into_owned());
+    }
+    for source in &record.project.audio_sources {
+        let root = registered_root(
+            roots,
+            record
+                .bindings
+                .get(&source.id)
+                .ok_or("Relink every independent audio source before rendering")?,
+        )?;
+        bindings.insert(source.id.clone(), root.to_string_lossy().into_owned());
     }
     let snapshot = crate::video_sequence_render::Snapshot {
         project: record.project,
