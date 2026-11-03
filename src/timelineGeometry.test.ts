@@ -1,5 +1,5 @@
 import {expect,it} from "vitest";
-import {adjacentCutPosition,clipDropIndex,timelineTicks} from "./timelineGeometry";
+import {adjacentCutPosition,clipDropIndex,cutNavigationDirection,timelineTicks} from "./timelineGeometry";
 it("keeps ruler labels readable and work bounded across zoom and duration",()=>{
   expect(timelineTicks(.5,800).map(tick=>tick.label)).toContain("0.1s");
   expect(timelineTicks(3661,1200).find(tick=>tick.seconds===3600)?.label).toBe("1:00:00");
@@ -29,4 +29,10 @@ it("avoids unstable seeks at boundaries and invalid projects",()=>{
   expect(adjacentCutPosition(0,[],"next")).toBeNull();
   expect(adjacentCutPosition(NaN,[1],"next")).toBeNull();
   expect(adjacentCutPosition(1,[Infinity],"previous")).toBeNull();
+});
+
+it("only interprets bracket keys as timeline cut navigation",()=>{
+  expect(cutNavigationDirection("[")).toBe("previous");
+  expect(cutNavigationDirection("]")).toBe("next");
+  for(const key of ["ArrowLeft","ArrowRight",",",".","Home","End","a","BracketLeft",""])expect(cutNavigationDirection(key)).toBeNull();
 });
