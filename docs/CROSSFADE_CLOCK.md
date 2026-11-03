@@ -28,3 +28,9 @@ Each clip owns its normal integer frame count. A crossfade of `N` frames starts 
 ## Acceptance
 
 Pure timing tests cover hard cuts, one and multiple overlapping pairs, adjacent validation, non-overlapping guards, integer-frame and time calculations. Native implementation, audio mixing, UI interaction, installed Windows review and full release CI are still required before claiming that users can create true crossfades.
+
+## Deterministic per-frame sampling (prototype)
+
+`src/crossfadeSampling.ts` maps each **integer project frame** to one or two clip-local source-frame indices. Hard cuts return one source at full gain. An overlap returns both neighboring sources: video uses linear center-of-frame weights that sum to 1; the proposed linked-audio gain curve uses complementary sine/cosine weights whose squared sum equals 1. At a four-frame overlap, the video contribution of the incoming clip rises from 12.5% through 87.5%.
+
+This sampling contract is currently TypeScript-only; native FFmpeg audio and video are unchanged. True visual blending, source-frame extraction, exact audio sample-clock handling, and parity tests must be implemented and reviewed separately. In particular, equal-power audio gain is a proposed mixing rule, not a promise of perceived loudness for correlated sources.
