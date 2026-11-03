@@ -228,6 +228,15 @@ fn bind_import(roots: &[String], project: &Sequence) -> Bindings {
             }
         }
     }
+    for asset in &project.audio_sources {
+        for root in roots {
+            let candidate = BTreeMap::from([(asset.id.clone(), root.clone())]);
+            if standalone_audio_source(roots, &candidate, asset).is_ok() {
+                bindings.insert(asset.id.clone(), root.clone());
+                break;
+            }
+        }
+    }
     bindings
 }
 fn new_record() -> Record {
