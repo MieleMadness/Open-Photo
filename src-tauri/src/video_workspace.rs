@@ -81,12 +81,10 @@ fn store(
     video_sequence::validate(project)?;
     if workspace.is_empty()
         || workspace.len() > 120
-        || bindings
-            .keys()
-            .any(|id| {
-                !project.assets.iter().any(|a| a.id == *id)
-                    && !project.audio_sources.iter().any(|a| a.id == *id)
-            })
+        || bindings.keys().any(|id| {
+            !project.assets.iter().any(|a| a.id == *id)
+                && !project.audio_sources.iter().any(|a| a.id == *id)
+        })
     {
         return Err("Invalid project ownership or source references".into());
     }
