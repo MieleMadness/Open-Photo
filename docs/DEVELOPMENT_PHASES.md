@@ -1,14 +1,25 @@
-## Next development patch — audio track trim handles (draft, unverified)
+## November 3, 2026 — Active roadmap status (development, not release sign-off)
 
-The shared audio placement lanes now expose direct start/end trim handles alongside the existing waveform seek control. Drag interactions preview locally and commit one project-history edit on pointer release; Escape, window blur, cancelled/stale gestures discard the draft. Arrow keys nudge by 0.01 seconds (Shift: 0.1 seconds). Start trims update both source in-point and timeline start while holding the opposite edge fixed. End trims only change duration. Bounds respect source and project lengths, fade lengths are clamped, and original media remain read-only.
+**Source of truth:** the active development branch (`feature/desktop-v0.1.0`) includes the fast/full Windows CI optimization merged as PR #14. The latest documented application checkpoint is **0.56.63**. Later editor changes remain in draft pull requests; do not label them shipped.
 
-This is a proposed development increment **on a separate feature branch**, not a verified 0.56.64 release. New model and component regression tests are included; TypeScript, Rust, installer and installed Windows acceptance for this commit have **not** been executed or claimed. Review the feature PR and run the full Windows Desktop Build against its exact head SHA before promotion.
+| Area | Current state | Next acceptance / milestone |
+| --- | --- | --- |
+| Core editing (A–D, Phase 6/7) | Shared photo/video hard-cut sequence, nondestructive clips, save/relink, continuous preview/export, global playback volume and appearance choices implemented | Real installed-Windows workflow and compatibility checks |
+| Search + local AI (E/F) | Unified ranked search, local AI indexing and bounded sampled-video semantic search implemented experimentally | Real hardware/model quality, signed Preview channel checks |
+| Library scale (G) | Grid/list virtualization and bounded caches implemented | **Defer the 10,000-media stress test to pre-1.0** |
+| Maps (H) | GPS, location grouping and zoom-aware clustering implemented | Real HEIC/MOV/Live samples and installed Windows map acceptance |
+| Social editor (I) | Social presets, timed titles, audio import/mixing, waveform excerpts and seek already present through 0.56.63 | Land and manually accept the next editor integration |
+| Draft editor integration | [PR #15](https://github.com/MieleMadness/Open-Photo/pull/15): direct audio trim handles, video-only dip-to-black, editable duration, preview/export parity. Parent increments #1109–#1111 had green Windows workflows. The **reintegrated** PR #15 requires its own exact-head validation and installed-app QA | Validate fast CI, request full Windows CI, test trims, audio, preview/export, persistence, undo |
+| Next isolated UX patch | [PR #16](https://github.com/MieleMadness/Open-Photo/pull/16): Previous/Next Cut timeline playhead navigation. Implemented on draft PR #15; not yet merged or independently CI-approved | Test buttons, shared preview playhead and edge cases |
+| Music provider (J) | User-imported music is available; an external provider/licensing integration is **not** finished | Provider/legal/licensing decision before online music integration |
+| Private vault (K) | Threat model and encryption/PIN workflow remain planned | Security design and review before implementation |
+| Release gates | Installer and auto-update signing, full application/hardware checks and physical-drive error cases remain separate from fast PR validation | Signed Preview upgrade test, real Windows acceptance, then pre-1.0 scale/disk/drive gates |
 
-## Draft Phase I transition increment — video dip to black (unverified)
+**Active focus:** First finish and integrate PR #15's editor features on the current development baseline; then validate PR #16. Next practical Phase I improvements are precise cut/playhead behavior, smoother timeline interactions, preview/export fidelity and eventually true crossfades. Current dip-to-black is **video-only**, not a crossfade; music-provider integration and 10k-scale tests are not the active development task.
 
-A separate development branch introduces saved, validated `dip_to_black` transitions between exact neighboring clip IDs. Each side fades to/from black within its existing normalized video interval, preserving the original hard-cut clock, project duration, title placements and source offsets. Timeline controls add/remove a 0.4-second video dip at an adjacent cut; undo/redo use the shared project session. Moved/deleted clip boundaries discard stale transition pairs. Durations and adjacent fade envelopes are validated in TypeScript and Rust.
+**CI policy:** Every normal PR runs fast frontend and native Rust tests. A PR labeled `full-windows-ci`, a manual workflow dispatch or a main-branch build runs the full Windows installer, export and installed-app lifecycle checks. Full mode was verified in #1116; the isolated CI optimization was verified in #1117 and merged in PR #14. These tests do not replace manual installed-Windows interaction testing.
 
-**Scope:** video only. Original and layered audio retain their existing mix and do not crossfade; this is **not** a crossfade or a complete video transition system. Actual overlapping crossfades require separate frame/audio timeline architecture. Native rendered-preview tests and source validator tests are included. This branch has not yet passed CI or installed-Windows acceptance; do not present the effect as shipping until exact-commit green validation and a manual video playback/export review.
+---
 
 ## 0.56.63 — Waveform seeking on the editor playhead
 
