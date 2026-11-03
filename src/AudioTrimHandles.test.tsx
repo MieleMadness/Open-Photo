@@ -24,6 +24,8 @@ it("drafts on pointer move and saves one edit on pointer release",()=>{
   pointer(start,"pointerMove",200);
   expect(commit).not.toHaveBeenCalled();
   expect(start.getAttribute("aria-valuenow")).toBe("6");
+  expect((document.querySelector(".sequence-audio-bar") as HTMLElement).style.left).toBe("40%");
+  expect((document.querySelector(".sequence-audio-bar") as HTMLElement).style.width).toBe(`${5/15*100}%`);
   pointer(start,"pointerUp",200);
   expect(commit).toHaveBeenCalledExactlyOnceWith({...track,start_seconds:6,source_in_seconds:3,duration_seconds:5});
   expect(screen.queryByRole("status")).toBeNull();
