@@ -1,3 +1,10 @@
+# 0.56.62 — Measured standalone audio waveform foundation
+
+- Decode up to 120 seconds of verified local standalone audio to mono 8 kHz PCM and return 64 actual amplitude peaks per audio track. The source file remains untouched.
+- Display measured waveform peaks in the audio inspector with clear loading, relink and unavailable states; explicitly label the 120-second visualization limit for longer clips.
+- Require current workspace ownership, saved revision, original source fingerprint and bounded audio timing before decoding.
+- Add native WAV regression coverage for nonzero decoded waveform peaks and rejected oversized excerpts. CI and installed-app tests remain required before considering waveform rendering fully verified.
+
 # 0.56.61 — Playhead-aligned audio editing
 
 - Add precise non-destructive audio-layer actions: move a track to the current playhead, trim its end to the playhead, and preview near its endpoint.
