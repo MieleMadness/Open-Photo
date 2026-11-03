@@ -2,7 +2,7 @@ import {useState} from "react";
 import {type SequenceSession,type AudioTrack} from "./videoSequence";
 import {projectDuration} from "./timelineCommands";
 
-export function SequenceAudio({session,disabled,playhead,onImport}:{session:SequenceSession;disabled:boolean;playhead:number;onImport:()=>void}){
+export function SequenceAudio({session,disabled,playhead,onImport,onRelink,sourceStatuses}:{session:SequenceSession;disabled:boolean;playhead:number;onImport:()=>void;onRelink:(id:string)=>void;sourceStatuses:{asset_id:string;path:string|null;status:string}[]}){
   const project=session.history.present;
   const tracks=project.audio_tracks||[];
   const duration=projectDuration(project);
@@ -15,6 +15,15 @@ export function SequenceAudio({session,disabled,playhead,onImport}:{session:Sequ
     <div className="timeline-heading"><h2>Audio tracks</h2><p>{tracks.length} / 8</p></div>
     <p className="timeline-help">Layer sound from imported videos or standalone audio. Audio plays in rendered previews and exports.</p>
     <button className="secondary-button" type="button" disabled={disabled||(project.audio_sources||[]).length>=8} onClick={onImport}>Import audio files…</button>
+    {(project.audio_sources||[]).length>0&&<div className="sequence-audio-imports" aria-label="Imported audio files">
+      {(project.audio_sources||[]).map(audio=>{
+        const status=sourceStatuses.find(item=>item.asset_id===audio.id);
+        return <div key={audio.id} className="sequence-audio-import">
+          <span title={audio.relative_path}><strong>{audio.relative_path.split("/").at(-1)}</strong><small>{status?.path?"Ready":status?.status||"Needs relinking"} · {audio.info.duration_seconds.toFixed(1)} s</small></span>
+          <button className="secondary-button" type="button" disabled={disabled} onClick={()=>onRelink(audio.id)}>Relink…</button>
+        </div>;
+      })}
+    </div>
     {tracks.length>0&&duration>0&&<div className="sequence-audio-overview" role="group" aria-label="Audio track placement on project timeline">
       <div className="sequence-audio-ruler"><span>0:00</span><span>{duration.toFixed(1)} s</span></div>
       {tracks.map((track,index)=><div key={track.id} className="sequence-audio-lane" aria-label={`Audio track ${index+1}: starts at ${track.start_seconds.toFixed(1)} seconds, lasts ${track.duration_seconds.toFixed(1)} seconds`}>
