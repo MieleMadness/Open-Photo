@@ -421,13 +421,13 @@ pub(crate) fn start_sequence_export(
         app,
         jobs,
         previews,
-        SourceRequest::Sequence(snapshot),
+        SourceRequest::Sequence(Box::new(snapshot)),
         options,
     )
 }
 enum SourceRequest {
     Single { root: String, project: Box<Project> },
-    Sequence(crate::video_sequence_render::Snapshot),
+    Sequence(Box<crate::video_sequence_render::Snapshot>),
 }
 fn start_export(
     app: tauri::AppHandle,
