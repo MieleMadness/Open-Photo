@@ -22,6 +22,7 @@ export function validSequence(project:SequenceProject){
   const sources=project.audio_sources||[];
   if(sources.length>8)return "Keep at most eight independent audio sources.";
   if(new Set(sources.map(source=>source.id)).size!==sources.length)return "Independent audio source IDs must be unique.";
+  if(sources.some(source=>project.assets.some(asset=>asset.id===source.id||(asset.bytes===source.bytes&&asset.sha256===source.sha256))))return "An audio source duplicates an existing media asset.";
   const tracks=project.audio_tracks||[];
   if(tracks.length>8)return "Keep at most eight audio tracks.";
   const trackIds=new Set<string>();
