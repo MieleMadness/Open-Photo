@@ -149,7 +149,7 @@ fn standalone_audio_source(
             .get(&asset.id)
             .ok_or("Relink this project's original audio")?,
     )?;
-    let path = crate::safe_media_path(
+    let path = video_probe::safe_audio_path(
         root.to_str().ok_or("Unsupported folder path")?,
         &root.join(&asset.relative_path).to_string_lossy(),
     )?;
@@ -212,6 +212,23 @@ fn root_for_file(roots: &[String], path: &str) -> Result<(PathBuf, PathBuf), Str
         .max_by_key(|r| r.components().count())
         .ok_or("Choose a video inside this workspace's folders")?;
     crate::safe_media_path(root.to_str().ok_or("Unsupported folder path")?, path)?;
+    Ok((root, file))
+}
+fn root_for_audio_file(
+    roots: &[String],
+    path: &str,
+) -> Result<(PathBuf, PathBuf), String> {
+    let file = fs::canonicalize(path).map_err(|_| "Audio file is unavailable")?;
+    let root = roots
+        .iter()
+        .filter_map(|entry| fs::canonicalize(entry).ok())
+        .filter(|entry| file.starts_with(entry))
+        .max_by_key(|entry| entry.components().count())
+        .ok_or("Choose audio inside this workspace's folders")?;
+    let file = video_probe::safe_audio_path(
+        root.to_str().ok_or("Unsupported folder path")?,
+        path,
+    )?;
     Ok((root, file))
 }
 fn bind_import(roots: &[String], project: &Sequence) -> Bindings {
@@ -315,8 +332,8 @@ fn add_audio_files(
     let mut project = record.project.clone();
     let mut bindings = record.bindings.clone();
     for path in paths {
-        let (root, file) = root_for_file(roots, path)?;
-        let safe = crate::safe_media_path(
+        let (root, file) = root_for_audio_file(roots, path)?;
+        let safe = video_probe::safe_audio_path(
             root.to_str().ok_or("Unsupported folder path")?,
             file.to_str().ok_or("Unsupported audio path")?,
         )?;
@@ -654,7 +671,16 @@ pub async fn edit_workspace_video_project(
                         record.bindings.remove(&asset_id);
                     }
                     Action::Relink { asset_id, path, .. } => {
-                        let (root, file) = root_for_file(&roots, &path)?;
+                        let (root, file) = if record
+                            .project
+                            .audio_sources
+                            .iter()
+                            .any(|asset| asset.id == asset_id)
+                        {
+                            root_for_audio_file(&roots, &path)?
+                        } else {
+                            root_for_file(&roots, &path)?
+                        };
                         let relative_path = file
                             .strip_prefix(&root)
                             .map_err(|e| e.to_string())?
