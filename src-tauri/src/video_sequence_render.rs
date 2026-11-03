@@ -28,7 +28,7 @@ impl Snapshot {
                 .roots
                 .get(&source.id)
                 .ok_or("Relink every independent audio source before rendering")?;
-            let path = crate::safe_media_path(
+            let path = video_probe::safe_audio_path(
                 root,
                 &Path::new(root)
                     .join(&source.relative_path)
@@ -698,7 +698,7 @@ pub fn compile(
                     .roots
                     .get(&asset.id)
                     .ok_or("Relink independent audio source before rendering")?;
-                let source = crate::safe_media_path(
+                let source = video_probe::safe_audio_path(
                     root,
                     &Path::new(root).join(&asset.relative_path).to_string_lossy(),
                 )?;
