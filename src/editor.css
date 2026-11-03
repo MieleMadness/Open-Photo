@@ -1063,3 +1063,7 @@
 .sequence-audio-import strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--type-caption); }
 .sequence-audio-import small { color:var(--muted); line-height:1.4; }
 .sequence-audio-import button { flex-shrink:0; }
+
+/* Playhead editing stays direct: frequent timeline commands have no entrance animation. */
+.sequence-audio-playhead-actions { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2); margin:var(--space-2) 0; }
+.sequence-audio-playhead-actions .secondary-button { flex:1 1 auto; }
