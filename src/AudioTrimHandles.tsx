@@ -40,7 +40,8 @@ export function AudioTrimHandles({track,trackNumber,sourceDuration,projectDurati
   }
   const shown=draft??track;
   return <>
-    {draft&&<output className="sequence-audio-trim-feedback" role="status">{format(shown.start_seconds)} – {format(shown.start_seconds+shown.duration_seconds)}</output>}
+    <span className="sequence-audio-bar" style={{left:`${shown.start_seconds/projectDuration*100}%`,width:`${shown.duration_seconds/projectDuration*100}%`}} title={`Track ${trackNumber}: ${shown.start_seconds.toFixed(2)}–${(shown.start_seconds+shown.duration_seconds).toFixed(2)} seconds`}>
+      {trackNumber}
     {(["start","end"] as const).map(edge=><button
       key={edge} type="button" role="slider" disabled={disabled}
       className={`sequence-audio-trim-handle audio-trim-${edge}`}
@@ -67,5 +68,7 @@ export function AudioTrimHandles({track,trackNumber,sourceDuration,projectDurati
         if(next)onCommit(next);
       }}
     />)}
+    </span>
+    {draft&&<output className="sequence-audio-trim-feedback" role="status">{format(shown.start_seconds)} – {format(shown.start_seconds+shown.duration_seconds)}</output>}
   </>;
 }
