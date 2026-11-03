@@ -59,6 +59,9 @@ export function SequenceAudio({session,disabled,playhead,onImport,onRelink,sourc
             revision={session.revision}
             sourceIn={track.source_in_seconds}
             duration={track.duration_seconds}
+            trackStart={track.start_seconds}
+            playhead={playhead}
+            onSeek={onSeek}
             ready={!!sourceStatuses.find(item=>item.asset_id===track.asset_id)?.path}
           />}
           <label>Start (seconds)<input aria-label="Audio start" type="number" min={0} max={Math.max(0,duration-track.duration_seconds)} step=".01" value={track.start_seconds} onChange={event=>{const n=Number(event.target.value);if(Number.isFinite(n)&&n>=0&&n+track.duration_seconds<=duration)update(track.id,{start_seconds:n});}}/></label>
