@@ -293,6 +293,76 @@ pub(crate) fn safe_audio_path(root: &str, path: &str) -> Result<std::path::PathB
     Ok(file)
 }
 
+/// A bounded 64-column peak envelope generated from actual decoded source PCM.
+/// Only the selected audio excerpt is decoded; no original media is modified.
+pub(crate) fn waveform_peaks(pcm: &[u8], columns: usize) -> Result<Vec<u8>, String> {
+    if columns == 0 || columns > 256 || pcm.len() % 2 != 0 {
+        return Err("Invalid waveform samples".into());
+    }
+    let samples = pcm.len() / 2;
+    if samples == 0 {
+        return Err("Audio excerpt contains no waveform samples".into());
+    }
+    let mut peaks = vec![0_u8; columns];
+    for (index, sample) in pcm.chunks_exact(2).enumerate() {
+        let amplitude = (i16::from_le_bytes([sample[0], sample[1]]) as i32).unsigned_abs();
+        let column = index.saturating_mul(columns) / samples;
+        let peak = ((amplitude * 100) / 32768).min(100) as u8;
+        peaks[column.min(columns - 1)] = peaks[column.min(columns - 1)].max(peak);
+    }
+    Ok(peaks)
+}
+
+pub(crate) fn decoded_waveform(
+    engine: &Path,
+    source: &Path,
+    stream: usize,
+    offset: f64,
+    duration: f64,
+    format: &str,
+) -> Result<Vec<u8>, String> {
+    if !offset.is_finite()
+        || offset < 0.0
+        || !duration.is_finite()
+        || !(0.04..=120.0).contains(&duration)
+        || !matches!(format, "mp3,wav,flac,mov" | "mov,matroska,webm,avi")
+    {
+        return Err("Invalid waveform excerpt".into());
+    }
+    let ffmpeg = crate::video_engine::tool(engine, "ffmpeg")?;
+    let seek = format!("{offset:.6}");
+    let length = format!("{duration:.6}");
+    let selected_stream = format!("0:{stream}");
+    let args: Vec<&std::ffi::OsStr> = vec![
+        "-nostdin".as_ref(),
+        "-v".as_ref(),
+        "error".as_ref(),
+        "-protocol_whitelist".as_ref(),
+        "file,pipe".as_ref(),
+        "-format_whitelist".as_ref(),
+        format.as_ref(),
+        "-i".as_ref(),
+        source.as_os_str(),
+        "-map".as_ref(),
+        selected_stream.as_ref(),
+        "-ss".as_ref(),
+        seek.as_ref(),
+        "-t".as_ref(),
+        length.as_ref(),
+        "-ac".as_ref(),
+        "1".as_ref(),
+        "-ar".as_ref(),
+        "8000".as_ref(),
+        "-f".as_ref(),
+        "s16le".as_ref(),
+        "pipe:1".as_ref(),
+    ];
+    waveform_peaks(
+        &crate::video_engine::run(&ffmpeg, &args, Duration::from_secs(30))?,
+        64,
+    )
+}
+
 pub(crate) fn probe_audio_only(
     engine: &Path,
     source: &Path,
