@@ -660,11 +660,8 @@ pub async fn edit_workspace_video_project(
                             .map_err(|e| e.to_string())?
                             .to_string_lossy()
                             .replace('\\', "/");
-                        if let Some(asset) = record
-                            .project
-                            .assets
-                            .iter_mut()
-                            .find(|a| a.id == asset_id)
+                        if let Some(asset) =
+                            record.project.assets.iter_mut().find(|a| a.id == asset_id)
                         {
                             asset.relative_path = relative_path;
                             record
@@ -775,7 +772,11 @@ fn render_snapshot(
     let mut bindings = BTreeMap::new();
     for asset in &record.project.assets {
         if !record.project.clips.iter().any(|c| c.asset_id == asset.id)
-            && !record.project.audio_tracks.iter().any(|t| t.asset_id == asset.id)
+            && !record
+                .project
+                .audio_tracks
+                .iter()
+                .any(|t| t.asset_id == asset.id)
         {
             continue;
         }
