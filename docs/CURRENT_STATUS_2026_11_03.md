@@ -2,6 +2,8 @@
 
 This is a **development-branch** snapshot at source version **0.56.63**. It reconciles `docs/DEVELOPMENT_PHASES.md`, `CHANGELOG.md`, `docs/MILESTONES.md`, and `docs/VIDEO_ROADMAP.md`. A source implementation is **not** proof of a passing GitHub Actions build, signed release, or installed-Windows acceptance.
 
+> **CI verified 2026-11-03:** Windows Desktop Build **#1095** (run ID `41654133502`) for development head `28cd8746d3e0b6b6bd4bddd90e0bf025a399c188` completed **successfully**. Frontend tests/build, Rust format/clippy/tests, Windows installer construction, video export measurement and installed AI/uninstall lifecycle CI steps all reported success. This certifies the checked commit's automated pipeline only: interactive installed-GUI testing, real audio listening, 10,000+ media, signed updater and real iPhone map acceptance remain open. [Workflow](https://github.com/MieleMadness/Open-Photo/actions/runs/41654133502).
+
 ## Branch and release truth
 
 - The active application work lives on `feature/desktop-v0.1.0` (currently the head of PR #2); `main` still contains the original project foundation and is **not** the latest functional application baseline.
