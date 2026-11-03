@@ -5,7 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main, feature/desktop-v0.1.0, integration/audio-trim-and-video-dip-05665, feature/transition-duration-control-05666]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 permissions:
   contents: read
@@ -57,15 +57,44 @@ jobs:
         with:
           path: src-tauri/target/ai-model-cache
           key: ai-models-v1-${{ hashFiles('config/ai-models.json') }}
-      - run: npm run prepare:models
-      - run: npm run prepare:video
+      - name: Verify bundled AI models (cached)
+        run: npm run prepare:models
+      - uses: actions/cache@v6.1.0
+        with:
+          path: src-tauri/target/ve
+          key: video-engine-windows-v1-${{ hashFiles('scripts/prepare-video-engine.ps1') }}
+      - name: Prepare bundled video engine (cached)
+        run: npm run prepare:video
       - run: npm run tauri icon assets/app-icon.svg
-      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
-      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
-      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Rust formatting check
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+      - name: Rust lint (Clippy)
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Native Rust regression tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Publish PR verification summary
+        if: always()
+        shell: pwsh
+        run: |
+          @(
+            '## Open-Photo Windows verification'
+            ''
+            "- **Run:** #${{ github.run_number }}"
+            "- **Commit:** \`${{ github.sha }}\`"
+            '- **Frontend:** npm tests and production build'
+            '- **Rust:** formatting, Clippy and native regression tests'
+            ''
+            '### Which checks ran?'
+            '- Pull requests: frontend + native validation on every update'
+            '- Full installer, release video export, installed AI, and uninstall lifecycle: main branch, manual run, or PR label \`full-windows-ci\`'
+            ''
+            'For a full installer on this PR, add the \`full-windows-ci\` label (or manually dispatch the workflow on its branch).'
+          ) | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+
 
   windows:
-    name: Build on Windows
+    name: Build on Windows (full verification)
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-windows-ci')
     needs: [frontend, rust]
     runs-on: windows-2022
     steps:
