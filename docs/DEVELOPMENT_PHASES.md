@@ -1,3 +1,9 @@
+## Draft Phase I transition increment — video dip to black (unverified)
+
+A separate development branch introduces saved, validated `dip_to_black` transitions between exact neighboring clip IDs. Each side fades to/from black within its existing normalized video interval, preserving the original hard-cut clock, project duration, title placements and source offsets. Timeline controls add/remove a 0.4-second video dip at an adjacent cut; undo/redo use the shared project session. Moved/deleted clip boundaries discard stale transition pairs. Durations and adjacent fade envelopes are validated in TypeScript and Rust.
+
+**Scope:** video only. Original and layered audio retain their existing mix and do not crossfade; this is **not** a crossfade or a complete video transition system. Actual overlapping crossfades require separate frame/audio timeline architecture. Native rendered-preview tests and source validator tests are included. This branch has not yet passed CI or installed-Windows acceptance; do not present the effect as shipping until exact-commit green validation and a manual video playback/export review.
+
 ## 0.56.63 — Waveform seeking on the editor playhead
 
 Wire the actual sampled waveform to an accessible range input for click, drag and keyboard scrubbing, synchronized to project time. End at playhead remains the explicit non-destructive trim action. Long-form full-resolution waveforms, waveform caching and drag trim handles remain pending.
