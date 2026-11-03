@@ -1,3 +1,26 @@
+## November 3, 2026 — Active roadmap status (development, not release sign-off)
+
+**Source of truth:** the active development branch (`feature/desktop-v0.1.0`) includes the fast/full Windows CI optimization merged as PR #14. The latest documented application checkpoint is **0.56.63**. Later editor changes remain in draft pull requests; do not label them shipped.
+
+| Area | Current state | Next acceptance / milestone |
+| --- | --- | --- |
+| Core editing (A–D, Phase 6/7) | Shared photo/video hard-cut sequence, nondestructive clips, save/relink, continuous preview/export, global playback volume and appearance choices implemented | Real installed-Windows workflow and compatibility checks |
+| Search + local AI (E/F) | Unified ranked search, local AI indexing and bounded sampled-video semantic search implemented experimentally | Real hardware/model quality, signed Preview channel checks |
+| Library scale (G) | Grid/list virtualization and bounded caches implemented | **Defer the 10,000-media stress test to pre-1.0** |
+| Maps (H) | GPS, location grouping and zoom-aware clustering implemented | Real HEIC/MOV/Live samples and installed Windows map acceptance |
+| Social editor (I) | Social presets, timed titles, audio import/mixing, waveform excerpts and seek already present through 0.56.63 | Land and manually accept the next editor integration |
+| Draft editor integration | [PR #15](https://github.com/MieleMadness/Open-Photo/pull/15): direct audio trim handles, video-only dip-to-black, editable duration, preview/export parity. Parent increments #1109–#1111 had green Windows workflows. The **reintegrated** PR #15 requires its own exact-head validation and installed-app QA | Validate fast CI, request full Windows CI, test trims, audio, preview/export, persistence, undo |
+| Next isolated UX patch | [PR #16](https://github.com/MieleMadness/Open-Photo/pull/16): Previous/Next Cut timeline playhead navigation. Implemented on draft PR #15; not yet merged or independently CI-approved | Test buttons, shared preview playhead and edge cases |
+| Music provider (J) | User-imported music is available; an external provider/licensing integration is **not** finished | Provider/legal/licensing decision before online music integration |
+| Private vault (K) | Threat model and encryption/PIN workflow remain planned | Security design and review before implementation |
+| Release gates | Installer and auto-update signing, full application/hardware checks and physical-drive error cases remain separate from fast PR validation | Signed Preview upgrade test, real Windows acceptance, then pre-1.0 scale/disk/drive gates |
+
+**Active focus:** First finish and integrate PR #15's editor features on the current development baseline; then validate PR #16. Next practical Phase I improvements are precise cut/playhead behavior, smoother timeline interactions, preview/export fidelity and eventually true crossfades. Current dip-to-black is **video-only**, not a crossfade; music-provider integration and 10k-scale tests are not the active development task.
+
+**CI policy:** Every normal PR runs fast frontend and native Rust tests. A PR labeled `full-windows-ci`, a manual workflow dispatch or a main-branch build runs the full Windows installer, export and installed-app lifecycle checks. Full mode was verified in #1116; the isolated CI optimization was verified in #1117 and merged in PR #14. These tests do not replace manual installed-Windows interaction testing.
+
+---
+
 > **0.56.21:** The shared timeline now accepts videos plus JPEG/PNG/BMP/TIFF photos and produces one continuous output, including photo-only projects. Use **Add media…**, select a photo to change its duration or shared image adjustments, and **Preview project edits** to render the saved sequence. Schema 3 stores typed assets and migrates older video documents. Text, local music and transitions remain pending; Phase F video semantic indexing is the next core search milestone. Short fixtures remain the baseline.
 
 > **0.56.8:** One project now previews and exports its entire ordered timeline as one continuous MP4. Start in the Library with one video's Edit action or **Create video from selection…**, then **Add videos…** to the same project. Select clips to trim/adjust, split at the playhead, drag/reorder, delete with the gap closed, and undo/redo. Preview playback follows the project playhead; **Show original source** restores source playback. Canvas shape/fit are saved edits; Project / up to 1080p / up to 4K are independent export choices. Joined clips use 30/60 fps with linked original audio and silence for silent/muted intervals; one clip retains source timing. Exports create new files and never overwrite existing destinations. Missing unused bin assets do not block output. Photos will join this same editor later. See [continuous rendering](VIDEO_SEQUENCE_RENDERING.md).
