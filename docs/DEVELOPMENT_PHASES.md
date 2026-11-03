@@ -1,3 +1,7 @@
+## 0.56.62 — Verified audio waveform excerpts
+
+Introduced a source-verified 64-column audio peak measurement pipeline (up to 120-second excerpts), displayed directly beside audio-track trim controls. Source files are read-only and workspace permissions remain enforced. Longer clips show the first 120 seconds only. Future milestones: optimized full-length/cached waveforms, interactive trim handles, video transitions.
+
 ## 0.56.61 — Playhead-aligned audio trim controls
 
 Added accessible, non-destructive audio placement and end-trim actions driven by the shared project playhead, with endpoint preview and unit tests. Waveform generation, direct drag gestures and transitions remain outstanding.
