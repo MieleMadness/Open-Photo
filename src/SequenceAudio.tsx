@@ -1,6 +1,7 @@
 import {useState} from "react";
 import {type SequenceSession,type AudioTrack} from "./videoSequence";
 import {projectDuration} from "./timelineCommands";
+import {AudioWaveform} from "./AudioWaveform";
 import {placeAudioAtPlayhead,trimAudioEndAtPlayhead} from "./audioTimeline";
 
 export function SequenceAudio({session,disabled,playhead,onImport,onRelink,sourceStatuses,onSeek}:{session:SequenceSession;disabled:boolean;playhead:number;onImport:()=>void;onRelink:(id:string)=>void;onSeek:(seconds:number)=>void;sourceStatuses:{asset_id:string;path:string|null;status:string}[]}){
@@ -51,6 +52,15 @@ export function SequenceAudio({session,disabled,playhead,onImport,onRelink,sourc
             const fadeIn=Math.min(track.fade_in_seconds,nextDuration);
             update(track.id,{asset_id:next.id,source_in_seconds:0,duration_seconds:nextDuration,fade_in_seconds:fadeIn,fade_out_seconds:Math.min(track.fade_out_seconds,nextDuration-fadeIn)});
           }}>{sources.map(a=><option key={a.id} value={a.id}>{a.label}</option>)}</select></label>
+          {(project.audio_sources||[]).some(item=>item.id===track.asset_id)&&session.workspaceId&&<AudioWaveform
+            workspaceId={session.workspaceId}
+            projectId={project.id}
+            assetId={track.asset_id}
+            revision={session.revision}
+            sourceIn={track.source_in_seconds}
+            duration={track.duration_seconds}
+            ready={!!sourceStatuses.find(item=>item.asset_id===track.asset_id)?.path}
+          />}
           <label>Start (seconds)<input aria-label="Audio start" type="number" min={0} max={Math.max(0,duration-track.duration_seconds)} step=".01" value={track.start_seconds} onChange={event=>{const n=Number(event.target.value);if(Number.isFinite(n)&&n>=0&&n+track.duration_seconds<=duration)update(track.id,{start_seconds:n});}}/></label>
           <label>Source offset (seconds)<input aria-label="Audio source offset" type="number" min={0} max={Math.max(0,(asset?.duration||0)-track.duration_seconds)} step=".01" value={track.source_in_seconds} onChange={event=>{const n=Number(event.target.value);if(Number.isFinite(n)&&n>=0&&!!asset&&n+track.duration_seconds<=asset.duration)update(track.id,{source_in_seconds:n});}}/></label>
           <label>Duration (seconds)<input aria-label="Audio duration" type="number" min=".04" max={Math.min(duration-track.start_seconds,(asset?.duration||0)-track.source_in_seconds)} step=".01" value={track.duration_seconds} onChange={event=>{const n=Number(event.target.value);if(Number.isFinite(n)&&n>=.04&&n<=duration-track.start_seconds&&!!asset&&track.source_in_seconds+n<=asset.duration&&n>=track.fade_in_seconds+track.fade_out_seconds)update(track.id,{duration_seconds:n});}}/></label>
