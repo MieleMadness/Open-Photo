@@ -23,7 +23,7 @@ export function SequenceAudio({session,disabled,playhead,onImport,onRelink,sourc
           <button className="secondary-button" type="button" disabled={disabled} onClick={()=>onRelink(audio.id)}>Relink…</button>
         </div>;
       })}
-    </div>
+    </div>}
     {tracks.length>0&&duration>0&&<div className="sequence-audio-overview" role="group" aria-label="Audio track placement on project timeline">
       <div className="sequence-audio-ruler"><span>0:00</span><span>{duration.toFixed(1)} s</span></div>
       {tracks.map((track,index)=><div key={track.id} className="sequence-audio-lane" aria-label={`Audio track ${index+1}: starts at ${track.start_seconds.toFixed(1)} seconds, lasts ${track.duration_seconds.toFixed(1)} seconds`}>
