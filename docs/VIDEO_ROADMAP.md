@@ -1,3 +1,11 @@
+## November 4, 2026 — Phase J preview-seek frame mapping (experimental)
+
+The `crossfadePreviewSeek` adapter maps a project playhead onto the discrete 30/60 FPS crossfade frame clock, returning source-relative trimmed frame offsets and the existing sampling weights. The project end is exclusive; no duplicate final frame is generated. Focused tests cover overlaps, hard-cut boundaries, fractional seeks and invalid positions.
+
+This is a **pure, test-only adapter**. It does not enable production UI, preview, persistence, native rendering or export. Installed Windows real-footage acceptance and preview/export parity remain required.
+
+---
+
 ## November 4, 2026 — Phase J isolated transition-edit command groundwork (draft)
 
 The `crossfadeCutCommands` module adds immutable add/replace/remove operations for an **experimental** adjacent-cut crossfade definition. It validates saved clip identities, 30/60 fps whole-frame bounds, two-frame reserve on both sides, and any neighboring overlaps *before* changing project state. No-op edits signal `changed: false` so a later UI can avoid unnecessary undo/autosave history, and changed boundaries are serialized in clip order. Focused unit tests cover frame budgets, malformed durations, removal and stale cuts.
