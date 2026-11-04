@@ -6,10 +6,12 @@ use std::{
     collections::HashSet,
     fs::{self, File, OpenOptions},
     io::{Read, Seek, SeekFrom},
-    os::windows::fs::OpenOptionsExt,
+    os::windows::fs::{MetadataExt, OpenOptionsExt},
     path::{Path, PathBuf},
 };
-use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
+use windows_sys::Win32::Storage::FileSystem::{
+    FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ,
+};
 
 pub(crate) struct PinnedMedia {
     handles: Vec<File>,
@@ -35,6 +37,7 @@ impl PinnedMedia {
             if !path.is_absolute()
                 || !metadata.is_file()
                 || metadata.file_type().is_symlink()
+                || metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
                 || *bytes == 0
                 || hash.len() != 64
                 || !hash.bytes().all(|b| b.is_ascii_hexdigit())
@@ -48,8 +51,18 @@ impl PinnedMedia {
             let mut handle = OpenOptions::new()
                 .read(true)
                 .share_mode(FILE_SHARE_READ)
+                .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
                 .open(path)
                 .map_err(|e| format!("Cannot pin crossfade input for read-only access: {e}"))?;
+            if handle
+                .metadata()
+                .map_err(|e| e.to_string())?
+                .file_attributes()
+                & FILE_ATTRIBUTE_REPARSE_POINT
+                != 0
+            {
+                return Err("Crossfade pinned input resolves to a reparse point.".into());
+            }
             let mut digest = Sha256::new();
             let mut buffer = [0_u8; 64 * 1024];
             let mut count = 0_u64;
@@ -103,6 +116,23 @@ mod tests {
         assert!(fs::remove_file(&path).is_err());
         drop(guard);
         fs::write(&path, b"replacement").unwrap();
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn rejects_reparse_point_file_even_when_target_matches_expected_hash() {
+        let dir = std::env::temp_dir().join(format!(
+            "openphoto-crossfade-windows-reparse-{}",
+            crate::video_project::id()
+        ));
+        fs::create_dir(&dir).unwrap();
+        let target = dir.join("trusted.mkv");
+        let alias = dir.join("alias.mkv");
+        fs::write(&target, b"trusted normalized footage").unwrap();
+        let (bytes, hash) = crate::video_project::fingerprint(&target, || false).unwrap();
+        if std::os::windows::fs::symlink_file(&target, &alias).is_ok() {
+            assert!(PinnedMedia::acquire(&[(&alias, bytes, &hash)], || false).is_err());
+        }
         fs::remove_dir_all(dir).unwrap();
     }
 

@@ -15,6 +15,8 @@ mod crossfade_audio_count;
 #[cfg(all(test, windows))]
 mod crossfade_audio_fixture;
 #[cfg(test)]
+mod crossfade_audio_stream;
+#[cfg(test)]
 mod crossfade_clock;
 #[cfg(test)]
 mod crossfade_command;

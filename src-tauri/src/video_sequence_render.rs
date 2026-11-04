@@ -2010,6 +2010,7 @@ mod tests {
         // One source has audible AAC; the second has no audio stream. Reuse the
         // production clip-part preprocessor, but keep graph execution test-only.
         let (fixture, snapshot) = fixture();
+        let owned_directory = fs::canonicalize(&fixture.0).unwrap();
         let frames = frame_allocation(&snapshot.project).unwrap();
         assert_eq!(frames, vec![6, 9]);
         let rate = snapshot.project.frame_rate;
@@ -2027,7 +2028,7 @@ mod tests {
                     .unwrap();
             let part = PartSource::video(prepared);
             assert_eq!(part.audio_stream.is_some(), index == 0);
-            let output = fixture.0.join(format!("crossfade-part-{index}.mkv"));
+            let output = owned_directory.join(format!("crossfade-part-{index}.mkv"));
             let args = part_args(
                 &part,
                 &snapshot.project.clips[index].edits,
@@ -2211,6 +2212,71 @@ mod tests {
         assert_eq!(result.audio.len(), 1);
         assert_eq!(result.audio[0].sample_rate.as_deref(), Some("48000"));
         assert!((result.duration_seconds - 0.4).abs() < 0.05);
+        // Full Phase I acceptance: saved originals, trusted normalizer-minted
+        // receipts, pinned Windows handles, FFmpeg render, decoded audio/frame
+        // checks and SHA-256-verified atomic publication in one native test.
+        let saved_clips = [
+            crate::crossfade_clock::ClipClock {
+                id: &snapshot.project.clips[0].id,
+                frames: frames[0],
+            },
+            crate::crossfade_clock::ClipClock {
+                id: &snapshot.project.clips[1].id,
+                frames: frames[1],
+            },
+        ];
+        let saved_boundaries = [crate::crossfade_clock::Boundary {
+            from_clip_id: &snapshot.project.clips[0].id,
+            to_clip_id: &snapshot.project.clips[1].id,
+            frames: 3,
+        }];
+        let verified_plan = crate::crossfade_preflight::plan_allocated(
+            &saved_clips,
+            &saved_boundaries,
+            &[true, false],
+            rate,
+        )
+        .unwrap();
+        let scratch = owned_directory.join("phase-i-native-scratch.mp4");
+        let published = owned_directory.join("phase-i-verified-output.mp4");
+        let verified_engine = engine();
+        let request = crate::crossfade_command::CrossfadeExecution {
+            engine: &verified_engine,
+            plan: &verified_plan,
+            inputs: &parts,
+            output: &scratch,
+            fps: rate,
+            max_bytes: 64 * 1024 * 1024,
+        };
+        crate::crossfade_pipeline::render_verify_publish_snapshot_receipts(
+            request,
+            &published,
+            &snapshot,
+            &receipts,
+            || false,
+        )
+        .unwrap();
+        assert!(!scratch.exists());
+        assert!(published.exists());
+        let verified = video_probe::probe(&engine(), &published, || false).unwrap();
+        assert_eq!(verified.frame_count, Some(12));
+        assert_eq!(verified.audio.len(), 1);
+        let repeated = crate::crossfade_pipeline::render_verify_publish_snapshot_receipts(
+            crate::crossfade_command::CrossfadeExecution {
+                engine: &verified_engine,
+                plan: &verified_plan,
+                inputs: &parts,
+                output: &scratch,
+                fps: rate,
+                max_bytes: 64 * 1024 * 1024,
+            },
+            &published,
+            &snapshot,
+            &receipts,
+            || false,
+        );
+        assert!(repeated.is_err());
+        assert!(!scratch.exists());
         snapshot.revalidate(|| false).unwrap();
     }
 }
