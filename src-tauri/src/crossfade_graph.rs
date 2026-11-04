@@ -100,8 +100,14 @@ mod tests {
     #[test]
     fn creates_one_video_and_audio_crossfade_with_correct_offset() {
         let clips = [
-            ClipClock { id: "a", frames: 90 },
-            ClipClock { id: "b", frames: 120 },
+            ClipClock {
+                id: "a",
+                frames: 90,
+            },
+            ClipClock {
+                id: "b",
+                frames: 120,
+            },
         ];
         let edge = [Boundary {
             from_clip_id: "a",
@@ -113,9 +119,9 @@ mod tests {
         assert!(graph.filter_complex.contains(
             "[v0][v1]xfade=transition=fade:duration=0.500000000:offset=2.500000000[vx1]"
         ));
-        assert!(graph.filter_complex.contains(
-            "[a0][a1]acrossfade=d=0.500000000:c1=tri:c2=tri[ax1]"
-        ));
+        assert!(graph
+            .filter_complex
+            .contains("[a0][a1]acrossfade=d=0.500000000:c1=tri:c2=tri[ax1]"));
         assert_eq!(graph.video_output, "vx1");
         assert_eq!(graph.audio_output, "ax1");
         assert_eq!(graph.expected_frames, 195);
@@ -124,13 +130,23 @@ mod tests {
     #[test]
     fn hard_cuts_use_concat_and_keep_full_duration() {
         let clips = [
-            ClipClock { id: "a", frames: 30 },
-            ClipClock { id: "b", frames: 30 },
+            ClipClock {
+                id: "a",
+                frames: 30,
+            },
+            ClipClock {
+                id: "b",
+                frames: 30,
+            },
         ];
         let clock = crossfade_clock::compile(&clips, &[]).unwrap();
         let graph = plan(&clock, 30).unwrap();
-        assert!(graph.filter_complex.contains("[v0][v1]concat=n=2:v=1:a=0[vx1]"));
-        assert!(graph.filter_complex.contains("[a0][a1]concat=n=2:v=0:a=1[ax1]"));
+        assert!(graph
+            .filter_complex
+            .contains("[v0][v1]concat=n=2:v=1:a=0[vx1]"));
+        assert!(graph
+            .filter_complex
+            .contains("[a0][a1]concat=n=2:v=0:a=1[ax1]"));
         assert!(!graph.filter_complex.contains("xfade="));
         assert_eq!(graph.expected_frames, 60);
     }
@@ -138,9 +154,18 @@ mod tests {
     #[test]
     fn mixed_cut_types_use_accumulated_project_clock() {
         let clips = [
-            ClipClock { id: "a", frames: 60 },
-            ClipClock { id: "b", frames: 60 },
-            ClipClock { id: "c", frames: 60 },
+            ClipClock {
+                id: "a",
+                frames: 60,
+            },
+            ClipClock {
+                id: "b",
+                frames: 60,
+            },
+            ClipClock {
+                id: "c",
+                frames: 60,
+            },
         ];
         let edges = [Boundary {
             from_clip_id: "b",
@@ -158,7 +183,14 @@ mod tests {
 
     #[test]
     fn rejects_bad_project_fps_empty_inputs_and_tampered_clock() {
-        let clock = crossfade_clock::compile(&[ClipClock { id: "a", frames: 30 }], &[]).unwrap();
+        let clock = crossfade_clock::compile(
+            &[ClipClock {
+                id: "a",
+                frames: 30,
+            }],
+            &[],
+        )
+        .unwrap();
         assert!(plan(&clock, 24).is_err());
         assert!(plan(&crossfade_clock::compile(&[], &[]).unwrap(), 30).is_err());
         let mut invalid = clock.clone();
