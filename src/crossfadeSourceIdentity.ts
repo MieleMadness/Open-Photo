@@ -21,7 +21,7 @@ export type CrossfadeSourceIdentity={
 const ID=/^[A-Za-z0-9-]{1,120}$/;
 const HASH=/^[a-fA-F0-9]{64}$/;
 const TICKS=/^(?:0|[1-9][0-9]{0,19})$/;
-const BASE=/^([1-9][0-9]*)\/([1-9][0-9]*)$/;
+const BASE=/^([1-9][0-9]{0,19})\/([1-9][0-9]{0,19})$/;
 
 /** Compare rational source times without reducing them to floating point.
  * This prevents microsecond-level trim changes from being rounded away.
@@ -34,7 +34,10 @@ function positiveDuration(start:VideoTime,end:VideoTime):boolean{
   return right>left;
 }
 function validateClip(clip:CrossfadeSourceClip):void{
-  if(!clip||typeof clip.clip_id!=="string"||typeof clip.asset_id!=="string"||typeof clip.sha256!=="string"\n    ||!clip.source_in||!clip.source_out||typeof clip.source_in.ticks!=="string"\n    ||typeof clip.source_out.ticks!=="string"||typeof clip.source_in.time_base!=="string"\n    ||typeof clip.source_out.time_base!=="string"||!ID.test(clip.clip_id)||!ID.test(clip.asset_id)||!HASH.test(clip.sha256)
+  if(!clip||typeof clip.clip_id!=="string"||typeof clip.asset_id!=="string"||typeof clip.sha256!=="string"
+    ||!clip.source_in||!clip.source_out||typeof clip.source_in.ticks!=="string"
+    ||typeof clip.source_out.ticks!=="string"||typeof clip.source_in.time_base!=="string"
+    ||typeof clip.source_out.time_base!=="string"||!ID.test(clip.clip_id)||!ID.test(clip.asset_id)||!HASH.test(clip.sha256)
     ||!Number.isSafeInteger(clip.bytes)||clip.bytes<1
     ||!positiveDuration(clip.source_in,clip.source_out))
     throw Error("Invalid crossfade source binding.");
