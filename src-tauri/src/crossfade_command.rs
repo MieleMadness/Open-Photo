@@ -198,3 +198,119 @@ mod tests {
         assert!(command_args(&plan, &parts, &output, 30, 1024).is_err());
     }
 }
+
+#[cfg(all(test, windows))]
+mod bundled_command_tests {
+    use super::*;
+    use crate::{
+        crossfade_clock::{Boundary, ClipClock},
+        crossfade_preflight::plan_allocated,
+        video_engine, video_probe, video_project,
+    };
+    use std::{fs, time::Duration};
+
+    struct Fixture(PathBuf);
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn executes_bounded_command_and_verifies_audio_video_output() {
+        let engine = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/video-engine");
+        let ffmpeg = video_engine::tool(&engine, "ffmpeg").unwrap();
+        let dir = std::env::temp_dir().join(format!("crossfade-command-{}", video_project::id()));
+        fs::create_dir(&dir).unwrap();
+        let _fixture = Fixture(dir.clone());
+
+        let clips = [
+            ClipClock {
+                id: "red",
+                frames: 60,
+            },
+            ClipClock {
+                id: "blue",
+                frames: 60,
+            },
+        ];
+        let edges = [Boundary {
+            from_clip_id: "red",
+            to_clip_id: "blue",
+            frames: 15,
+        }];
+        let preflight = plan_allocated(&clips, &edges, &[true, false], 30).unwrap();
+        let mut parts = Vec::new();
+        for (index, color) in ["red", "blue"].iter().enumerate() {
+            let part = dir.join(format!("part-{index}.mkv"));
+            let args: Vec<OsString> = vec![
+                "-nostdin".into(),
+                "-v".into(),
+                "error".into(),
+                "-f".into(),
+                "lavfi".into(),
+                "-i".into(),
+                format!("color=c={color}:s=96x64:r=30:d=2").into(),
+                "-f".into(),
+                "lavfi".into(),
+                "-i".into(),
+                "anullsrc=r=48000:cl=stereo".into(),
+                "-t".into(),
+                "2".into(),
+                "-frames:v".into(),
+                "60".into(),
+                "-c:v".into(),
+                "libopenh264".into(),
+                "-b:v".into(),
+                "150000".into(),
+                "-pix_fmt".into(),
+                "yuv420p".into(),
+                "-c:a".into(),
+                "pcm_f32le".into(),
+                part.clone().into(),
+            ];
+            video_engine::run_until(
+                &ffmpeg,
+                &args.iter().map(OsString::as_os_str).collect::<Vec<_>>(),
+                Duration::from_secs(90),
+                || false,
+            )
+            .unwrap();
+            parts.push(part);
+        }
+
+        let output = dir.join("result.mp4");
+        let args = command_args(&preflight, &parts, &output, 30, 64 * 1024 * 1024).unwrap();
+        video_engine::run_until(
+            &ffmpeg,
+            &args.iter().map(OsString::as_os_str).collect::<Vec<_>>(),
+            Duration::from_secs(90),
+            || false,
+        )
+        .unwrap();
+
+        let result = video_probe::probe(&engine, &output, || false).unwrap();
+        assert!(fs::metadata(&output).unwrap().len() <= 64 * 1024 * 1024);
+        assert_eq!(result.frame_count, Some(105));
+        assert_eq!((result.width, result.height), (96, 64));
+        assert!((result.duration_seconds - 3.5).abs() < 0.05);
+        assert_eq!(result.audio.len(), 1);
+        assert_eq!(result.audio[0].sample_rate.as_deref(), Some("48000"));
+        let audio_seconds = result.audio[0]
+            .duration_seconds
+            .unwrap_or(result.duration_seconds);
+        assert!((audio_seconds - 3.5).abs() < 0.05);
+
+        // FFmpeg versions may return success when -n skips an existing file.
+        // Verify the actual safety contract: output contents must not change.
+        let original_bytes = fs::read(&output).unwrap();
+        let _ = video_engine::run_until(
+            &ffmpeg,
+            &args.iter().map(OsString::as_os_str).collect::<Vec<_>>(),
+            Duration::from_secs(90),
+            || false,
+        );
+        assert_eq!(fs::read(&output).unwrap(), original_bytes);
+    }
+}
