@@ -1052,8 +1052,7 @@ mod tests {
                 .iter()
                 .find(|asset| asset.id == clip.asset_id)
                 .unwrap();
-            let (_, part_sha256) =
-                video_project::fingerprint(&paths[i], || false).unwrap();
+            let (_, part_sha256) = video_project::fingerprint(&paths[i], || false).unwrap();
             receipts.push(crate::crossfade_provenance::NormalizedReceipt {
                 clip_id: clip.id.clone(),
                 asset_id: asset.id.clone(),
