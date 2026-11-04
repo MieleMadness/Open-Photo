@@ -176,7 +176,7 @@ impl Compiled {
 }
 
 /// Rounding cumulative boundaries bounds total rounding error to half an output frame.
-fn frame_allocation(project: &Sequence) -> Result<Vec<u64>, String> {
+pub(crate) fn frame_allocation(project: &Sequence) -> Result<Vec<u64>, String> {
     let mut seconds = 0.0;
     let mut previous = 0u64;
     let mut result = vec![];
