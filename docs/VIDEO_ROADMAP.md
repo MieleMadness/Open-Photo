@@ -1,3 +1,15 @@
+## November 4, 2026 — Phase I native engineering checkpoint (updated)
+
+**Automated engineering baseline:** The experimental crossfade native pipeline was integrated through [PR #61](https://github.com/MieleMadness/Open-Photo/pull/61), which passed exact-head Windows Rust, frontend and full installer CI. [PR #63](https://github.com/MieleMadness/Open-Photo/pull/63) adds verified Windows file identity, hard-link rejection, pinning of saved originals during normalization and a final destination-space recheck; it requires its own full exact-head Windows success before merge.
+
+**Phase I distinction:** The *experimental, test-only crossfade infrastructure* may clear its automated development gate without crossfades being shipped. There is no active production transition schema, timeline control, real-time preview, or export route. The existing hard-cut/dip editor remains the production fallback.
+
+**Open verification:** Installed Windows interactive editing with real phone SDR/VFR media, external-codec independence, source relink/cancellation, filesystem reparse/privileged-race behavior, user-visible export and performance measurements are still unverified. See [Phase I exit gate](PHASE_I_EXIT_GATE.md).
+
+**Phase J entry criteria:** Only begin production schema/UI/preview/export routing after #63's exact-head green checks and a reviewed real-footage acceptance report. Implement schema migration, UI transition creation/undo, synchronized preview/export frame clock, and active export with safe fallback under separate gated PRs. Do not imply that full Windows CI's installer checks exercised interactive crossfades—they remain test-only.
+
+---
+
 ## November 4, 2026 — Phase I crossfade development checkpoint
 
 **Development baseline:** `feature/desktop-v0.1.0`; the documented application version remains **0.56.63**. This section tracks engineering and test readiness, **not shipped crossfade support**.
