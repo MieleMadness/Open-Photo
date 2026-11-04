@@ -18,6 +18,19 @@ pub(crate) fn render_verify_publish(
     sources: &[SourceExpectation<'_>],
     cancel: impl Fn() -> bool,
 ) -> Result<(), String> {
+    render_verify_publish_with_part_guard(request, destination, sources, || Ok(()), cancel)
+}
+
+/// A normalized-part verifier is checked before FFmpeg, after FFmpeg and again
+/// before output staging. The same callback participates in the FFmpeg source
+/// verification boundary, closing the render-time replacement window.
+fn render_verify_publish_with_part_guard(
+    request: CrossfadeExecution<'_>,
+    destination: &Path,
+    sources: &[SourceExpectation<'_>],
+    verify_parts: impl Fn() -> Result<(), String>,
+    cancel: impl Fn() -> bool,
+) -> Result<(), String> {
     struct Cleanup<'a>(&'a Path);
     impl Drop for Cleanup<'_> {
         fn drop(&mut self) {
@@ -37,10 +50,14 @@ pub(crate) fn render_verify_publish(
     let _cleanup = Cleanup(scratch);
     crossfade_command::execute_with_source_verification(
         request,
-        || crossfade_integrity::verify_source_fingerprints(sources, &cancel),
+        || {
+            crossfade_integrity::verify_source_fingerprints(sources, &cancel)?;
+            verify_parts()
+        },
         &cancel,
     )?;
     crossfade_audio_count_check(engine, scratch, expected_audio, &cancel)?;
+    verify_parts()?;
     if cancel() {
         return Err("Crossfade cancelled before publication.".into());
     }
@@ -65,6 +82,42 @@ pub(crate) fn render_verify_publish_snapshot(
     }
     let expectations = manifest.expectations();
     render_verify_publish(request, destination, &expectations, cancel)
+}
+
+/// Test-only pathway that binds normalized video bytes to the exact saved
+/// clip order throughout rendering. Receipts must be minted by the trusted
+/// normalizer; checking caller-created receipts alone does not prove origin.
+pub(crate) fn render_verify_publish_snapshot_receipts(
+    request: CrossfadeExecution<'_>,
+    destination: &Path,
+    snapshot: &crate::video_sequence_render::Snapshot,
+    receipts: &[crate::crossfade_provenance::NormalizedReceipt],
+    cancel: impl Fn() -> bool,
+) -> Result<(), String> {
+    let manifest = crate::crossfade_snapshot::SourceManifest::from_snapshot(snapshot, &cancel)?;
+    let expected_frames = crate::video_sequence_render::frame_allocation(&snapshot.project)?;
+    if request.fps != snapshot.project.frame_rate
+        || request.plan.normalized_clip_frames != expected_frames
+    {
+        return Err("Crossfade plan differs from the saved project frame clock.".into());
+    }
+    let scratch = request
+        .output
+        .parent()
+        .ok_or("Crossfade scratch directory is missing.")?;
+    crate::crossfade_scratch::validate_scratch_paths(scratch, request.inputs, request.output)?;
+    let validate = || {
+        crate::crossfade_provenance::verify_ordered_receipts(
+            snapshot,
+            receipts,
+            request.inputs,
+            &expected_frames,
+            &cancel,
+        )
+    };
+    validate()?;
+    let expectations = manifest.expectations();
+    render_verify_publish_with_part_guard(request, destination, &expectations, validate, cancel)
 }
 
 fn crossfade_audio_count_check(
