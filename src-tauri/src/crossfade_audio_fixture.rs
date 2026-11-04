@@ -157,7 +157,9 @@ fn bundled_ffmpeg_preserves_audible_audio_before_during_and_after_crossfade() {
     let bytes = fs::read(decoded).unwrap();
     assert_eq!(bytes.len() % 4, 0);
     let samples = bytes
-        .as_chunks::<4>().0.iter()
+        .as_chunks::<4>()
+        .0
+        .iter()
         .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
         .collect::<Vec<_>>();
     assert!((samples.len() as i64 - 168000).abs() < 96);
