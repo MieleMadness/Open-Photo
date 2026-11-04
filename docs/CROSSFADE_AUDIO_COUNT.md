@@ -1,5 +1,12 @@
-# Experimental exact decoded audio clock
+# Experimental AAC audio sample-clock verification
 
-The native crossfade preflight predicts exactly `expected_audio_samples = expected_frames × 48000 / fps`. A new test-only checker queries bundled `ffprobe -show_frames -show_entries frame=nb_samples` on an MP4 and sums **decoded audio frame sample counts**, rather than accepting only a rounded AAC stream duration or AAC packet count. The existing cancellable native runner limits the probe output to 4 MiB, and the checker rejects invalid, zero, oversized or missing decoded frames, count overflow, excessive padding and truncation.
+A native crossfade project needs exactly `expected_audio_samples = expected_video_frames × 48000 / fps` **presentation samples**.
 
-This utility is **not yet wired into the experimental executor** and may uncover legitimate AAC priming/padding behavior in real fixtures; it must be tested with the actual bundled FFmpeg and source timing before being used as an export gate. It does not modify production previews or exports. The full-output decode check still applies separately.
+AAC decoders may expose padded decoded samples even when the MP4's presentation duration is correct. For example, a two-second 48kHz AAC fixture locally yielded 96,256 decoded frame samples, while packet durations minus 1,024 priming samples yielded the correct 96,000 presented samples. **Decoded frame counts alone must not be used as an exact export acceptance gate.**
+
+The test-only module provides two deliberately separate checks:
+
+- `sum_decoded_samples` measures raw decoded frames and rejects malformed/overflowing data, but does not make a valid presentation-timing decision by itself.
+- `presentation_samples_from_probe` and `verify_presentation_samples` read bundled ffprobe audio packet durations plus skip/discard padding, verify a 1/48000 time base, and compare the resulting presentation sample total to the expected project clock. A two-second bundled-Windows AAC fixture checks the actual behavior.
+
+The current runner caps ffprobe output at 4 MiB and will fail closed on long projects until a streaming, bounded-memory packet inspector is implemented. A full video/audio decode and source fingerprint revalidation remain separate requirements. This module is still `#[cfg(test)]` and does not change production exports.
