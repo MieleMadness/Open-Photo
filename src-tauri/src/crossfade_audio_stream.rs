@@ -30,9 +30,12 @@ impl PacketClock {
                     return Err("Crossfade AAC packet duration is duplicated.".into());
                 }
                 duration = value.parse::<u64>().ok();
-            } else if let Some(value) = field.strip_prefix("side_datum/skip_samples:side_data_type=") {
+            } else if let Some(value) =
+                field.strip_prefix("side_datum/skip_samples:side_data_type=")
+            {
                 side_type = Some(value);
-            } else if let Some(value) = field.strip_prefix("side_datum/skip_samples:skip_samples=") {
+            } else if let Some(value) = field.strip_prefix("side_datum/skip_samples:skip_samples=")
+            {
                 skip = value
                     .parse()
                     .map_err(|_| "Crossfade AAC priming field is invalid.")?;
@@ -120,7 +123,11 @@ pub(crate) fn verify_streaming(
         crate::video_engine::run_until(&ffprobe, stream_args, Duration::from_secs(120), &cancel)?;
     let text = std::str::from_utf8(&stream_info)
         .map_err(|_| "Crossfade AAC stream timebase is not UTF-8.")?;
-    if text.lines().filter(|line| line.contains("time_base=")).count() != 1
+    if text
+        .lines()
+        .filter(|line| line.contains("time_base="))
+        .count()
+        != 1
         || !text
             .lines()
             .any(|line| line.split('|').any(|field| field == "time_base=1/48000"))
@@ -190,8 +197,8 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn verifies_bundled_two_second_aac_in_streaming_mode() {
-        let engine = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("resources/video-engine");
+        let engine =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/video-engine");
         let dir = std::env::temp_dir().join(format!(
             "openphoto-streaming-aac-{}",
             crate::video_project::id()
@@ -219,8 +226,7 @@ mod tests {
             output.as_os_str(),
         ];
         let ffmpeg = crate::video_engine::tool(&engine, "ffmpeg").unwrap();
-        crate::video_engine::run_until(&ffmpeg, args, Duration::from_secs(90), || false)
-            .unwrap();
+        crate::video_engine::run_until(&ffmpeg, args, Duration::from_secs(90), || false).unwrap();
         verify_streaming(&engine, &output, 96_000, || false).unwrap();
         assert!(verify_streaming(&engine, &output, 96_001, || false).is_err());
         std::fs::remove_dir_all(dir).unwrap();
