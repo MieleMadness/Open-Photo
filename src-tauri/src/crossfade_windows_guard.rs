@@ -196,6 +196,25 @@ mod tests {
     }
 
     #[test]
+    fn rejects_hard_links_even_when_the_sha256_matches() {
+        let dir = std::env::temp_dir().join(format!(
+            "openphoto-crossfade-windows-hardlink-{}",
+            crate::video_project::id()
+        ));
+        fs::create_dir(&dir).unwrap();
+        let original = dir.join("original.mkv");
+        let hardlink = dir.join("second-name.mkv");
+        fs::write(&original, b"known normalized bytes").unwrap();
+        fs::hard_link(&original, &hardlink).unwrap();
+        let (bytes, hash) = crate::video_project::fingerprint(&original, || false).unwrap();
+        assert!(PinnedMedia::acquire(&[(&original, bytes, &hash)], || false).is_err());
+        fs::remove_file(hardlink).unwrap();
+        let guard = PinnedMedia::acquire(&[(&original, bytes, &hash)], || false).unwrap();
+        drop(guard);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn rejects_changed_contents_and_duplicate_paths() {
         let dir = std::env::temp_dir().join(format!(
             "openphoto-crossfade-windows-pin-reject-{}",
