@@ -2119,11 +2119,8 @@ mod tests {
 
         // Confirm the real bundled FFmpeg can read every input while pinned
         // Windows handles deny ordinary writer/delete access.
-        let manifest = crate::crossfade_snapshot::SourceManifest::from_snapshot(
-            &snapshot,
-            || false,
-        )
-        .unwrap();
+        let manifest =
+            crate::crossfade_snapshot::SourceManifest::from_snapshot(&snapshot, || false).unwrap();
         let sources = manifest.expectations();
         let original_expected: Vec<_> = sources
             .iter()
