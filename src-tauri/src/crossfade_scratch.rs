@@ -39,10 +39,7 @@ pub(crate) fn validate_scratch_paths(
         if !info.is_file() || info.file_type().is_symlink() {
             return Err("Crossfade input must be a regular normalized file.".into());
         }
-        if fs::canonicalize(part)
-            .map_err(|e| e.to_string())?
-            .parent()
-            != Some(canonical.as_path())
+        if fs::canonicalize(part).map_err(|e| e.to_string())?.parent() != Some(canonical.as_path())
         {
             return Err("Crossfade input escaped scratch ownership.".into());
         }
