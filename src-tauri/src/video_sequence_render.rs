@@ -1047,11 +1047,9 @@ mod tests {
         bytes[last] ^= 1;
         fs::write(&changed, bytes).unwrap();
         assert!(manifest.verify(|| false).is_err());
-        assert!(crate::crossfade_snapshot::SourceManifest::from_snapshot(
-            &snapshot,
-            || false
-        )
-        .is_err());
+        assert!(
+            crate::crossfade_snapshot::SourceManifest::from_snapshot(&snapshot, || false).is_err()
+        );
         assert!(manifest.verify(|| true).is_err());
     }
 
