@@ -2261,7 +2261,7 @@ mod tests {
         let verified = video_probe::probe(&engine(), &published, || false).unwrap();
         assert_eq!(verified.frame_count, Some(12));
         assert_eq!(verified.audio.len(), 1);
-        assert!(crate::crossfade_pipeline::render_verify_publish_snapshot_receipts(
+        let repeated = crate::crossfade_pipeline::render_verify_publish_snapshot_receipts(
             crate::crossfade_command::CrossfadeExecution {
                 engine: &verified_engine,
                 plan: &verified_plan,
@@ -2274,8 +2274,8 @@ mod tests {
             &snapshot,
             &receipts,
             || false,
-        )
-        .is_err());
+        );
+        assert!(repeated.is_err());
         assert!(!scratch.exists());
         snapshot.revalidate(|| false).unwrap();
     }
