@@ -25,3 +25,9 @@ No production code calls this graph planner (`#[cfg(test)]` only). There is no p
 5. Introduce a versioned project transition format, TS/Rust validators, undo/redo and consistent titles/music timing; perform installed-Windows preview/export acceptance.
 
 This planner is groundwork and is **not a working end-user crossfade feature**.
+
+## First real FFmpeg fixture (development-machine smoke test)
+
+The planner's initial `settb=AVTB,setpts=PTS-STARTPTS,format=yuv420p` chain lost constant-frame-rate metadata when passed into FFmpeg 7.1's `xfade` filter, which rejected the stream as rate `1/0`. The corrected chain is `settb=AVTB,setpts=PTS-STARTPTS,fps=30,format=yuv420p` for a 30 fps project (or 60 for 60 fps): applying `fps` **after** resetting timestamps restores explicit CFR at the transition input.
+
+A **local FFmpeg 7.1.5 fixture**, using two synthetic, normalized 64×64 video clips (90 red frames/3 seconds and 120 blue frames/4 seconds), with 48 kHz stereo silent audio and 15 overlapping frames, produced **195 output video frames at 30 fps, 6.5 seconds of video, and 6.5 seconds of audio** using the corrected graph. This verifies that sample graph syntax works for one synthetic video/audio overlap. It does **not** yet validate Open-Photo's bundled Windows engine, 60 fps, actual user media, chained transitions, cancellation, source protection, or installed-app preview/export behavior.
