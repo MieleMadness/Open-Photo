@@ -118,7 +118,7 @@ pub(crate) fn render_verify_publish_snapshot_receipts(
     };
     validate()?;
     let expectations = manifest.expectations();
-    render_verify_publish_with_part_guard(request, destination, &expectations, validate, cancel)
+    render_verify_publish_with_part_guard(request, destination, &expectations, validate, &cancel)
 }
 
 fn crossfade_audio_count_check(
