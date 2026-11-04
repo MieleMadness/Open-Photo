@@ -174,7 +174,9 @@ mod tests {
         }];
         let clock = crossfade_clock::compile(&clips, &edges).unwrap();
         let graph = plan(&clock, 30).unwrap();
-        assert!(graph.filter_complex.contains("[v0][v1]concat=n=2:v=1:a=0[vx1]"));
+        assert!(graph
+            .filter_complex
+            .contains("[v0][v1]concat=n=2:v=1:a=0[vx1]"));
         assert!(graph.filter_complex.contains(
             "[vx1][v2]xfade=transition=fade:duration=0.500000000:offset=3.500000000[vx2]"
         ));
