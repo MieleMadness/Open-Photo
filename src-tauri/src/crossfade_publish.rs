@@ -29,6 +29,12 @@ pub(crate) fn publish_verified(
     if metadata.len() != expected_bytes {
         return Err("Crossfade scratch MP4 size changed before publication.".into());
     }
+    // A same-sized scratch MP4 replacement must not silently pass staging.
+    let (initial_len, initial_hash) =
+        crate::video_project::fingerprint(scratch_mp4, || false)?;
+    if initial_len != expected_bytes {
+        return Err("Crossfade verified scratch length changed.".into());
+    }
     verify_originals()?;
     let mut stage = crate::safe_output::StagedOutput::new(destination)?;
     let mut source = File::open(scratch_mp4).map_err(|e| e.to_string())?;
@@ -36,8 +42,15 @@ pub(crate) fn publish_verified(
     if written != expected_bytes {
         return Err("Crossfade scratch MP4 changed while staging.".into());
     }
+    stage.file().sync_all().map_err(|e| e.to_string())?;
+    let (staged_len, staged_hash) =
+        crate::video_project::fingerprint(stage.temporary_path(), || false)?;
+    if staged_len != expected_bytes || staged_hash != initial_hash {
+        return Err("Crossfade staged MP4 differs from verified scratch bytes.".into());
+    }
     verify_originals()?;
-    if fs::metadata(scratch_mp4).map_err(|e| e.to_string())?.len() != expected_bytes {
+    let (final_len, final_hash) = crate::video_project::fingerprint(scratch_mp4, || false)?;
+    if final_len != expected_bytes || final_hash != initial_hash {
         return Err("Crossfade scratch MP4 changed before final publication.".into());
     }
     stage.commit()?;
