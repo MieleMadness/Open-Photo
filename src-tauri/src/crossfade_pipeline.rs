@@ -118,6 +118,30 @@ pub(crate) fn render_verify_publish_snapshot_receipts(
     };
     validate()?;
     let expectations = manifest.expectations();
+    // Pin the same bytes verified by the saved source manifest and the
+    // normalizer's ordered receipts. These handles outlive FFmpeg, AAC decode
+    // validation, and atomic staged publication.
+    #[cfg(windows)]
+    let _pinned_originals = {
+        let expected: Vec<_> = expectations
+            .iter()
+            .map(|source| (source.path, source.bytes, source.sha256))
+            .collect();
+        crate::crossfade_windows_guard::PinnedMedia::acquire(&expected, &cancel)?
+    };
+    #[cfg(windows)]
+    let _pinned_parts = {
+        let expected = receipts
+            .iter()
+            .map(|receipt| {
+                let bytes = fs::metadata(&receipt.part)
+                    .map_err(|e| e.to_string())?
+                    .len();
+                Ok((receipt.part.as_path(), bytes, receipt.part_sha256.as_str()))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        crate::crossfade_windows_guard::PinnedMedia::acquire(&expected, &cancel)?
+    };
     render_verify_publish_with_part_guard(request, destination, &expectations, validate, &cancel)
 }
 

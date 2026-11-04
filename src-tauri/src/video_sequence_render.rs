@@ -2117,6 +2117,35 @@ mod tests {
         )
         .unwrap();
 
+        // Confirm the real bundled FFmpeg can read every input while pinned
+        // Windows handles deny ordinary writer/delete access.
+        let manifest =
+            crate::crossfade_snapshot::SourceManifest::from_snapshot(&snapshot, || false).unwrap();
+        let sources = manifest.expectations();
+        let original_expected: Vec<_> = sources
+            .iter()
+            .map(|source| (source.path, source.bytes, source.sha256))
+            .collect();
+        let original_pins =
+            crate::crossfade_windows_guard::PinnedMedia::acquire(&original_expected, || false)
+                .unwrap();
+        let normalized_expected = receipts
+            .iter()
+            .map(|receipt| {
+                (
+                    receipt.part.as_path(),
+                    fs::metadata(&receipt.part).unwrap().len(),
+                    receipt.part_sha256.as_str(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let normalized_pins =
+            crate::crossfade_windows_guard::PinnedMedia::acquire(&normalized_expected, || false)
+                .unwrap();
+        assert_eq!(normalized_pins.count(), 2);
+        assert!(fs::OpenOptions::new().write(true).open(&parts[0]).is_err());
+        assert!(fs::remove_file(&parts[0]).is_err());
+
         let clips = [
             crate::crossfade_clock::ClipClock {
                 id: "a",
@@ -2170,6 +2199,12 @@ mod tests {
             Duration::from_secs(90),
         )
         .unwrap();
+        // FFmpeg completed with both guard groups alive; release the handles
+        // before checking that normal write access is restored.
+        drop(normalized_pins);
+        drop(original_pins);
+        let opened = fs::OpenOptions::new().write(true).open(&parts[0]).unwrap();
+        drop(opened);
         let result = video_probe::probe(&engine(), &output, || false).unwrap();
         assert_eq!(result.frame_count, Some(12));
         assert_eq!((result.width, result.height), (96, 64));
