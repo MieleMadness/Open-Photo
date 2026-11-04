@@ -6,6 +6,8 @@ use std::{
     io::ErrorKind,
     path::{Path, PathBuf},
 };
+#[cfg(windows)]
+use std::os::windows::fs::MetadataExt;
 
 /// Require all normalized parts and the prospective output to be direct
 /// children of a real, non-symlink temporary directory. This must be combined
@@ -21,6 +23,13 @@ pub(crate) fn validate_scratch_paths(
     let metadata = fs::symlink_metadata(scratch).map_err(|e| e.to_string())?;
     if !metadata.is_dir() || metadata.file_type().is_symlink() {
         return Err("Crossfade scratch must be a real directory.".into());
+    }
+    #[cfg(windows)]
+    if metadata.file_attributes()
+        & windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT
+        != 0
+    {
+        return Err("Crossfade scratch directory cannot be a Windows reparse point.".into());
     }
     let canonical = fs::canonicalize(scratch).map_err(|e| e.to_string())?;
     if canonical != scratch {
@@ -38,6 +47,13 @@ pub(crate) fn validate_scratch_paths(
         let info = fs::symlink_metadata(part).map_err(|e| e.to_string())?;
         if !info.is_file() || info.file_type().is_symlink() {
             return Err("Crossfade input must be a regular normalized file.".into());
+        }
+        #[cfg(windows)]
+        if info.file_attributes()
+            & windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT
+            != 0
+        {
+            return Err("Crossfade input cannot be a Windows reparse point.".into());
         }
         if fs::canonicalize(part).map_err(|e| e.to_string())?.parent() != Some(canonical.as_path())
         {
