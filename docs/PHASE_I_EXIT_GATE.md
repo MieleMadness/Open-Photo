@@ -25,3 +25,11 @@ On a Windows test PC with the matching repository revision and pinned engine, ru
 ## Current verification
 
 This document describes implementation targets, not an unconditional sign-off. Each exact-head CI result, installed-app result, and any discovered failures must be recorded separately before changing the gate to complete.
+
+## Final file-identity and publication guards (dependent safety PR)
+
+- Pin the actual saved original file handle **before** trusted bundled FFmpeg normalization and hold it through MKV generation. This closes a normalization-time gap left by a receipt created only afterward.
+- Compare pinned handle Win32 volume serial number and file index with a separately reopened pathname both before and after SHA-256 verification; refuse unidentifiable files, duplicate identities, reparse points and hard-linked files. This is conservative for non-NTFS or unusual filesystems. ReFS 128-bit identity, privileged writers and directory ancestor swaps still need platform security acceptance.
+- Re-evaluate measured destination free disk space immediately before the final scratch-to-staged-output copy; require full bytes plus a 16 MiB reserve, rejecting filesystems where free space cannot be measured.
+
+Passing fast native tests and the full Windows CI workflow is the **automated test-only Phase I code exit gate**. It cannot prove installed GUI behavior with real source media or enable production crossfade selection; those require an explicitly recorded acceptance run and Phase J.
