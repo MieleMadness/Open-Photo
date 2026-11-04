@@ -89,7 +89,7 @@ pub(crate) fn plan_sequence(
             id: &clip.id,
             frames: *frames,
         });
-        has_audio.push(!info.audio.is_empty() && !clip.edits.mute);
+        has_audio.push(!info.audio.is_empty() && !clip.edits.muted && clip.edits.gain_percent > 0);
     }
     plan_allocated(&sources, boundaries, &has_audio, project.frame_rate)
 }
