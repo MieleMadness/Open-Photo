@@ -10,13 +10,14 @@
 | Mixed transition graph | [PR #31](https://github.com/MieleMadness/Open-Photo/pull/31) merged after exact-head Windows CI #1181; verifies overlap followed by hard-cut graph ordering | Add real bundled-engine mixed-order and audio acceptance |
 | Crossfade resource guards | [PR #32](https://github.com/MieleMadness/Open-Photo/pull/32) merged after exact-head Windows CI #1184; two-hour and 200-clip boundary tests | Enforce these bounds in later native execution |
 | Bounded FFmpeg command | [PR #33](https://github.com/MieleMadness/Open-Photo/pull/33) merged after exact-head Windows CI #1187; bounded test-only command planning with no shell or user export routing | Validate scratch ownership and trusted normalized streams |
-| Windows synthetic execution | [PR #34](https://github.com/MieleMadness/Open-Photo/pull/34) draft under exact-head CI; real bundled-engine synthetic fixture and byte-level no-overwrite check | Pass exact-head CI and verify cancellation and decoded audio samples |
+| Windows synthetic execution | [PR #34](https://github.com/MieleMadness/Open-Photo/pull/34) merged after exact-head Windows CI #1193; bundled-engine synthetic fixture verifies frame/audio timing and byte-level no-overwrite | Verify cancellation and decoded audio samples |
+| Crossfade scratch ownership | [PR #36](https://github.com/MieleMadness/Open-Photo/pull/36) merged after exact-head Windows CI #1197; tests canonical scratch part/output ownership | Link to verified normalizer, test reparse-point races and cleanup on cancel |
 | Real crossfade functionality | **Not enabled**; no live transition selection, project schema migration, or active preview/export integration | Strict cancellable native render path, verified frame/audio output, schema and UI with undo/reopen parity |
 | Other roadmap gates | 10,000+ real-media scale test deferred to **pre-1.0**; music licensing, private vault and installer signing remain separate | Dedicated hardware, release and security acceptance |
 
 **CI integration policy:** Merge only exact-head green PRs into the development branch. Work on unrelated feature branches while CI runs, but never interpret a previous green SHA as approval for a newer commit. Treat stacked PRs as dependent and retarget/revalidate after their parent merges. Fast PR CI does not establish full installer acceptance. Keep the existing source read-only and existing hard-cut renderer as fallback until crossfade verification is complete.
 
-**Immediate sequence:** Finish #34's bundled Windows test, then add scratch ownership and output validation; implement cancellation and safe failure cleanup; perform installed-app media acceptance before adding UI controls or claiming true crossfades shipped.
+**Immediate sequence:** Use merged #34/#36 as foundations; add decoded output validation and scratch cleanup on cancellation; implement cancellation and safe failure cleanup; perform installed-app media acceptance before adding UI controls or claiming true crossfades shipped.
 
 ---
 
