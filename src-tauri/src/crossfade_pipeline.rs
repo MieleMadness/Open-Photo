@@ -26,8 +26,10 @@ pub(crate) fn render_verify_publish(
     }
     // Caller must not specify an existing scratch output; a failed preparation
     // must not remove unrelated pre-existing files.
-    if fs::symlink_metadata(request.output).is_ok() {
-        return Err("Crossfade scratch output already exists.".into());
+    match fs::symlink_metadata(request.output) {
+        Ok(_) => return Err("Crossfade scratch output already exists.".into()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(format!("Cannot inspect crossfade scratch output: {error}")),
     }
     let scratch = request.output;
     let engine = request.engine;
