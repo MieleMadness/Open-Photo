@@ -1959,6 +1959,7 @@ mod tests {
             acknowledge_first_audio: false,
         };
         let mut parts = Vec::new();
+        let mut receipts = Vec::new();
         for (index, count) in frames.iter().enumerate() {
             let (root, project) = snapshot.single(index).unwrap();
             let prepared =
@@ -1990,8 +1991,51 @@ mod tests {
             assert_eq!((normalized.width, normalized.height), (96, 64));
             assert_eq!(normalized.audio.len(), 1);
             assert_eq!(normalized.audio[0].sample_rate.as_deref(), Some("48000"));
+            // Mint the receipt directly inside the trusted normalization
+            // fixture, after FFmpeg succeeds and the output is probed.
+            // No externally supplied post-hoc receipt is accepted here.
+            let clip = &snapshot.project.clips[index];
+            let asset = snapshot
+                .project
+                .assets
+                .iter()
+                .find(|asset| asset.id == clip.asset_id)
+                .unwrap();
+            crate::sequence_media::source(
+                snapshot.roots.get(&asset.id).unwrap(),
+                asset,
+                || false,
+            )
+            .unwrap();
+            let (_, part_sha256) = video_project::fingerprint(&output, || false).unwrap();
+            receipts.push(crate::crossfade_provenance::NormalizedReceipt {
+                clip_id: clip.id.clone(),
+                asset_id: asset.id.clone(),
+                saved_source_sha256: asset.sha256.clone(),
+                part: output.clone(),
+                part_sha256,
+                frames: *count,
+            });
             parts.push(output);
         }
+        crate::crossfade_provenance::verify_ordered_receipts(
+            &snapshot,
+            &receipts,
+            &parts,
+            &frames,
+            || false,
+        )
+        .unwrap();
+        let mut reversed = parts.clone();
+        reversed.reverse();
+        assert!(crate::crossfade_provenance::verify_ordered_receipts(
+            &snapshot,
+            &receipts,
+            &reversed,
+            &frames,
+            || false,
+        )
+        .is_err());
 
         let clips = [
             crate::crossfade_clock::ClipClock {
