@@ -38,6 +38,9 @@ function checkedIdentity(identity:CrossfadeDraftIdentity):CrossfadeDraftIdentity
   return identity;
 }
 function checkedBoundaries(identity:CrossfadeDraftIdentity,boundaries:CrossfadeBoundary[]):CrossfadeBoundary[]{
+  if(boundaries.some(edge=>!Number.isSafeInteger(edge.frames)
+    ||edge.frames<Math.ceil(.08*identity.fps)||edge.frames>Math.floor(1.5*identity.fps)))
+    throw Error("Crossfade draft transition duration is outside supported frame bounds.");
   const clock=compileCrossfadeClock(identity.clips,boundaries);
   if(clock.total_frames>7200*identity.fps)throw Error("Crossfade timeline exceeds two hours.");
   return [...boundaries].map(edge=>({...edge}));
