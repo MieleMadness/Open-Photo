@@ -1037,10 +1037,8 @@ mod tests {
     #[test]
     fn crossfade_receipts_reject_swapped_and_modified_normalized_parts() {
         let (fixture, snapshot) = fixture();
-        let paths = [
-            fixture.0.join("normalized-0.mkv"),
-            fixture.0.join("normalized-1.mkv"),
-        ];
+        let owned = fs::canonicalize(&fixture.0).unwrap();
+        let paths = [owned.join("normalized-0.mkv"), owned.join("normalized-1.mkv")];
         fs::write(&paths[0], b"normalized first").unwrap();
         fs::write(&paths[1], b"normalized second").unwrap();
         let frames = [6_u64, 9_u64];
@@ -1096,8 +1094,8 @@ mod tests {
         )
         .unwrap();
         let bundled_engine = engine();
-        let scratch = fixture.0.join("untrusted-receipt-render.mp4");
-        let published = fixture.0.join("untrusted-receipt-published.mp4");
+        let scratch = owned.join("untrusted-receipt-render.mp4");
+        let published = owned.join("untrusted-receipt-published.mp4");
         let request = crate::crossfade_command::CrossfadeExecution {
             engine: &bundled_engine,
             plan: &plan,
