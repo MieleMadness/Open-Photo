@@ -250,3 +250,136 @@ mod tests {
         assert!(plan(&invalid, 30).is_err());
     }
 }
+
+
+#[cfg(all(test, windows))]
+mod bundled_engine_tests {
+    use super::*;
+    use crate::{
+        crossfade_clock::{self, Boundary, ClipClock},
+        video_engine, video_probe, video_project,
+    };
+    use std::{
+        ffi::{OsStr, OsString},
+        fs,
+        path::{Path, PathBuf},
+        time::Duration,
+    };
+
+    struct Fixture(PathBuf);
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn ffmpeg(engine: &Path, args: &[OsString]) {
+        video_engine::run(
+            &video_engine::tool(engine, "ffmpeg").unwrap(),
+            &args.iter().map(OsString::as_os_str).collect::<Vec<_>>(),
+            Duration::from_secs(90),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn bundled_ffmpeg_renders_half_second_audio_video_overlap() {
+        let engine = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources/video-engine");
+        let dir = std::env::temp_dir()
+            .join(format!("crossfade-graph-{}", video_project::id()));
+        fs::create_dir(&dir).unwrap();
+        let _fixture = Fixture(dir.clone());
+
+        let inputs = [
+            ("red", 90_u64, 3_u32),
+            ("blue", 120_u64, 4_u32),
+        ];
+        for (index, (color, frames, seconds)) in inputs.iter().enumerate() {
+            let file = dir.join(format!("clip-{index}.mkv"));
+            let args: Vec<OsString> = vec![
+                "-nostdin".into(),
+                "-v".into(),
+                "error".into(),
+                "-f".into(),
+                "lavfi".into(),
+                "-i".into(),
+                format!("color=c={color}:s=96x64:r=30:d={seconds}").into(),
+                "-f".into(),
+                "lavfi".into(),
+                "-i".into(),
+                "anullsrc=r=48000:cl=stereo".into(),
+                "-t".into(),
+                seconds.to_string().into(),
+                "-frames:v".into(),
+                frames.to_string().into(),
+                "-c:v".into(),
+                "libopenh264".into(),
+                "-b:v".into(),
+                "150000".into(),
+                "-pix_fmt".into(),
+                "yuv420p".into(),
+                "-c:a".into(),
+                "pcm_f32le".into(),
+                file.into(),
+            ];
+            ffmpeg(&engine, &args);
+        }
+
+        let clips = [
+            ClipClock {
+                id: "red",
+                frames: 90,
+            },
+            ClipClock {
+                id: "blue",
+                frames: 120,
+            },
+        ];
+        let edge = [Boundary {
+            from_clip_id: "red",
+            to_clip_id: "blue",
+            frames: 15,
+        }];
+        let clock = crossfade_clock::compile(&clips, &edge).unwrap();
+        let graph = plan(&clock, 30).unwrap();
+        let output = dir.join("crossfade.mp4");
+        let args: Vec<OsString> = vec![
+            "-nostdin".into(),
+            "-v".into(),
+            "error".into(),
+            "-i".into(),
+            dir.join("clip-0.mkv").into(),
+            "-i".into(),
+            dir.join("clip-1.mkv").into(),
+            "-filter_complex".into(),
+            graph.filter_complex.into(),
+            "-map".into(),
+            format!("[{}]", graph.video_output).into(),
+            "-map".into(),
+            format!("[{}]", graph.audio_output).into(),
+            "-c:v".into(),
+            "libopenh264".into(),
+            "-b:v".into(),
+            "200000".into(),
+            "-pix_fmt".into(),
+            "yuv420p".into(),
+            "-c:a".into(),
+            "aac".into(),
+            "-ar".into(),
+            "48000".into(),
+            "-ac".into(),
+            "2".into(),
+            output.clone().into(),
+        ];
+        ffmpeg(&engine, &args);
+        let info = video_probe::probe(&engine, &output, || false).unwrap();
+        assert_eq!(info.frame_count, Some(graph.expected_frames));
+        assert_eq!((info.width, info.height), (96, 64));
+        assert!((info.duration_seconds - 6.5).abs() < 0.05);
+        assert_eq!(info.audio.len(), 1);
+        assert_eq!(info.audio[0].sample_rate.as_deref(), Some("48000"));
+        let audio_seconds = info.audio[0].duration_seconds.unwrap_or(info.duration_seconds);
+        assert!((audio_seconds - 6.5).abs() < 0.05);
+    }
+}
