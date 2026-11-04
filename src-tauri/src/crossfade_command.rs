@@ -187,6 +187,12 @@ pub(crate) fn execute_in_scratch(
     {
         return Err("Crossfade output frame/audio verification failed.".into());
     }
+    // Container/probe metadata alone cannot catch corrupted decoded frames.
+    // Reuse the existing bounded, cancellable full-output decode check.
+    crate::video_render::decode_check(engine, output, &cancel, |_| {})?;
+    if cancel() {
+        return Err("Crossfade cancelled during decoded-output verification.".into());
+    }
     cleanup.verified = true;
     Ok(())
 }
