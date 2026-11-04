@@ -195,5 +195,5 @@ fn crossfade_audio_count_check(
     expected: u64,
     cancel: impl Fn() -> bool,
 ) -> Result<(), String> {
-    crate::crossfade_audio_count::verify_presentation_samples(engine, output, expected, cancel)
+    crate::crossfade_audio_stream::verify_streaming(engine, output, expected, cancel)
 }
