@@ -617,6 +617,105 @@ mod bundled_command_tests {
         .is_err());
         assert!(!rejected_output.exists());
 
+        // End-to-end experimental pipeline: prior original-source fingerprints,
+        // normalized input checks, verified render/decode, exact AAC clock,
+        // and staged no-overwrite publication all have to succeed.
+        let origin_a = dir.join("original-red.mov");
+        let origin_b = dir.join("original-blue.mov");
+        fs::write(&origin_a, b"original red source").unwrap();
+        fs::write(&origin_b, b"original blue source").unwrap();
+        let (bytes_a, hash_a) = crate::video_project::fingerprint(&origin_a, || false).unwrap();
+        let (bytes_b, hash_b) = crate::video_project::fingerprint(&origin_b, || false).unwrap();
+        let original_sources = [
+            crate::crossfade_integrity::SourceExpectation {
+                path: &origin_a,
+                bytes: bytes_a,
+                sha256: &hash_a,
+            },
+            crate::crossfade_integrity::SourceExpectation {
+                path: &origin_b,
+                bytes: bytes_b,
+                sha256: &hash_b,
+            },
+        ];
+        let cancelled_pipeline = dir.join("cancelled-pipeline.mp4");
+        let cancelled_publication = dir.join("cancelled-publication.mp4");
+        assert!(crate::crossfade_pipeline::render_verify_publish(
+            CrossfadeExecution {
+                engine: &engine,
+                plan: &preflight,
+                inputs: &parts,
+                output: &cancelled_pipeline,
+                fps: 30,
+                max_bytes: 64 * 1024 * 1024,
+            },
+            &cancelled_publication,
+            &original_sources,
+            || true,
+        )
+        .is_err());
+        assert!(!cancelled_pipeline.exists());
+        assert!(!cancelled_publication.exists());
+
+        let pipeline_output = dir.join("verified-pipeline.mp4");
+        let published = dir.join("published-pipeline.mp4");
+        crate::crossfade_pipeline::render_verify_publish(
+            CrossfadeExecution {
+                engine: &engine,
+                plan: &preflight,
+                inputs: &parts,
+                output: &pipeline_output,
+                fps: 30,
+                max_bytes: 64 * 1024 * 1024,
+            },
+            &published,
+            &original_sources,
+            || false,
+        )
+        .unwrap();
+        assert!(!pipeline_output.exists());
+        assert!(published.exists());
+        let published_info = video_probe::probe(&engine, &published, || false).unwrap();
+        assert_eq!(published_info.frame_count, Some(105));
+        let published_bytes = fs::read(&published).unwrap();
+
+        let already_published_scratch = dir.join("already-published.mp4");
+        assert!(crate::crossfade_pipeline::render_verify_publish(
+            CrossfadeExecution {
+                engine: &engine,
+                plan: &preflight,
+                inputs: &parts,
+                output: &already_published_scratch,
+                fps: 30,
+                max_bytes: 64 * 1024 * 1024,
+            },
+            &published,
+            &original_sources,
+            || false,
+        )
+        .is_err());
+        assert!(!already_published_scratch.exists());
+        assert_eq!(fs::read(&published).unwrap(), published_bytes);
+
+        let mutated_scratch = dir.join("mutated-original.mp4");
+        fs::write(&origin_a, b"replaced red source").unwrap();
+        assert!(crate::crossfade_pipeline::render_verify_publish(
+            CrossfadeExecution {
+                engine: &engine,
+                plan: &preflight,
+                inputs: &parts,
+                output: &mutated_scratch,
+                fps: 30,
+                max_bytes: 64 * 1024 * 1024,
+            },
+            &dir.join("not-published.mp4"),
+            &original_sources,
+            || false,
+        )
+        .is_err());
+        assert!(!mutated_scratch.exists());
+        assert!(!dir.join("not-published.mp4").exists());
+
         // FFmpeg versions may return success when -n skips an existing file.
         // Verify the actual safety contract: output contents must not change.
         let original_bytes = fs::read(&output).unwrap();
