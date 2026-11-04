@@ -182,7 +182,9 @@ fn verify_crossfade_disk_budget(
                 .and_then(|bytes| bytes.checked_add(RESERVE))
                 .ok_or("Crossfade combined free-space budget overflow.")?;
             if scratch_free.is_some_and(|available| available < combined) {
-                return Err("Insufficient shared-volume space for crossfade scratch and stage.".into());
+                return Err(
+                    "Insufficient shared-volume space for crossfade scratch and stage.".into(),
+                );
             }
         }
     }
