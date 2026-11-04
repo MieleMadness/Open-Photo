@@ -23,6 +23,8 @@ mod crossfade_inputs;
 #[cfg(test)]
 mod crossfade_preflight;
 #[cfg(test)]
+mod crossfade_publish;
+#[cfg(test)]
 mod crossfade_scratch;
 mod edit_export;
 mod geo;
