@@ -97,7 +97,7 @@ fn bundled_ffmpeg_preserves_audible_audio_before_during_and_after_crossfade() {
     let clock = crossfade_clock::compile(&clips, &edges).unwrap();
     let graph = crossfade_graph::plan(&clock, 30).unwrap();
     assert_eq!(graph.expected_frames, 105);
-    let output = dir.join("mixed-tones.mkv");
+    let output = dir.join("mixed-tones.mp4");
     let args: Vec<OsString> = vec![
         "-nostdin".into(),
         "-v".into(),
@@ -119,7 +119,7 @@ fn bundled_ffmpeg_preserves_audible_audio_before_during_and_after_crossfade() {
         "-pix_fmt".into(),
         "yuv420p".into(),
         "-c:a".into(),
-        "pcm_f32le".into(),
+        "aac".into(),
         "-ar".into(),
         "48000".into(),
         "-ac".into(),
