@@ -204,4 +204,27 @@ mod tests {
         }];
         assert!(plan_allocated(&clips, &edges, &[true, true], 30).is_err());
     }
+
+    #[test]
+    fn rejects_invalid_saved_sequence_before_computing_crossfades() {
+        let project = Sequence {
+            schema_version: 3,
+            id: "project-1".into(),
+            title: "Invalid source-less project".into(),
+            assets: vec![],
+            clips: vec![],
+            output: crate::video_project::Output {
+                width: 96,
+                height: 64,
+                fit: "fit".into(),
+            },
+            frame_rate: 30,
+            titles: vec![],
+            audio_tracks: vec![],
+            audio_sources: vec![],
+            transitions: vec![],
+        };
+        assert!(plan_sequence(&project, &[]).is_err());
+    }
+
 }
