@@ -255,8 +255,8 @@ mod tests {
             to_clip_id: "clip-1",
             frames: 2,
         }];
-        assert!(plan_allocated(&clips, &boundaries, &vec![true; 201], 30).is_err());
-        let accepted = plan_allocated(&clips[..200], &boundaries, &vec![true; 200], 30).unwrap();
+        assert!(plan_allocated(&clips, &boundaries, &[true; 201], 30).is_err());
+        let accepted = plan_allocated(&clips[..200], &boundaries, &[true; 200], 30).unwrap();
         assert_eq!(accepted.graph.expected_frames, 5_998);
         assert!(accepted.silence_required_for.is_empty());
     }
