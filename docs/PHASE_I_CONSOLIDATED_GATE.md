@@ -17,3 +17,8 @@ All crossfade code remains behind `#[cfg(test)]`; no production editor transitio
 
 ## Acceptance policy
 Merge only a successful exact-head workflow; if native lint, security or installer checks fail, fix on this branch and rerun. CI passing is not equivalent to installed-app signoff.
+
+## Added native end-to-end test gate
+The mixed-audio Windows normalization fixture now also uses the actual test-only `render_verify_publish_snapshot_receipts` entrypoint with two saved video clips, real normalized MKVs, a three-frame crossfade, and a user-visible publication target. It checks successful full MP4 decoding, 12 exact output frames, one audio stream, unchanged saved originals, automatic scratch MP4 removal and a destination-collision retry that leaves the existing SHA-256 and length unchanged.
+
+A passing result is a complete **test-only pipeline acceptance**, not installed-app UI acceptance. Its media is synthetic and the release app never invokes these crossfade modules.
