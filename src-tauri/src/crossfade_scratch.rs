@@ -1,13 +1,13 @@
 //! Test-only filesystem ownership gate for future crossfade command execution.
 //! Not connected to the production renderer or user-facing exports.
+#[cfg(windows)]
+use std::os::windows::fs::MetadataExt;
 use std::{
     collections::HashSet,
     fs,
     io::ErrorKind,
     path::{Path, PathBuf},
 };
-#[cfg(windows)]
-use std::os::windows::fs::MetadataExt;
 
 /// Require all normalized parts and the prospective output to be direct
 /// children of a real, non-symlink temporary directory. This must be combined
