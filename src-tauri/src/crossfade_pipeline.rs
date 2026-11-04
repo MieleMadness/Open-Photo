@@ -106,11 +106,12 @@ pub(crate) fn render_verify_publish_snapshot_receipts(
         .parent()
         .ok_or("Crossfade scratch directory is missing.")?;
     crate::crossfade_scratch::validate_scratch_paths(scratch, request.inputs, request.output)?;
+    let inputs = request.inputs;
     let validate = || {
         crate::crossfade_provenance::verify_ordered_receipts(
             snapshot,
             receipts,
-            request.inputs,
+            inputs,
             &expected_frames,
             &cancel,
         )
