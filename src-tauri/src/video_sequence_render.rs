@@ -1789,4 +1789,114 @@ mod tests {
         }
         snapshot.revalidate(|| false).unwrap();
     }
+
+    #[test]
+    fn existing_normalized_parts_feed_crossfade_with_missing_source_audio() {
+        // One source has audible AAC; the second has no audio stream. Reuse the
+        // production clip-part preprocessor, but keep graph execution test-only.
+        let (fixture, snapshot) = fixture();
+        let frames = frame_allocation(&snapshot.project).unwrap();
+        assert_eq!(frames, vec![6, 9]);
+        let rate = snapshot.project.frame_rate;
+        let render_options = RenderOptions {
+            preview: false,
+            size: ExportSize::Project,
+            acknowledge_first_audio: false,
+        };
+        let mut parts = Vec::new();
+        for (index, count) in frames.iter().enumerate() {
+            let (root, project) = snapshot.single(index).unwrap();
+            let prepared =
+                video_render::prepare(&engine(), &root, &project, render_options, || false).unwrap();
+            let part = PartSource::video(prepared);
+            assert_eq!(part.audio_stream.is_some(), index == 0);
+            let output = fixture.0.join(format!("crossfade-part-{index}.mkv"));
+            let args = part_args(
+                &part,
+                &snapshot.project.clips[index].edits,
+                PartOptions {
+                    frames: *count,
+                    fps: rate,
+                    audio: true,
+                    bitrate: 200_000,
+                    output: &output,
+                    max_bytes: 64 * 1024 * 1024,
+                    titles_filter: String::new(),
+                },
+            );
+            video_engine::run(
+                &video_engine::tool(&engine(), "ffmpeg").unwrap(),
+                &args.iter().map(OsString::as_os_str).collect::<Vec<_>>(),
+                Duration::from_secs(90),
+            )
+            .unwrap();
+            let normalized = video_probe::probe(&engine(), &output, || false).unwrap();
+            assert_eq!((normalized.width, normalized.height), (96, 64));
+            assert_eq!(normalized.audio.len(), 1);
+            assert_eq!(normalized.audio[0].sample_rate.as_deref(), Some("48000"));
+            parts.push(output);
+        }
+
+        let clips = [
+            crate::crossfade_clock::ClipClock {
+                id: "a",
+                frames: frames[0],
+            },
+            crate::crossfade_clock::ClipClock {
+                id: "b",
+                frames: frames[1],
+            },
+        ];
+        let edges = [crate::crossfade_clock::Boundary {
+            from_clip_id: "a",
+            to_clip_id: "b",
+            frames: 3,
+        }];
+        let clock = crate::crossfade_clock::compile(&clips, &edges).unwrap();
+        let graph = crate::crossfade_graph::plan(&clock, rate).unwrap();
+        assert_eq!(graph.expected_frames, 12);
+        let output = fixture.0.join("crossfade-normalized.mp4");
+        let args: Vec<OsString> = vec![
+            "-nostdin".into(),
+            "-v".into(),
+            "error".into(),
+            "-i".into(),
+            parts[0].clone().into(),
+            "-i".into(),
+            parts[1].clone().into(),
+            "-filter_complex".into(),
+            graph.filter_complex.into(),
+            "-map".into(),
+            format!("[{}]", graph.video_output).into(),
+            "-map".into(),
+            format!("[{}]", graph.audio_output).into(),
+            "-c:v".into(),
+            "libopenh264".into(),
+            "-b:v".into(),
+            "200000".into(),
+            "-pix_fmt".into(),
+            "yuv420p".into(),
+            "-c:a".into(),
+            "aac".into(),
+            "-ar".into(),
+            "48000".into(),
+            "-ac".into(),
+            "2".into(),
+            output.clone().into(),
+        ];
+        video_engine::run(
+            &video_engine::tool(&engine(), "ffmpeg").unwrap(),
+            &args.iter().map(OsString::as_os_str).collect::<Vec<_>>(),
+            Duration::from_secs(90),
+        )
+        .unwrap();
+        let result = video_probe::probe(&engine(), &output, || false).unwrap();
+        assert_eq!(result.frame_count, Some(12));
+        assert_eq!((result.width, result.height), (96, 64));
+        assert_eq!(result.audio.len(), 1);
+        assert_eq!(result.audio[0].sample_rate.as_deref(), Some("48000"));
+        assert!((result.duration_seconds - 0.4).abs() < 0.05);
+        snapshot.revalidate(|| false).unwrap();
+    }
+
 }
