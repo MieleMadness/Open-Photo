@@ -5,3 +5,7 @@ The test-only `render_verify_publish_snapshot_receipts` path now holds two indep
 The existing path-based rechecks are still performed before and after FFmpeg and before publication. On cancellation or failure, the RAII guards automatically release all handles and the experimental scratch-output cleanup still applies. A failed guard acquisition does not invoke FFmpeg.
 
 **Limitations:** This is test-only, not installed-application validation; it does not eliminate all pathname/reparse-point and hard-link attacks, nor does a callback-controlled receipt prove it was minted by the actual trusted normalizer. Holding read handles does not block privileged writers or guarantee behavior on remote filesystems. Windows acceptance must confirm FFmpeg can read pinned files while other writers and renames are denied, and must exercise cancellation and large projects before production crossfade routing.
+
+
+## Native Windows execution fixture
+The bundled-engine mixed-audio crossfade fixture now holds pinned handles for both saved originals and the two genuinely normalized MKVs while FFmpeg renders its crossfade. The test requires blocked writes and deletion during the guard lifetime, successful FFmpeg decoding of those inputs, and restored write access after both guards are dropped. This is a Windows regression, not proof of full installed-app export readiness.
