@@ -1,23 +1,23 @@
-## November 3, 2026 — Active roadmap status (development, not release sign-off)
+## November 4, 2026 — Phase I crossfade development checkpoint
 
-**Source of truth:** the active development branch (`feature/desktop-v0.1.0`) includes the fast/full Windows CI optimization merged as PR #14. The latest documented application checkpoint is **0.56.63**. Later editor changes remain in draft pull requests; do not label them shipped.
+**Development baseline:** `feature/desktop-v0.1.0`; the documented application version remains **0.56.63**. This section tracks engineering and test readiness, **not shipped crossfade support**.
 
-| Area | Current state | Next acceptance / milestone |
+| Workstream | Verified development state | Next requirement |
 | --- | --- | --- |
-| Core editing (A–D, Phase 6/7) | Shared photo/video hard-cut sequence, nondestructive clips, save/relink, continuous preview/export, global playback volume and appearance choices implemented | Real installed-Windows workflow and compatibility checks |
-| Search + local AI (E/F) | Unified ranked search, local AI indexing and bounded sampled-video semantic search implemented experimentally | Real hardware/model quality, signed Preview channel checks |
-| Library scale (G) | Grid/list virtualization and bounded caches implemented | **Defer the 10,000-media stress test to pre-1.0** |
-| Maps (H) | GPS, location grouping and zoom-aware clustering implemented | Real HEIC/MOV/Live samples and installed Windows map acceptance |
-| Social editor (I) | Social presets, timed titles, audio import/mixing, waveform excerpts and seek already present through 0.56.63 | Land and manually accept the next editor integration |
-| Draft editor integration | [PR #15](https://github.com/MieleMadness/Open-Photo/pull/15): direct audio trim handles, video-only dip-to-black, editable duration, preview/export parity. Parent increments #1109–#1111 had green Windows workflows. The **reintegrated** PR #15 requires its own exact-head validation and installed-app QA | Validate fast CI, request full Windows CI, test trims, audio, preview/export, persistence, undo |
-| Next isolated UX patch | [PR #16](https://github.com/MieleMadness/Open-Photo/pull/16): Previous/Next Cut timeline playhead navigation. Implemented on draft PR #15; not yet merged or independently CI-approved | Test buttons, shared preview playhead and edge cases |
-| Music provider (J) | User-imported music is available; an external provider/licensing integration is **not** finished | Provider/legal/licensing decision before online music integration |
-| Private vault (K) | Threat model and encryption/PIN workflow remain planned | Security design and review before implementation |
-| Release gates | Installer and auto-update signing, full application/hardware checks and physical-drive error cases remain separate from fast PR validation | Signed Preview upgrade test, real Windows acceptance, then pre-1.0 scale/disk/drive gates |
+| Existing video editor | Hard-cut/dip rendering, waveform and timeline navigation foundations integrated; do not regress preview/export | Installed Windows editing acceptance and source preservation |
+| Crossfade project clock | TS/Rust frame-clock models, trimmed source adaptation, native preflight and FFmpeg graph planning merged through PRs #21–#29 | Audio sample parity and true preview/export clock consistency |
+| Native normalized inputs | [PR #30](https://github.com/MieleMadness/Open-Photo/pull/30) merged after exact-head Windows CI #1178; test exercises existing part normalization with a source lacking audio | Validate output exact media frame/sample counts, source fingerprints, cancellation and cleanup |
+| Mixed transition graph | [PR #31](https://github.com/MieleMadness/Open-Photo/pull/31) merged after exact-head Windows CI #1181; verifies overlap followed by hard-cut graph ordering | Add real bundled-engine mixed-order and audio acceptance |
+| Crossfade resource guards | [PR #32](https://github.com/MieleMadness/Open-Photo/pull/32) merged after exact-head Windows CI #1184; two-hour and 200-clip boundary tests | Enforce these bounds in later native execution |
+| Bounded FFmpeg command | [PR #33](https://github.com/MieleMadness/Open-Photo/pull/33) merged after exact-head Windows CI #1187; bounded test-only command planning with no shell or user export routing | Validate scratch ownership and trusted normalized streams |
+| Windows synthetic execution | [PR #34](https://github.com/MieleMadness/Open-Photo/pull/34) merged after exact-head Windows CI #1193; bundled-engine synthetic fixture verifies frame/audio timing and byte-level no-overwrite | Verify cancellation and decoded audio samples |
+| Crossfade scratch ownership | [PR #36](https://github.com/MieleMadness/Open-Photo/pull/36) merged after exact-head Windows CI #1197; tests canonical scratch part/output ownership | Link to verified normalizer, test reparse-point races and cleanup on cancel |
+| Real crossfade functionality | **Not enabled**; no live transition selection, project schema migration, or active preview/export integration | Strict cancellable native render path, verified frame/audio output, schema and UI with undo/reopen parity |
+| Other roadmap gates | 10,000+ real-media scale test deferred to **pre-1.0**; music licensing, private vault and installer signing remain separate | Dedicated hardware, release and security acceptance |
 
-**Active focus:** First finish and integrate PR #15's editor features on the current development baseline; then validate PR #16. Next practical Phase I improvements are precise cut/playhead behavior, smoother timeline interactions, preview/export fidelity and eventually true crossfades. Current dip-to-black is **video-only**, not a crossfade; music-provider integration and 10k-scale tests are not the active development task.
+**CI integration policy:** Merge only exact-head green PRs into the development branch. Work on unrelated feature branches while CI runs, but never interpret a previous green SHA as approval for a newer commit. Treat stacked PRs as dependent and retarget/revalidate after their parent merges. Fast PR CI does not establish full installer acceptance. Keep the existing source read-only and existing hard-cut renderer as fallback until crossfade verification is complete.
 
-**CI policy:** Every normal PR runs fast frontend and native Rust tests. A PR labeled `full-windows-ci`, a manual workflow dispatch or a main-branch build runs the full Windows installer, export and installed-app lifecycle checks. Full mode was verified in #1116; the isolated CI optimization was verified in #1117 and merged in PR #14. These tests do not replace manual installed-Windows interaction testing.
+**Immediate sequence:** Use merged #34/#36 as foundations; add decoded output validation and scratch cleanup on cancellation; implement cancellation and safe failure cleanup; perform installed-app media acceptance before adding UI controls or claiming true crossfades shipped.
 
 ---
 
