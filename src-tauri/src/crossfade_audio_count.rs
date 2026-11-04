@@ -8,8 +8,8 @@ pub(crate) fn sum_decoded_samples(lines: &[u8], expected: u64) -> Result<u64, St
     if expected == 0 || expected > 48_000 * 7200 {
         return Err("Crossfade expected audio sample clock is out of bounds.".into());
     }
-    let decoded = std::str::from_utf8(lines)
-        .map_err(|_| "Crossfade audio frame metadata is not UTF-8.")?;
+    let decoded =
+        std::str::from_utf8(lines).map_err(|_| "Crossfade audio frame metadata is not UTF-8.")?;
     let mut sum = 0_u64;
     let mut frames = 0_u64;
     for line in decoded.lines() {
@@ -75,10 +75,7 @@ pub(crate) fn verify_decoded_samples(
 /// AAC can decode padded samples at its end. Compute exact *presentation*
 /// samples from packet durations minus priming and discard padding, rather
 /// than treating the raw decoded frame tally as playback duration.
-pub(crate) fn presentation_samples_from_probe(
-    data: &[u8],
-    expected: u64,
-) -> Result<u64, String> {
+pub(crate) fn presentation_samples_from_probe(data: &[u8], expected: u64) -> Result<u64, String> {
     if expected == 0 || expected > 48_000 * 7200 {
         return Err("Crossfade expected presentation clock is out of bounds.".into());
     }
@@ -183,8 +180,8 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn bundled_aac_presentation_clock_handles_encoder_priming() {
-        let engine = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("resources/video-engine");
+        let engine =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/video-engine");
         let scratch = std::env::temp_dir().join(format!(
             "openphoto-aac-presentation-{}",
             crate::video_project::id()
@@ -242,16 +239,24 @@ mod tests {
             ]
         });
         let encoded = serde_json::to_vec(&doc).unwrap();
-        assert_eq!(presentation_samples_from_probe(&encoded, 1792).unwrap(), 1792);
+        assert_eq!(
+            presentation_samples_from_probe(&encoded, 1792).unwrap(),
+            1792
+        );
         assert!(presentation_samples_from_probe(&encoded, 2048).is_err());
         let mut invalid = doc;
         invalid["streams"][0]["time_base"] = "1/1000".into();
-        assert!(presentation_samples_from_probe(&serde_json::to_vec(&invalid).unwrap(), 1792).is_err());
+        assert!(
+            presentation_samples_from_probe(&serde_json::to_vec(&invalid).unwrap(), 1792).is_err()
+        );
     }
 
     #[test]
     fn validates_exact_sample_count_and_rejects_padding_or_truncation() {
-        assert_eq!(sum_decoded_samples(b"1024\n1024\n512\n", 2560).unwrap(), 2560);
+        assert_eq!(
+            sum_decoded_samples(b"1024\n1024\n512\n", 2560).unwrap(),
+            2560
+        );
         assert!(sum_decoded_samples(b"1024\n1024\n512\n", 2048).is_err());
         assert!(sum_decoded_samples(b"1024\n1024\n512\n", 3072).is_err());
         assert!(sum_decoded_samples(b"1024\n1024\n512\n", 0).is_err());
