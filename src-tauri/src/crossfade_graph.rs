@@ -251,7 +251,6 @@ mod tests {
     }
 }
 
-
 #[cfg(all(test, windows))]
 mod bundled_engine_tests {
     use super::*;
@@ -284,17 +283,12 @@ mod bundled_engine_tests {
 
     #[test]
     fn bundled_ffmpeg_renders_half_second_audio_video_overlap() {
-        let engine = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("resources/video-engine");
-        let dir = std::env::temp_dir()
-            .join(format!("crossfade-graph-{}", video_project::id()));
+        let engine = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/video-engine");
+        let dir = std::env::temp_dir().join(format!("crossfade-graph-{}", video_project::id()));
         fs::create_dir(&dir).unwrap();
         let _fixture = Fixture(dir.clone());
 
-        let inputs = [
-            ("red", 90_u64, 3_u32),
-            ("blue", 120_u64, 4_u32),
-        ];
+        let inputs = [("red", 90_u64, 3_u32), ("blue", 120_u64, 4_u32)];
         for (index, (color, frames, seconds)) in inputs.iter().enumerate() {
             let file = dir.join(format!("clip-{index}.mkv"));
             let args: Vec<OsString> = vec![
@@ -379,7 +373,9 @@ mod bundled_engine_tests {
         assert!((info.duration_seconds - 6.5).abs() < 0.05);
         assert_eq!(info.audio.len(), 1);
         assert_eq!(info.audio[0].sample_rate.as_deref(), Some("48000"));
-        let audio_seconds = info.audio[0].duration_seconds.unwrap_or(info.duration_seconds);
+        let audio_seconds = info.audio[0]
+            .duration_seconds
+            .unwrap_or(info.duration_seconds);
         assert!((audio_seconds - 6.5).abs() < 0.05);
     }
 }
