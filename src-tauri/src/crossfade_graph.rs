@@ -28,6 +28,9 @@ pub(crate) fn plan(clock: &Clock<'_>, fps: u32) -> Result<FilterGraph, String> {
     if clock.entries.is_empty() {
         return Err("Crossfade filter graph needs at least one clip.".into());
     }
+    if clock.entries[0].start_frame != 0 || clock.overlaps.len() > clock.entries.len() - 1 {
+        return Err("Crossfade clock has an invalid initial frame or boundary count.".into());
+    }
     let mut filters = Vec::new();
     for index in 0..clock.entries.len() {
         filters.push(format!(
@@ -48,6 +51,15 @@ pub(crate) fn plan(clock: &Clock<'_>, fps: u32) -> Result<FilterGraph, String> {
             .iter()
             .find(|edge| edge.from_clip_id == previous.id && edge.to_clip_id == next.id);
         let overlap = boundary.map_or(0, |edge| edge.frames);
+        if let Some(edge) = boundary {
+            if edge.frames == 0
+                || edge.start_frame != next.start_frame
+                || edge.end_frame != previous.end_frame
+                || edge.end_frame.checked_sub(edge.start_frame) != Some(edge.frames)
+            {
+                return Err("Crossfade overlap metadata does not match clip timing.".into());
+            }
+        }
         let expected_start = accumulated_frames
             .checked_sub(overlap)
             .ok_or("Crossfade overlap exceeds accumulated timeline.")?;
@@ -197,6 +209,38 @@ mod tests {
         assert!(plan(&crossfade_clock::compile(&[], &[]).unwrap(), 30).is_err());
         let mut invalid = clock.clone();
         invalid.total_frames += 1;
+        assert!(plan(&invalid, 30).is_err());
+        let mut invalid = clock.clone();
+        invalid.entries[0].start_frame = 1;
+        assert!(plan(&invalid, 30).is_err());
+    }
+
+    #[test]
+    fn rejects_tampered_overlap_metadata_without_unsafe_filter_offsets() {
+        let clips = [
+            ClipClock {
+                id: "a",
+                frames: 90,
+            },
+            ClipClock {
+                id: "b",
+                frames: 120,
+            },
+        ];
+        let edges = [Boundary {
+            from_clip_id: "a",
+            to_clip_id: "b",
+            frames: 15,
+        }];
+        let clock = crossfade_clock::compile(&clips, &edges).unwrap();
+        let mut invalid = clock.clone();
+        invalid.overlaps[0].start_frame += 1;
+        assert!(plan(&invalid, 30).is_err());
+        let mut invalid = clock.clone();
+        invalid.overlaps[0].frames = 0;
+        assert!(plan(&invalid, 30).is_err());
+        let mut invalid = clock.clone();
+        invalid.overlaps[0].end_frame -= 1;
         assert!(plan(&invalid, 30).is_err());
     }
 }
