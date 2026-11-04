@@ -20,3 +20,9 @@
 ## Bundled Windows engine execution fixture
 
 A Windows-only regression exercises the experimental command through the existing cancellable `video_engine::run_until` process runner. It creates two 60-frame 30fps 96×64 normalized Matroska parts with 48kHz stereo PCM, plans a 15-frame overlap and expects exactly 105 output frames, 3.5 seconds and an AAC audio stream at 48kHz. The fixture reruns the command against an existing output and compares the complete output bytes to verify `-n` prevents modification; FFmpeg may exit successfully even when it skips an existing file. This is synthetic test execution, **not** production source-verified rendering, and still requires cancellation, source fingerprint revalidation, exact decoded sample count and scratch ownership testing.
+
+## Test-only cancellable scratch execution and validation
+
+The experimental `execute_in_scratch` helper now combines the scratch path gate, bounded command generation and existing cancellable bundled FFmpeg process runner. It refuses a pre-cancelled job, checks cancellation after rendering and probing, and removes an incomplete MP4 whenever execution or output verification fails. Successful synthetic runs verify nonempty and bounded output size, exact video frame count, duration and 48kHz audio duration. Windows fixture cases cover a pre-cancelled execution and an intentionally corrupt normalized MKV, asserting that neither leaves an MP4 behind.
+
+This is **not** connected to production export. It does not yet prevent scratch-path replacement races, verify original media fingerprints across the run, guarantee exact AAC sample count, or perform a full decode check. An installed Windows acceptance and strict publication boundary remain mandatory before enabling user crossfades.
