@@ -6,11 +6,14 @@ use std::{
     collections::HashSet,
     fs::{self, File, OpenOptions},
     io::{Read, Seek, SeekFrom},
-    os::windows::{fs::{MetadataExt, OpenOptionsExt}, io::AsRawHandle},
+    os::windows::{
+        fs::{MetadataExt, OpenOptionsExt},
+        io::AsRawHandle,
+    },
     path::{Path, PathBuf},
 };
 use windows_sys::Win32::Storage::FileSystem::{
-    BY_HANDLE_FILE_INFORMATION, FILE_SHARE_READ, GetFileInformationByHandle,
+    GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION, FILE_SHARE_READ,
 };
 
 fn file_identity(file: &File) -> Result<(u32, u64, u32, u32), String> {
@@ -19,7 +22,10 @@ fn file_identity(file: &File) -> Result<(u32, u64, u32, u32), String> {
     // the full BY_HANDLE_FILE_INFORMATION on successful completion.
     let ok = unsafe { GetFileInformationByHandle(file.as_raw_handle(), info.as_mut_ptr()) };
     if ok == 0 {
-        return Err(format!("Crossfade cannot inspect Windows file identity: {}", std::io::Error::last_os_error()));
+        return Err(format!(
+            "Crossfade cannot inspect Windows file identity: {}",
+            std::io::Error::last_os_error()
+        ));
     }
     // SAFETY: GetFileInformationByHandle returned success above.
     let info = unsafe { info.assume_init() };
@@ -27,9 +33,13 @@ fn file_identity(file: &File) -> Result<(u32, u64, u32, u32), String> {
     if index == 0 || info.dwVolumeSerialNumber == 0 {
         return Err("Crossfade source has no stable Windows file identity.".into());
     }
-    Ok((info.dwVolumeSerialNumber, index, info.nNumberOfLinks, info.dwFileAttributes))
+    Ok((
+        info.dwVolumeSerialNumber,
+        index,
+        info.nNumberOfLinks,
+        info.dwFileAttributes,
+    ))
 }
-
 
 pub(crate) struct PinnedMedia {
     handles: Vec<File>,
