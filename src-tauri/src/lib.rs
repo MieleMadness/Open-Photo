@@ -15,6 +15,8 @@ mod crossfade_audio_fixture;
 #[cfg(test)]
 mod crossfade_clock;
 #[cfg(test)]
+mod crossfade_command;
+#[cfg(test)]
 mod crossfade_graph;
 #[cfg(test)]
 mod crossfade_preflight;
