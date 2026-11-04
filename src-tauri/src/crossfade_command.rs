@@ -302,13 +302,15 @@ mod bundled_command_tests {
             .unwrap_or(result.duration_seconds);
         assert!((audio_seconds - 3.5).abs() < 0.05);
 
-        // Never silently overwrite an existing user-visible output.
-        assert!(video_engine::run_until(
+        // FFmpeg versions may return success when -n skips an existing file.
+        // Verify the actual safety contract: output contents must not change.
+        let original_bytes = fs::read(&output).unwrap();
+        let _ = video_engine::run_until(
             &ffmpeg,
             &args.iter().map(OsString::as_os_str).collect::<Vec<_>>(),
             Duration::from_secs(90),
             || false,
-        )
-        .is_err());
+        );
+        assert_eq!(fs::read(&output).unwrap(), original_bytes);
     }
 }
