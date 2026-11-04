@@ -16,3 +16,7 @@
 2. Add a cancellable test-only invocation with bundled Windows FFmpeg and strict post-encode frame/audio verification.
 3. Add fault-injection cases for cancel, missing part, wrong stream shape, output collision, and insufficient space.
 4. Only then design native renderer integration, persisted transitions and editor UI, followed by installed-Windows acceptance.
+
+## Bundled Windows engine execution fixture
+
+A Windows-only regression exercises the experimental command through the existing cancellable `video_engine::run_until` process runner. It creates two 60-frame 30fps 96×64 normalized Matroska parts with 48kHz stereo PCM, plans a 15-frame overlap and expects exactly 105 output frames, 3.5 seconds and an AAC audio stream at 48kHz. The fixture also rejects a second invocation against an existing output (`-n` no-overwrite). This is synthetic test execution, **not** production source-verified rendering, and still requires cancellation, source fingerprint revalidation, exact decoded sample count and scratch ownership testing.
