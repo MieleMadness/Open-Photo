@@ -54,7 +54,10 @@ impl PinnedMedia {
                 .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
                 .open(path)
                 .map_err(|e| format!("Cannot pin crossfade input for read-only access: {e}"))?;
-            if handle.metadata().map_err(|e| e.to_string())?.file_attributes()
+            if handle
+                .metadata()
+                .map_err(|e| e.to_string())?
+                .file_attributes()
                 & FILE_ATTRIBUTE_REPARSE_POINT
                 != 0
             {
