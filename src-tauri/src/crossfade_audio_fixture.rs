@@ -132,6 +132,11 @@ fn bundled_ffmpeg_preserves_audible_audio_before_during_and_after_crossfade() {
     assert!((info.duration_seconds - 3.5).abs() < 0.05);
     assert_eq!(info.audio.len(), 1);
     assert_eq!(info.audio[0].sample_rate.as_deref(), Some("48000"));
+    let encoded_audio_seconds = info.audio[0].duration_seconds.unwrap_or(info.duration_seconds);
+    assert!(
+        (encoded_audio_seconds - 3.5).abs() < 0.05,
+        "Encoded audio duration was {encoded_audio_seconds}s, expected 3.5s"
+    );
 
     let decoded = dir.join("mixed-mono.f32le");
     let args: Vec<OsString> = vec![
@@ -143,6 +148,10 @@ fn bundled_ffmpeg_preserves_audible_audio_before_during_and_after_crossfade() {
         "-map".into(),
         "0:a:0".into(),
         "-vn".into(),
+        // Trim AAC packet padding from the *decoded fixture*, not the exported file.
+        // This still fails if fewer than 168000 samples are actually available.
+        "-af".into(),
+        "atrim=end_sample=168000,asetpts=N/SR/TB".into(),
         "-ar".into(),
         "48000".into(),
         "-ac".into(),
@@ -162,7 +171,11 @@ fn bundled_ffmpeg_preserves_audible_audio_before_during_and_after_crossfade() {
         .iter()
         .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
         .collect::<Vec<_>>();
-    assert!((samples.len() as i64 - 168000).abs() < 96);
+    assert_eq!(
+        samples.len(),
+        168_000,
+        "Decoded and bounded fixture audio must cover the full 3.5-second timeline"
+    );
     assert!(samples.iter().all(|sample| sample.is_finite()));
     for seconds in [0.5, 1.75, 3.0] {
         let rms = rms_at(&samples, seconds);
