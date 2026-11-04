@@ -117,6 +117,23 @@ mod tests {
     }
 
     #[test]
+    fn rejects_reparse_point_file_even_when_target_matches_expected_hash() {
+        let dir = std::env::temp_dir().join(format!(
+            "openphoto-crossfade-windows-reparse-{}",
+            crate::video_project::id()
+        ));
+        fs::create_dir(&dir).unwrap();
+        let target = dir.join("trusted.mkv");
+        let alias = dir.join("alias.mkv");
+        fs::write(&target, b"trusted normalized footage").unwrap();
+        let (bytes, hash) = crate::video_project::fingerprint(&target, || false).unwrap();
+        if std::os::windows::fs::symlink_file(&target, &alias).is_ok() {
+            assert!(PinnedMedia::acquire(&[(&alias, bytes, &hash)], || false).is_err());
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn rejects_changed_contents_and_duplicate_paths() {
         let dir = std::env::temp_dir().join(format!(
             "openphoto-crossfade-windows-pin-reject-{}",
