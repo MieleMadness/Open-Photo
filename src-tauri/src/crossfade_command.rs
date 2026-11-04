@@ -94,7 +94,11 @@ pub(crate) fn command_args(
         "-frames:v".into(),
         plan.graph.expected_frames.to_string().into(),
         "-t".into(),
-        format!("{:.9}", plan.graph.expected_frames as f64 / f64::from(fps)).into(),
+        format!(
+            "{:.9}",
+            plan.graph.expected_frames as f64 / f64::from(fps)
+        )
+        .into(),
         "-c:v".into(),
         "libopenh264".into(),
         "-pix_fmt".into(),
@@ -151,7 +155,10 @@ mod tests {
     fn builds_bounded_input_only_graph_command() {
         let (plan, parts, output) = fixture();
         let args = command_args(&plan, &parts, &output, 30, 64 * 1024 * 1024).unwrap();
-        let values: Vec<String> = args.iter().map(|v| v.to_string_lossy().into_owned()).collect();
+        let values: Vec<String> = args
+            .iter()
+            .map(|v| v.to_string_lossy().into_owned())
+            .collect();
         assert_eq!(values.iter().filter(|v| *v == "-i").count(), 2);
         assert!(values.contains(&"-filter_complex".to_owned()));
         assert!(values.contains(&"-frames:v".to_owned()));
@@ -170,8 +177,22 @@ mod tests {
         assert!(command_args(&plan, &parts, &output, 24, 64 * 1024 * 1024).is_err());
         assert!(command_args(&plan, &parts, &output, 30, 0).is_err());
         assert!(command_args(&plan, &parts, &output, 30, u64::MAX).is_err());
-        assert!(command_args(&plan, &[parts[0].clone(), parts[0].clone()], &output, 30, 1024).is_err());
-        assert!(command_args(&plan, &[PathBuf::from("relative.mkv"), parts[1].clone()], &output, 30, 1024).is_err());
+        assert!(command_args(
+            &plan,
+            &[parts[0].clone(), parts[0].clone()],
+            &output,
+            30,
+            1024
+        )
+        .is_err());
+        assert!(command_args(
+            &plan,
+            &[PathBuf::from("relative.mkv"), parts[1].clone()],
+            &output,
+            30,
+            1024
+        )
+        .is_err());
         assert!(command_args(&plan, &parts, &output.with_extension("mkv"), 30, 1024).is_err());
         plan.expected_audio_samples += 1;
         assert!(command_args(&plan, &parts, &output, 30, 1024).is_err());
