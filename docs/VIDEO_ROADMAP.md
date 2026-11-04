@@ -1,3 +1,15 @@
+## November 4, 2026 — Phase I native engineering checkpoint (updated)
+
+**Automated engineering baseline:** The experimental crossfade native pipeline was integrated through [PR #61](https://github.com/MieleMadness/Open-Photo/pull/61), which passed exact-head Windows Rust, frontend and full installer CI. [PR #63](https://github.com/MieleMadness/Open-Photo/pull/63) adds verified Windows file identity, hard-link rejection, pinning of saved originals during normalization and a final destination-space recheck; it requires its own full exact-head Windows success before merge.
+
+**Phase I distinction:** The *experimental, test-only crossfade infrastructure* may clear its automated development gate without crossfades being shipped. There is no active production transition schema, timeline control, real-time preview, or export route. The existing hard-cut/dip editor remains the production fallback.
+
+**Open verification:** Installed Windows interactive editing with real phone SDR/VFR media, external-codec independence, source relink/cancellation, filesystem reparse/privileged-race behavior, user-visible export and performance measurements are still unverified. See [Phase I exit gate](PHASE_I_EXIT_GATE.md).
+
+**Phase J entry criteria:** Only begin production schema/UI/preview/export routing after #63's exact-head green checks and a reviewed real-footage acceptance report. Implement schema migration, UI transition creation/undo, synchronized preview/export frame clock, and active export with safe fallback under separate gated PRs. Do not imply that full Windows CI's installer checks exercised interactive crossfades—they remain test-only.
+
+---
+
 ## November 4, 2026 — Phase I crossfade development checkpoint
 
 **Development baseline:** `feature/desktop-v0.1.0`; the documented application version remains **0.56.63**. This section tracks engineering and test readiness, **not shipped crossfade support**.
@@ -28,7 +40,7 @@
 
 **CI integration policy:** Merge only exact-head green PRs into the development branch. Work on unrelated feature branches while CI runs, but never interpret a previous green SHA as approval for a newer commit. Treat stacked PRs as dependent and retarget/revalidate after their parent merges. Fast PR CI does not establish full installer acceptance. Keep the existing source read-only and existing hard-cut renderer as fallback until crossfade verification is complete.
 
-**Immediate sequence:** Verify and merge #60 after exact-head Windows CI; validate the consolidated native hardening and end-to-end tests in #61, then run installed Windows acceptance as specified in [Phase I exit gates](PHASE_I_EXIT_GATE.md). Continue real saved-project normalization, stable Windows filesystem handles/reparse-point race guards, bounded-memory audio accounting, disk budgets, cancellation during staging and installed-app acceptance before enabling transitions. Integrate saved-project source fingerprints and the validated MKV/audio contracts with the experimental scratch executor, then enforce full-decode/audio verification and no-overwrite publication. Revalidate file handles and Windows reparse-point/race cases. Only after real installed-Windows source/preview/export acceptance should persisted transitions and timeline controls be enabled.
+**Immediate sequence (updated November 4, 2026):** [PR #61](https://github.com/MieleMadness/Open-Photo/pull/61) merged with exact-head full Windows installer CI, bounded-memory AAC packet accounting and native end-to-end publication regression. Validate [PR #63](https://github.com/MieleMadness/Open-Photo/pull/63)'s Windows identity, normalization pinning and post-render staging-space protections with its *own* full exact-head Windows workflow. Use the [real-media acceptance record](PHASE_I_REAL_MEDIA_ACCEPTANCE.md) for installed Windows testing. The active user-facing transition schema, timeline editing, preview and export routing belong to **Phase J**, not Phase I.
 
 ---
 
