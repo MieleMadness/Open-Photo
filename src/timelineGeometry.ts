@@ -17,3 +17,23 @@ export function clipDropIndex(from:number,target:number,after:boolean){
   const boundary=target+(after?1:0);
   return boundary-(from<boundary?1:0);
 }
+
+/** Seek strictly to the previous/next edit boundary, not the nearest repeated frame.
+ * The first and final project boundaries are included for predictable keyboard navigation.
+ */
+export function adjacentCutPosition(position:number,clipEnds:number[],direction:"previous"|"next"):number|null{
+  if(!Number.isFinite(position)||clipEnds.length===0||clipEnds.some(end=>!Number.isFinite(end)||end<=0))return null;
+  const cuts=[0,...clipEnds];
+  const epsilon=1e-6;
+  if(direction==="previous"){
+    for(let index=cuts.length-1;index>=0;index--)if(cuts[index]<position-epsilon)return cuts[index];
+  }else{
+    for(const cut of cuts)if(cut>position+epsilon)return cut;
+  }
+  return null;
+}
+
+/** Brackets are scoped to the focused timeline viewport; media/player shortcuts stay independent. */
+export function cutNavigationDirection(key:string):"previous"|"next"|null {
+  return key==="["?"previous":key==="]"?"next":null;
+}

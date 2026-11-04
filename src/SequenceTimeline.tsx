@@ -1,9 +1,9 @@
 import {maxCutTransitionDuration} from "./cutTransitions";
 import {useEffect,useId,useRef,useState} from "react";
-import {ArrowLeft,ArrowRight,Plus,RotateCcw,Scissors,Trash2,Undo2,Redo2,ZoomIn,ZoomOut,Maximize2} from "lucide-react";
+import {ArrowLeft,ArrowRight,Plus,RotateCcw,Scissors,Trash2,Undo2,Redo2,ZoomIn,ZoomOut,Maximize2,SkipBack,SkipForward} from "lucide-react";
 import {TimelineTrimHandles} from "./TimelineTrimHandles";
 import {EditorPoster} from "./EditorPoster";
-import {timelineTicks,clipDropIndex} from "./timelineGeometry";
+import {timelineTicks,clipDropIndex,adjacentCutPosition,cutNavigationDirection} from "./timelineGeometry";
 import type {LoadedSequence} from "./videoSequence";
 import {NumberField} from "./EditorFields";
 import {assetGeometry,hasAudio,videoInfo} from "./sequenceMedia";
@@ -30,6 +30,9 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
   const playheadId=useId();
 
   const playhead=Math.min(position,duration);
+  const clipEnds=entries.map(entry=>entry.end);
+  const previousCut=adjacentCutPosition(playhead,clipEnds,"previous");
+  const nextCut=adjacentCutPosition(playhead,clipEnds,"next");
   function choose(id:string){onSelected(id);const item=entries.find(e=>e.clip.id===id);if(item){onSelectAsset(item.clip.asset_id);onPosition(item.start);}}
   const {command,history,error}=useTimelineActions(session,selected,onSelected);
   return <section aria-label="Project timeline" className="sequence-timeline">
@@ -39,6 +42,10 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
         <button className="secondary-button" disabled={!session.history.past.length} aria-label="Undo timeline edit" title="Undo timeline edit" onClick={()=>history("undo")}><Undo2 size={16}/>Undo</button>
         <button className="secondary-button" disabled={!session.history.future.length} aria-label="Redo timeline edit" title="Redo timeline edit" onClick={()=>history("redo")}><Redo2 size={16}/>Redo</button>
         <button className="secondary-button" aria-label="Append selected media" title="Add selected media to the end of the timeline" onClick={()=>command({type:"append",assetId,newId:crypto.randomUUID()})}><Plus size={16}/>Add clip</button>
+        <div className="timeline-cut-navigation" role="group" aria-label="Navigate timeline cuts">
+          <button type="button" className="secondary-button" aria-label="Previous timeline cut" title="Move the project playhead to the previous clip boundary" disabled={previousCut===null} onClick={()=>{if(previousCut!==null)onPosition(previousCut);}}><SkipBack size={16}/>Previous cut</button>
+          <button type="button" className="secondary-button" aria-label="Next timeline cut" title="Move the project playhead to the next clip boundary" disabled={nextCut===null} onClick={()=>{if(nextCut!==null)onPosition(nextCut);}}>Next cut<SkipForward size={16}/></button>
+        </div>
         <div className="timeline-zoom" role="group" aria-label="Timeline zoom">
           <button type="button" className="icon-button" aria-label="Zoom timeline out" title="Zoom timeline out" disabled={zoom<=1} onClick={()=>setZoom(value=>Math.max(1,value/2))}><ZoomOut size={16}/></button>
           <button type="button" className="secondary-button" aria-label="Fit timeline" title="Fit the whole project in the timeline" onClick={()=>setZoom(1)}><Maximize2 size={15}/>Fit</button>
@@ -46,7 +53,14 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
           <output aria-label="Timeline zoom level">{zoom}×</output>
         </div>
       </div>
-      <div ref={viewport} className="timeline-scroll" tabIndex={0} aria-label="Scrollable timeline">
+      <div ref={viewport} className="timeline-scroll" tabIndex={0} aria-label="Scrollable timeline" onKeyDown={event=>{
+          if(event.target!==event.currentTarget||event.ctrlKey||event.metaKey||event.altKey||disabled)return;
+          const direction=cutNavigationDirection(event.key);
+          if(!direction)return;
+          const target=direction==="previous"?previousCut:nextCut;
+          if(target===null)return;
+          event.preventDefault();onPosition(target);
+        }}>
         <div ref={track} className="timeline-track" style={{width:`${zoom*100}%`}}>
           <div className="timeline-scrubber"><label htmlFor={playheadId}>Project playhead</label><output aria-label="Project playhead time">{clockTime(playhead)}</output><div className="timeline-ruler"><div className="timeline-ticks" aria-hidden="true">{ticks.map(tick=><span key={tick.seconds} data-end={tick.left>95} style={{left:`${tick.left}%`}}>{tick.label}</span>)}</div><input id={playheadId} aria-label="Project playhead" title="Drag the ruler or use arrow keys to seek" type="range" min={0} max={duration||1} step="any" value={playhead} disabled={!entries.length} onChange={e=>onPosition(Number(e.target.value))}/><span className="timeline-ruler-head" aria-hidden="true" style={{left:`${duration?playhead/duration*100:0}%`}}/></div></div>
           <ol className="timeline-clips">{entries.map((item,i)=>{
@@ -89,7 +103,7 @@ export function SequenceTimeline({session,disabled,assetId,onSelectAsset,selecte
 
     </fieldset>
     {error&&<p role="alert" className="field-error">{error}</p>}
-    <p className="timeline-help">Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap and keeps its original in the media bin. Joined clips use the project frame clock; source trim marks retain their original timing. Add dip creates a video-only fade at an adjacent cut. Select the preceding clip to adjust its duration; audio and project duration are unchanged.</p>
+    <p className="timeline-help">Use Previous cut / Next cut to review clip boundaries without dragging the playhead (focus the timeline and press [ or ]). Drag clips to reorder, or use Move earlier / Move later. Deleting a clip closes the gap and keeps its original in the media bin. Joined clips use the project frame clock; source trim marks retain their original timing. Add dip creates a video-only fade at an adjacent cut. Select the preceding clip to adjust its duration; audio and project duration are unchanged.</p>
   </section>;
 }
 
