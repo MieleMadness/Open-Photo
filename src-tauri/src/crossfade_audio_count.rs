@@ -36,42 +36,6 @@ pub(crate) fn sum_decoded_samples(lines: &[u8], expected: u64) -> Result<u64, St
 
 /// FFprobe enumerates decoded audio frames (nb_samples), not AAC packet count
 /// or a rounded container duration. The process runner bounds stdout at 4 MiB.
-pub(crate) fn verify_decoded_samples(
-    engine: &Path,
-    output: &Path,
-    expected: u64,
-    cancel: impl Fn() -> bool,
-) -> Result<(), String> {
-    if cancel() {
-        return Err("Crossfade decoded audio verification cancelled.".into());
-    }
-    let tool = crate::video_engine::tool(engine, "ffprobe")?;
-    let args: &[&OsStr] = &[
-        OsStr::new("-v"),
-        OsStr::new("error"),
-        OsStr::new("-max_alloc"),
-        OsStr::new("268435456"),
-        OsStr::new("-protocol_whitelist"),
-        OsStr::new("file,pipe"),
-        OsStr::new("-format_whitelist"),
-        OsStr::new("mov"),
-        OsStr::new("-select_streams"),
-        OsStr::new("a:0"),
-        OsStr::new("-show_frames"),
-        OsStr::new("-show_entries"),
-        OsStr::new("frame=nb_samples"),
-        OsStr::new("-of"),
-        OsStr::new("csv=p=0"),
-        output.as_os_str(),
-    ];
-    let result = crate::video_engine::run_until(&tool, args, Duration::from_secs(120), &cancel)?;
-    if cancel() {
-        return Err("Crossfade decoded audio verification cancelled.".into());
-    }
-    sum_decoded_samples(&result, expected)?;
-    Ok(())
-}
-
 /// AAC can decode padded samples at its end. Compute exact *presentation*
 /// samples from packet durations minus priming and discard padding, rather
 /// than treating the raw decoded frame tally as playback duration.
