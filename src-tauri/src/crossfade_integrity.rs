@@ -6,6 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[derive(Clone, Copy)]
 pub(crate) struct SourceExpectation<'a> {
     pub path: &'a Path,
     pub bytes: u64,
