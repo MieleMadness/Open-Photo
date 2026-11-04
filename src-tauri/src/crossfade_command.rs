@@ -136,6 +136,20 @@ pub(crate) fn execute_in_scratch(
         inputs,
         output,
     )?;
+    // Probe each normalized part before starting the expensive graph. Missing
+    // streams, mismatched canvas, frame-rate drift and invalid audio fail closed.
+    let mut normalized = Vec::with_capacity(inputs.len());
+    for part in inputs {
+        if cancel() {
+            return Err("Crossfade cancelled while verifying normalized inputs.".into());
+        }
+        normalized.push(crate::video_probe::probe(engine, part, &cancel)?);
+    }
+    crate::crossfade_inputs::validate_normalized_parts(
+        &normalized,
+        &plan.normalized_clip_frames,
+        fps,
+    )?;
     let args = command_args(plan, inputs, output, fps, max_bytes)?;
     struct Cleanup<'a> {
         output: &'a Path,
