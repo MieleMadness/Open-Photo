@@ -82,6 +82,31 @@ impl Snapshot {
                 .ok_or("Relink this timeline source")?;
             crate::sequence_media::source(root, asset, &cancel)?;
         }
+        // Independent audio must satisfy the same pre-publication integrity
+        // gate as video/photos. A replacement track must never be published.
+        for source in &self.project.audio_sources {
+            if !self
+                .project
+                .audio_tracks
+                .iter()
+                .any(|track| track.asset_id == source.id)
+            {
+                continue;
+            }
+            if cancel() {
+                return Err("Video source verification cancelled.".into());
+            }
+            let root = self
+                .roots
+                .get(&source.id)
+                .ok_or("Relink this independent audio source")?;
+            let candidate = Path::new(root).join(&source.relative_path);
+            let path = video_probe::safe_audio_path(root, &candidate.to_string_lossy())?;
+            let (bytes, hash) = video_project::fingerprint(&path, &cancel)?;
+            if bytes != source.bytes || hash != source.sha256 {
+                return Err("Independent audio file changed; relink the original.".into());
+            }
+        }
         Ok(())
     }
     pub fn duration(&self) -> Result<f64, String> {
@@ -1108,6 +1133,11 @@ mod tests {
         snapshot.project.audio_sources[0].sha256 = "0".repeat(64);
         assert!(build_preview(&engine(), &snapshot, &fixture.0, || false).is_err());
         snapshot.project.audio_sources[0].sha256 = altered;
+        snapshot.revalidate(|| false).unwrap();
+        // The preview was valid, but a changed track must fail final
+        // source revalidation even if all video sources still match.
+        fs::write(&audio, b"modified music after snapshot").unwrap();
+        assert!(snapshot.revalidate(|| false).is_err());
     }
     #[test]
     fn dip_to_black_preserves_project_frame_count_and_fades_the_cut() {
