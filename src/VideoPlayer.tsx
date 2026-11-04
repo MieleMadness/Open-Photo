@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState,type KeyboardEvent,type ReactNode} from "react";
-import {FastForward,Rewind} from "lucide-react";
+import {FastForward,Rewind,StepBack,StepForward} from "lucide-react";
+import {adjacentPlaybackFrame,playbackFrameRate} from "./frameSeek";
 import {convertFileSrc,invoke} from "@tauri-apps/api/core";
 import {ErrorNotice} from "./Ui";
 import {VideoDetails,type VideoInfo} from "./VideoDetails";
@@ -28,6 +29,8 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,c
   const [playing,setPlaying]=useState(false);
   const [position,setPosition]=useState(0);
   const [duration,setDuration]=useState(0);
+  const sourceRate=info?.frame_rate||assets?.info.frame_rate||null;
+  const sourceDuration=duration||info?.duration_seconds||assets?.info.duration_seconds||0;
   const inMark=selection?.start||null;
   const outMark=selection?.end||null;
   const [rangeError,setRangeError]=useState("");
@@ -78,6 +81,12 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,c
     if(video.current){video.current.currentTime=value;current.current=value;setPosition(value);}
   }
   useEffect(()=>{if(!Number.isFinite(startAt)||startAt<0)return;restore.current=startAt;current.current=startAt;if(video.current?.readyState&&video.current.readyState>=1)seek(startAt);},[startAt]);
+  function stepFrame(direction:-1|1){
+    const target=adjacentPlaybackFrame(current.current,sourceRate,direction,sourceDuration);
+    if(target===null||!video.current)return;
+    video.current.pause();
+    seek(target);
+  }
   function toggle(){
     const element=video.current;if(!element)return;
     if(element.paused)void element.play().catch(cause=>{if(video.current===element)setError(`Playback could not start: ${String(cause)}`);});else element.pause();
@@ -104,6 +113,7 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,c
     if(event.ctrlKey||event.altKey||event.metaKey)return;
     if(event.key===" "){event.preventDefault();toggle();}
     else if(event.key==="ArrowLeft"||event.key==="ArrowRight"){event.preventDefault();seek(current.current+(event.key==="ArrowLeft"?-1:1)*(event.shiftKey?10:5));}
+    else if((event.key===","||event.key===".")&&!viewerMode&&!editorMode){event.preventDefault();stepFrame(event.key===","?-1:1);}
     else if(event.key==="Home"){event.preventDefault();seek(0);}
     else if(event.key==="End"){event.preventDefault();seek(duration);}
   }
@@ -121,6 +131,8 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,c
         <button className="secondary-button" onClick={toggle}>{playing?"Pause":"Play"}</button>
         <button className="icon-button" title="Back 5 seconds" aria-label="Back 5 seconds" onClick={()=>seek(current.current-5)}><Rewind size={18}/></button>
         <button className="icon-button" title="Forward 5 seconds" aria-label="Forward 5 seconds" onClick={()=>seek(current.current+5)}><FastForward size={18}/></button>
+        <button className="icon-button" title="Previous nominal frame (approximate for variable-frame-rate video)" aria-label="Previous frame" disabled={!playbackFrameRate(sourceRate)} onClick={()=>stepFrame(-1)}><StepBack size={18}/></button>
+        <button className="icon-button" title="Next nominal frame (approximate for variable-frame-rate video)" aria-label="Next frame" disabled={!playbackFrameRate(sourceRate)} onClick={()=>stepFrame(1)}><StepForward size={18}/></button>
         <output aria-label="Playback time">{clockTime(position)} / {clockTime(duration)}</output>
       </div>
       <input className="video-scrubber" type="range" aria-label="Seek video" min={0} max={duration||info?.duration_seconds||0} step={0.001} value={Math.min(position,duration||info?.duration_seconds||0)} onChange={event=>seek(Number(event.target.value))}/></>}
@@ -130,7 +142,7 @@ export function VideoPlayer({root,path,onOpenExternal,selection,autoLoad=false,c
         <span>Trim: {clockTime(markSeconds(selection.start))} → {clockTime(markSeconds(selection.end))}</span>
         <button className="secondary-button" disabled={selection.disabled} onClick={()=>{rangePlaying.current=false;selection.onChange(markTime(0,info?.time_base||null),markTime(info?.duration_seconds||duration,info?.time_base||null));setRangeError("");}}>Reset trim</button>
       </div></SourceTools>}
-      {!compact&&!editorMode&&!viewerMode&&!viewerMode&&<small>Focus the player: Space to play/pause, arrows to seek 5 seconds, Shift+arrows for 10 seconds.</small>}
+      {!compact&&!editorMode&&!viewerMode&&!viewerMode&&<small>Focus the player: Space to play/pause, arrows to seek 5 seconds, Shift+arrows for 10 seconds, comma/period for approximate frame stepping.</small>}
     </>}
     {rangeError&&<p role="alert">{rangeError}</p>}
     {!editorMode&&!viewerMode&&<SourceTools compact={compact} label="Source details & playback options">

@@ -182,3 +182,20 @@ it("removes the typed timestamp form in favor of scrubber and skip controls",asy
   expect(screen.getByLabelText("Back 5 seconds")).toBeTruthy();
   expect(screen.getByLabelText("Forward 5 seconds")).toBeTruthy();
 });
+
+it("steps source video by nominal frames without touching project trim marks",async()=>{
+  const onChange=vi.fn();
+  const selection={start:{ticks:"0",time_base:"1/90000"},end:{ticks:"1800000",time_base:"1/90000"},onChange};
+  render(<VideoPlayer root="library" path="one.mp4" autoLoad selection={selection} onOpenExternal={()=>{}}/>);
+  const video=await screen.findByLabelText("Selected video") as HTMLVideoElement;
+  const next=screen.getByRole("button",{name:"Next frame"}) as HTMLButtonElement;
+  await waitFor(()=>expect(next.disabled).toBe(false));
+  video.currentTime=1;fireEvent.timeUpdate(video);
+  fireEvent.click(next);
+  expect(video.currentTime).toBeCloseTo(31/30);
+  expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+  const section=screen.getByLabelText("Video playback");
+  fireEvent.keyDown(section,{key:","});
+  expect(video.currentTime).toBeCloseTo(1);
+  expect(onChange).not.toHaveBeenCalled();
+});
