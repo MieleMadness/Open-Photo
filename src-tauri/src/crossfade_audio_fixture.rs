@@ -4,8 +4,7 @@
 
 use crate::{
     crossfade_clock::{self, Boundary, ClipClock},
-    crossfade_graph,
-    video_engine, video_probe, video_project,
+    crossfade_graph, video_engine, video_probe, video_project,
 };
 use std::{
     ffi::{OsStr, OsString},
@@ -34,7 +33,12 @@ fn rms_at(samples: &[f32], seconds: f64) -> f64 {
     let center = (seconds * 48000.0).round() as usize;
     let radius = 4800;
     let span = &samples[center - radius..center + radius];
-    (span.iter().map(|sample| f64::from(*sample).powi(2)).sum::<f64>() / span.len() as f64).sqrt()
+    (span
+        .iter()
+        .map(|sample| f64::from(*sample).powi(2))
+        .sum::<f64>()
+        / span.len() as f64)
+        .sqrt()
 }
 
 #[test]
