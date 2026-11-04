@@ -2010,6 +2010,7 @@ mod tests {
         // One source has audible AAC; the second has no audio stream. Reuse the
         // production clip-part preprocessor, but keep graph execution test-only.
         let (fixture, snapshot) = fixture();
+        let canonical_scratch = fs::canonicalize(&fixture.0).unwrap();
         let frames = frame_allocation(&snapshot.project).unwrap();
         assert_eq!(frames, vec![6, 9]);
         let rate = snapshot.project.frame_rate;
@@ -2048,7 +2049,7 @@ mod tests {
                     .unwrap();
             let part = PartSource::video(prepared);
             assert_eq!(part.audio_stream.is_some(), index == 0);
-            let output = fixture.0.join(format!("crossfade-part-{index}.mkv"));
+            let output = canonical_scratch.join(format!("crossfade-part-{index}.mkv"));
             let args = part_args(
                 &part,
                 &snapshot.project.clips[index].edits,
@@ -2225,6 +2226,78 @@ mod tests {
         assert_eq!(result.audio.len(), 1);
         assert_eq!(result.audio[0].sample_rate.as_deref(), Some("48000"));
         assert!((result.duration_seconds - 0.4).abs() < 0.05);
+        // Phase I full test-only entrypoint: same normalized parts and minted
+        // receipts pass the real FFmpeg graph, full decode, AAC presentation
+        // clock, pinned Windows source handles and atomic publication.
+        let saved_clips = [
+            crate::crossfade_clock::ClipClock {
+                id: &snapshot.project.clips[0].id,
+                frames: frames[0],
+            },
+            crate::crossfade_clock::ClipClock {
+                id: &snapshot.project.clips[1].id,
+                frames: frames[1],
+            },
+        ];
+        let saved_edges = [crate::crossfade_clock::Boundary {
+            from_clip_id: &snapshot.project.clips[0].id,
+            to_clip_id: &snapshot.project.clips[1].id,
+            frames: 3,
+        }];
+        let plan = crate::crossfade_preflight::plan_allocated(
+            &saved_clips,
+            &saved_edges,
+            &[true, false],
+            rate,
+        )
+        .unwrap();
+        let engine_root = engine();
+        let verified_scratch = canonical_scratch.join("full-verified-crossfade.mp4");
+        let published = canonical_scratch.join("published-crossfade.mp4");
+        crate::crossfade_pipeline::render_verify_publish_snapshot_receipts(
+            crate::crossfade_command::CrossfadeExecution {
+                engine: &engine_root,
+                plan: &plan,
+                inputs: &parts,
+                output: &verified_scratch,
+                fps: rate,
+                max_bytes: 64 * 1024 * 1024,
+            },
+            &published,
+            &snapshot,
+            &receipts,
+            || false,
+        )
+        .unwrap();
+        assert!(!verified_scratch.exists());
+        assert!(published.exists());
+        video_render::decode_check(&engine_root, &published, || false, |_| {}).unwrap();
+        let verified = video_probe::probe(&engine_root, &published, || false).unwrap();
+        assert_eq!(verified.frame_count, Some(12));
+        assert_eq!(verified.audio.len(), 1);
+        snapshot.revalidate(|| false).unwrap();
+        // A destination collision must fail without replacing the published MP4.
+        let (saved_bytes, saved_hash) =
+            video_project::fingerprint(&published, || false).unwrap();
+        assert!(crate::crossfade_pipeline::render_verify_publish_snapshot_receipts(
+            crate::crossfade_command::CrossfadeExecution {
+                engine: &engine_root,
+                plan: &plan,
+                inputs: &parts,
+                output: &verified_scratch,
+                fps: rate,
+                max_bytes: 64 * 1024 * 1024,
+            },
+            &published,
+            &snapshot,
+            &receipts,
+            || false,
+        )
+        .is_err());
+        assert!(!verified_scratch.exists());
+        let (after_bytes, after_hash) =
+            video_project::fingerprint(&published, || false).unwrap();
+        assert_eq!((after_bytes, after_hash), (saved_bytes, saved_hash));
         snapshot.revalidate(|| false).unwrap();
     }
 }
