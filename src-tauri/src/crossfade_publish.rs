@@ -58,7 +58,12 @@ pub(crate) fn publish_verified_cancellable(
     verify_originals()?;
     let mut stage = crate::safe_output::StagedOutput::new(destination)?;
     let mut source = File::open(scratch_mp4).map_err(|e| e.to_string())?;
-    crate::crossfade_staging::copy_verified_bytes(&mut source, stage.file(), expected_bytes, &cancel)?;
+    crate::crossfade_staging::copy_verified_bytes(
+        &mut source,
+        stage.file(),
+        expected_bytes,
+        &cancel,
+    )?;
     stage.file().sync_all().map_err(|e| e.to_string())?;
     let (staged_len, staged_hash) =
         crate::video_project::fingerprint(stage.temporary_path(), &cancel)?;
@@ -216,7 +221,10 @@ mod tests {
                     .unwrap()
                     .filter_map(Result::ok)
                     .any(|entry| {
-                        let is_stage = entry.file_name().to_string_lossy().starts_with(".openphoto-");
+                        let is_stage = entry
+                            .file_name()
+                            .to_string_lossy()
+                            .starts_with(".openphoto-");
                         is_stage && entry.metadata().is_ok_and(|metadata| metadata.len() > 0)
                     });
                 if wrote_chunk {
