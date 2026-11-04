@@ -72,9 +72,7 @@ impl PinnedMedia {
             if count != *bytes || format!("{:x}", digest.finalize()) != *hash {
                 return Err("Crossfade pinned input differs from its saved fingerprint.".into());
             }
-            handle
-                .seek(SeekFrom::Start(0))
-                .map_err(|e| e.to_string())?;
+            handle.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
             handles.push(handle);
         }
         Ok(Self { handles })
