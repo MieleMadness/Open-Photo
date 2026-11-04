@@ -38,6 +38,8 @@ mod crossfade_scratch;
 mod crossfade_snapshot;
 #[cfg(test)]
 mod crossfade_staging;
+#[cfg(all(test, windows))]
+mod crossfade_windows_guard;
 mod edit_export;
 mod geo;
 mod image_decode;
