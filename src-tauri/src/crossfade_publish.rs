@@ -216,8 +216,8 @@ mod tests {
                     .unwrap()
                     .filter_map(Result::ok)
                     .any(|entry| {
-                        entry.file_name().to_string_lossy().starts_with(".openphoto-")
-                            && entry.metadata().is_ok_and(|metadata| metadata.len() > 0)
+                        let is_stage = entry.file_name().to_string_lossy().starts_with(".openphoto-");
+                        is_stage && entry.metadata().is_ok_and(|metadata| metadata.len() > 0)
                     });
                 if wrote_chunk {
                     cancelled_after_copy_started.set(true);
