@@ -62,6 +62,7 @@ fn render_verify_publish_with_part_guard(
         return Err("Crossfade cancelled before publication.".into());
     }
     let length = fs::metadata(scratch).map_err(|e| e.to_string())?.len();
+    require_publication_space(destination, length)?;
     crossfade_publish::publish_with_sources(scratch, destination, length, sources, &cancel)?;
     Ok(())
 }
@@ -143,6 +144,24 @@ pub(crate) fn render_verify_publish_snapshot_receipts(
         crate::crossfade_windows_guard::PinnedMedia::acquire(&expected, &cancel)?
     };
     render_verify_publish_with_part_guard(request, destination, &expectations, validate, &cancel)
+}
+
+/// Reserve enough free space for the entire independently staged copy plus
+/// a fixed filesystem/metadata margin. Never publish when disk availability
+/// cannot be measured reliably for this experimental Windows export path.
+fn require_publication_space(destination: &Path, scratch_bytes: u64) -> Result<(), String> {
+    let reserve = scratch_bytes
+        .checked_add(32 * 1024 * 1024)
+        .ok_or("Crossfade staging free-space budget overflow.")?;
+    let parent = destination
+        .parent()
+        .ok_or("Crossfade export destination has no parent directory.")?;
+    let available = crate::video_export::available_space(parent)?
+        .ok_or("Crossfade export destination space cannot be verified.")?;
+    if available < reserve {
+        return Err("Not enough destination disk space for verified crossfade staging.".into());
+    }
+    Ok(())
 }
 
 fn crossfade_audio_count_check(
