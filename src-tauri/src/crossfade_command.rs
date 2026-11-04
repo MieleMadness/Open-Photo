@@ -118,6 +118,85 @@ pub(crate) fn command_args(
     Ok(args)
 }
 
+/// Experimental test-only executor. Never use this with untrusted or user-owned
+/// paths: the caller must own the scratch directory and verified normalized parts.
+pub(crate) fn execute_in_scratch(
+    engine: &Path,
+    plan: &PreparedCrossfade,
+    inputs: &[PathBuf],
+    output: &Path,
+    fps: u32,
+    max_bytes: u64,
+    cancel: impl Fn() -> bool,
+) -> Result<(), String> {
+    crate::crossfade_scratch::validate_scratch_paths(
+        output
+            .parent()
+            .ok_or("Crossfade output folder is missing.")?,
+        inputs,
+        output,
+    )?;
+    let args = command_args(plan, inputs, output, fps, max_bytes)?;
+    struct Cleanup<'a> {
+        output: &'a Path,
+        verified: bool,
+    }
+    impl Drop for Cleanup<'_> {
+        fn drop(&mut self) {
+            if !self.verified {
+                let _ = std::fs::remove_file(self.output);
+            }
+        }
+    }
+    let mut cleanup = Cleanup {
+        output,
+        verified: false,
+    };
+    if cancel() {
+        return Err("Crossfade cancelled before execution.".into());
+    }
+    let ffmpeg = crate::video_engine::tool(engine, "ffmpeg")?;
+    crate::video_engine::run_until(
+        &ffmpeg,
+        &args.iter().map(OsString::as_os_str).collect::<Vec<_>>(),
+        std::time::Duration::from_secs(120),
+        &cancel,
+    )?;
+    if cancel() {
+        return Err("Crossfade cancelled after execution.".into());
+    }
+    let result = crate::video_probe::probe(engine, output, &cancel)?;
+    if cancel() {
+        return Err("Crossfade cancelled during output validation.".into());
+    }
+    let bytes = std::fs::metadata(output).map_err(|e| e.to_string())?.len();
+    if bytes == 0 || bytes > max_bytes {
+        return Err("Crossfade generated an empty or oversized output.".into());
+    }
+    let duration = plan.graph.expected_frames as f64 / f64::from(fps);
+    if result.frame_count != Some(plan.graph.expected_frames)
+        || (result.duration_seconds - duration).abs() > 0.05
+        || result.audio.len() != 1
+        || result.audio[0].sample_rate.as_deref() != Some("48000")
+        || (result.audio[0]
+            .duration_seconds
+            .unwrap_or(result.duration_seconds)
+            - duration)
+            .abs()
+            > 0.05
+    {
+        return Err("Crossfade output frame/audio verification failed.".into());
+    }
+    // Container/probe metadata alone cannot catch corrupted decoded frames.
+    // Reuse the existing bounded, cancellable full-output decode check.
+    crate::video_render::decode_check(engine, output, &cancel, |_| {})?;
+    if cancel() {
+        return Err("Crossfade cancelled during decoded-output verification.".into());
+    }
+    cleanup.verified = true;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,6 +302,7 @@ mod bundled_command_tests {
         let ffmpeg = video_engine::tool(&engine, "ffmpeg").unwrap();
         let dir = std::env::temp_dir().join(format!("crossfade-command-{}", video_project::id()));
         fs::create_dir(&dir).unwrap();
+        let dir = fs::canonicalize(&dir).unwrap();
         let _fixture = Fixture(dir.clone());
 
         let clips = [
@@ -282,10 +362,13 @@ mod bundled_command_tests {
 
         let output = dir.join("result.mp4");
         let args = command_args(&preflight, &parts, &output, 30, 64 * 1024 * 1024).unwrap();
-        video_engine::run_until(
-            &ffmpeg,
-            &args.iter().map(OsString::as_os_str).collect::<Vec<_>>(),
-            Duration::from_secs(90),
+        execute_in_scratch(
+            &engine,
+            &preflight,
+            &parts,
+            &output,
+            30,
+            64 * 1024 * 1024,
             || false,
         )
         .unwrap();
@@ -301,6 +384,51 @@ mod bundled_command_tests {
             .duration_seconds
             .unwrap_or(result.duration_seconds);
         assert!((audio_seconds - 3.5).abs() < 0.05);
+
+        let cancelled_output = dir.join("cancelled.mp4");
+        assert!(execute_in_scratch(
+            &engine,
+            &preflight,
+            &parts,
+            &cancelled_output,
+            30,
+            64 * 1024 * 1024,
+            || true,
+        )
+        .is_err());
+        assert!(!cancelled_output.exists());
+
+        // Cancel after preflight but during the process-runner lifecycle.
+        let cancellation_checks = std::sync::atomic::AtomicUsize::new(0);
+        let interrupted_output = dir.join("interrupted.mp4");
+        assert!(execute_in_scratch(
+            &engine,
+            &preflight,
+            &parts,
+            &interrupted_output,
+            30,
+            64 * 1024 * 1024,
+            || cancellation_checks.fetch_add(1, std::sync::atomic::Ordering::SeqCst) > 0,
+        )
+        .is_err());
+        assert!(cancellation_checks.load(std::sync::atomic::Ordering::SeqCst) >= 2);
+        assert!(!interrupted_output.exists());
+
+        // Corrupt normalized inputs must never leave a published output.
+        let corrupt_part = dir.join("corrupt.mkv");
+        fs::write(&corrupt_part, b"not matroska").unwrap();
+        let corrupt_output = dir.join("corrupt.mp4");
+        assert!(execute_in_scratch(
+            &engine,
+            &preflight,
+            &[parts[0].clone(), corrupt_part],
+            &corrupt_output,
+            30,
+            64 * 1024 * 1024,
+            || false,
+        )
+        .is_err());
+        assert!(!corrupt_output.exists());
 
         // FFmpeg versions may return success when -n skips an existing file.
         // Verify the actual safety contract: output contents must not change.
