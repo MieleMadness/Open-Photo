@@ -34,7 +34,7 @@ pub(crate) fn plan(clock: &Clock<'_>, fps: u32) -> Result<FilterGraph, String> {
     let mut filters = Vec::new();
     for index in 0..clock.entries.len() {
         filters.push(format!(
-            "[{index}:v:0]settb=AVTB,setpts=PTS-STARTPTS,format=yuv420p[v{index}]"
+            "[{index}:v:0]settb=AVTB,setpts=PTS-STARTPTS,fps={fps},format=yuv420p[v{index}]"
         ));
         filters.push(format!(
             "[{index}:a:0]aformat=sample_fmts=flt:channel_layouts=stereo,aresample=48000,asetpts=PTS-STARTPTS[a{index}]"
@@ -137,6 +137,12 @@ mod tests {
         assert_eq!(graph.video_output, "vx1");
         assert_eq!(graph.audio_output, "ax1");
         assert_eq!(graph.expected_frames, 195);
+        assert!(graph
+            .filter_complex
+            .contains("[0:v:0]settb=AVTB,setpts=PTS-STARTPTS,fps=30,format=yuv420p[v0]"));
+        assert!(graph
+            .filter_complex
+            .contains("[1:v:0]settb=AVTB,setpts=PTS-STARTPTS,fps=30,format=yuv420p[v1]"));
     }
 
     #[test]
