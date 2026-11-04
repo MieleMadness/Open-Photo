@@ -302,6 +302,7 @@ mod bundled_command_tests {
         let ffmpeg = video_engine::tool(&engine, "ffmpeg").unwrap();
         let dir = std::env::temp_dir().join(format!("crossfade-command-{}", video_project::id()));
         fs::create_dir(&dir).unwrap();
+        let dir = fs::canonicalize(&dir).unwrap();
         let _fixture = Fixture(dir.clone());
 
         let clips = [
