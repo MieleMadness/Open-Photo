@@ -31,14 +31,10 @@ pub(crate) fn validate_normalized_parts(
             || info.rotation_degrees.abs() > 0.01
             || info.hdr
             || info.frame_rate_may_vary
-            || info
-                .frame_rate
-                .as_deref()
-                .and_then(|value| {
-                    let (a, b) = value.split_once('/')?;
-                    Some(a.parse::<u64>().ok()? == u64::from(fps).checked_mul(b.parse::<u64>().ok()?)?)
-                })
-                != Some(true)
+            || info.frame_rate.as_deref().and_then(|value| {
+                let (a, b) = value.split_once('/')?;
+                Some(a.parse::<u64>().ok()? == u64::from(fps).checked_mul(b.parse::<u64>().ok()?)?)
+            }) != Some(true)
             || (info.duration_seconds - duration).abs() > 1.0 / f64::from(fps)
             || info.audio.len() != 1
         {
@@ -52,7 +48,9 @@ pub(crate) fn validate_normalized_parts(
                 .duration_seconds
                 .is_some_and(|seconds| (seconds - duration).abs() > 0.05)
         {
-            return Err("Crossfade part must contain 48kHz stereo PCM with matching duration.".into());
+            return Err(
+                "Crossfade part must contain 48kHz stereo PCM with matching duration.".into(),
+            );
         }
     }
     Ok(())
