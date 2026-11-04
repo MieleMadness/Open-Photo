@@ -61,7 +61,9 @@ impl PinnedMedia {
                 if n == 0 {
                     break;
                 }
-                count = count.checked_add(n as u64).ok_or("Crossfade input exceeds byte limit.")?;
+                count = count
+                    .checked_add(n as u64)
+                    .ok_or("Crossfade input exceeds byte limit.")?;
                 if count > *bytes {
                     return Err("Crossfade pinned input size changed.".into());
                 }
@@ -70,7 +72,9 @@ impl PinnedMedia {
             if count != *bytes || format!("{:x}", digest.finalize()) != *hash {
                 return Err("Crossfade pinned input differs from its saved fingerprint.".into());
             }
-            handle.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+            handle
+                .seek(SeekFrom::Start(0))
+                .map_err(|e| e.to_string())?;
             handles.push(handle);
         }
         Ok(Self { handles })
@@ -115,7 +119,10 @@ mod tests {
         fs::write(&path, b"saved source").unwrap();
         let (bytes, hash) = crate::video_project::fingerprint(&path, || false).unwrap();
         assert!(PinnedMedia::acquire(&[(&path, bytes, &hash)], || true).is_err());
-        assert!(PinnedMedia::acquire(&[(&path, bytes, &hash), (&path, bytes, &hash)], || false).is_err());
+        assert!(
+            PinnedMedia::acquire(&[(&path, bytes, &hash), (&path, bytes, &hash)], || false)
+                .is_err()
+        );
         fs::write(&path, b"changed data").unwrap();
         assert!(PinnedMedia::acquire(&[(&path, bytes, &hash)], || false).is_err());
         fs::remove_dir_all(dir).unwrap();
