@@ -19,6 +19,8 @@ mod crossfade_command;
 #[cfg(test)]
 mod crossfade_graph;
 #[cfg(test)]
+mod crossfade_inputs;
+#[cfg(test)]
 mod crossfade_preflight;
 #[cfg(test)]
 mod crossfade_scratch;
