@@ -206,6 +206,62 @@ mod tests {
     }
 
     #[test]
+    fn accepts_exact_two_hour_limit_and_rejects_one_extra_frame() {
+        let clips = [
+            ClipClock {
+                id: "a",
+                frames: 108_001,
+            },
+            ClipClock {
+                id: "b",
+                frames: 108_001,
+            },
+        ];
+        let edges = [Boundary {
+            from_clip_id: "a",
+            to_clip_id: "b",
+            frames: 2,
+        }];
+        let accepted = plan_allocated(&clips, &edges, &[false, false], 30).unwrap();
+        assert_eq!(accepted.graph.expected_frames, 216_000);
+        assert_eq!(accepted.expected_audio_samples, 345_600_000);
+        assert_eq!(accepted.silence_required_for, vec![0, 1]);
+
+        let over_limit = [
+            ClipClock {
+                id: "a",
+                frames: 108_002,
+            },
+            ClipClock {
+                id: "b",
+                frames: 108_001,
+            },
+        ];
+        assert!(plan_allocated(&over_limit, &edges, &[false, false], 30).is_err());
+    }
+
+    #[test]
+    fn refuses_more_than_two_hundred_clips_before_graph_planning() {
+        let ids: Vec<String> = (0..201).map(|index| format!("clip-{index}")).collect();
+        let clips: Vec<ClipClock<'_>> = ids
+            .iter()
+            .map(|id| ClipClock {
+                id: id.as_str(),
+                frames: 30,
+            })
+            .collect();
+        let boundaries = [Boundary {
+            from_clip_id: "clip-0",
+            to_clip_id: "clip-1",
+            frames: 2,
+        }];
+        assert!(plan_allocated(&clips, &boundaries, &[true; 201], 30).is_err());
+        let accepted = plan_allocated(&clips[..200], &boundaries, &[true; 200], 30).unwrap();
+        assert_eq!(accepted.graph.expected_frames, 5_998);
+        assert!(accepted.silence_required_for.is_empty());
+    }
+
+    #[test]
     fn rejects_invalid_saved_sequence_before_computing_crossfades() {
         let project = Sequence {
             schema_version: 3,
