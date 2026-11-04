@@ -62,6 +62,7 @@ fn render_verify_publish_with_part_guard(
         return Err("Crossfade cancelled before publication.".into());
     }
     let length = fs::metadata(scratch).map_err(|e| e.to_string())?.len();
+    verify_staging_space(destination, length)?;
     crossfade_publish::publish_with_sources(scratch, destination, length, sources, &cancel)?;
     Ok(())
 }
@@ -150,6 +151,24 @@ pub(crate) fn render_verify_publish_snapshot_receipts(
 /// an independently staged destination MP4 before starting the encoder.
 /// On the same Windows volume both allocations may coexist, so require their
 /// *combined* budget instead of two insufficient independent checks.
+/// Check real free destination space *again* immediately before staging the
+/// measured scratch MP4: normalization and encoding can consume the original
+/// preflight reserve while this export is running.
+fn verify_staging_space(destination: &Path, bytes: u64) -> Result<(), String> {
+    let required = bytes
+        .checked_add(16 * 1024 * 1024)
+        .ok_or("Crossfade staged output free-space requirement overflow.")?;
+    let parent = destination
+        .parent()
+        .ok_or("Crossfade publication destination has no parent folder.")?;
+    let remaining = crate::video_export::available_space(parent)?
+        .ok_or("Crossfade destination free space could not be verified.")?;
+    if remaining < required {
+        return Err("Not enough destination disk space to stage the verified crossfade.".into());
+    }
+    Ok(())
+}
+
 fn verify_crossfade_disk_budget(
     scratch: &Path,
     destination: &Path,
