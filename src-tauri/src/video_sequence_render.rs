@@ -1041,6 +1041,48 @@ mod tests {
             crate::crossfade_snapshot::SourceManifest::from_snapshot(&snapshot, || false).unwrap();
         assert_eq!(manifest.expectations().len(), 2);
         manifest.verify(|| false).unwrap();
+        let clock_clips = [
+            crate::crossfade_clock::ClipClock {
+                id: "a",
+                frames: 12,
+            },
+            crate::crossfade_clock::ClipClock {
+                id: "b",
+                frames: 12,
+            },
+        ];
+        let boundaries = [crate::crossfade_clock::Boundary {
+            from_clip_id: "a",
+            to_clip_id: "b",
+            frames: 3,
+        }];
+        let plan = crate::crossfade_preflight::plan_allocated(
+            &clock_clips,
+            &boundaries,
+            &[true, false],
+            30,
+        )
+        .unwrap();
+        let nonexistent_input = [fixture.0.join("never-normalized.mkv")];
+        let scratch = fixture.0.join("never-rendered.mp4");
+        let publication = fixture.0.join("never-published.mp4");
+        let request = crate::crossfade_command::CrossfadeExecution {
+            engine: &engine(),
+            plan: &plan,
+            inputs: &nonexistent_input,
+            output: &scratch,
+            fps: 30,
+            max_bytes: 64 * 1024 * 1024,
+        };
+        assert!(crate::crossfade_pipeline::render_verify_publish_snapshot(
+            request,
+            &publication,
+            &snapshot,
+            || false,
+        )
+        .is_err());
+        assert!(!scratch.exists());
+        assert!(!publication.exists());
         let changed = fixture.0.join("source-0 世界.mp4");
         let mut bytes = fs::read(&changed).unwrap();
         let last = bytes.len() - 1;
