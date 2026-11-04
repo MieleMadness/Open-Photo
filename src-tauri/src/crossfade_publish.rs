@@ -2,7 +2,6 @@
 //! A caller must have decoded and validated the scratch MP4 before entry.
 use std::{
     fs::{self, File},
-    io,
     path::Path,
 };
 
@@ -14,6 +13,28 @@ pub(crate) fn publish_verified(
     expected_bytes: u64,
     verify_originals: impl Fn() -> Result<(), String>,
 ) -> Result<(), String> {
+    publish_verified_cancellable(
+        scratch_mp4,
+        destination,
+        expected_bytes,
+        verify_originals,
+        || false,
+    )
+}
+
+/// Cooperative cancellation is checked during fingerprint verification and
+/// each 64 KiB staging copy chunk. StagedOutput removes temporary content on
+/// any error; no file is published before every verification completes.
+pub(crate) fn publish_verified_cancellable(
+    scratch_mp4: &Path,
+    destination: &Path,
+    expected_bytes: u64,
+    verify_originals: impl Fn() -> Result<(), String>,
+    cancel: impl Fn() -> bool,
+) -> Result<(), String> {
+    if cancel() {
+        return Err("Crossfade publication cancelled.".into());
+    }
     if expected_bytes == 0 || expected_bytes > crate::video_render::MAX_EXPORT_BYTES {
         return Err("Crossfade published byte limit is invalid.".into());
     }
@@ -29,16 +50,33 @@ pub(crate) fn publish_verified(
     if metadata.len() != expected_bytes {
         return Err("Crossfade scratch MP4 size changed before publication.".into());
     }
+    // A same-sized scratch MP4 replacement must not silently pass staging.
+    let (initial_len, initial_hash) = crate::video_project::fingerprint(scratch_mp4, &cancel)?;
+    if initial_len != expected_bytes {
+        return Err("Crossfade verified scratch length changed.".into());
+    }
     verify_originals()?;
     let mut stage = crate::safe_output::StagedOutput::new(destination)?;
     let mut source = File::open(scratch_mp4).map_err(|e| e.to_string())?;
-    let written = io::copy(&mut source, stage.file()).map_err(|e| e.to_string())?;
-    if written != expected_bytes {
-        return Err("Crossfade scratch MP4 changed while staging.".into());
+    crate::crossfade_staging::copy_verified_bytes(
+        &mut source,
+        stage.file(),
+        expected_bytes,
+        &cancel,
+    )?;
+    stage.file().sync_all().map_err(|e| e.to_string())?;
+    let (staged_len, staged_hash) =
+        crate::video_project::fingerprint(stage.temporary_path(), &cancel)?;
+    if staged_len != expected_bytes || staged_hash != initial_hash {
+        return Err("Crossfade staged MP4 differs from verified scratch bytes.".into());
     }
     verify_originals()?;
-    if fs::metadata(scratch_mp4).map_err(|e| e.to_string())?.len() != expected_bytes {
+    let (final_len, final_hash) = crate::video_project::fingerprint(scratch_mp4, &cancel)?;
+    if final_len != expected_bytes || final_hash != initial_hash {
         return Err("Crossfade scratch MP4 changed before final publication.".into());
+    }
+    if cancel() {
+        return Err("Crossfade publication cancelled before commit.".into());
     }
     stage.commit()?;
     Ok(())
@@ -57,9 +95,13 @@ pub(crate) fn publish_with_sources(
     if cancel() {
         return Err("Crossfade publication cancelled.".into());
     }
-    publish_verified(scratch_mp4, destination, expected_bytes, || {
-        crate::crossfade_integrity::verify_source_fingerprints(sources, &cancel)
-    })
+    publish_verified_cancellable(
+        scratch_mp4,
+        destination,
+        expected_bytes,
+        || crate::crossfade_integrity::verify_source_fingerprints(sources, &cancel),
+        &cancel,
+    )
 }
 
 #[cfg(test)]
@@ -125,6 +167,76 @@ mod tests {
         assert_eq!(fs::read(&destination).unwrap(), b"verified test video");
         assert!(publish_verified(&scratch, &destination, 19, || Ok(())).is_err());
         assert_eq!(fs::read(&destination).unwrap(), b"verified test video");
+    }
+
+    #[test]
+    fn rejects_same_size_scratch_replacement_during_staging() {
+        let dir = std::env::temp_dir().join(format!(
+            "openphoto-crossfade-stage-hash-{}",
+            crate::video_project::id()
+        ));
+        fs::create_dir(&dir).unwrap();
+        let _fixture = Fixture(dir.clone());
+        let scratch = dir.join("scratch.mp4");
+        let destination = dir.join("destination.mp4");
+        fs::write(&scratch, b"before").unwrap();
+        let calls = Cell::new(0_u32);
+        let result = publish_verified(&scratch, &destination, 6, || {
+            calls.set(calls.get() + 1);
+            if calls.get() == 1 {
+                fs::write(&scratch, b"after!").unwrap();
+            }
+            Ok(())
+        });
+        assert!(result.is_err());
+        assert!(!destination.exists());
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+        fs::write(&scratch, b"before").unwrap();
+        publish_verified(&scratch, &destination, 6, || Ok(())).unwrap();
+        assert_eq!(fs::read(&destination).unwrap(), b"before");
+    }
+
+    #[test]
+    fn cancellation_during_staging_removes_partial_copy() {
+        let dir = std::env::temp_dir().join(format!(
+            "openphoto-crossfade-staging-cancel-{}",
+            crate::video_project::id()
+        ));
+        fs::create_dir(&dir).unwrap();
+        let _fixture = Fixture(dir.clone());
+        let scratch = dir.join("scratch.mp4");
+        let destination = dir.join("destination.mp4");
+        fs::write(&scratch, vec![0x5a; 512 * 1024]).unwrap();
+        let cancelled_after_copy_started = Cell::new(false);
+        let result = publish_verified_cancellable(
+            &scratch,
+            &destination,
+            512 * 1024,
+            || Ok(()),
+            || {
+                // Only cancel once the owned staging file actually contains
+                // data. This exercises the integrated per-chunk cancellation
+                // path, not just the preflight fingerprint checks.
+                let wrote_chunk = fs::read_dir(&dir)
+                    .unwrap()
+                    .filter_map(Result::ok)
+                    .any(|entry| {
+                        let is_stage = entry
+                            .file_name()
+                            .to_string_lossy()
+                            .starts_with(".openphoto-");
+                        is_stage && entry.metadata().is_ok_and(|metadata| metadata.len() > 0)
+                    });
+                if wrote_chunk {
+                    cancelled_after_copy_started.set(true);
+                }
+                wrote_chunk
+            },
+        );
+        assert!(cancelled_after_copy_started.get());
+        assert!(result.is_err());
+        assert!(!destination.exists());
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
     }
 
     #[test]
