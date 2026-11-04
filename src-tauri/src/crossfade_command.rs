@@ -94,11 +94,7 @@ pub(crate) fn command_args(
         "-frames:v".into(),
         plan.graph.expected_frames.to_string().into(),
         "-t".into(),
-        format!(
-            "{:.9}",
-            plan.graph.expected_frames as f64 / f64::from(fps)
-        )
-        .into(),
+        format!("{:.9}", plan.graph.expected_frames as f64 / f64::from(fps)).into()
         "-c:v".into(),
         "libopenh264".into(),
         "-pix_fmt".into(),
@@ -148,7 +144,11 @@ mod tests {
         }];
         let plan = plan_allocated(&clips, &edges, &[true, false], 30).unwrap();
         let dir = std::env::temp_dir().join("openphoto-crossfade-plan-test");
-        (plan, vec![dir.join("part-0.mkv"), dir.join("part-1.mkv")], dir.join("result.mp4"))
+        (
+            plan,
+            vec![dir.join("part-0.mkv"), dir.join("part-1.mkv")],
+            dir.join("result.mp4"),
+        )
     }
 
     #[test]
