@@ -1035,6 +1035,27 @@ mod tests {
         .unwrap()
     }
     #[test]
+    fn crossfade_manifest_uses_saved_hashes_and_rejects_changed_video() {
+        let (fixture, snapshot) = fixture();
+        let manifest =
+            crate::crossfade_snapshot::SourceManifest::from_snapshot(&snapshot, || false).unwrap();
+        assert_eq!(manifest.expectations().len(), 2);
+        manifest.verify(|| false).unwrap();
+        let changed = fixture.0.join("source-0 世界.mp4");
+        let mut bytes = fs::read(&changed).unwrap();
+        let last = bytes.len() - 1;
+        bytes[last] ^= 1;
+        fs::write(&changed, bytes).unwrap();
+        assert!(manifest.verify(|| false).is_err());
+        assert!(crate::crossfade_snapshot::SourceManifest::from_snapshot(
+            &snapshot,
+            || false
+        )
+        .is_err());
+        assert!(manifest.verify(|| true).is_err());
+    }
+
+    #[test]
     fn audio_track_mixes_into_native_project_preview() {
         let (fixture, mut snapshot) = fixture();
         let source = &snapshot.project.assets[0];
