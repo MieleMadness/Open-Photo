@@ -16,3 +16,7 @@ This change is **test-only** and does not activate an editor feature.
 ## Outstanding gates for production use
 
 A real renderer needs to safely normalize every video/audio stream to exact expected counts, synthesize silence where required, enforce cancellation and source path protection, run the bundled FFmpeg graph, verify output frame/sample counts and preview/export parity, then introduce schema migration and editor controls for selectable crossfades. This preflight is a guardrail, not a replacement for those stages.
+
+## Resource-limit regression tests
+
+The test-only preflight now covers a timeline of **exactly 216,000 frames at 30fps (two hours)** and rejects a project exceeding that by one frame. It checks the corresponding 345,600,000 expected 48-kHz audio samples and requires explicit silence for both audio-less inputs. A separate test rejects 201 clips while accepting 200, with one overlap and an exact expected output clock. These checks validate planning only: they deliberately do not allocate two hours of media, perform an export, or change active preview/rendering behavior.
