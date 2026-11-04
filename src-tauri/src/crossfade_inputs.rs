@@ -36,7 +36,7 @@ pub(crate) fn validate_normalized_parts(
                 .as_deref()
                 .and_then(|value| {
                     let (a, b) = value.split_once('/')?;
-                    Some(a.parse::<u64>().ok()? == u64::from(fps) * b.parse::<u64>().ok()?)
+                    Some(a.parse::<u64>().ok()? == u64::from(fps).checked_mul(b.parse::<u64>().ok()?)?)
                 })
                 != Some(true)
             || (info.duration_seconds - duration).abs() > 1.0 / f64::from(fps)
@@ -105,7 +105,9 @@ mod tests {
     fn rejects_wrong_video_clock_geometry_or_audio_normalization() {
         let first = part(60);
         let second = part(90);
-        assert!(validate_normalized_parts(&[first.clone(), second.clone()], &[60, 91], 30).is_err());
+        assert!(
+            validate_normalized_parts(&[first.clone(), second.clone()], &[60, 91], 30).is_err()
+        );
         let mut wrong_canvas = second.clone();
         wrong_canvas.width = 128;
         assert!(validate_normalized_parts(&[first.clone(), wrong_canvas], &[60, 90], 30).is_err());
