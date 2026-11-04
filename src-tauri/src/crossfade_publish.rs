@@ -141,6 +141,33 @@ mod tests {
     }
 
     #[test]
+    fn rejects_same_size_scratch_replacement_during_staging() {
+        let dir = std::env::temp_dir().join(format!(
+            "openphoto-crossfade-stage-hash-{}",
+            crate::video_project::id()
+        ));
+        fs::create_dir(&dir).unwrap();
+        let _fixture = Fixture(dir.clone());
+        let scratch = dir.join("scratch.mp4");
+        let destination = dir.join("destination.mp4");
+        fs::write(&scratch, b"before").unwrap();
+        let calls = Cell::new(0_u32);
+        let result = publish_verified(&scratch, &destination, 6, || {
+            calls.set(calls.get() + 1);
+            if calls.get() == 1 {
+                fs::write(&scratch, b"after!").unwrap();
+            }
+            Ok(())
+        });
+        assert!(result.is_err());
+        assert!(!destination.exists());
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+        fs::write(&scratch, b"before").unwrap();
+        publish_verified(&scratch, &destination, 6, || Ok(())).unwrap();
+        assert_eq!(fs::read(&destination).unwrap(), b"before");
+    }
+
+    #[test]
     fn rejects_mutated_originals_and_preserves_racing_destinations() {
         let dir = std::env::temp_dir().join(format!(
             "openphoto-crossfade-racing-{}",
