@@ -143,7 +143,45 @@ pub(crate) fn execute_in_scratch(
         if cancel() {
             return Err("Crossfade cancelled while verifying normalized inputs.".into());
         }
-        normalized.push(crate::video_probe::probe(engine, part, &cancel)?);
+        let mut info = crate::video_probe::probe(engine, part, &cancel)?;
+        // Matroska commonly omits nb_frames. Count decoded video frames
+        // explicitly instead of trusting an estimated duration or frame rate.
+        let ffprobe = crate::video_engine::tool(engine, "ffprobe")?;
+        let count_args: [&std::ffi::OsStr; 14] = [
+            "-v".as_ref(),
+            "error".as_ref(),
+            "-max_alloc".as_ref(),
+            "268435456".as_ref(),
+            "-protocol_whitelist".as_ref(),
+            "file,pipe".as_ref(),
+            "-format_whitelist".as_ref(),
+            "matroska".as_ref(),
+            "-count_frames".as_ref(),
+            "-select_streams".as_ref(),
+            "v:0".as_ref(),
+            "-show_entries".as_ref(),
+            "stream=nb_read_frames".as_ref(),
+            "-of".as_ref(),
+        ];
+        let mut args = count_args.to_vec();
+        args.push("default=noprint_wrappers=1:nokey=1".as_ref());
+        args.push(part.as_os_str());
+        let measured = crate::video_engine::run_until(
+            &ffprobe,
+            &args,
+            std::time::Duration::from_secs(120),
+            &cancel,
+        )?;
+        let measured_frames = String::from_utf8(measured)
+            .map_err(|_| "Crossfade decoded frame count is not valid UTF-8.")?
+            .trim()
+            .parse::<u64>()
+            .map_err(|_| "Crossfade decoded frame count is unavailable.")?;
+        if info.frame_count.is_some_and(|reported| reported != measured_frames) {
+            return Err("Crossfade declared and decoded frame counts disagree.".into());
+        }
+        info.frame_count = Some(measured_frames);
+        normalized.push(info);
     }
     crate::crossfade_inputs::validate_normalized_parts(
         &normalized,
