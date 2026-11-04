@@ -1807,7 +1807,8 @@ mod tests {
         for (index, count) in frames.iter().enumerate() {
             let (root, project) = snapshot.single(index).unwrap();
             let prepared =
-                video_render::prepare(&engine(), &root, &project, render_options, || false).unwrap();
+                video_render::prepare(&engine(), &root, &project, render_options, || false)
+                    .unwrap();
             let part = PartSource::video(prepared);
             assert_eq!(part.audio_stream.is_some(), index == 0);
             let output = fixture.0.join(format!("crossfade-part-{index}.mkv"));
