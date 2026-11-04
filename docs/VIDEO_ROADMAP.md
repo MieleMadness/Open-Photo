@@ -1,3 +1,13 @@
+## November 4, 2026 — Phase J isolated transition-edit command groundwork (draft)
+
+The `crossfadeCutCommands` module adds immutable add/replace/remove operations for an **experimental** adjacent-cut crossfade definition. It validates saved clip identities, 30/60 fps whole-frame bounds, two-frame reserve on both sides, and any neighboring overlaps *before* changing project state. No-op edits signal `changed: false` so a later UI can avoid unnecessary undo/autosave history, and changed boundaries are serialized in clip order. Focused unit tests cover frame budgets, malformed durations, removal and stale cuts.
+
+**Boundary:** This patch does not persist crossfade transitions, add controls, change schema v3, or route production preview/export. It is not user-visible. The accepted hard-cut/dip editor remains unchanged. Production Phase J is blocked on a real-media Windows acceptance report, production schema/recovery design, editor parity and verified export routing.
+
+**CI note:** Validate this PR's exact head before merging; an independently green branch is not sufficient to enable production crossfade export.
+
+---
+
 ## November 4, 2026 — Phase I native engineering checkpoint (updated)
 
 **Automated engineering baseline:** The experimental crossfade native pipeline was integrated through [PR #61](https://github.com/MieleMadness/Open-Photo/pull/61), which passed exact-head Windows Rust, frontend and full installer CI. [PR #63](https://github.com/MieleMadness/Open-Photo/pull/63) adds verified Windows file identity, hard-link rejection, pinning of saved originals during normalization and a final destination-space recheck; it requires its own full exact-head Windows success before merge.
