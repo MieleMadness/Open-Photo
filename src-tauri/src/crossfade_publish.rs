@@ -44,6 +44,24 @@ pub(crate) fn publish_verified(
     Ok(())
 }
 
+/// Test-only final publication adapter: verify *previously stored* original
+/// fingerprints both before staging and immediately before the atomic commit.
+/// The native crossfade executor remains separate until installed acceptance.
+pub(crate) fn publish_with_sources(
+    scratch_mp4: &Path,
+    destination: &Path,
+    expected_bytes: u64,
+    sources: &[crate::crossfade_integrity::SourceExpectation<'_>],
+    cancel: impl Fn() -> bool,
+) -> Result<(), String> {
+    if cancel() {
+        return Err("Crossfade publication cancelled.".into());
+    }
+    publish_verified(scratch_mp4, destination, expected_bytes, || {
+        crate::crossfade_integrity::verify_source_fingerprints(sources, &cancel)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -54,6 +72,36 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn source_bound_publication_rejects_changed_origins_and_cancellation() {
+        let dir = std::env::temp_dir().join(format!(
+            "openphoto-crossfade-source-publication-{}",
+            crate::video_project::id()
+        ));
+        fs::create_dir(&dir).unwrap();
+        let _fixture = Fixture(dir.clone());
+        let original = dir.join("original.mov");
+        let scratch = dir.join("verified.mp4");
+        let destination = dir.join("export.mp4");
+        fs::write(&original, b"saved original").unwrap();
+        fs::write(&scratch, b"verified sample").unwrap();
+        let (bytes, sha256) = crate::video_project::fingerprint(&original, || false).unwrap();
+        let expected = [crate::crossfade_integrity::SourceExpectation {
+            path: &original,
+            bytes,
+            sha256: &sha256,
+        }];
+        assert!(publish_with_sources(&scratch, &destination, 15, &expected, || true).is_err());
+        assert!(!destination.exists());
+        fs::write(&original, b"other original").unwrap();
+        assert!(publish_with_sources(&scratch, &destination, 15, &expected, || false).is_err());
+        assert!(!destination.exists());
+        fs::write(&original, b"saved original").unwrap();
+        publish_with_sources(&scratch, &destination, 15, &expected, || false).unwrap();
+        assert_eq!(fs::read(&destination).unwrap(), b"verified sample");
+        assert!(publish_with_sources(&scratch, &destination, 15, &expected, || false).is_err());
     }
 
     #[test]
