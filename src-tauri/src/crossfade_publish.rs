@@ -30,8 +30,7 @@ pub(crate) fn publish_verified(
         return Err("Crossfade scratch MP4 size changed before publication.".into());
     }
     // A same-sized scratch MP4 replacement must not silently pass staging.
-    let (initial_len, initial_hash) =
-        crate::video_project::fingerprint(scratch_mp4, || false)?;
+    let (initial_len, initial_hash) = crate::video_project::fingerprint(scratch_mp4, || false)?;
     if initial_len != expected_bytes {
         return Err("Crossfade verified scratch length changed.".into());
     }
