@@ -180,6 +180,55 @@ pub(crate) fn verify_presentation_samples(
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
+    #[test]
+    fn bundled_aac_presentation_clock_handles_encoder_priming() {
+        let engine = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources/video-engine");
+        let scratch = std::env::temp_dir().join(format!(
+            "openphoto-aac-presentation-{}",
+            crate::video_project::id()
+        ));
+        std::fs::create_dir(&scratch).unwrap();
+        struct Fixture(std::path::PathBuf);
+        impl Drop for Fixture {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let _fixture = Fixture(scratch.clone());
+        let output = scratch.join("two-seconds.mp4");
+        let args: &[&OsStr] = &[
+            "-nostdin".as_ref(),
+            "-v".as_ref(),
+            "error".as_ref(),
+            "-f".as_ref(),
+            "lavfi".as_ref(),
+            "-i".as_ref(),
+            "anullsrc=r=48000:cl=stereo".as_ref(),
+            "-t".as_ref(),
+            "2".as_ref(),
+            "-c:a".as_ref(),
+            "aac".as_ref(),
+            "-ar".as_ref(),
+            "48000".as_ref(),
+            "-ac".as_ref(),
+            "2".as_ref(),
+            "-f".as_ref(),
+            "mp4".as_ref(),
+            output.as_os_str(),
+        ];
+        crate::video_engine::run_until(
+            &crate::video_engine::tool(&engine, "ffmpeg").unwrap(),
+            args,
+            Duration::from_secs(90),
+            || false,
+        )
+        .unwrap();
+        verify_presentation_samples(&engine, &output, 96_000, || false).unwrap();
+        assert!(verify_presentation_samples(&engine, &output, 95_999, || false).is_err());
+    }
+
     #[test]
     fn packet_clock_corrects_encoder_priming_and_partial_final_packet() {
         let doc = serde_json::json!({
