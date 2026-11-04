@@ -76,8 +76,14 @@ fn bundled_ffmpeg_preserves_audible_audio_before_during_and_after_crossfade() {
     }
 
     let clips = [
-        ClipClock { id: "red", frames: 60 },
-        ClipClock { id: "blue", frames: 60 },
+        ClipClock {
+            id: "red",
+            frames: 60,
+        },
+        ClipClock {
+            id: "blue",
+            frames: 60,
+        },
     ];
     let edges = [Boundary {
         from_clip_id: "red",
