@@ -2023,6 +2023,27 @@ mod tests {
         let mut receipts = Vec::new();
         for (index, count) in frames.iter().enumerate() {
             let (root, project) = snapshot.single(index).unwrap();
+            // A receipt minted after normalization cannot by itself prove
+            // that the encoder read the expected saved original. Keep a
+            // verified Windows handle pinned throughout the FFmpeg pass.
+            let clip = &snapshot.project.clips[index];
+            let asset = snapshot
+                .project
+                .assets
+                .iter()
+                .find(|asset| asset.id == clip.asset_id)
+                .unwrap();
+            let source = crate::sequence_media::source(
+                snapshot.roots.get(&asset.id).unwrap(),
+                asset,
+                || false,
+            )
+            .unwrap();
+            let _original_pin = crate::crossfade_windows_guard::PinnedMedia::acquire(
+                &[(&source, asset.bytes, asset.sha256.as_str())],
+                || false,
+            )
+            .unwrap();
             let prepared =
                 video_render::prepare(&engine(), &root, &project, render_options, || false)
                     .unwrap();
@@ -2055,13 +2076,6 @@ mod tests {
             // Mint the receipt directly inside the trusted normalization
             // fixture, after FFmpeg succeeds and the output is probed.
             // No externally supplied post-hoc receipt is accepted here.
-            let clip = &snapshot.project.clips[index];
-            let asset = snapshot
-                .project
-                .assets
-                .iter()
-                .find(|asset| asset.id == clip.asset_id)
-                .unwrap();
             crate::sequence_media::source(snapshot.roots.get(&asset.id).unwrap(), asset, || false)
                 .unwrap();
             let (_, part_sha256) = video_project::fingerprint(&output, || false).unwrap();

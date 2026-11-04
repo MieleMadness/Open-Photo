@@ -36,7 +36,7 @@ roxmltree = "0.21"
 tokio = { version = "1", features = ["sync"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_Security"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_Security"] }
 
 [target.'cfg(windows)'.dev-dependencies]
 windows-sys = { version = "0.61", features = ["Win32_System_ProcessStatus"] }
