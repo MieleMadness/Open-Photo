@@ -1038,7 +1038,10 @@ mod tests {
     fn crossfade_receipts_reject_swapped_and_modified_normalized_parts() {
         let (fixture, snapshot) = fixture();
         let owned = fs::canonicalize(&fixture.0).unwrap();
-        let paths = [owned.join("normalized-0.mkv"), owned.join("normalized-1.mkv")];
+        let paths = [
+            owned.join("normalized-0.mkv"),
+            owned.join("normalized-1.mkv"),
+        ];
         fs::write(&paths[0], b"normalized first").unwrap();
         fs::write(&paths[1], b"normalized second").unwrap();
         let frames = [6_u64, 9_u64];
@@ -1086,13 +1089,9 @@ mod tests {
             to_clip_id: "second",
             frames: 3,
         }];
-        let plan = crate::crossfade_preflight::plan_allocated(
-            &clocks,
-            &boundary,
-            &[true, false],
-            fps,
-        )
-        .unwrap();
+        let plan =
+            crate::crossfade_preflight::plan_allocated(&clocks, &boundary, &[true, false], fps)
+                .unwrap();
         let bundled_engine = engine();
         let scratch = owned.join("untrusted-receipt-render.mp4");
         let published = owned.join("untrusted-receipt-published.mp4");
@@ -1106,7 +1105,7 @@ mod tests {
         };
         // The receipt boundary must reject an untrusted swap before it could
         // attempt FFmpeg or commit any user-visible MP4.
-        assert!(crate::crossfade_pipeline::render_verify_publish_snapshot_receipts(
+        let rejected = crate::crossfade_pipeline::render_verify_publish_snapshot_receipts(
             request,
             &published,
             &snapshot,
@@ -1129,8 +1128,8 @@ mod tests {
                 },
             ],
             || false,
-        )
-        .is_err());
+        );
+        assert!(rejected.is_err());
         assert!(!scratch.exists());
         assert!(!published.exists());
         assert!(crate::crossfade_provenance::verify_ordered_receipts(
