@@ -1898,5 +1898,4 @@ mod tests {
         assert!((result.duration_seconds - 0.4).abs() < 0.05);
         snapshot.revalidate(|| false).unwrap();
     }
-
 }
