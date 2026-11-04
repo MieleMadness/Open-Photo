@@ -259,7 +259,7 @@ mod bundled_engine_tests {
         video_engine, video_probe, video_project,
     };
     use std::{
-        ffi::{OsStr, OsString},
+        ffi::OsString,
         fs,
         path::{Path, PathBuf},
         time::Duration,
