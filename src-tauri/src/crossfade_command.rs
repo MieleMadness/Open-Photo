@@ -428,6 +428,51 @@ mod bundled_command_tests {
         assert!(cancellation_checks.load(std::sync::atomic::Ordering::SeqCst) >= 2);
         assert!(!interrupted_output.exists());
 
+        // A playable MKV with no normalized PCM audio must be rejected before
+        // the multi-input graph, even if its video frame count is correct.
+        let missing_pcm = dir.join("no-pcm.mkv");
+        let missing_pcm_args: Vec<OsString> = vec![
+            "-nostdin".into(),
+            "-v".into(),
+            "error".into(),
+            "-f".into(),
+            "lavfi".into(),
+            "-i".into(),
+            "color=c=green:s=96x64:r=30:d=2".into(),
+            "-t".into(),
+            "2".into(),
+            "-frames:v".into(),
+            "60".into(),
+            "-c:v".into(),
+            "libopenh264".into(),
+            "-pix_fmt".into(),
+            "yuv420p".into(),
+            "-an".into(),
+            missing_pcm.clone().into(),
+        ];
+        video_engine::run_until(
+            &ffmpeg,
+            &missing_pcm_args
+                .iter()
+                .map(OsString::as_os_str)
+                .collect::<Vec<_>>(),
+            Duration::from_secs(90),
+            || false,
+        )
+        .unwrap();
+        let missing_pcm_output = dir.join("no-pcm-output.mp4");
+        assert!(execute_in_scratch(
+            &engine,
+            &preflight,
+            &[parts[0].clone(), missing_pcm],
+            &missing_pcm_output,
+            30,
+            64 * 1024 * 1024,
+            || false,
+        )
+        .is_err());
+        assert!(!missing_pcm_output.exists());
+
         // Corrupt normalized inputs must never leave a published output.
         let corrupt_part = dir.join("corrupt.mkv");
         fs::write(&corrupt_part, b"not matroska").unwrap();
