@@ -202,6 +202,37 @@ mod tests {
     }
 
     #[test]
+    fn overlap_followed_by_hard_cut_uses_overlap_adjusted_audio_video_clock() {
+        let clips = [
+            ClipClock { id: "a", frames: 60 },
+            ClipClock { id: "b", frames: 60 },
+            ClipClock { id: "c", frames: 60 },
+        ];
+        let edges = [Boundary {
+            from_clip_id: "a",
+            to_clip_id: "b",
+            frames: 15,
+        }];
+        let clock = crossfade_clock::compile(&clips, &edges).unwrap();
+        let graph = plan(&clock, 30).unwrap();
+        assert_eq!(graph.expected_frames, 165);
+        assert!(graph.filter_complex.contains(
+            "[v0][v1]xfade=transition=fade:duration=0.500000000:offset=1.500000000[vx1]"
+        ));
+        assert!(graph.filter_complex.contains(
+            "[a0][a1]acrossfade=d=0.500000000:c1=tri:c2=tri[ax1]"
+        ));
+        assert!(graph.filter_complex.contains(
+            "[vx1][v2]concat=n=2:v=1:a=0[vx2]"
+        ));
+        assert!(graph.filter_complex.contains(
+            "[ax1][a2]concat=n=2:v=0:a=1[ax2]"
+        ));
+        assert_eq!(graph.video_output, "vx2");
+        assert_eq!(graph.audio_output, "ax2");
+    }
+
+    #[test]
     fn rejects_bad_project_fps_empty_inputs_and_tampered_clock() {
         let clock = crossfade_clock::compile(
             &[ClipClock {
