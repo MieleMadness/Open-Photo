@@ -1037,9 +1037,10 @@ mod tests {
     #[test]
     fn crossfade_receipts_reject_swapped_and_modified_normalized_parts() {
         let (fixture, snapshot) = fixture();
+        let owned = fs::canonicalize(&fixture.0).unwrap();
         let paths = [
-            fixture.0.join("normalized-0.mkv"),
-            fixture.0.join("normalized-1.mkv"),
+            owned.join("normalized-0.mkv"),
+            owned.join("normalized-1.mkv"),
         ];
         fs::write(&paths[0], b"normalized first").unwrap();
         fs::write(&paths[1], b"normalized second").unwrap();
@@ -1072,6 +1073,65 @@ mod tests {
             )
         };
         verify().unwrap();
+        let fps = snapshot.project.frame_rate;
+        let clocks = [
+            crate::crossfade_clock::ClipClock {
+                id: "first",
+                frames: frames[0],
+            },
+            crate::crossfade_clock::ClipClock {
+                id: "second",
+                frames: frames[1],
+            },
+        ];
+        let boundary = [crate::crossfade_clock::Boundary {
+            from_clip_id: "first",
+            to_clip_id: "second",
+            frames: 3,
+        }];
+        let plan =
+            crate::crossfade_preflight::plan_allocated(&clocks, &boundary, &[true, false], fps)
+                .unwrap();
+        let bundled_engine = engine();
+        let scratch = owned.join("untrusted-receipt-render.mp4");
+        let published = owned.join("untrusted-receipt-published.mp4");
+        let request = crate::crossfade_command::CrossfadeExecution {
+            engine: &bundled_engine,
+            plan: &plan,
+            inputs: &paths,
+            output: &scratch,
+            fps,
+            max_bytes: 64 * 1024 * 1024,
+        };
+        // The receipt boundary must reject an untrusted swap before it could
+        // attempt FFmpeg or commit any user-visible MP4.
+        let rejected = crate::crossfade_pipeline::render_verify_publish_snapshot_receipts(
+            request,
+            &published,
+            &snapshot,
+            &[
+                crate::crossfade_provenance::NormalizedReceipt {
+                    clip_id: receipts[1].clip_id.clone(),
+                    asset_id: receipts[1].asset_id.clone(),
+                    saved_source_sha256: receipts[1].saved_source_sha256.clone(),
+                    part: paths[1].clone(),
+                    part_sha256: receipts[1].part_sha256.clone(),
+                    frames: frames[1],
+                },
+                crate::crossfade_provenance::NormalizedReceipt {
+                    clip_id: receipts[0].clip_id.clone(),
+                    asset_id: receipts[0].asset_id.clone(),
+                    saved_source_sha256: receipts[0].saved_source_sha256.clone(),
+                    part: paths[0].clone(),
+                    part_sha256: receipts[0].part_sha256.clone(),
+                    frames: frames[0],
+                },
+            ],
+            || false,
+        );
+        assert!(rejected.is_err());
+        assert!(!scratch.exists());
+        assert!(!published.exists());
         assert!(crate::crossfade_provenance::verify_ordered_receipts(
             &snapshot,
             &receipts,
