@@ -226,5 +226,4 @@ mod tests {
         };
         assert!(plan_sequence(&project, &[]).is_err());
     }
-
 }
