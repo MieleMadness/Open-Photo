@@ -2036,6 +2036,30 @@ mod tests {
             || false,
         )
         .is_err());
+        // Even replacing exactly one byte of a valid normalized MKV must
+        // invalidate its trusted, already-minted provenance receipt.
+        let mut normalized_bytes = fs::read(&parts[0]).unwrap();
+        let last = normalized_bytes.len() - 1;
+        normalized_bytes[last] ^= 1;
+        fs::write(&parts[0], &normalized_bytes).unwrap();
+        assert!(crate::crossfade_provenance::verify_ordered_receipts(
+            &snapshot,
+            &receipts,
+            &parts,
+            &frames,
+            || false,
+        )
+        .is_err());
+        normalized_bytes[last] ^= 1;
+        fs::write(&parts[0], &normalized_bytes).unwrap();
+        crate::crossfade_provenance::verify_ordered_receipts(
+            &snapshot,
+            &receipts,
+            &parts,
+            &frames,
+            || false,
+        )
+        .unwrap();
 
         let clips = [
             crate::crossfade_clock::ClipClock {
