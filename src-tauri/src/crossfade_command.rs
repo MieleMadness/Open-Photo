@@ -130,7 +130,9 @@ pub(crate) fn execute_in_scratch(
     cancel: impl Fn() -> bool,
 ) -> Result<(), String> {
     crate::crossfade_scratch::validate_scratch_paths(
-        output.parent().ok_or("Crossfade output folder is missing.")?,
+        output
+            .parent()
+            .ok_or("Crossfade output folder is missing.")?,
         inputs,
         output,
     )?;
@@ -353,8 +355,16 @@ mod bundled_command_tests {
 
         let output = dir.join("result.mp4");
         let args = command_args(&preflight, &parts, &output, 30, 64 * 1024 * 1024).unwrap();
-        execute_in_scratch(&engine, &preflight, &parts, &output, 30, 64 * 1024 * 1024, || false)
-            .unwrap();
+        execute_in_scratch(
+            &engine,
+            &preflight,
+            &parts,
+            &output,
+            30,
+            64 * 1024 * 1024,
+            || false,
+        )
+        .unwrap();
 
         let result = video_probe::probe(&engine, &output, || false).unwrap();
         assert!(fs::metadata(&output).unwrap().len() <= 64 * 1024 * 1024);
