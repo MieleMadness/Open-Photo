@@ -39,7 +39,7 @@ it("rejects invalid trimmed source marks and sub-two-frame clips",()=>{
   expect(()=>compileMarkedCrossfadeClock([clip("a",7201)],30,[])).toThrow(/two hours/);
   const invalid={id:"a",source_in:markTime(2,"1/1000"),source_out:markTime(1,"1/1000")};
   expect(()=>compileMarkedCrossfadeClock([invalid],30,[])).toThrow(/source marks/);
-  expect(()=>compileMarkedCrossfadeClock([clip("a",1)],24 as 30,[])).toThrow(/frame rate/);
+  expect(()=>compileMarkedCrossfadeClock([clip("a",1)],24 as unknown as 30,[])).toThrow(/frame rate/);
 });
 it("rejects malformed duration requests and clip overlaps that exhaust source",()=>{
   for(const seconds of [-1,0,.079,1.501,NaN,Infinity]){
