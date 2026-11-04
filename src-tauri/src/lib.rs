@@ -29,6 +29,8 @@ mod crossfade_pipeline;
 #[cfg(test)]
 mod crossfade_preflight;
 #[cfg(test)]
+mod crossfade_provenance;
+#[cfg(test)]
 mod crossfade_publish;
 #[cfg(test)]
 mod crossfade_scratch;

@@ -1035,6 +1035,64 @@ mod tests {
         .unwrap()
     }
     #[test]
+    fn crossfade_receipts_reject_swapped_and_modified_normalized_parts() {
+        let (fixture, snapshot) = fixture();
+        let paths = [
+            fixture.0.join("normalized-0.mkv"),
+            fixture.0.join("normalized-1.mkv"),
+        ];
+        fs::write(&paths[0], b"normalized first").unwrap();
+        fs::write(&paths[1], b"normalized second").unwrap();
+        let frames = [6_u64, 9_u64];
+        let mut receipts = Vec::new();
+        for (i, clip) in snapshot.project.clips.iter().enumerate() {
+            let asset = snapshot
+                .project
+                .assets
+                .iter()
+                .find(|asset| asset.id == clip.asset_id)
+                .unwrap();
+            let (_, part_sha256) = video_project::fingerprint(&paths[i], || false).unwrap();
+            receipts.push(crate::crossfade_provenance::NormalizedReceipt {
+                clip_id: clip.id.clone(),
+                asset_id: asset.id.clone(),
+                saved_source_sha256: asset.sha256.clone(),
+                part: paths[i].clone(),
+                part_sha256,
+                frames: frames[i],
+            });
+        }
+        let verify = || {
+            crate::crossfade_provenance::verify_ordered_receipts(
+                &snapshot,
+                &receipts,
+                &paths,
+                &frames,
+                || false,
+            )
+        };
+        verify().unwrap();
+        assert!(crate::crossfade_provenance::verify_ordered_receipts(
+            &snapshot,
+            &receipts,
+            &[paths[1].clone(), paths[0].clone()],
+            &frames,
+            || false,
+        )
+        .is_err());
+        assert!(crate::crossfade_provenance::verify_ordered_receipts(
+            &snapshot,
+            &receipts,
+            &paths,
+            &frames,
+            || true,
+        )
+        .is_err());
+        fs::write(&paths[0], b"normalized FIRST").unwrap();
+        assert!(verify().is_err());
+    }
+
+    #[test]
     fn crossfade_manifest_uses_saved_hashes_and_rejects_changed_video() {
         let (fixture, snapshot) = fixture();
         let manifest =
