@@ -381,6 +381,22 @@ mod bundled_command_tests {
         .is_err());
         assert!(!cancelled_output.exists());
 
+        // Cancel after preflight but during the process-runner lifecycle.
+        let cancellation_checks = std::sync::atomic::AtomicUsize::new(0);
+        let interrupted_output = dir.join("interrupted.mp4");
+        assert!(execute_in_scratch(
+            &engine,
+            &preflight,
+            &parts,
+            &interrupted_output,
+            30,
+            64 * 1024 * 1024,
+            || cancellation_checks.fetch_add(1, std::sync::atomic::Ordering::SeqCst) > 0,
+        )
+        .is_err());
+        assert!(cancellation_checks.load(std::sync::atomic::Ordering::SeqCst) >= 2);
+        assert!(!interrupted_output.exists());
+
         // Corrupt normalized inputs must never leave a published output.
         let corrupt_part = dir.join("corrupt.mkv");
         fs::write(&corrupt_part, b"not matroska").unwrap();
