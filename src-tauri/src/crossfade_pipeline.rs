@@ -117,6 +117,7 @@ pub(crate) fn render_verify_publish_snapshot_receipts(
         )
     };
     validate()?;
+    verify_crossfade_disk_budget(scratch, destination, request.max_bytes)?;
     let expectations = manifest.expectations();
     // Pin the same bytes verified by the saved source manifest and the
     // normalizer's ordered receipts. These handles outlive FFmpeg, AAC decode
@@ -143,6 +144,49 @@ pub(crate) fn render_verify_publish_snapshot_receipts(
         crate::crossfade_windows_guard::PinnedMedia::acquire(&expected, &cancel)?
     };
     render_verify_publish_with_part_guard(request, destination, &expectations, validate, &cancel)
+}
+
+/// Verify that enough free space remains for a bounded scratch MP4 and
+/// an independently staged destination MP4 before starting the encoder.
+/// On the same Windows volume both allocations may coexist, so require their
+/// *combined* budget instead of two insufficient independent checks.
+fn verify_crossfade_disk_budget(
+    scratch: &Path,
+    destination: &Path,
+    export_limit: u64,
+) -> Result<(), String> {
+    const RESERVE: u64 = 16 * 1024 * 1024;
+    if export_limit == 0 || export_limit > crate::video_render::MAX_EXPORT_BYTES {
+        return Err("Crossfade export byte budget is invalid.".into());
+    }
+    let target_parent = destination
+        .parent()
+        .ok_or("Crossfade destination folder is unavailable.")?;
+    let scratch_free = crate::video_export::available_space(scratch)?;
+    let destination_free = crate::video_export::available_space(target_parent)?;
+    let single = export_limit
+        .checked_add(RESERVE)
+        .ok_or("Crossfade free-space budget overflow.")?;
+    if scratch_free.is_some_and(|available| available < single)
+        || destination_free.is_some_and(|available| available < single)
+    {
+        return Err("Insufficient free disk space for crossfade rendering.".into());
+    }
+    #[cfg(windows)]
+    {
+        let scratch_canonical = fs::canonicalize(scratch).map_err(|e| e.to_string())?;
+        let destination_canonical = fs::canonicalize(target_parent).map_err(|e| e.to_string())?;
+        if scratch_canonical.components().next() == destination_canonical.components().next() {
+            let combined = export_limit
+                .checked_mul(2)
+                .and_then(|bytes| bytes.checked_add(RESERVE))
+                .ok_or("Crossfade combined free-space budget overflow.")?;
+            if scratch_free.is_some_and(|available| available < combined) {
+                return Err("Insufficient shared-volume space for crossfade scratch and stage.".into());
+            }
+        }
+    }
+    Ok(())
 }
 
 fn crossfade_audio_count_check(
