@@ -28,7 +28,15 @@ export function AudioWaveform({workspaceId,projectId,assetId,revision,sourceIn,d
       workspaceId,id:projectId,assetId,expectedRevision:revision,
       sourceInSeconds:sourceIn,durationSeconds:duration
     }).then(values=>{
-      if(!cancelled)setPeaks(values.length===64?values:null);
+      if(cancelled)return;
+      // Fail closed on unexpected native measurement data rather than showing
+      // a misleading waveform or leaving the loading state indefinitely.
+      if(!Array.isArray(values)||values.length!==64||!values.every(value=>typeof value==="number"&&Number.isFinite(value)&&value>=0&&value<=100)){
+        setPeaks(null);
+        setError("Waveform unavailable — audio editing still works.");
+        return;
+      }
+      setPeaks(values);
     }).catch(()=>{
       if(!cancelled)setError("Waveform unavailable — audio editing still works.");
     });
