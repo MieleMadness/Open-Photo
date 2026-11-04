@@ -14,6 +14,8 @@ mod cache_disk;
 mod crossfade_clock;
 #[cfg(test)]
 mod crossfade_graph;
+#[cfg(test)]
+mod crossfade_preflight;
 mod edit_export;
 mod geo;
 mod image_decode;
