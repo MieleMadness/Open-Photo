@@ -291,6 +291,7 @@ mod bundled_command_tests {
         .unwrap();
 
         let result = video_probe::probe(&engine, &output, || false).unwrap();
+        assert!(fs::metadata(&output).unwrap().len() <= 64 * 1024 * 1024);
         assert_eq!(result.frame_count, Some(105));
         assert_eq!((result.width, result.height), (96, 64));
         assert!((result.duration_seconds - 3.5).abs() < 0.05);
