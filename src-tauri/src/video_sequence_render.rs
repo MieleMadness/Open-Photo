@@ -1147,6 +1147,10 @@ mod tests {
                 fade_in_seconds: 0.05,
                 fade_out_seconds: 0.05,
             });
+        let manifest =
+            crate::crossfade_snapshot::SourceManifest::from_snapshot(&snapshot, || false).unwrap();
+        assert_eq!(manifest.expectations().len(), 3);
+        manifest.verify(|| false).unwrap();
         let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
         assert_eq!(preview.info.audio.len(), 1);
         assert!(Path::new(&preview.source).exists());
@@ -1159,6 +1163,7 @@ mod tests {
         // source revalidation even if all video sources still match.
         fs::write(&audio, b"modified music after snapshot").unwrap();
         assert!(snapshot.revalidate(|| false).is_err());
+        assert!(manifest.verify(|| false).is_err());
     }
     #[test]
     fn dip_to_black_preserves_project_frame_count_and_fades_the_cut() {
