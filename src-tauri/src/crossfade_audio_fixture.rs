@@ -132,7 +132,9 @@ fn bundled_ffmpeg_preserves_audible_audio_before_during_and_after_crossfade() {
     assert!((info.duration_seconds - 3.5).abs() < 0.05);
     assert_eq!(info.audio.len(), 1);
     assert_eq!(info.audio[0].sample_rate.as_deref(), Some("48000"));
-    let encoded_audio_seconds = info.audio[0].duration_seconds.unwrap_or(info.duration_seconds);
+    let encoded_audio_seconds = info.audio[0]
+        .duration_seconds
+        .unwrap_or(info.duration_seconds);
     assert!(
         (encoded_audio_seconds - 3.5).abs() < 0.05,
         "Encoded audio duration was {encoded_audio_seconds}s, expected 3.5s"
