@@ -202,17 +202,30 @@ mod tests {
         let scratch = dir.join("scratch.mp4");
         let destination = dir.join("destination.mp4");
         fs::write(&scratch, vec![0x5a; 512 * 1024]).unwrap();
-        let polls = Cell::new(0_u32);
+        let cancelled_after_copy_started = Cell::new(false);
         let result = publish_verified_cancellable(
             &scratch,
             &destination,
             512 * 1024,
             || Ok(()),
             || {
-                polls.set(polls.get() + 1);
-                polls.get() >= 2
+                // Only cancel once the owned staging file actually contains
+                // data. This exercises the integrated per-chunk cancellation
+                // path, not just the preflight fingerprint checks.
+                let wrote_chunk = fs::read_dir(&dir)
+                    .unwrap()
+                    .filter_map(Result::ok)
+                    .any(|entry| {
+                        entry.file_name().to_string_lossy().starts_with(".openphoto-")
+                            && entry.metadata().is_ok_and(|metadata| metadata.len() > 0)
+                    });
+                if wrote_chunk {
+                    cancelled_after_copy_started.set(true);
+                }
+                wrote_chunk
             },
         );
+        assert!(cancelled_after_copy_started.get());
         assert!(result.is_err());
         assert!(!destination.exists());
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
