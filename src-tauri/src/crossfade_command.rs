@@ -638,6 +638,25 @@ mod bundled_command_tests {
                 sha256: &hash_b,
             },
         ];
+        let cancelled_pipeline = dir.join("cancelled-pipeline.mp4");
+        let cancelled_publication = dir.join("cancelled-publication.mp4");
+        assert!(crate::crossfade_pipeline::render_verify_publish(
+            CrossfadeExecution {
+                engine: &engine,
+                plan: &preflight,
+                inputs: &parts,
+                output: &cancelled_pipeline,
+                fps: 30,
+                max_bytes: 64 * 1024 * 1024,
+            },
+            &cancelled_publication,
+            &original_sources,
+            || true,
+        )
+        .is_err());
+        assert!(!cancelled_pipeline.exists());
+        assert!(!cancelled_publication.exists());
+
         let pipeline_output = dir.join("verified-pipeline.mp4");
         let published = dir.join("published-pipeline.mp4");
         crate::crossfade_pipeline::render_verify_publish(
