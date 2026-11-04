@@ -30,6 +30,8 @@ mod crossfade_preflight;
 mod crossfade_publish;
 #[cfg(test)]
 mod crossfade_scratch;
+#[cfg(test)]
+mod crossfade_staging;
 mod edit_export;
 mod geo;
 mod image_decode;
