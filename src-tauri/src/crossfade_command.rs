@@ -255,13 +255,17 @@ pub(crate) fn execute_in_scratch(
 /// Test-only source verification boundary. The caller must provide an
 /// independently stored fingerprint verifier for *original* timeline files.
 /// Keep the rendered output private if an original changes mid-export.
+pub(crate) struct CrossfadeExecution<'a> {
+    pub engine: &'a Path,
+    pub plan: &'a PreparedCrossfade,
+    pub inputs: &'a [PathBuf],
+    pub output: &'a Path,
+    pub fps: u32,
+    pub max_bytes: u64,
+}
+
 pub(crate) fn execute_with_source_verification(
-    engine: &Path,
-    plan: &PreparedCrossfade,
-    inputs: &[PathBuf],
-    output: &Path,
-    fps: u32,
-    max_bytes: u64,
+    request: CrossfadeExecution<'_>,
     verify_sources: impl Fn() -> Result<(), String>,
     cancel: impl Fn() -> bool,
 ) -> Result<(), String> {
@@ -272,14 +276,22 @@ pub(crate) fn execute_with_source_verification(
     if cancel() {
         return Err("Crossfade source verification cancelled.".into());
     }
-    execute_in_scratch(engine, plan, inputs, output, fps, max_bytes, &cancel)?;
+    execute_in_scratch(
+        request.engine,
+        request.plan,
+        request.inputs,
+        request.output,
+        request.fps,
+        request.max_bytes,
+        &cancel,
+    )?;
     // Never expose an MP4 whose original source changed while FFmpeg worked.
     if let Err(error) = verify_sources() {
-        let _ = std::fs::remove_file(output);
+        let _ = std::fs::remove_file(request.output);
         return Err(error);
     }
     if cancel() {
-        let _ = std::fs::remove_file(output);
+        let _ = std::fs::remove_file(request.output);
         return Err("Crossfade cancelled after source verification.".into());
     }
     Ok(())
@@ -567,12 +579,14 @@ mod bundled_command_tests {
         let changed_output = dir.join("changed-after-encode.mp4");
         let verify_calls = std::cell::Cell::new(0_u32);
         let changed = execute_with_source_verification(
-            &engine,
-            &preflight,
-            &parts,
-            &changed_output,
-            30,
-            64 * 1024 * 1024,
+            CrossfadeExecution {
+                engine: &engine,
+                plan: &preflight,
+                inputs: &parts,
+                output: &changed_output,
+                fps: 30,
+                max_bytes: 64 * 1024 * 1024,
+            },
             || {
                 verify_calls.set(verify_calls.get() + 1);
                 if verify_calls.get() == 2 {
@@ -589,12 +603,14 @@ mod bundled_command_tests {
 
         let rejected_output = dir.join("rejected-before-encode.mp4");
         assert!(execute_with_source_verification(
-            &engine,
-            &preflight,
-            &parts,
-            &rejected_output,
-            30,
-            64 * 1024 * 1024,
+            CrossfadeExecution {
+                engine: &engine,
+                plan: &preflight,
+                inputs: &parts,
+                output: &rejected_output,
+                fps: 30,
+                max_bytes: 64 * 1024 * 1024,
+            },
             || Err("Original source already changed.".into()),
             || false,
         )
