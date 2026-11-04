@@ -249,6 +249,39 @@ pub(crate) fn execute_in_scratch(
     Ok(())
 }
 
+/// Test-only source verification boundary. The caller must provide an
+/// independently stored fingerprint verifier for *original* timeline files.
+/// Keep the rendered output private if an original changes mid-export.
+pub(crate) fn execute_with_source_verification(
+    engine: &Path,
+    plan: &PreparedCrossfade,
+    inputs: &[PathBuf],
+    output: &Path,
+    fps: u32,
+    max_bytes: u64,
+    verify_sources: impl Fn() -> Result<(), String>,
+    cancel: impl Fn() -> bool,
+) -> Result<(), String> {
+    if cancel() {
+        return Err("Crossfade source verification cancelled.".into());
+    }
+    verify_sources()?;
+    if cancel() {
+        return Err("Crossfade source verification cancelled.".into());
+    }
+    execute_in_scratch(engine, plan, inputs, output, fps, max_bytes, &cancel)?;
+    // Never expose an MP4 whose original source changed while FFmpeg worked.
+    if let Err(error) = verify_sources() {
+        let _ = std::fs::remove_file(output);
+        return Err(error);
+    }
+    if cancel() {
+        let _ = std::fs::remove_file(output);
+        return Err("Crossfade cancelled after source verification.".into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -526,6 +559,44 @@ mod bundled_command_tests {
         )
         .is_err());
         assert!(!corrupt_output.exists());
+
+        // A valid encode is discarded if original sources change after encode.
+        let changed_output = dir.join("changed-after-encode.mp4");
+        let verify_calls = std::cell::Cell::new(0_u32);
+        let changed = execute_with_source_verification(
+            &engine,
+            &preflight,
+            &parts,
+            &changed_output,
+            30,
+            64 * 1024 * 1024,
+            || {
+                verify_calls.set(verify_calls.get() + 1);
+                if verify_calls.get() == 2 {
+                    Err("Original media changed during rendering.".into())
+                } else {
+                    Ok(())
+                }
+            },
+            || false,
+        );
+        assert!(changed.is_err());
+        assert_eq!(verify_calls.get(), 2);
+        assert!(!changed_output.exists());
+
+        let rejected_output = dir.join("rejected-before-encode.mp4");
+        assert!(execute_with_source_verification(
+            &engine,
+            &preflight,
+            &parts,
+            &rejected_output,
+            30,
+            64 * 1024 * 1024,
+            || Err("Original source already changed.".into()),
+            || false,
+        )
+        .is_err());
+        assert!(!rejected_output.exists());
 
         // FFmpeg versions may return success when -n skips an existing file.
         // Verify the actual safety contract: output contents must not change.
