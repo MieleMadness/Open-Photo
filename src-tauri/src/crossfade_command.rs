@@ -94,7 +94,7 @@ pub(crate) fn command_args(
         "-frames:v".into(),
         plan.graph.expected_frames.to_string().into(),
         "-t".into(),
-        format!("{:.9}", plan.graph.expected_frames as f64 / f64::from(fps)).into()
+        format!("{:.9}", plan.graph.expected_frames as f64 / f64::from(fps)).into(),
         "-c:v".into(),
         "libopenh264".into(),
         "-pix_fmt".into(),
