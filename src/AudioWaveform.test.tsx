@@ -48,7 +48,7 @@ it.each([
 
 it("ignores a stale native response after the audio source changes",async()=>{
   let completeFirst:(value:number[])=>void=()=>{};
-  vi.mocked(invoke).mockImplementationOnce(()=>new Promise(resolve=>{completeFirst=resolve as (value:number[])=>void;}))
+  vi.mocked(invoke).mockReturnValueOnce(new Promise<number[]>(resolve=>{completeFirst=resolve;}))
     .mockResolvedValueOnce(Array.from({length:64},()=>80));
   const props={workspaceId:"workspace",projectId:"project",revision:2,sourceIn:0,duration:10,trackStart:0,playhead:0,onSeek:vi.fn(),ready:true};
   const {rerender}=render(<AudioWaveform {...props} assetId="first"/>);
