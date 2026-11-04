@@ -6,10 +6,30 @@ use std::{
     collections::HashSet,
     fs::{self, File, OpenOptions},
     io::{Read, Seek, SeekFrom},
-    os::windows::fs::{MetadataExt, OpenOptionsExt},
+    os::windows::{fs::{MetadataExt, OpenOptionsExt}, io::AsRawHandle},
     path::{Path, PathBuf},
 };
-use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
+use windows_sys::Win32::Storage::FileSystem::{
+    BY_HANDLE_FILE_INFORMATION, FILE_SHARE_READ, GetFileInformationByHandle,
+};
+
+fn file_identity(file: &File) -> Result<(u32, u64, u32, u32), String> {
+    let mut info = std::mem::MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::uninit();
+    // SAFETY: file is an owned, live Windows File handle and the API writes
+    // the full BY_HANDLE_FILE_INFORMATION on successful completion.
+    let ok = unsafe { GetFileInformationByHandle(file.as_raw_handle(), info.as_mut_ptr()) };
+    if ok == 0 {
+        return Err(format!("Crossfade cannot inspect Windows file identity: {}", std::io::Error::last_os_error()));
+    }
+    // SAFETY: GetFileInformationByHandle returned success above.
+    let info = unsafe { info.assume_init() };
+    let index = (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow);
+    if index == 0 || info.dwVolumeSerialNumber == 0 {
+        return Err("Crossfade source has no stable Windows file identity.".into());
+    }
+    Ok((info.dwVolumeSerialNumber, index, info.nNumberOfLinks, info.dwFileAttributes))
+}
+
 
 pub(crate) struct PinnedMedia {
     handles: Vec<File>,
@@ -47,9 +67,6 @@ impl PinnedMedia {
             if metadata.file_attributes() & 0x400 != 0 {
                 return Err("Crossfade pin rejects reparse-point files.".into());
             }
-            if metadata.number_of_links() != Some(1) {
-                return Err("Crossfade pin requires singly linked local files.".into());
-            }
             let canonical = fs::canonicalize(path).map_err(|e| e.to_string())?;
             if !seen.insert(canonical) {
                 return Err("Crossfade pin cannot accept duplicate files.".into());
@@ -59,29 +76,30 @@ impl PinnedMedia {
                 .share_mode(FILE_SHARE_READ)
                 .open(path)
                 .map_err(|e| format!("Cannot pin crossfade input for read-only access: {e}"))?;
-            let opened = handle.metadata().map_err(|e| e.to_string())?;
-            let path_after_open = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
-            let identity = || -> Result<(u32, u64), String> {
-                let volume = opened
-                    .volume_serial_number()
-                    .ok_or("Crossfade file volume identity is unavailable.")?;
-                let index = opened
-                    .file_index()
-                    .ok_or("Crossfade file identity is unavailable.")?;
-                let path_identity = (
-                    path_after_open.volume_serial_number(),
-                    path_after_open.file_index(),
-                );
-                if path_identity != (Some(volume), Some(index))
-                    || opened.number_of_links() != Some(1)
-                    || path_after_open.file_attributes() & 0x400 != 0
-                    || path_after_open.number_of_links() != Some(1)
+            let (volume, index, links, attributes) = file_identity(&handle)?;
+            if links != 1 || attributes & 0x400 != 0 {
+                return Err("Crossfade pin rejects hard links and reparse-point files.".into());
+            }
+            let check_path = || -> Result<(), String> {
+                // A second path open must address the same file as the pinned
+                // read handle. Share-read pinning blocks ordinary replacement.
+                let path_file = OpenOptions::new()
+                    .read(true)
+                    .share_mode(FILE_SHARE_READ)
+                    .open(path)
+                    .map_err(|e| e.to_string())?;
+                let (other_volume, other_index, other_links, other_attrs) =
+                    file_identity(&path_file)?;
+                if (other_volume, other_index) != (volume, index)
+                    || other_links != 1
+                    || other_attrs & 0x400 != 0
                 {
-                    return Err("Crossfade input changed between pathname and handle verification.".into());
+                    return Err("Crossfade pathname no longer references the verified file.".into());
                 }
-                Ok((volume, index))
-            }()?;
-            if !identities.insert(identity) {
+                Ok(())
+            };
+            check_path()?;
+            if !identities.insert((volume, index)) {
                 return Err("Crossfade pin found aliases to the same file identity.".into());
             }
             let mut digest = Sha256::new();
@@ -106,15 +124,7 @@ impl PinnedMedia {
             if count != *bytes || format!("{:x}", digest.finalize()) != *hash {
                 return Err("Crossfade pinned input differs from its saved fingerprint.".into());
             }
-            // Do not accept a path swapped after the handle was opened.
-            let path_final = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
-            if path_final.volume_serial_number() != Some(identity.0)
-                || path_final.file_index() != Some(identity.1)
-                || path_final.number_of_links() != Some(1)
-                || path_final.file_attributes() & 0x400 != 0
-            {
-                return Err("Crossfade pinned pathname no longer names the verified file.".into());
-            }
+            check_path()?;
             handle.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
             handles.push(handle);
         }
