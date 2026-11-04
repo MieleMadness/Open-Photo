@@ -49,6 +49,24 @@ pub(crate) fn render_verify_publish(
     Ok(())
 }
 
+/// Experimental saved-project entry boundary. It derives original source
+/// identities from the persisted document and trusted relink roots; caller
+/// supplied normalized MKVs remain private scratch artifacts that must pass
+/// the strict independent input contract in `execute_in_scratch`.
+pub(crate) fn render_verify_publish_snapshot(
+    request: CrossfadeExecution<'_>,
+    destination: &Path,
+    snapshot: &crate::video_sequence_render::Snapshot,
+    cancel: impl Fn() -> bool,
+) -> Result<(), String> {
+    let manifest = crate::crossfade_snapshot::SourceManifest::from_snapshot(snapshot, &cancel)?;
+    if request.inputs.len() != snapshot.project.clips.len() {
+        return Err("Crossfade normalized parts do not match saved timeline clip count.".into());
+    }
+    let expectations = manifest.expectations();
+    render_verify_publish(request, destination, &expectations, cancel)
+}
+
 fn crossfade_audio_count_check(
     engine: &Path,
     output: &Path,
