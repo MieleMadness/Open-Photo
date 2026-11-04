@@ -1066,8 +1066,9 @@ mod tests {
         let nonexistent_input = [fixture.0.join("never-normalized.mkv")];
         let scratch = fixture.0.join("never-rendered.mp4");
         let publication = fixture.0.join("never-published.mp4");
+        let bundled_engine = engine();
         let request = crate::crossfade_command::CrossfadeExecution {
-            engine: &engine(),
+            engine: &bundled_engine,
             plan: &plan,
             inputs: &nonexistent_input,
             output: &scratch,
