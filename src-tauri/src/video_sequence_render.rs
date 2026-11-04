@@ -2001,12 +2001,8 @@ mod tests {
                 .iter()
                 .find(|asset| asset.id == clip.asset_id)
                 .unwrap();
-            crate::sequence_media::source(
-                snapshot.roots.get(&asset.id).unwrap(),
-                asset,
-                || false,
-            )
-            .unwrap();
+            crate::sequence_media::source(snapshot.roots.get(&asset.id).unwrap(), asset, || false)
+                .unwrap();
             let (_, part_sha256) = video_project::fingerprint(&output, || false).unwrap();
             receipts.push(crate::crossfade_provenance::NormalizedReceipt {
                 clip_id: clip.id.clone(),
