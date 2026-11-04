@@ -2277,9 +2277,8 @@ mod tests {
         assert_eq!(verified.audio.len(), 1);
         snapshot.revalidate(|| false).unwrap();
         // A destination collision must fail without replacing the published MP4.
-        let (saved_bytes, saved_hash) =
-            video_project::fingerprint(&published, || false).unwrap();
-        assert!(crate::crossfade_pipeline::render_verify_publish_snapshot_receipts(
+        let (saved_bytes, saved_hash) = video_project::fingerprint(&published, || false).unwrap();
+        let collision = crate::crossfade_pipeline::render_verify_publish_snapshot_receipts(
             crate::crossfade_command::CrossfadeExecution {
                 engine: &engine_root,
                 plan: &plan,
@@ -2292,11 +2291,10 @@ mod tests {
             &snapshot,
             &receipts,
             || false,
-        )
-        .is_err());
+        );
+        assert!(collision.is_err());
         assert!(!verified_scratch.exists());
-        let (after_bytes, after_hash) =
-            video_project::fingerprint(&published, || false).unwrap();
+        let (after_bytes, after_hash) = video_project::fingerprint(&published, || false).unwrap();
         assert_eq!((after_bytes, after_hash), (saved_bytes, saved_hash));
         snapshot.revalidate(|| false).unwrap();
     }
