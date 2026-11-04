@@ -29,3 +29,32 @@ it("does not request inaccessible audio files",()=>{
   expect(screen.getByText("Relink this file to view its waveform.")).toBeTruthy();
   expect(invoke).not.toHaveBeenCalled();
 });
+
+it.each([
+  ["wrong count",Array.from({length:63},()=>35)],
+  ["non-finite peak",Array.from({length:64},(_,index)=>index===12?Number.NaN:35)],
+  ["negative peak",Array.from({length:64},(_,index)=>index===12?-1:35)],
+  ["peak above 100",Array.from({length:64},(_,index)=>index===12?101:35)],
+  ["non-array response",null],
+])("does not render %s from native waveform measurements",async(_caseName,invalidPeaks)=>{
+  vi.mocked(invoke).mockResolvedValue(invalidPeaks);
+  render(<AudioWaveform workspaceId="workspace" projectId="project" assetId="sound"
+    revision={2} sourceIn={0} duration={10} trackStart={0} playhead={0}
+    onSeek={vi.fn()} ready/>);
+  expect(await screen.findByText("Waveform unavailable — audio editing still works.")).toBeTruthy();
+  expect(screen.queryByRole("slider")).toBeNull();
+  expect(document.querySelectorAll(".sequence-waveform-peak")).toHaveLength(0);
+});
+
+it("ignores a stale native response after the audio source changes",async()=>{
+  let completeFirst:(value:number[])=>void=()=>{};
+  vi.mocked(invoke).mockImplementationOnce(()=>new Promise(resolve=>{completeFirst=resolve as (value:number[])=>void;}))
+    .mockResolvedValueOnce(Array.from({length:64},()=>80));
+  const props={workspaceId:"workspace",projectId:"project",revision:2,sourceIn:0,duration:10,trackStart:0,playhead:0,onSeek:vi.fn(),ready:true};
+  const {rerender}=render(<AudioWaveform {...props} assetId="first"/>);
+  rerender(<AudioWaveform {...props} assetId="second"/>);
+  await screen.findByRole("slider");
+  completeFirst(Array.from({length:63},()=>40));
+  await waitFor(()=>expect(screen.queryByText("Waveform unavailable — audio editing still works.")).toBeNull());
+  expect(document.querySelectorAll(".sequence-waveform-peak")).toHaveLength(64);
+});
