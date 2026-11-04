@@ -177,7 +177,10 @@ pub(crate) fn execute_in_scratch(
             .trim()
             .parse::<u64>()
             .map_err(|_| "Crossfade decoded frame count is unavailable.")?;
-        if info.frame_count.is_some_and(|reported| reported != measured_frames) {
+        if info
+            .frame_count
+            .is_some_and(|reported| reported != measured_frames)
+        {
             return Err("Crossfade declared and decoded frame counts disagree.".into());
         }
         info.frame_count = Some(measured_frames);
