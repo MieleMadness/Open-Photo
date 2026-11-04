@@ -87,8 +87,7 @@ mod tests {
         let destination = dir.join("export.mp4");
         fs::write(&original, b"saved original").unwrap();
         fs::write(&scratch, b"verified sample").unwrap();
-        let (bytes, sha256) =
-            crate::video_project::fingerprint(&original, || false).unwrap();
+        let (bytes, sha256) = crate::video_project::fingerprint(&original, || false).unwrap();
         let expected = [crate::crossfade_integrity::SourceExpectation {
             path: &original,
             bytes,
