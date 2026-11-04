@@ -26,7 +26,7 @@ it("quantizes a crossfade to integer frames without changing source trims",()=>{
   expect(clock.entries.map(e=>e.frames)).toEqual([60,60,60]);
 });
 it("supports 60fps and quantized 0.08-second minimum",()=>{
-  expect(crossfadeDurationFrames(.08,30)).toBe(2);
+  expect(crossfadeDurationFrames(.08,30)).toBe(3);
   expect(crossfadeDurationFrames(.08,60)).toBe(5);
   const clock=compileMarkedCrossfadeClock([clip("a",1),clip("b",1)],60,[
     {from_clip_id:"a",to_clip_id:"b",frames:5},
