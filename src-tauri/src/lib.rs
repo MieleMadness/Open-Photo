@@ -10,12 +10,12 @@ mod ai_text;
 mod ai_validation;
 mod cache_disk;
 // Crossfade frame-clock parity fixture only; no active renderer changes.
+#[cfg(all(test, windows))]
+mod crossfade_audio_fixture;
 #[cfg(test)]
 mod crossfade_clock;
 #[cfg(test)]
 mod crossfade_graph;
-#[cfg(all(test, windows))]
-mod crossfade_audio_fixture;
 mod edit_export;
 mod geo;
 mod image_decode;
