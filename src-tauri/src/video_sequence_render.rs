@@ -1035,6 +1035,25 @@ mod tests {
         .unwrap()
     }
     #[test]
+    fn crossfade_manifest_uses_saved_hashes_and_rejects_changed_video() {
+        let (fixture, snapshot) = fixture();
+        let manifest =
+            crate::crossfade_snapshot::SourceManifest::from_snapshot(&snapshot, || false).unwrap();
+        assert_eq!(manifest.expectations().len(), 2);
+        manifest.verify(|| false).unwrap();
+        let changed = fixture.0.join("source-0 世界.mp4");
+        let mut bytes = fs::read(&changed).unwrap();
+        let last = bytes.len() - 1;
+        bytes[last] ^= 1;
+        fs::write(&changed, bytes).unwrap();
+        assert!(manifest.verify(|| false).is_err());
+        assert!(
+            crate::crossfade_snapshot::SourceManifest::from_snapshot(&snapshot, || false).is_err()
+        );
+        assert!(manifest.verify(|| true).is_err());
+    }
+
+    #[test]
     fn audio_track_mixes_into_native_project_preview() {
         let (fixture, mut snapshot) = fixture();
         let source = &snapshot.project.assets[0];
@@ -1126,6 +1145,10 @@ mod tests {
                 fade_in_seconds: 0.05,
                 fade_out_seconds: 0.05,
             });
+        let manifest =
+            crate::crossfade_snapshot::SourceManifest::from_snapshot(&snapshot, || false).unwrap();
+        assert_eq!(manifest.expectations().len(), 3);
+        manifest.verify(|| false).unwrap();
         let preview = build_preview(&engine(), &snapshot, &fixture.0, || false).unwrap();
         assert_eq!(preview.info.audio.len(), 1);
         assert!(Path::new(&preview.source).exists());
@@ -1138,6 +1161,7 @@ mod tests {
         // source revalidation even if all video sources still match.
         fs::write(&audio, b"modified music after snapshot").unwrap();
         assert!(snapshot.revalidate(|| false).is_err());
+        assert!(manifest.verify(|| false).is_err());
     }
     #[test]
     fn dip_to_black_preserves_project_frame_count_and_fades_the_cut() {
