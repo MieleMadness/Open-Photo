@@ -28,7 +28,9 @@ pub(crate) fn verify_ordered_receipts(
         || receipts.len() < 2
         || receipts.len() > 200
     {
-        return Err("Crossfade receipts must match the saved timeline and normalized inputs.".into());
+        return Err(
+            "Crossfade receipts must match the saved timeline and normalized inputs.".into(),
+        );
     }
     let mut unique_clip_ids = HashSet::new();
     let mut unique_parts = HashSet::new();
@@ -54,7 +56,9 @@ pub(crate) fn verify_ordered_receipts(
             || receipt.part_sha256.len() != 64
             || !receipt.part_sha256.bytes().all(|b| b.is_ascii_hexdigit())
         {
-            return Err("Crossfade normalized receipt differs from saved clip order or source.".into());
+            return Err(
+                "Crossfade normalized receipt differs from saved clip order or source.".into(),
+            );
         }
         let (_, actual_hash) = crate::video_project::fingerprint(&receipt.part, &cancel)?;
         if actual_hash != receipt.part_sha256 {
