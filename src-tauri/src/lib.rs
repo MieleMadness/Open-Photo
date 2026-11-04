@@ -20,6 +20,8 @@ mod crossfade_command;
 mod crossfade_graph;
 #[cfg(test)]
 mod crossfade_preflight;
+#[cfg(test)]
+mod crossfade_scratch;
 mod edit_export;
 mod geo;
 mod image_decode;
