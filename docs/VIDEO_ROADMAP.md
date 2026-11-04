@@ -1,3 +1,11 @@
+## November 4, 2026 — Phase J preview seek frame mapping (experimental)
+
+The `crossfadePreviewSeek` adapter maps a continuous project playhead to one discrete 30/60 FPS frame and the already validated crossfade sampler's source offsets/blend weights. The project end is exclusive (no duplicate terminal frame); clip source offsets remain relative to the trimmed `source_in` mark. Regression cases cover exact cut boundaries, each overlapping frame, non-frame-aligned playheads and invalid timestamps.
+
+**Safety/feature boundary:** No schema migration, production UI, source I/O, FFmpeg invocation or preview/export routing changes. This pure adapter is preparatory, not proof that live crossfade preview works. Real Windows media acceptance and exact native preview/export parity remain prerequisites to enabling crossfades.
+
+---
+
 ## November 4, 2026 — Phase I native engineering checkpoint (updated)
 
 **Automated engineering baseline:** The experimental crossfade native pipeline was integrated through [PR #61](https://github.com/MieleMadness/Open-Photo/pull/61), which passed exact-head Windows Rust, frontend and full installer CI. [PR #63](https://github.com/MieleMadness/Open-Photo/pull/63) adds verified Windows file identity, hard-link rejection, pinning of saved originals during normalization and a final destination-space recheck; it requires its own full exact-head Windows success before merge.
