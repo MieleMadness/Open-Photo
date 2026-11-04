@@ -16,7 +16,7 @@ export type CrossfadeProjectRate=30|60;
 export function crossfadeDurationFrames(seconds:number,fps:CrossfadeProjectRate):number{
   if(![30,60].includes(fps)||!Number.isFinite(seconds)||seconds<0.08||seconds>1.5)
     throw Error("Choose a crossfade duration between 0.08 and 1.5 seconds.");
-  const frames=Math.round(seconds*fps);
+  const frames=Math.max(Math.ceil(0.08*fps),Math.round(seconds*fps));
   if(!Number.isSafeInteger(frames)||frames<1)
     throw Error("Crossfade duration cannot be represented in project frames.");
   return frames;
