@@ -61,3 +61,9 @@ The source-side batch path uses `symlink_metadata` instead of `exists()` before 
 ## Stale-save and recovery-artifact native fixtures (test-only)
 
 The `src-tauri/src/xmp_conflict_state_tests.rs` suite checks sequential stale-save rejection: once a managed sidecar is updated, an operation with its old expected contents must fail, and a refreshed snapshot can write. Existing recovery-backup artifacts must block repeated writes; a Unix dangling backup symlink must not be followed or reused. These tests are synthetic and sequential. They do **not** establish atomic filesystem compare-and-swap, prove a crash-safe recovery state machine, or close the external editor's compare-to-publish race. Issue #90 remains open.
+
+## Deterministic publish-error test seam (test-only, Issue #90)
+
+The native `replace_managed_sidecar_with_publish` helper keeps the production code path bound to the existing `atomic_replace` implementation. Test-only callbacks simulate a publication error after staging and backup are complete. The regression fixtures assert that (1) the old sidecar stays intact when publication fails, (2) the original backup remains for inspection, (3) staging is removed, (4) a subsequent save refuses the ambiguous recovery artifact, and (5) an external writer's changed sidecar bytes are not destroyed when the publish callback explicitly returns an error.
+
+**Limit:** This deliberately simulates **failed** publication. It does not demonstrate safety if an external writer modifies the destination and the OS replace succeeds, nor does it cover a crash, interrupted backup flush, Windows handle identity checks, parent directory durability, or installed external-editor concurrency. These are still unresolved under [Issue #90](https://github.com/MieleMadness/Open-Photo/issues/90).
