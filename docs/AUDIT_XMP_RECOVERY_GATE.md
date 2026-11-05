@@ -85,3 +85,9 @@ This is a deterministic injected interleaving, **not** an installed Windows Exif
 The native regression `published_but_unacknowledged_save_retains_recovery_and_blocks_unreviewed_retry` uses disposable sidecar bytes and the real platform `atomic_replace`, then returns an injected error **after publication succeeds**. It checks that the new sidecar and original backup coexist, temporary staging is gone, and retrying against either snapshot refuses to proceed without a manual recovery decision. This covers only the *simulated acknowledgement-failure state*; it is not a crash/power-loss durability test, persisted state machine, or automatic safe recovery implementation.
 
 Still required: restart and fault-injection tests at every write/flush/replace boundary; sidecar identity protection against an external editor on successful replacement; Windows NTFS/root/junction validation; accessible user-reviewable conflict decisions. This regression does not close Issue #90.
+
+## Read-only recovery entry inspection (incremental foundation)
+
+The internal `xmp_recovery_inventory` helper inspects both temporary and backup directory entries with `symlink_metadata` and reports whether **any** recovery entry requires review. The guarded production writer now uses this helper, preserving its previous fail-closed collision error and exclusive `create_new` semantics. Synthetic native tests cover absent entries, two surviving versions, unexpected directories and (on Unix) dangling symlinks without reading the linked target. No sidecar or original media bytes are modified by inspection.
+
+**Not a recovery decision engine:** Metadata inspection alone cannot identify a safe winner, prove identity under a concurrent rename, provide durable interruption markers, or validate Windows junction/reparse behavior. Preserve the blocked-save policy until user-reviewable recovery and the real external-editor publication race are verified under Issue #90.
