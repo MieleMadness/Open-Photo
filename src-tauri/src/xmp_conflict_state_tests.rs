@@ -1,6 +1,6 @@
 //! Synthetic-only XMP writer regressions for stale snapshots and recovery artifacts.
 //! These tests document existing fail-closed behavior, not atomic compare-and-swap.
-use crate::replace_managed_sidecar;
+use crate::{replace_managed_sidecar, replace_managed_sidecar_with_publish};
 use std::{
     fs,
     path::PathBuf,
@@ -85,5 +85,52 @@ fn dangling_backup_symlink_is_never_reused_as_recovery_file() {
         .file_type()
         .is_symlink());
     assert!(!external.exists());
+    assert!(!fixture.temp().exists());
+}
+
+#[test]
+fn failed_publish_keeps_old_sidecar_and_retains_original_backup() {
+    let fixture = Fixture::new("expected-xmp");
+    let result = replace_managed_sidecar_with_publish(
+        &fixture.sidecar,
+        "expected-xmp",
+        "new-xmp",
+        |staged, destination| {
+            assert_eq!(destination, fixture.sidecar);
+            assert_eq!(fs::read(staged).unwrap(), b"new-xmp");
+            assert_eq!(fs::read(fixture.backup()).unwrap(), b"expected-xmp");
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "injected replace failure",
+            ))
+        },
+    );
+
+    assert!(result.unwrap_err().contains("recovery backup retained"));
+    assert_eq!(fs::read(&fixture.sidecar).unwrap(), b"expected-xmp");
+    assert_eq!(fs::read(fixture.backup()).unwrap(), b"expected-xmp");
+    assert!(!fixture.temp().exists());
+    assert!(replace_managed_sidecar(&fixture.sidecar, "expected-xmp", "retry").is_err());
+}
+
+#[test]
+fn external_edit_before_failed_publish_keeps_external_bytes() {
+    let fixture = Fixture::new("expected-xmp");
+    let result = replace_managed_sidecar_with_publish(
+        &fixture.sidecar,
+        "expected-xmp",
+        "new-xmp",
+        |_staged, destination| {
+            fs::write(destination, "external-writer-data")?;
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "injected external publisher conflict",
+            ))
+        },
+    );
+
+    assert!(result.unwrap_err().contains("recovery backup retained"));
+    assert_eq!(fs::read(&fixture.sidecar).unwrap(), b"external-writer-data");
+    assert_eq!(fs::read(fixture.backup()).unwrap(), b"expected-xmp");
     assert!(!fixture.temp().exists());
 }
