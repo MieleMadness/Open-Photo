@@ -118,6 +118,15 @@ fn commit(
             if updated != 1 {
                 return Err("Draft changed during the transaction.".into());
             }
+            tx.execute(
+                "DELETE FROM crossfade_draft_history_test
+                 WHERE project_id=?1 AND id NOT IN (
+                     SELECT id FROM crossfade_draft_history_test
+                     WHERE project_id=?1 ORDER BY id DESC LIMIT 20
+                 )",
+                params![project_id],
+            )
+            .map_err(|error| error.to_string())?;
             advanced
         }
         _ => return Err("Draft changed elsewhere; reopen before saving.".into()),
