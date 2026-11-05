@@ -1,3 +1,10 @@
+## 0.56.68 — XMP batch path safety (pending Windows verification)
+
+- Inspect managed XMP sidecar directory entries without following links before deciding whether a new sidecar may be created. Refuse existing directories and dangling links rather than treating them as absent.
+- Record an XMP preservation failure against the affected item and continue the remaining bulk tag operation, rather than abandoning the whole batch.
+- Add regression coverage for per-file isolation and a dangling sidecar link (Unix fixture); Windows installed-path, junction and external-editor acceptance remain outstanding.
+- Development-only PR; do not treat this version as released before exact-head Windows CI and interactive safety acceptance.
+
 # 0.56.67 — Literal map filename labels
 
 - Render map tooltips through a text-only DOM element so filenames cannot be interpreted as HTML. Preserve marker selection and clustering.
