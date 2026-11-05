@@ -340,7 +340,19 @@ fn bulk_create_tags(
         };
         let sidecar = PathBuf::from(format!("{}.xmp", file.display()));
 
-        if !sidecar.exists() {
+        // exists() follows links and reports a dangling symlink as absent.
+        // Inspect the directory entry itself before attempting a create-new write.
+        let sidecar_present = match fs::symlink_metadata(&sidecar) {
+            Ok(_) => true,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(error) => {
+                output
+                    .errors
+                    .push(format!("{}: {error}", sidecar.display()));
+                continue;
+            }
+        };
+        if !sidecar_present {
             let xml = render_openphoto_xmp(&normalized_tags);
             let result = (|| -> Result<(), String> {
                 let mut staged = crate::safe_output::StagedOutput::new(&sidecar)?;
@@ -407,8 +419,13 @@ fn bulk_create_tags(
             ));
             continue;
         }
-        let replacement = xmp::append_tags(&xml, &normalized_tags)
-            .ok_or("Cannot safely preserve this XMP document")?;
+        let Some(replacement) = xmp::append_tags(&xml, &normalized_tags) else {
+            output.errors.push(format!(
+                "{}: Cannot safely preserve this XMP document",
+                sidecar.display()
+            ));
+            continue;
+        };
         match replace_managed_sidecar(&sidecar, &xml, &replacement) {
             Ok(()) => output.updated += 1,
             Err(error) => output
