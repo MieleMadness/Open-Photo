@@ -58,7 +58,10 @@ fn external_edit_with_matching_length_is_not_overwritten() {
     fs::write(&fixture.sidecar, "other-content").unwrap();
     let result = replace_managed_sidecar(&fixture.sidecar, "first-content", "our-new-tags");
     assert!(result.unwrap_err().contains("changed outside Open-Photo"));
-    assert_eq!(fs::read_to_string(&fixture.sidecar).unwrap(), "other-content");
+    assert_eq!(
+        fs::read_to_string(&fixture.sidecar).unwrap(),
+        "other-content"
+    );
     assert!(!fixture.temporary().exists());
     assert!(!fixture.backup().exists());
 }
@@ -70,7 +73,10 @@ fn preexisting_backup_blocks_replacement_without_mutating_any_file() {
     let result = replace_managed_sidecar(&fixture.sidecar, "prior-xmp", "new-xmp");
     assert!(result.unwrap_err().contains("recovery file exists"));
     assert_eq!(fs::read_to_string(&fixture.sidecar).unwrap(), "prior-xmp");
-    assert_eq!(fs::read_to_string(fixture.backup()).unwrap(), "recovery-bytes");
+    assert_eq!(
+        fs::read_to_string(fixture.backup()).unwrap(),
+        "recovery-bytes"
+    );
     assert!(!fixture.temporary().exists());
 }
 
@@ -81,7 +87,10 @@ fn preexisting_temporary_file_blocks_replacement_without_mutating_any_file() {
     let result = replace_managed_sidecar(&fixture.sidecar, "prior-xmp", "new-xmp");
     assert!(result.unwrap_err().contains("recovery file exists"));
     assert_eq!(fs::read_to_string(&fixture.sidecar).unwrap(), "prior-xmp");
-    assert_eq!(fs::read_to_string(fixture.temporary()).unwrap(), "partially-staged");
+    assert_eq!(
+        fs::read_to_string(fixture.temporary()).unwrap(),
+        "partially-staged"
+    );
     assert!(!fixture.backup().exists());
 }
 
