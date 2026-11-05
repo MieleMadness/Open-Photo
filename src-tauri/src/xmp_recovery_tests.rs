@@ -167,8 +167,7 @@ fn dangling_temporary_symlink_is_detected_before_backup_creation() {
     let target = fixture.root.join("missing-target");
     symlink(&target, fixture.temporary()).unwrap();
 
-    let error =
-        replace_managed_sidecar(&fixture.sidecar, "original-xmp", "new-xmp").unwrap_err();
+    let error = replace_managed_sidecar(&fixture.sidecar, "original-xmp", "new-xmp").unwrap_err();
     assert!(error.contains("recovery file exists"));
     assert_eq!(
         fs::read_to_string(&fixture.sidecar).unwrap(),
@@ -190,8 +189,7 @@ fn dangling_backup_symlink_is_detected_without_staging() {
     let target = fixture.root.join("missing-recovery-target");
     symlink(&target, fixture.backup()).unwrap();
 
-    let error =
-        replace_managed_sidecar(&fixture.sidecar, "original-xmp", "new-xmp").unwrap_err();
+    let error = replace_managed_sidecar(&fixture.sidecar, "original-xmp", "new-xmp").unwrap_err();
     assert!(error.contains("recovery file exists"));
     assert_eq!(
         fs::read_to_string(&fixture.sidecar).unwrap(),
