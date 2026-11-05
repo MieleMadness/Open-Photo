@@ -91,7 +91,7 @@ Open-Photo treats your source media as protected content.
 - Commands reject media outside the selected library root.
 - Symlink escapes are not followed during normal scanning.
 - Deletion and original-media editing are not implemented.
-- XMP keyword writing is explicit and creates a **new missing sidecar only**. Existing XMP sidecars are not overwritten.
+- XMP keyword writing is explicit. Open-Photo creates a new missing sidecar or merges keywords into an existing **Open-Photo-managed** sidecar while retaining unrelated XML metadata; foreign or malformed XMP is not intentionally rewritten. External-editor conflicts and interrupted-write recovery are still being hardened (see [XMP safety gate](docs/AUDIT_XMP_RECOVERY_GATE.md) and [open race/recovery issue](https://github.com/MieleMadness/Open-Photo/issues/90)). Keep a separate backup of important metadata.
 - AI models, indexes, embeddings, ratings and other application state live outside the original photo folders unless you explicitly create an XMP sidecar.
 - A truncated or inaccessible scan is handled conservatively so an unavailable drive is not treated as a reason to purge source media.
 
