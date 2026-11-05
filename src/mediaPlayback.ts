@@ -1,10 +1,10 @@
-import {saveSetting} from "./userData";
+import {readSetting,saveSetting} from "./userData";
 import {useCallback,useEffect,useRef} from "react";
 
 const volumeKey="openphoto.videoVolume";
 const volumeEvent="openphoto-video-volume";
 export function savedVideoVolume(){
-  const saved=localStorage.getItem(volumeKey);
+  const saved=readSetting(volumeKey);
   if(saved===null||!saved.trim())return 1;
   const value=Number(saved);
   return Number.isFinite(value)&&value>=0&&value<=1?value:1;

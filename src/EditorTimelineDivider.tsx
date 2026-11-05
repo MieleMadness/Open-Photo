@@ -1,8 +1,8 @@
 import {useLayoutEffect,useRef,useState,type RefObject} from "react";
-import {saveSetting} from "./userData";
+import {readSetting,saveSetting} from "./userData";
 
 const key="openphoto.editor.timelineRatio",defaultRatio=.32;
-function savedRatio(){const value=localStorage.getItem(key),number=Number(value);return value!==null&&Number.isFinite(number)&&number>0&&number<1?number:defaultRatio;}
+function savedRatio(){const value=readSetting(key),number=Number(value);return value!==null&&Number.isFinite(number)&&number>0&&number<1?number:defaultRatio;}
 export function timelineSplitBounds(height:number,occupied:number){
   const available=Math.floor(Math.max(0,height-occupied-10)),minimum=Math.min(180,Math.max(120,available-160),available);
   return {minimum,maximum:Math.max(minimum,available-160),available};
