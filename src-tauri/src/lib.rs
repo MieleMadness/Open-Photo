@@ -82,13 +82,13 @@ mod video_timing;
 mod video_workspace;
 mod watch;
 mod xmp;
-mod xmp_recovery_inventory;
 #[cfg(test)]
 mod xmp_batch_preservation_tests;
 #[cfg(test)]
 mod xmp_conflict_state_tests;
 #[cfg(test)]
 mod xmp_publish_race_tests;
+mod xmp_recovery_inventory;
 #[cfg(test)]
 mod xmp_recovery_tests;
 use base64::Engine;
