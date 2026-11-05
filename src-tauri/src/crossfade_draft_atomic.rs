@@ -169,8 +169,14 @@ mod tests {
     #[test]
     fn inserts_new_draft_then_updates_with_undo_recovery_copy() {
         let mut connection = db();
-        assert_eq!(commit(&mut connection, "project-1", 5, None, "draft-a"), Ok(1));
-        assert_eq!(commit(&mut connection, "project-1", 5, Some(1), "draft-b"), Ok(2));
+        assert_eq!(
+            commit(&mut connection, "project-1", 5, None, "draft-a"),
+            Ok(1)
+        );
+        assert_eq!(
+            commit(&mut connection, "project-1", 5, Some(1), "draft-b"),
+            Ok(2)
+        );
         assert_eq!(
             read(&connection, "project-1").unwrap().unwrap(),
             Stored {
@@ -193,7 +199,10 @@ mod tests {
         ] {
             assert!(result.is_err());
         }
-        assert_eq!(read(&connection, "project-1").unwrap().unwrap().data, "original");
+        assert_eq!(
+            read(&connection, "project-1").unwrap().unwrap().data,
+            "original"
+        );
         assert!(history(&connection, "project-1").is_empty());
     }
 
@@ -201,7 +210,10 @@ mod tests {
     fn unchanged_draft_does_not_increment_revision_or_create_history() {
         let mut connection = db();
         commit(&mut connection, "project-1", 5, None, "same").unwrap();
-        assert_eq!(commit(&mut connection, "project-1", 5, Some(1), "same"), Ok(1));
+        assert_eq!(
+            commit(&mut connection, "project-1", 5, Some(1), "same"),
+            Ok(1)
+        );
         assert!(history(&connection, "project-1").is_empty());
     }
 
@@ -216,8 +228,17 @@ mod tests {
             )
             .unwrap();
         assert!(commit(&mut connection, "project-1", 5, Some(1), "new").is_err());
-        assert_eq!(read(&connection, "project-1").unwrap().unwrap().data, "untouched");
-        assert_eq!(read(&connection, "project-1").unwrap().unwrap().draft_revision, 1);
+        assert_eq!(
+            read(&connection, "project-1").unwrap().unwrap().data,
+            "untouched"
+        );
+        assert_eq!(
+            read(&connection, "project-1")
+                .unwrap()
+                .unwrap()
+                .draft_revision,
+            1
+        );
     }
 
     #[test]
@@ -238,7 +259,13 @@ mod tests {
         assert_eq!(saved.len(), 20);
         assert_eq!(saved.first().unwrap(), "v6");
         assert_eq!(saved.last().unwrap(), "v25");
-        assert_eq!(read(&connection, "project-1").unwrap().unwrap().draft_revision, 26);
+        assert_eq!(
+            read(&connection, "project-1")
+                .unwrap()
+                .unwrap()
+                .draft_revision,
+            26
+        );
     }
 
     #[test]
@@ -246,7 +273,14 @@ mod tests {
         let mut connection = db();
         assert!(commit(&mut connection, "bad id", 0, None, "draft").is_err());
         assert!(commit(&mut connection, "p", 0, None, "").is_err());
-        assert!(commit(&mut connection, "p", 0, None, &"a".repeat(MAX_DRAFT_BYTES + 1)).is_err());
+        assert!(commit(
+            &mut connection,
+            "p",
+            0,
+            None,
+            &"a".repeat(MAX_DRAFT_BYTES + 1)
+        )
+        .is_err());
         assert!(commit(&mut connection, "p", u64::MAX, None, "draft").is_err());
         assert!(read(&connection, "p").unwrap().is_none());
     }
