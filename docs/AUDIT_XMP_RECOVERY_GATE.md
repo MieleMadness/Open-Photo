@@ -65,3 +65,7 @@ The `src-tauri/src/xmp_conflict_state_tests.rs` suite checks sequential stale-sa
 ## 0.56.69 follow-up candidate — recovery filename entry detection
 
 Before staging a managed XMP replacement, `symlink_metadata` now distinguishes genuinely absent temporary/backup directory entries from dangling links and refuses unknown inspection failures. Exclusive `create_new` creation still prevents a late ordinary filename collision. This is a focused failure-mode improvement only: it does **not** make the final sidecar compare and replace atomic or satisfy Issue #90's crash recovery and installed Windows path-race requirements.
+
+## Installed Windows manual evidence
+
+The [installed XMP safety acceptance runbook](XMP_WINDOWS_INSTALLED_ACCEPTANCE.md) provides disposable-fixture procedures, before/after SHA-256 evidence, external-editor concurrency and root/junction tests, and signoff fields. It is a **procedure only**: no human Windows trial has been recorded, and passing Actions installer CI does not close Issue #90.
