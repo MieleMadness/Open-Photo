@@ -188,10 +188,14 @@ mod tests {
         let saved = snapshot(&source());
         let mut wrong: Value = serde_json::from_str(&saved).unwrap();
         wrong["version"] = json!(2);
-        assert!(validate_snapshot(&wrong.to_string(), 5, &source(), "project-1", 30, CLIPS).is_err());
+        assert!(
+            validate_snapshot(&wrong.to_string(), 5, &source(), "project-1", 30, CLIPS).is_err()
+        );
         wrong["version"] = json!(1);
         wrong["unexpected"] = json!(true);
-        assert!(validate_snapshot(&wrong.to_string(), 5, &source(), "project-1", 30, CLIPS).is_err());
+        assert!(
+            validate_snapshot(&wrong.to_string(), 5, &source(), "project-1", 30, CLIPS).is_err()
+        );
         assert!(validate_snapshot("{", 5, &source(), "project-1", 30, CLIPS).is_err());
     }
 
@@ -212,14 +216,9 @@ mod tests {
     fn rejects_corrupt_inner_draft_even_when_source_matches() {
         let mut corrupted: Value = serde_json::from_str(&snapshot(&source())).unwrap();
         corrupted["draft"] = json!("{}");
-        assert!(validate_snapshot(
-            &corrupted.to_string(),
-            5,
-            &source(),
-            "project-1",
-            30,
-            CLIPS
-        )
-        .is_err());
+        assert!(
+            validate_snapshot(&corrupted.to_string(), 5, &source(), "project-1", 30, CLIPS)
+                .is_err()
+        );
     }
 }
