@@ -248,15 +248,8 @@ mod tests {
             let mut modified = base.clone();
             modified["clips"][0][mark][field] = json!(value);
             assert!(
-                validate_snapshot(
-                    &snapshot(&modified),
-                    5,
-                    &modified,
-                    "project-1",
-                    30,
-                    CLIPS
-                )
-                .is_err(),
+                validate_snapshot(&snapshot(&modified), 5, &modified, "project-1", 30, CLIPS)
+                    .is_err(),
                 "invalid mark {mark}.{field}={value}"
             );
         }
@@ -270,17 +263,10 @@ mod tests {
         assert!(validate_snapshot(&snapshot(&valid), 5, &valid, "project-1", 30, CLIPS).is_ok());
 
         let mut reversed = valid.clone();
-        reversed["clips"][0]["source_out"] =
-            json!({"ticks":"333333","time_base":"1/1000000"});
-        assert!(validate_snapshot(
-            &snapshot(&reversed),
-            5,
-            &reversed,
-            "project-1",
-            30,
-            CLIPS
-        )
-        .is_err());
+        reversed["clips"][0]["source_out"] = json!({"ticks":"333333","time_base":"1/1000000"});
+        assert!(
+            validate_snapshot(&snapshot(&reversed), 5, &reversed, "project-1", 30, CLIPS).is_err()
+        );
     }
 
     #[test]
