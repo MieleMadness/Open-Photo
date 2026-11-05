@@ -1,3 +1,8 @@
+# XMP recovery status classification (development candidate, PR #111)
+
+- Internal read-only recovery inspection now distinguishes clear, temporary-only, backup-only, both-present and unexpected filesystem entries, all conservatively. Existing production behavior continues to block all non-clear entries without deleting or restoring files.
+- Synthetic tests cover the classification matrix. This is groundwork for a future user-reviewable recovery flow, not a crash-safe state machine, successful-editor-publish CAS fix, or public release. Installer remains opt-in.
+
 # XMP recovery inspection helper (development candidate, PR #110)
 
 - Factor the existing fail-closed `.openphoto.tmp`/`.openphoto.bak` directory-entry checks into an internal, strictly read-only inspection helper, preserving dangling-link and unknown-error behavior.
