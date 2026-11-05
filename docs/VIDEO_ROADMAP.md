@@ -1,3 +1,21 @@
+## November 5, 2026 — 0.56.68 XMP safety checkpoint and Phase J boundary
+
+**Current merged development baseline:** 0.56.67 on `feature/desktop-v0.1.0`; [PR #88](https://github.com/MieleMadness/Open-Photo/pull/88) merged with exact-head CI #1365, adding native regression fixtures for managed XMP sidecars. [PR #89](https://github.com/MieleMadness/Open-Photo/pull/89) is the 0.56.68 bugfix candidate for safer per-item bulk tagging and existing sidecar entry handling; its full Windows acceptance is pending. This entry is an engineering handoff, not a release announcement.
+
+**Unresolved priority F07/R01:** [Issue #90](https://github.com/MieleMadness/Open-Photo/issues/90) tracks the external-editor **compare-to-publish race**, persisted interrupted-write recovery, Windows reparse/junction/root authorization, and no-silent-overwrite guarantees. The [XMP fault matrix](AUDIT_XMP_RECOVERY_GATE.md) documents the required deterministic tests and installed Windows trials. Existing test fixtures establish only pre-publish conflict detection and recovery-file refusal, not complete transactional safety. Do not close F07/R01 or report a production metadata conflict UI until these cases pass.
+
+| Immediate priority | Current verified boundary | Next work |
+| --- | --- | --- |
+| 0.56.68 XMP batch safety (#89) | Candidate branch, not yet merged | Exact-head Rust/Clippy/frontend/full Windows CI; fix failures before integration |
+| External-editor and crash recovery (#90) | Native regression foundation from #88 | Deterministic compare-to-publish race, backup/flush/rename failure injection and persisted, user-reviewable recovery |
+| Installed Windows acceptance | Automated checks do not exercise GUI editor flows | Real-media sidecar conflict, root/junction safety, settings/RAW and update lifecycle trials |
+| Phase J production crossfades | Experimental/test-only snapshot/clock/render infrastructure | Remains gated on production schema/recovery, real-media playback/export parity and installed acceptance |
+| 10,000+ media scale test | Deferred by owner | Complete before 1.0, not a prerequisite for narrow 0.56.x safety changes |
+
+**Non-regression rule:** Original source media stays read-only, managed/foreign metadata is never silently discarded, and existing hard-cut/dip video behavior remains the production fallback.
+
+---
+
 ## November 5, 2026 — Phase J persisted-draft safety checkpoint (experimental)
 
 **Verified and merged:** PRs [#66](https://github.com/MieleMadness/Open-Photo/pull/66), [#68](https://github.com/MieleMadness/Open-Photo/pull/68), [#69](https://github.com/MieleMadness/Open-Photo/pull/69), [#70](https://github.com/MieleMadness/Open-Photo/pull/70), [#71](https://github.com/MieleMadness/Open-Photo/pull/71), [#72](https://github.com/MieleMadness/Open-Photo/pull/72), [#73](https://github.com/MieleMadness/Open-Photo/pull/73), [#74](https://github.com/MieleMadness/Open-Photo/pull/74), [#75](https://github.com/MieleMadness/Open-Photo/pull/75), [#76](https://github.com/MieleMadness/Open-Photo/pull/76), [#77](https://github.com/MieleMadness/Open-Photo/pull/77) and [#78](https://github.com/MieleMadness/Open-Photo/pull/78) added *isolated* command/history, frame-preview seek, source/revision-bound draft snapshots, Rust wire validators, and in-memory SQLite atomic/CAS/recovery test fixtures. Combined CI verification is still required after the latest base merges.
