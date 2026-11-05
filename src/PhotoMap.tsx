@@ -26,7 +26,9 @@ export default function PhotoMap({points,onChoose,compact=false}:{points:PhotoLo
         const count=group.photos.length;
         let nextPhoto=0;
         const marker=L.circleMarker([group.lat,group.lon],{radius:count>1?Math.min(19,9+Math.log2(count)*2):7,color:"#6727ad",fillColor:"#28b678",fillOpacity:.85,weight:2}).addTo(markers);
-        marker.bindTooltip(count===1?(group.photos[0].path.split(/[\\/]/).pop()||"Media"):`${count} items · Click to browse`);
+        const label=document.createElement("span");
+        label.textContent=count===1?(group.photos[0].path.split(/[\\/]/).pop()||"Media"):`${count} items · Click to browse`;
+        marker.bindTooltip(label);
         marker.on("click",()=>{onChooseRef.current(group.photos[nextPhoto%count].path);nextPhoto++;});
       }
     };

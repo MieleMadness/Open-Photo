@@ -1,3 +1,8 @@
+# 0.56.67 — Literal map filename labels
+
+- Render map tooltips through a text-only DOM element so filenames cannot be interpreted as HTML. Preserve marker selection and clustering.
+- Add regression coverage for entity-like and markup-like filenames.
+
 # 0.56.64 — Audit data-safety fixes
 
 - Drain queued settings before close or update and block new settings writes during the exit barrier. Settings failures block exit even when project edits are discarded.
