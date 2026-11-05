@@ -36,7 +36,9 @@ fn commit(
     clips: &[(&str, u64)],
     candidate: &str,
 ) -> Result<u64, String> {
-    if !project_id.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    if !project_id
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
         || project_id.is_empty()
         || project_id.len() > 120
         || expected_project_revision > i64::MAX as u64
