@@ -15,7 +15,7 @@ import {useUnifiedSearch} from "./useUnifiedSearch";
 import {SearchStatus} from "./SearchStatus";
 import {useManagedTags} from "./useManagedTags";
 import {readMetadataBatches} from "./metadataBatches";
-import {saveSetting,retrySettings} from "./userData";
+import {readSetting,saveSetting,retrySettings} from "./userData";
 import {AiDashboard} from "./AiDashboard";
 import {useAiIndex,isAiExcluded} from "./useAiIndex";
 import {LibraryFilmstrip} from "./LibraryFilmstrip";
@@ -112,7 +112,7 @@ export default function App() {
   const [noticeHost,setNoticeHost]=useState<HTMLDivElement|null>(null);
   const [form,setForm]=useState<"workspace"|"collection"|"smart"|null>(null);
   const appUpdater=useAppUpdater(isDesktop);
-  const [aiOptIn,setAiOptIn]=useState(()=>localStorage.getItem("openphoto.ai.optin")==="true");
+  const [aiOptIn,setAiOptIn]=useState(()=>readSetting("openphoto.ai.optin")==="true");
   const [aiModels,setAiModels]=useState<AiModelInfo[]>([]);
   const aiModelByKind=useMemo(()=>new Map(aiModels.map(model=>[model.kind,model])),[aiModels]);
   const semanticReady=["semantic","semantic_text","semantic_tokenizer"].every(kind=>aiModelByKind.get(kind)?.compatible);
@@ -129,7 +129,7 @@ export default function App() {
   const [peopleGroups,setPeopleGroups]=useState<PersonGroup[]>([]);
   const [peopleStatus,setPeopleStatus]=useState<FaceIndexStatus|null>(null);
   const [peopleMessage,setPeopleMessage]=useState("");
-  const [peopleNames,setPeopleNames]=useState<Record<string,string>>(()=>{try{return JSON.parse(localStorage.getItem("openphoto.peopleNames")||"{}") as Record<string,string>}catch{return {}}});
+  const [peopleNames,setPeopleNames]=useState<Record<string,string>>(()=>{try{return JSON.parse(readSetting("openphoto.peopleNames")||"{}") as Record<string,string>}catch{return {}}});
   useEffect(()=>saveSetting("openphoto.peopleNames",JSON.stringify(peopleNames)),[peopleNames]);
   const [aiRuntime,setAiRuntime]=useState<{directml_compiled:boolean;directml_available:boolean;automatic_policy:string;cpu_fallback:boolean}|null>(null);
   const refreshModels=async()=>{setAiModelBusy(true);try{setAiModels(await invoke<AiModelInfo[]>("ai_model_status"));}catch(e){setAiModelMessage(String(e));}finally{setAiModelBusy(false);}};
@@ -148,15 +148,15 @@ export default function App() {
     if(!enabled){aiCancelRequested.current=true;aiEpoch.current+=1;setAiSimilar([]);setPeopleGroups([]);}
     setAiOptIn(enabled);
   }
-  const [aiDevice,setAiDevice]=useState<"auto"|"cpu">(()=>localStorage.getItem("openphoto.ai.device")==="cpu"?"cpu":"auto");
+  const [aiDevice,setAiDevice]=useState<"auto"|"cpu">(()=>readSetting("openphoto.ai.device")==="cpu"?"cpu":"auto");
   useEffect(()=>saveSetting("openphoto.ai.optin",String(aiOptIn)),[aiOptIn]);
   useEffect(()=>saveSetting("openphoto.ai.device",aiDevice),[aiDevice]);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>(()=>{try{return JSON.parse(localStorage.getItem("openphoto.workspaces")||"[]") as Workspace[]}catch{return []}});
-  const [activeWorkspace,setActiveWorkspace] = useState<string>(()=>localStorage.getItem("openphoto.activeWorkspace")||"");
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(()=>{try{return JSON.parse(readSetting("openphoto.workspaces")||"[]") as Workspace[]}catch{return []}});
+  const [activeWorkspace,setActiveWorkspace] = useState<string>(()=>readSetting("openphoto.activeWorkspace")||"");
   const [folderFilter,setFolderFilter] = useState("");
   const [folderView,setFolderView]=useBrowseView(activeWorkspace,"folders"),[collectionView,setCollectionView]=useBrowseView(activeWorkspace,"collections");
   const [collectionFilter,setCollectionFilter]=useState("");
-  const [collections,setCollections]=useState<Collection[]>(()=>{try{return JSON.parse(localStorage.getItem("openphoto.collections")||"[]") as Collection[]}catch{return []}});
+  const [collections,setCollections]=useState<Collection[]>(()=>{try{return JSON.parse(readSetting("openphoto.collections")||"[]") as Collection[]}catch{return []}});
   useEffect(()=>saveSetting("openphoto.collections",JSON.stringify(collections)),[collections]);
   const [geoPoints,setGeoPoints]=useState<PhotoLocation[]>([]);
   const [geoBusy,setGeoBusy]=useState(false);
@@ -174,7 +174,7 @@ export default function App() {
   const [duplicateBusy, setDuplicateBusy] = useState(false);
   const [duplicateReview,setDuplicateReview]=useState<Record<string,string>>(()=>{
     try {
-      const stored=JSON.parse(localStorage.getItem("openphoto.duplicateReview")||"{}") as Record<string,unknown>;
+      const stored=JSON.parse(readSetting("openphoto.duplicateReview")||"{}") as Record<string,unknown>;
       return Object.fromEntries(Object.entries(stored).filter((entry):entry is [string,string]=>typeof entry[1]==="string"));
     } catch { return {}; }
   });
@@ -184,14 +184,14 @@ export default function App() {
   const [organizeFilter,setOrganizeFilter] = useState<"all"|"favorites"|"rated">("all");
   const [photoRatings,setPhotoRatings] = useState<Record<string,number>>(()=>{
     try {
-      const saved=JSON.parse(localStorage.getItem("openphoto.ratings")||"{}") as Record<string,number>;
+      const saved=JSON.parse(readSetting("openphoto.ratings")||"{}") as Record<string,number>;
       return Object.fromEntries(Object.entries(saved).filter(([,rating])=>Number.isInteger(rating)&&rating>=0&&rating<=5));
     } catch { return {}; }
   });
   useEffect(()=>saveSetting("openphoto.ratings",JSON.stringify(photoRatings)),[photoRatings]);
   const ratePhoto=(path:string,rating:number)=>setPhotoRatings(previous=>({...previous,[path]:previous[path]===rating?0:rating}));
-  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("openphoto.theme") as Theme) || "system");
-  const [accent,setAccent]=useState<Accent>(()=>{const value=localStorage.getItem("openphoto.accent") as Accent|null;return ACCENTS.some(item=>item.id===value)?value!:"purple";});
+  const [theme, setTheme] = useState<Theme>(() => (readSetting("openphoto.theme") as Theme) || "system");
+  const [accent,setAccent]=useState<Accent>(()=>{const value=readSetting("openphoto.accent") as Accent|null;return ACCENTS.some(item=>item.id===value)?value!:"purple";});
   const [root, setRoot] = useState("");
   useEffect(()=>{saveSetting("openphoto.workspaces",JSON.stringify(workspaces))},[workspaces]);
   useEffect(()=>{saveSetting("openphoto.activeWorkspace",activeWorkspace)},[activeWorkspace]);
@@ -206,7 +206,7 @@ export default function App() {
   const [selectedSmartRule,setSelectedSmartRule]=useState("");
   const [smartRules,setSmartRules]=useState<SmartRule[]>(()=>{
     try {
-      const saved=JSON.parse(localStorage.getItem("openphoto.smartRules")||"[]") as SmartRule[];
+      const saved=JSON.parse(readSetting("openphoto.smartRules")||"[]") as SmartRule[];
       return Array.isArray(saved)?saved.filter(item=>typeof item.id==="string"&&typeof item.name==="string"&&["all","photo","video"].includes(item.type)&&Number.isInteger(item.minRating)&&item.minRating>=0&&item.minRating<=5&&Number.isFinite(item.minMB)&&item.minMB>=0):[];
     }catch{return [];}
   });
@@ -253,7 +253,7 @@ export default function App() {
 
   const [selected, setSelected] = useState<Photo | null>(null);
   const [fullScreenPreview,setFullScreenPreview]=useState(false);
-  const [showViewerFilmstrip,setShowViewerFilmstrip]=useState(()=>localStorage.getItem("openphoto.viewerFilmstrip")!=="false");
+  const [showViewerFilmstrip,setShowViewerFilmstrip]=useState(()=>readSetting("openphoto.viewerFilmstrip")!=="false");
   useEffect(()=>saveSetting("openphoto.viewerFilmstrip",String(showViewerFilmstrip)),[showViewerFilmstrip]);
   const [livePlaying,setLivePlaying]=useState(false);
   const [videoStartAt,setVideoStartAt]=useState(0);

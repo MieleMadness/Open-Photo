@@ -133,6 +133,7 @@ pub(crate) fn database() -> Result<Connection, String> {
         face_key TEXT PRIMARY KEY, person_id TEXT NOT NULL REFERENCES people(id));",
         )
         .map_err(|e| e.to_string())?;
+    crate::source_version::initialize(&connection)?;
     Ok(connection)
 }
 
@@ -565,7 +566,11 @@ fn index_state_is_current(
     modified: i64,
     detector_key: &str,
     embedder_key: &str,
+    version: &str,
 ) -> Result<bool, String> {
+    if !crate::source_version::matches(db, root, path, version)? {
+        return Ok(false);
+    }
     db.query_row(
         "SELECT EXISTS(
             SELECT 1 FROM face_index_state
@@ -579,6 +584,7 @@ fn index_state_is_current(
     .map_err(|e| e.to_string())
 }
 
+#[allow(clippy::too_many_arguments)] // Publication includes the captured source version.
 fn store_faces(
     db: &mut Connection,
     root: &str,
@@ -587,6 +593,7 @@ fn store_faces(
     detector_key: &str,
     embedder_key: &str,
     faces: &[FaceRecord],
+    version: &str,
 ) -> Result<(), String> {
     let transaction = db.transaction().map_err(|e| e.to_string())?;
     transaction
@@ -640,6 +647,7 @@ fn store_faces(
             ],
         )
         .map_err(|e| e.to_string())?;
+    crate::source_version::publish(&transaction, root, path, version)?;
     transaction.commit().map_err(|e| e.to_string())
 }
 
@@ -677,7 +685,23 @@ fn index_batch_blocking(
                 continue;
             }
         };
-        match index_state_is_current(&db, &root, &path, modified, &detector_key, &embedder_key) {
+        let version = match crate::source_version::capture(&root, &path) {
+            Ok(version) => version,
+            Err(error) => {
+                result.failed_images += 1;
+                result.errors.push(format!("{path}: {error}"));
+                continue;
+            }
+        };
+        match index_state_is_current(
+            &db,
+            &root,
+            &path,
+            modified,
+            &detector_key,
+            &embedder_key,
+            &version,
+        ) {
             Ok(true) => {
                 result.skipped_images += 1;
                 continue;
@@ -700,6 +724,7 @@ fn index_batch_blocking(
                     &detector_key,
                     &embedder_key,
                     &faces,
+                    &version,
                 ) {
                     result.failed_images += 1;
                     result.errors.push(format!("{path}: {error}"));
@@ -832,13 +857,13 @@ pub fn ai_people_groups(
     }
     let (_, embedder_key) = crate::ai_models::validate_supported_face_bundle()?;
     let mut db = database()?;
-    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::attach_current(&db, &crate::index::current_database_path()?)?;
     crate::search_providers::prepare_scope(&db, &crate::ai_index::active_exclusions()?)?;
     // Filter roots before applying the cap, so other workspaces cannot crowd this one out.
     let candidates = {
         let mut statement = db
             .prepare(
-                "SELECT f.root,f.path,face_index,x,y,width,height,score,vector FROM face_embeddings f JOIN visible_media m ON m.root=f.root AND m.path=f.path AND m.modified_unix=f.modified_unix
+                "SELECT f.root,f.path,face_index,x,y,width,height,score,vector FROM face_embeddings f JOIN visible_media m ON m.root=f.root AND m.path=f.path AND m.modified_unix=f.modified_unix JOIN ai_source_versions sv ON sv.root=f.root AND sv.path=f.path AND sv.version=m.source_version
             WHERE embedder_key=?1 AND f.root IN (SELECT value FROM json_each(?2))
             ORDER BY f.root,f.path,face_index LIMIT ?3",
             )
@@ -979,7 +1004,7 @@ pub fn ai_face_index_status(roots: Vec<String>) -> Result<FaceIndexStatus, Strin
     let (detector_key, embedder_key) = crate::ai_models::validate_supported_face_bundle()?;
     let allowed: HashSet<String> = roots.into_iter().collect();
     let db = database()?;
-    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::attach_current(&db, &crate::index::current_database_path()?)?;
     crate::search_providers::prepare_scope(&db, &crate::ai_index::active_exclusions()?)?;
     let mut statement = db
         .prepare(
@@ -1037,6 +1062,7 @@ impl IndexWorker {
         modified: i64,
         bytes: u64,
     ) -> Result<(), String> {
+        let version = crate::source_version::capture(root, path)?;
         crate::ai_index::verify_source(root, path, modified, bytes)?;
         if index_state_is_current(
             &self.db,
@@ -1045,6 +1071,7 @@ impl IndexWorker {
             modified,
             &self.first_key,
             &self.second_key,
+            &version,
         )? {
             return Ok(());
         }
@@ -1061,6 +1088,7 @@ impl IndexWorker {
             &self.first_key,
             &self.second_key,
             &records,
+            &version,
         )
     }
 }

@@ -9,6 +9,7 @@ mod ai_runtime;
 mod ai_text;
 mod ai_validation;
 mod cache_disk;
+mod source_version;
 // Crossfade frame-clock parity fixture only; no active renderer changes.
 #[cfg(test)]
 mod crossfade_audio_count;
@@ -426,6 +427,7 @@ struct Photo {
     extension: String,
     bytes: u64,
     modified_unix: u64,
+    source_version: Option<String>,
     capture_local: Option<String>,
     live_asset_id: Option<String>,
 }
@@ -943,6 +945,13 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
+            let source_version = match source_version::read(&path) {
+                Ok(version) => Some(version),
+                Err(error) => {
+                    errors.push(format!("{}: {error}", path.display()));
+                    continue;
+                }
+            };
             let capture_local = read_capture_local(&path, &ext);
             let live_asset_id = read_live_asset_id(&path, &ext);
             photos.push(Photo {
@@ -951,6 +960,7 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
                 extension: ext,
                 bytes: metadata.len(),
                 modified_unix,
+                source_version,
                 capture_local,
                 live_asset_id,
             });

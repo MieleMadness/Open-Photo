@@ -1,3 +1,22 @@
+# 0.56.67 — Literal map filename labels
+
+- Render map tooltips through a text-only DOM element so filenames cannot be interpreted as HTML. Preserve marker selection and clustering.
+- Add regression coverage for entity-like and markup-like filenames.
+
+# 0.56.66 — Recover settings without browser-storage quota
+
+- Hydrate desktop settings directly into memory from SQLite and route settings readers through that store. Keep only bounded theme/accent bootstrap mirrors in browser storage.
+- Start normally when browser storage is full or unavailable; preserve native-load failures and retry without resetting saved metadata.
+- Retry exact latest memory values after persistence failures, including values that never fit in browser storage. Preserve close/update settings barriers.
+- Add large native-store, browser-quota, disabled-storage, failed-save/retry and restart regression coverage.
+
+# 0.56.65 — Consistent AI source freshness
+
+- Share a source version containing byte length, precise modification time and SHA-256 across saved media, queued work, semantic/OCR/People results, video staging and content search.
+- Requeue changed content even when file size and whole-second timestamps match; reject outdated queue completions and source changes during result publication.
+- Publish AI results and their source version in one transaction; invalidate legacy results without deleting reviewed person identities. Sync upgrades old library snapshots before automatic reindexing.
+- Add preserved-timestamp replacement, result rollback, queue and search freshness regressions. Full-content hashing increases sync I/O; no large-library performance claim.
+
 # 0.56.64 — Audit data-safety fixes
 
 - Drain queued settings before close or update and block new settings writes during the exit barrier. Settings failures block exit even when project edits are discarded.

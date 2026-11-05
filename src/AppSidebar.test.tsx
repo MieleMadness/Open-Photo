@@ -3,7 +3,7 @@ import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {Images,Settings} from "lucide-react";
 import {AppSidebar} from "./AppSidebar";
 import {saveSetting} from "./userData";
-vi.mock("./userData",()=>({saveSetting:vi.fn((key:string,value:string)=>localStorage.setItem(key,value))}));
+vi.mock("./userData",()=>({readSetting:(key:string)=>localStorage.getItem(key),saveSetting:vi.fn((key:string,value:string)=>localStorage.setItem(key,value))}));
 beforeEach(()=>{localStorage.clear();vi.clearAllMocks();});
 afterEach(cleanup);
 it("remembers the menu width while keeping workspace, navigation and appearance accessible",()=>{

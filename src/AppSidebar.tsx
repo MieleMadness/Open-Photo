@@ -1,12 +1,12 @@
 import {useEffect,useState} from "react";
 import {ChevronRight,Images,Layers3,Moon,PanelLeftClose,PanelLeftOpen,Sun,type LucideIcon} from "lucide-react";
 import type {Workspace} from "./libraryWorkspace";
-import {saveSetting} from "./userData";
+import {readSetting,saveSetting} from "./userData";
 
 type Props<T extends string>={items:{id:T;title:string;icon:LucideIcon}[];view:T;onNavigate:(view:T)=>void;workspaces:Workspace[];workspace:string;onWorkspace:(id:string)=>void;onCreateWorkspace:()=>void;theme:string;onTheme:(theme:"light"|"dark")=>void;version:string};
 /** Width is an explicit app preference. Compact rows never stretch with the window height. */
 export function AppSidebar<T extends string>({items,view,onNavigate,workspaces,workspace,onWorkspace,onCreateWorkspace,theme,onTheme,version}:Props<T>){
-  const [collapsed,setCollapsed]=useState(()=>localStorage.getItem("openphoto.sidebarCollapsed")==="true");
+  const [collapsed,setCollapsed]=useState(()=>readSetting("openphoto.sidebarCollapsed")==="true");
   useEffect(()=>saveSetting("openphoto.sidebarCollapsed",String(collapsed)),[collapsed]);
   const workspaceName=workspaces.find(w=>w.id===workspace)?.name||"Select a workspace";
   return <aside className="sidebar" data-collapsed={collapsed} aria-label="Application sidebar">
