@@ -57,3 +57,7 @@ The isolated `src-tauri/src/xmp_batch_preservation_tests.rs` module exercises a 
 ## 0.56.68 XMP batch safety follow-up (pending full Windows verification)
 
 The source-side batch path uses `symlink_metadata` instead of `exists()` before creating sidecars so dangling symlinks are not treated as missing, and a preservation failure is reported for its own photo without stopping the full batch. Native fixture tests check directory entries and (on Unix) a dangling link. These fixes do not resolve Issue #90's final compare-to-publish race, Windows reparse/root revocation and crash recovery; review those independently before shipping.
+
+## Stale-save and recovery-artifact native fixtures (test-only)
+
+The `src-tauri/src/xmp_conflict_state_tests.rs` suite checks sequential stale-save rejection: once a managed sidecar is updated, an operation with its old expected contents must fail, and a refreshed snapshot can write. Existing recovery-backup artifacts must block repeated writes; a Unix dangling backup symlink must not be followed or reused. These tests are synthetic and sequential. They do **not** establish atomic filesystem compare-and-swap, prove a crash-safe recovery state machine, or close the external editor's compare-to-publish race. Issue #90 remains open.
