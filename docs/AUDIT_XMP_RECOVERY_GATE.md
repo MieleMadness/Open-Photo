@@ -53,3 +53,7 @@ The test-only `src-tauri/src/xmp_recovery_tests.rs` suite exercises the existing
 ## Additional metadata-preservation regression (test-only)
 
 The isolated `src-tauri/src/xmp_batch_preservation_tests.rs` module exercises a mixed bulk-tag request: merge a managed Open-Photo sidecar while retaining unknown third-party XML, leave foreign-created sidecars byte-identical, keep both source photos byte-identical, and confirm a repeated operation is idempotent. A malformed XMP fixture must be skipped rather than repaired or rewritten. This is **not** an external-editor concurrency or crash-recovery test and does not close Issue #90.
+
+## 0.56.68 XMP batch safety follow-up (pending full Windows verification)
+
+The source-side batch path uses `symlink_metadata` instead of `exists()` before creating sidecars so dangling symlinks are not treated as missing, and a preservation failure is reported for its own photo without stopping the full batch. Native fixture tests check directory entries and (on Unix) a dangling link. These fixes do not resolve Issue #90's final compare-to-publish race, Windows reparse/root revocation and crash recovery; review those independently before shipping.
