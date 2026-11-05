@@ -96,7 +96,7 @@ fn failed_publish_keeps_old_sidecar_and_retains_original_backup() {
         "expected-xmp",
         "new-xmp",
         |staged, destination| {
-            assert_eq!(destination, fixture.sidecar);
+            assert_eq!(destination, fixture.sidecar.as_path());
             assert_eq!(fs::read(staged).unwrap(), b"new-xmp");
             assert_eq!(fs::read(fixture.backup()).unwrap(), b"expected-xmp");
             Err(std::io::Error::new(
