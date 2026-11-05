@@ -1,0 +1,5 @@
+# Phase J — Native full-snapshot validation (test-only)
+
+This native Rust test module validates an entire versioned experimental crossfade snapshot before handing its embedded draft JSON to the existing strict Rust draft-record validator. The test fixture requires the expected project revision, project ID, 30/60-fps clip frame clock, and **independently provided** source identity to agree with the serialized snapshot. It rejects unsupported envelope versions, unknown properties, changed source hashes and trim marks, and corrupted inner drafts.
+
+**Important limits:** The expected source identity is passed in by the test caller; this module does not yet independently resolve or hash original media files. It performs no file I/O, production schema migration, DB write, Tauri command or export. Production integration must derive source identity from verified native project metadata and pinned originals, validate the real project revision and draft revision within one transaction, handle recovery/old-client compatibility and pass installed-Windows footage tests. A passing isolated unit test does not authorize release.
