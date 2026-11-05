@@ -4,6 +4,8 @@
 - Include the AI work database and SQLite companions in explicit uninstall cleanup; independently check the cleanup inventory against native persistence services.
 - Apply shared decode limits to embedded RAW previews before pixel allocation, bound extraction, and preserve RAW orientation.
 
+- Explicitly run the short real-model video staging/resume acceptance test in the prepared Windows native job.
+
 # 0.56.63 — Accessible waveform scrubbing
 
 - Make decoded audio waveforms interactive with a native pointer/keyboard seek control tied to the global project playhead.

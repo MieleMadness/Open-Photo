@@ -72,6 +72,8 @@ jobs:
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
       - name: Native Rust regression tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Short real-model video staging and resume acceptance
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --lib video_semantic::tests::video_embeddings_resume_staging_and_publish_with_the_real_bundled_model -- --exact --ignored --nocapture --test-threads=1
       - name: Publish PR verification summary
         if: always()
         shell: pwsh

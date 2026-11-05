@@ -9,6 +9,8 @@ Baseline: active desktop branch 86367d3 (0.56.63), not the older audited af856ef
 - F04/C01: purge includes ai-work.sqlite and SQLite companions. A source-derived inventory regression compares production database names with uninstall cleanup and installed acceptance. Actual installed lifecycle acceptance remains required.
 - F05: current baseline already retains the callback in a ref and has clustering work beyond the audited version; do not overwrite it with the old implementation.
 
+- C02: prepared Windows native CI explicitly selects the short ignored real-model video staging/resume test; long/manual tests remain excluded.
+
 ## Verification boundaries
 
 Frontend suite, TypeScript and production build run locally using existing dependencies. Cargo is unavailable locally; native formatting, Clippy and tests require exact-head Windows CI. Full installer acceptance and hands-on Windows close/update/RAW checks remain required before release. No release tag or publication is part of this patch.
@@ -18,7 +20,6 @@ Frontend suite, TypeScript and production build run locally using existing depen
 1. F02: unified source identity and migrations across queue, semantic/OCR/face stores and search freshness. Include preserved timestamps, same-second rewrites, legacy record invalidation and publication fences.
 2. F06: remove startup dependence on LocalStorage capacity and retry from in-memory values.
 3. F07/R01: explicit XMP recovery states, fault injection and external-process conflicts.
-4. C02: prepared real-model short-video CI acceptance.
 5. Reassess remaining documentation, authorization, junction, cache and polling findings against the current branch before changing them.
 
 Version policy: major releases increment the first number; features the second; bug fixes the third. Workflow title and run name must match the application version. This bug-fix batch is 0.56.64.
