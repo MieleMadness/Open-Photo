@@ -1,3 +1,9 @@
+# XMP recovery inspection helper (development candidate, PR #110)
+
+- Factor the existing fail-closed `.openphoto.tmp`/`.openphoto.bak` directory-entry checks into an internal, strictly read-only inspection helper, preserving dangling-link and unknown-error behavior.
+- Add isolated native tests for missing entries, existing staged/backup versions, directories, and Unix dangling links. No automatic recovery or external-editor concurrency fix is claimed; the production save policy remains unchanged.
+- CI is required before merging; full Windows packaging remains opt-in. No public release.
+
 # CI policy — Opt-in Windows installer builds (development)
 
 - Ordinary pull requests and pushes to main run frontend build/tests, Rust formatting/Clippy/native tests, and real-model staging acceptance **without building or uploading a Windows installer**.
