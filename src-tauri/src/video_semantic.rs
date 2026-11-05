@@ -1,6 +1,6 @@
 //! Bounded, resumable frame embeddings. Staged frames are invisible until a whole video commits.
 use crate::{ai_embeddings, ai_inference, ai_preprocess, video_engine, video_probe};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::{
     ffi::{OsStr, OsString},
     path::{Path, PathBuf},
@@ -28,7 +28,8 @@ pub(crate) fn initialize(db: &Connection) -> Result<(), String> {
     db.execute_batch("CREATE TABLE IF NOT EXISTS video_frames(root TEXT,path TEXT,modified INTEGER,bytes INTEGER,model TEXT,seconds REAL,vector BLOB,PRIMARY KEY(root,path,seconds));
  CREATE TABLE IF NOT EXISTS video_index_state(root TEXT,path TEXT,modified INTEGER,bytes INTEGER,model TEXT,PRIMARY KEY(root,path));
  CREATE TABLE IF NOT EXISTS video_frame_work(root TEXT,path TEXT,modified INTEGER,bytes INTEGER,model TEXT,idx INTEGER,seconds REAL,hash INTEGER,r INTEGER,g INTEGER,b INTEGER,vector BLOB,PRIMARY KEY(root,path,idx));
- CREATE INDEX IF NOT EXISTS idx_video_frame_model ON video_frames(model);").map_err(|e|e.to_string())
+ CREATE INDEX IF NOT EXISTS idx_video_frame_model ON video_frames(model);").map_err(|e|e.to_string())?;
+    crate::source_version::initialize(db)
 }
 pub(crate) fn samples(duration: f64) -> Result<Vec<f64>, String> {
     if !duration.is_finite() || duration <= 0. || duration > 7200. {
@@ -160,6 +161,7 @@ struct Plan {
     path: String,
     modified: i64,
     bytes: u64,
+    version: String,
     info: video_probe::VideoInfo,
     positions: Vec<f64>,
 }
@@ -189,13 +191,37 @@ impl IndexWorker {
         cancel: impl Fn() -> bool,
     ) -> Result<bool, String> {
         crate::ai_index::verify_source(root, path, modified, bytes)?;
+        let version = crate::source_version::capture(root, path)?;
         let model = key();
         let current:bool=self.db.query_row("SELECT EXISTS(SELECT 1 FROM video_index_state WHERE root=?1 AND path=?2 AND modified=?3 AND bytes=?4 AND model=?5)",params![root,path,modified,bytes,model],|r|r.get(0)).map_err(|e|e.to_string())?;
-        if current {
+        if current && crate::source_version::matches(&self.db, root, path, &version)? {
             return Ok(true);
         }
+        let staged: Option<String> = self
+            .db
+            .query_row(
+                "SELECT version FROM ai_staged_versions WHERE root=?1 AND path=?2",
+                params![root, path],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+        if staged.as_deref() != Some(&version) {
+            let tx = self.db.transaction().map_err(|e| e.to_string())?;
+            tx.execute(
+                "DELETE FROM video_frame_work WHERE root=?1 AND path=?2",
+                params![root, path],
+            )
+            .map_err(|e| e.to_string())?;
+            tx.execute("INSERT INTO ai_staged_versions VALUES(?1,?2,?3) ON CONFLICT(root,path) DO UPDATE SET version=excluded.version", params![root,path,version]).map_err(|e| e.to_string())?;
+            tx.commit().map_err(|e| e.to_string())?;
+        }
         if !self.plan.as_ref().is_some_and(|p| {
-            p.root == root && p.path == path && p.modified == modified && p.bytes == bytes
+            p.root == root
+                && p.path == path
+                && p.modified == modified
+                && p.bytes == bytes
+                && p.version == version
         }) {
             let source = crate::media_stream::validated_video(root, path)?;
             let info = video_probe::probe(&self.engine, &source, &cancel)?;
@@ -208,6 +234,7 @@ impl IndexWorker {
                 path: path.into(),
                 modified,
                 bytes,
+                version: version.clone(),
                 info,
                 positions,
             });
@@ -224,7 +251,7 @@ impl IndexWorker {
             .map_or(0, |i| i + 1);
         let plan = self.plan.as_ref().unwrap();
         if next >= plan.positions.len() {
-            return self.publish(root, path, modified, bytes, &model);
+            return self.publish(root, path, modified, bytes, &model, &version);
         }
         let seconds = plan.positions[next];
         let source = crate::media_stream::validated_video(root, path)?;
@@ -272,6 +299,7 @@ impl IndexWorker {
             return Err("Video indexing cancelled".into());
         }
         crate::ai_index::verify_source(root, path, modified, bytes)?;
+        crate::source_version::verify(root, path, &version)?;
         self.db.execute("INSERT OR REPLACE INTO video_frame_work VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",params![root,path,modified,bytes,model,next,seconds,sig.0 as i64,sig.1[0],sig.1[1],sig.1[2],vector]).map_err(|e|e.to_string())?;
         if next + 1 == plan.positions.len() {
             self.publish(root, path, modified, bytes, &model)
@@ -286,6 +314,7 @@ impl IndexWorker {
         modified: i64,
         bytes: u64,
         model: &str,
+        version: &str,
     ) -> Result<bool, String> {
         crate::ai_index::verify_source(root, path, modified, bytes)?;
         let tx = self.db.transaction().map_err(|e| e.to_string())?;
@@ -308,6 +337,7 @@ impl IndexWorker {
             params![root, path],
         )
         .map_err(|e| e.to_string())?;
+        crate::source_version::publish(&tx, root, path, version)?;
         tx.commit().map_err(|e| e.to_string())?;
         Ok(true)
     }

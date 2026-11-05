@@ -1,3 +1,10 @@
+# 0.56.65 — Consistent AI source freshness
+
+- Share a source version containing byte length, precise modification time and SHA-256 across saved media, queued work, semantic/OCR/People results, video staging and content search.
+- Requeue changed content even when file size and whole-second timestamps match; reject outdated queue completions and source changes during result publication.
+- Publish AI results and their source version in one transaction; invalidate legacy results without deleting reviewed person identities. Sync upgrades old library snapshots before automatic reindexing.
+- Add preserved-timestamp replacement, result rollback, queue and search freshness regressions. Full-content hashing increases sync I/O; no large-library performance claim.
+
 # 0.56.63 — Accessible waveform scrubbing
 
 - Make decoded audio waveforms interactive with a native pointer/keyboard seek control tied to the global project playhead.

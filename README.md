@@ -1,6 +1,6 @@
 File Details includes a location map below metadata for GPS-tagged photos. The Map view supports JPEG/TIFF/HEIC/HEIF and MOV/MP4 location discovery, media-type and capture-year filters. Map imagery requires internet; coordinates remain visible offline.
 
-> Development update: **0.56.63** retains automatic local AI indexing with counters/failures/folder exclusions, video-content search with matching times, expanded zoomable previews and a fullscreen library filmstrip. Signed Preview update support is prepared; channel publication and installed upgrade acceptance remain pending.
+> Development update: **0.56.65** retains automatic local AI indexing with counters/failures/folder exclusions, video-content search with matching times, expanded zoomable previews and a fullscreen library filmstrip. Signed Preview update support is prepared; channel publication and installed upgrade acceptance remain pending.
 
 Turn Local AI on in Settings to index known workspace media automatically; use manual **Sync** to discover new/changed files. The AI dashboard shows progress and failed files, with retries and **Don't index** per folder. Counters count source files (a Live still and motion can count separately). Video sampling can miss brief content; HEIC AI and HDR conversion remain unsupported. See [AI indexing](docs/AUTOMATIC_AI_INDEXING.md).
 
@@ -636,3 +636,5 @@ Fresh installations now start video playback at normal volume. A deliberately sa
 - **Search:** after about 400ms without typing, the full query runs, including local semantic matches when AI is enabled. Enter/Search starts immediately. Previous results stay visible with an updating state until the new query finishes; changing workspace or AI state discards incompatible evidence. **Clear search** restores browsing. Provider failures leave metadata matches available.
 
 Automatic AI indexing, durable indexing counters/folder exclusions, viewer zoom/fullscreen improvements, the private vault and signed Preview updates remain planned in [the feedback roadmap](docs/AI_VIEWER_VAULT_ROADMAP.md). This release still uses the existing installer/update policy.
+
+AI source freshness uses one version containing size, precise modification time and a streamed SHA-256 digest. **Sync Now** upgrades older saved libraries; legacy AI results remain hidden until reindexed. Sync reads media content to detect replacements with preserved timestamps, so large libraries can take longer. Hashing uses bounded scratch memory, leaves sources untouched and keeps the previous saved snapshot if a source cannot be read consistently.

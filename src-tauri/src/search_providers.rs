@@ -96,7 +96,7 @@ fn ocr_from(
         crate::image_decode::POLICY,
         crate::ai_models::SUPPORTED_OCR_RECOGNIZER_SHA256
     );
-    let mut statement=db.prepare("SELECT a.root,a.path,a.modified_unix,a.text FROM ocr_index a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix WHERE a.root IN (SELECT value FROM json_each(?1)) AND a.recognizer_key=?2 ORDER BY a.root,a.path LIMIT ?3").map_err(|e|e.to_string())?;
+    let mut statement=db.prepare("SELECT a.root,a.path,a.modified_unix,a.text FROM ocr_index a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix JOIN ai_source_versions sv ON sv.root=a.root AND sv.path=a.path AND sv.version=m.source_version WHERE a.root IN (SELECT value FROM json_each(?1)) AND a.recognizer_key=?2 ORDER BY a.root,a.path LIMIT ?3").map_err(|e|e.to_string())?;
     let rows = statement
         .query_map(
             params![
@@ -174,7 +174,7 @@ fn people_from(
         crate::image_decode::POLICY,
         crate::ai_models::SUPPORTED_SFACE_SHA256
     );
-    let mut statement=db.prepare("SELECT a.root,a.path,a.modified_unix,a.vector FROM face_embeddings a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix WHERE a.root IN (SELECT value FROM json_each(?1)) AND a.embedder_key=?2 AND a.dimensions=128 AND length(a.vector)=512 ORDER BY a.root,a.path,a.face_index LIMIT ?3").map_err(|e|e.to_string())?;
+    let mut statement=db.prepare("SELECT a.root,a.path,a.modified_unix,a.vector FROM face_embeddings a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix JOIN ai_source_versions sv ON sv.root=a.root AND sv.path=a.path AND sv.version=m.source_version WHERE a.root IN (SELECT value FROM json_each(?1)) AND a.embedder_key=?2 AND a.dimensions=128 AND length(a.vector)=512 ORDER BY a.root,a.path,a.face_index LIMIT ?3").map_err(|e|e.to_string())?;
     let rows = statement
         .query_map(
             params![
@@ -294,7 +294,7 @@ fn semantic_from(
         "openclip-vit-b32-oriented-v2:{}",
         crate::ai_models::SUPPORTED_CLIP_VISION_SHA256
     );
-    let mut statement=db.prepare("SELECT a.root,a.path,a.modified_unix,a.vector FROM semantic_embeddings a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix WHERE a.root IN (SELECT value FROM json_each(?1)) AND a.model_sha256=?2 AND a.dimensions=512 AND length(a.vector)=2048 ORDER BY a.root,a.path LIMIT ?3").map_err(|e|e.to_string())?;
+    let mut statement=db.prepare("SELECT a.root,a.path,a.modified_unix,a.vector FROM semantic_embeddings a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix JOIN ai_source_versions sv ON sv.root=a.root AND sv.path=a.path AND sv.version=m.source_version WHERE a.root IN (SELECT value FROM json_each(?1)) AND a.model_sha256=?2 AND a.dimensions=512 AND length(a.vector)=2048 ORDER BY a.root,a.path LIMIT ?3").map_err(|e|e.to_string())?;
     let rows = statement
         .query_map(
             params![
@@ -353,7 +353,7 @@ fn video_semantic_from(
     vector: &[f32],
     cancelled: impl Fn() -> bool,
 ) -> Result<Batch, String> {
-    let mut stmt=db.prepare("SELECT v.root,v.path,v.modified,v.seconds,v.vector FROM video_frames v JOIN video_index_state s ON s.root=v.root AND s.path=v.path AND s.modified=v.modified AND s.bytes=v.bytes AND s.model=v.model JOIN visible_media m ON m.root=v.root AND m.path=v.path AND m.modified_unix=v.modified AND m.bytes=v.bytes WHERE v.root IN(SELECT value FROM json_each(?1)) AND v.model=?2 AND length(v.vector)=2048 ORDER BY v.root,v.path,v.seconds LIMIT ?3").map_err(|e|e.to_string())?;
+    let mut stmt=db.prepare("SELECT v.root,v.path,v.modified,v.seconds,v.vector FROM video_frames v JOIN video_index_state s ON s.root=v.root AND s.path=v.path AND s.modified=v.modified AND s.bytes=v.bytes AND s.model=v.model JOIN visible_media m ON m.root=v.root AND m.path=v.path AND m.modified_unix=v.modified AND m.bytes=v.bytes JOIN ai_source_versions sv ON sv.root=v.root AND sv.path=v.path AND sv.version=m.source_version WHERE v.root IN(SELECT value FROM json_each(?1)) AND v.model=?2 AND length(v.vector)=2048 ORDER BY v.root,v.path,v.seconds LIMIT ?3").map_err(|e|e.to_string())?;
     let rows = stmt
         .query_map(
             params![
@@ -424,11 +424,14 @@ mod tests {
     use super::*;
     fn db() -> Connection {
         let db = Connection::open_in_memory().unwrap();
-        db.execute_batch("ATTACH DATABASE ':memory:' AS current_media; CREATE TABLE current_media.media(root TEXT,path TEXT,modified_unix INTEGER,bytes INTEGER DEFAULT 0,PRIMARY KEY(root,path));").unwrap();
+        db.execute_batch("ATTACH DATABASE ':memory:' AS current_media; CREATE TABLE current_media.media(root TEXT,path TEXT,modified_unix INTEGER,bytes INTEGER DEFAULT 0,source_version TEXT DEFAULT 'fixture-v1',PRIMARY KEY(root,path));").unwrap();
         db.execute_batch("CREATE TABLE ocr_index(root TEXT,path TEXT,modified_unix INTEGER,text TEXT,recognizer_key TEXT);CREATE TABLE face_embeddings(root TEXT,path TEXT,modified_unix INTEGER,vector BLOB,embedder_key TEXT,dimensions INTEGER,face_index INTEGER);CREATE TABLE people(id TEXT PRIMARY KEY,name TEXT);CREATE TABLE person_faces(face_key TEXT PRIMARY KEY,person_id TEXT);CREATE TABLE semantic_embeddings(root TEXT,path TEXT,modified_unix INTEGER,vector BLOB,model_sha256 TEXT,dimensions INTEGER);").unwrap();
         crate::video_semantic::initialize(&db).unwrap();
         prepare_scope(&db, &[]).unwrap();
         db
+    }
+    fn seed_versions(db: &Connection) {
+        db.execute("INSERT OR IGNORE INTO ai_source_versions SELECT root,path,source_version FROM current_media.media", []).unwrap();
     }
     fn vector(value: f32, size: usize) -> Vec<u8> {
         (0..size).flat_map(|_| value.to_le_bytes()).collect()
@@ -452,6 +455,7 @@ mod tests {
             .unwrap();
         }
         prepare_scope(&db, &["C:/r/hidden".into()]).unwrap();
+        seed_versions(&db);
         let result = video_semantic_from(&db, &["C:/r".into()], &[1.; 512], || false).unwrap();
         assert_eq!(result.evidence.len(), 1);
         assert_eq!(result.evidence[0].timestamp_seconds, Some(2.5));
@@ -520,6 +524,7 @@ mod tests {
         db.execute_batch("INSERT INTO current_media.media(root,path,modified_unix) VALUES('r','one',10),('r','two',10);")
             .unwrap();
         let roots = vec!["r".into()];
+        seed_versions(&db);
         let batch = ocr_from(&db, &roots, &search::terms("burger cream"), || false).unwrap();
         assert_eq!(batch.evidence.len(), 2);
         assert_eq!(batch.evidence[0].path, "one");
@@ -559,6 +564,7 @@ mod tests {
             "INSERT INTO current_media.media(root,path,modified_unix) VALUES('r','local',10);",
         )
         .unwrap();
+        seed_versions(&db);
         let batch = people_from(&db, &["r".into()], "ZOË", || false).unwrap();
         assert_eq!(batch.evidence.len(), 1);
         assert_eq!(batch.evidence[0].path, "local");
@@ -598,6 +604,7 @@ mod tests {
             "INSERT INTO current_media.media(root,path,modified_unix) VALUES('a','a',10),('b','best',10),('a','stale',10);",
         )
         .unwrap();
+        seed_versions(&db);
         let batch =
             semantic_from(&db, &["a".into(), "b".into()], &vec![1.0; 512], || false).unwrap();
         assert_eq!(batch.evidence.len(), 1);
@@ -631,10 +638,51 @@ mod tests {
             "INSERT INTO current_media.media(root,path,modified_unix) VALUES('r','changed',10),('r','current',10);",
         )
         .unwrap();
+        seed_versions(&db);
         let batch = ocr_from(&db, &["r".into()], &search::terms("burger"), || false).unwrap();
         assert_eq!(batch.evidence.len(), 1);
         assert_eq!(batch.evidence[0].path, "current");
     }
+    #[test]
+    fn source_identity_mismatch_and_legacy_results_are_not_searchable() {
+        let db = db();
+        let key = format!(
+            "ppocrv4-en-rec-mobile:{}:{}",
+            crate::image_decode::POLICY,
+            crate::ai_models::SUPPORTED_OCR_RECOGNIZER_SHA256
+        );
+        db.execute(
+            "INSERT INTO ocr_index VALUES('r','photo',10,'invoice',?1)",
+            [&key],
+        )
+        .unwrap();
+        db.execute("INSERT INTO current_media.media(root,path,modified_unix,source_version) VALUES('r','photo',10,'new-content')", []).unwrap();
+        let roots = vec!["r".into()];
+        let terms = search::terms("invoice");
+        assert!(ocr_from(&db, &roots, &terms, || false)
+            .unwrap()
+            .evidence
+            .is_empty());
+        db.execute(
+            "INSERT INTO ai_source_versions VALUES('r','photo','old-content')",
+            [],
+        )
+        .unwrap();
+        assert!(ocr_from(&db, &roots, &terms, || false)
+            .unwrap()
+            .evidence
+            .is_empty());
+        db.execute("UPDATE ai_source_versions SET version='new-content'", [])
+            .unwrap();
+        assert_eq!(
+            ocr_from(&db, &roots, &terms, || false)
+                .unwrap()
+                .evidence
+                .len(),
+            1
+        );
+    }
+
     #[test]
     fn current_index_attachment_handles_unicode_and_uri_characters_and_is_read_only() {
         let path = std::env::temp_dir().join(format!(

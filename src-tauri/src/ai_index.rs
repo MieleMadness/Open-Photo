@@ -10,7 +10,7 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
-type Media = (String, String, i64, u64);
+type Media = (String, String, i64, u64, String);
 type States = HashMap<Media, (usize, bool)>;
 
 #[derive(Clone, PartialEq)]
@@ -62,6 +62,25 @@ fn initialize(db: &Connection) -> Result<(), String> {
     db.execute_batch("CREATE TABLE IF NOT EXISTS jobs(workspace TEXT,root TEXT,path TEXT,modified INTEGER,bytes INTEGER,service TEXT,model TEXT,status TEXT NOT NULL DEFAULT 'pending',error TEXT,attempted INTEGER,PRIMARY KEY(workspace,root,path,service));
       CREATE TABLE IF NOT EXISTS exclusions(workspace TEXT,folder TEXT,PRIMARY KEY(workspace,folder));
       CREATE INDEX IF NOT EXISTS idx_ai_pending ON jobs(workspace,status,service);").map_err(|e|e.to_string())?;
+    let columns = db
+        .prepare("PRAGMA table_info(jobs)")
+        .map_err(|e| e.to_string())?
+        .query_map([], |r| r.get::<_, String>(1))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    if !columns.iter().any(|name| name == "source_version") {
+        db.execute(
+            "ALTER TABLE jobs ADD COLUMN source_version TEXT NOT NULL DEFAULT ''",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    db.execute(
+        "UPDATE jobs SET status='pending' WHERE source_version='' AND status='indexed'",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 pub(crate) fn normalized(path: &str) -> String {
@@ -166,12 +185,12 @@ fn model(service: &str) -> String {
 fn reconcile(
     db: &mut Connection,
     workspace: &str,
-    media: &[(String, String, i64, u64)],
+    media: &[Media],
     excluded: &[String],
 ) -> Result<(), String> {
     let tx = db.transaction().map_err(|e| e.to_string())?;
     tx.execute_batch("CREATE TEMP TABLE IF NOT EXISTS seen(root TEXT,path TEXT,PRIMARY KEY(root,path)); DELETE FROM seen;").map_err(|e|e.to_string())?;
-    for (root, path, modified, bytes) in media {
+    for (root, path, modified, bytes, version) in media {
         if !supported(path) || !allowed(path, excluded) {
             continue;
         }
@@ -186,7 +205,7 @@ fn reconcile(
             vec!["semantic", "ocr", "people"]
         };
         for service in services {
-            tx.execute("INSERT INTO jobs(workspace,root,path,modified,bytes,service,model,status) VALUES(?1,?2,?3,?4,?5,?6,?7,'pending') ON CONFLICT(workspace,root,path,service) DO UPDATE SET modified=excluded.modified,bytes=excluded.bytes,model=excluded.model,status='pending',error=NULL WHERE jobs.modified!=excluded.modified OR jobs.bytes!=excluded.bytes OR jobs.model!=excluded.model",params![workspace,root,path,modified,bytes,service,model(service)]).map_err(|e|e.to_string())?;
+            tx.execute("INSERT INTO jobs(workspace,root,path,modified,bytes,service,model,status,source_version) VALUES(?1,?2,?3,?4,?5,?6,?7,'pending',?8) ON CONFLICT(workspace,root,path,service) DO UPDATE SET modified=excluded.modified,bytes=excluded.bytes,model=excluded.model,source_version=excluded.source_version,status='pending',error=NULL WHERE jobs.modified!=excluded.modified OR jobs.bytes!=excluded.bytes OR jobs.model!=excluded.model OR jobs.source_version!=excluded.source_version",params![workspace,root,path,modified,bytes,service,model(service),version]).map_err(|e|e.to_string())?;
         }
     }
     // Removing/excluding a folder removes queue ownership, never source media or shared indexes.
@@ -198,7 +217,7 @@ fn reconcile(
     .map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())
 }
-fn media(workspace: &str) -> Result<Vec<(String, String, i64, u64)>, String> {
+fn media(workspace: &str) -> Result<Vec<Media>, String> {
     let mut all = vec![];
     let mut roots = crate::user_data::workspace_roots(workspace)?;
     roots.sort_by_key(|r| std::cmp::Reverse(r.len()));
@@ -219,6 +238,7 @@ fn media(workspace: &str) -> Result<Vec<(String, String, i64, u64)>, String> {
                 photo.path,
                 photo.modified_unix as i64,
                 photo.bytes,
+                photo.source_version.unwrap_or_default(),
             ));
         }
     }
@@ -232,10 +252,11 @@ struct Job {
     bytes: u64,
     service: String,
     model: String,
+    source_version: String,
 }
 fn next(db: &Connection, workspace: &str) -> Result<Option<Job>, String> {
     use rusqlite::OptionalExtension;
-    db.query_row("SELECT root,path,modified,bytes,service,model FROM jobs WHERE workspace=?1 AND status='pending' ORDER BY CASE service WHEN 'semantic' THEN 0 WHEN 'ocr' THEN 1 ELSE 2 END,root,path LIMIT 1",[workspace],|r|Ok(Job{root:r.get(0)?,path:r.get(1)?,modified:r.get(2)?,bytes:r.get(3)?,service:r.get(4)?,model:r.get(5)?})).optional().map_err(|e|e.to_string())
+    db.query_row("SELECT root,path,modified,bytes,service,model,source_version FROM jobs WHERE workspace=?1 AND status='pending' ORDER BY CASE service WHEN 'semantic' THEN 0 WHEN 'ocr' THEN 1 ELSE 2 END,root,path LIMIT 1",[workspace],|r|Ok(Job{root:r.get(0)?,path:r.get(1)?,modified:r.get(2)?,bytes:r.get(3)?,service:r.get(4)?,model:r.get(5)?,source_version:r.get(6)?})).optional().map_err(|e|e.to_string())
 }
 enum Worker {
     Semantic(crate::ai_embeddings::IndexWorker),
@@ -264,7 +285,11 @@ impl Worker {
         }
     }
     fn process(&mut self, j: &Job, cancel: impl Fn() -> bool) -> Result<bool, String> {
-        match self {
+        if j.source_version.is_empty() {
+            return Err("Sync the library to upgrade source identities before indexing".into());
+        }
+        crate::source_version::verify(&j.root, &j.path, &j.source_version)?;
+        let result = match self {
             Self::Semantic(w) => w
                 .process(&j.root, &j.path, j.modified, j.bytes)
                 .map(|_| true),
@@ -275,7 +300,9 @@ impl Worker {
                 .process(&j.root, &j.path, j.modified, j.bytes)
                 .map(|_| true),
             Self::Video(w) => w.process(&j.root, &j.path, j.modified, j.bytes, cancel),
-        }
+        };
+        crate::source_version::verify(&j.root, &j.path, &j.source_version)?;
+        result
     }
 }
 fn finish(
@@ -293,7 +320,7 @@ fn finish(
     let error = result
         .err()
         .map(|e| e.chars().take(1000).collect::<String>());
-    let changed=db.execute("UPDATE jobs SET status=?1,error=?2,attempted=unixepoch() WHERE workspace=?3 AND root=?4 AND path=?5 AND service=?6 AND modified=?7 AND bytes=?8 AND model=?9",params![if error.is_some(){"failed"}else if complete{"indexed"}else{"pending"},error,workspace,job.root,job.path,job.service,job.modified,job.bytes,job.model]).map_err(|e|e.to_string())?;
+    let changed=db.execute("UPDATE jobs SET status=?1,error=?2,attempted=unixepoch() WHERE workspace=?3 AND root=?4 AND path=?5 AND service=?6 AND modified=?7 AND bytes=?8 AND model=?9 AND source_version=?10",params![if error.is_some(){"failed"}else if complete{"indexed"}else{"pending"},error,workspace,job.root,job.path,job.service,job.modified,job.bytes,job.model,job.source_version]).map_err(|e|e.to_string())?;
     if changed > 0 && (complete || error.is_some()) {
         control.revision += 1;
     }
@@ -463,7 +490,7 @@ pub struct Report {
     generation: u64,
 }
 fn states(db: &Connection, workspace: &str) -> Result<States, String> {
-    let mut statement=db.prepare("SELECT root,path,modified,bytes,status,COUNT(*) FROM jobs WHERE workspace=?1 GROUP BY root,path,modified,bytes,status").map_err(|e|e.to_string())?;
+    let mut statement=db.prepare("SELECT root,path,modified,bytes,status,COUNT(*),source_version FROM jobs WHERE workspace=?1 GROUP BY root,path,modified,bytes,status,source_version").map_err(|e|e.to_string())?;
     let mut states = States::new();
     let rows = statement
         .query_map([workspace], |r| {
@@ -474,12 +501,16 @@ fn states(db: &Connection, workspace: &str) -> Result<States, String> {
                 r.get(3)?,
                 r.get::<_, String>(4)?,
                 r.get::<_, usize>(5)?,
+                r.get::<_, String>(6)?,
             ))
         })
         .map_err(|e| e.to_string())?;
     for row in rows {
-        let (root, path, modified, bytes, status, count) = row.map_err(|e| e.to_string())?;
-        let state = states.entry((root, path, modified, bytes)).or_default();
+        let (root, path, modified, bytes, status, count, version) =
+            row.map_err(|e| e.to_string())?;
+        let state = states
+            .entry((root, path, modified, bytes, version))
+            .or_default();
         if status == "indexed" {
             state.0 += count;
         }
@@ -492,7 +523,7 @@ fn states(db: &Connection, workspace: &str) -> Result<States, String> {
 fn counts(states: &States, files: &[Media], excluded: &[String]) -> Counts {
     let mut result = Counts::default();
     let mut seen = HashSet::new();
-    for (root, path, modified, bytes) in files {
+    for (root, path, modified, bytes, version) in files {
         if !seen.insert(normalized(path)) {
             continue;
         }
@@ -505,7 +536,13 @@ fn counts(states: &States, files: &[Media], excluded: &[String]) -> Counts {
             continue;
         }
         let (done, failed) = states
-            .get(&(root.clone(), path.clone(), *modified, *bytes))
+            .get(&(
+                root.clone(),
+                path.clone(),
+                *modified,
+                *bytes,
+                version.clone(),
+            ))
             .copied()
             .unwrap_or_default();
         if failed {
@@ -552,7 +589,7 @@ pub async fn ai_index_report(
     let files=match cached {Some(files)=>files,None=>{let files=Arc::new(media(&workspace_id)?);let mut c=copy.0.lock().map_err(|e|e.to_string())?;if c.generation==generation{c.snapshot=Some((workspace_id.clone(),files.clone()));}files}};
     let excluded=exclusions(&workspace_id)?;let database=db()?;let states=states(&database,&workspace_id)?;let mut folders=vec![];
     let roots=crate::user_data::workspace_roots(&workspace_id)?;
-    for root in &roots {let root_files=files.iter().filter(|(r,_,_,_)|r==root).cloned().collect::<Vec<_>>();let note=database.query_row("SELECT error FROM jobs WHERE workspace=?1 AND root=?2 AND status='blocked' LIMIT 1",params![workspace_id,root],|r|r.get::<_,String>(0)).optional().map_err(|e|e.to_string())?;folders.push(Folder{note,excluded:!allowed(root,&excluded),inherited:!allowed(root,&excluded)&&!excluded.iter().any(|folder|normalized(folder)==normalized(root)),counts:counts(&states,&root_files,&excluded),path:root.clone()});}
+    for root in &roots {let root_files=files.iter().filter(|(r,_,_,_,_)|r==root).cloned().collect::<Vec<_>>();let note=database.query_row("SELECT error FROM jobs WHERE workspace=?1 AND root=?2 AND status='blocked' LIMIT 1",params![workspace_id,root],|r|r.get::<_,String>(0)).optional().map_err(|e|e.to_string())?;folders.push(Folder{note,excluded:!allowed(root,&excluded),inherited:!allowed(root,&excluded)&&!excluded.iter().any(|folder|normalized(folder)==normalized(root)),counts:counts(&states,&root_files,&excluded),path:root.clone()});}
     crate::search_providers::attach_current(&database,&crate::index::database_path()?)?;
     crate::search_providers::prepare_scope(&database,&excluded)?;
     let roots_json=serde_json::to_string(&roots).map_err(|e|e.to_string())?;
@@ -646,16 +683,45 @@ mod tests {
     }
     fn files() -> Vec<Media> {
         vec![
-            ("C:/photos".into(), "C:/photos/one.jpg".into(), 10, 42),
+            (
+                "C:/photos".into(),
+                "C:/photos/one.jpg".into(),
+                10,
+                42,
+                "v1".into(),
+            ),
             (
                 "C:/photos".into(),
                 "C:/photos/private/two.jpg".into(),
                 10,
                 21,
+                "v1".into(),
             ),
-            ("C:/photos".into(), "C:/photos/clip.mp4".into(), 10, 80),
+            (
+                "C:/photos".into(),
+                "C:/photos/clip.mp4".into(),
+                10,
+                80,
+                "v1".into(),
+            ),
         ]
     }
+    #[test]
+    fn changed_content_with_identical_size_and_seconds_requeues_and_rejects_old_completion() {
+        let mut db = memory();
+        let mut items = files();
+        reconcile(&mut db, "a", &items, &[]).unwrap();
+        let old = next(&db, "a").unwrap().unwrap();
+        db.execute("UPDATE jobs SET status='indexed'", []).unwrap();
+        items[0].4 = "different-content-same-metadata".into();
+        reconcile(&mut db, "a", &items, &[]).unwrap();
+        let mut control = Control::default();
+        finish(&db, &mut control, 0, "a", &old, Ok(true)).unwrap();
+        assert_eq!(control.revision, 0);
+        assert_eq!(counts(&states(&db, "a").unwrap(), &items, &[]).pending, 1);
+        assert_eq!(next(&db, "a").unwrap().unwrap().source_version, items[0].4);
+    }
+
     #[test]
     fn obsolete_generations_and_source_versions_cannot_publish_progress() {
         let mut db = memory();

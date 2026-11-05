@@ -36,6 +36,7 @@ pub(crate) fn database() -> Result<Connection, String> {
         )
         .map_err(|e| e.to_string())?;
     crate::video_semantic::initialize(&connection)?;
+    crate::source_version::initialize(&connection)?;
     Ok(connection)
 }
 
@@ -64,7 +65,11 @@ fn embedding_is_current(
     path: &str,
     modified_unix: i64,
     model_key: &str,
+    version: &str,
 ) -> Result<bool, String> {
+    if !crate::source_version::matches(db, root, path, version)? {
+        return Ok(false);
+    }
     db.query_row(
         "SELECT EXISTS(
             SELECT 1 FROM semantic_embeddings
@@ -85,7 +90,10 @@ fn store_embedding(
     modified_unix: i64,
     model_key: &str,
     values: &[f32],
+    version: &str,
 ) -> Result<usize, String> {
+    let transaction = db.unchecked_transaction().map_err(|e| e.to_string())?;
+    let db = &transaction;
     let dimensions = values.len();
     let vector = encode_f32(values);
     db.execute(
@@ -106,6 +114,8 @@ fn store_embedding(
         ],
     )
     .map_err(|e| e.to_string())?;
+    crate::source_version::publish(db, root, path, version)?;
+    transaction.commit().map_err(|e| e.to_string())?;
     Ok(dimensions)
 }
 
@@ -117,11 +127,20 @@ pub fn ai_index_semantic_image(
 ) -> Result<usize, String> {
     crate::ai_index::require_allowed(&root, std::slice::from_ref(&path))?;
     let source = crate::safe_media_path(&root, &path)?;
+    let version = crate::source_version::capture(&root, &path)?;
     let modified_unix = modified_unix(&source)?;
     let model_key = crate::ai_models::validate_supported_clip_vision()?;
     let result = crate::ai_inference::run_semantic_image(root.clone(), path.clone(), device)?;
     let db = database()?;
-    store_embedding(&db, &root, &path, modified_unix, &model_key, &result.values)
+    store_embedding(
+        &db,
+        &root,
+        &path,
+        modified_unix,
+        &model_key,
+        &result.values,
+        &version,
+    )
 }
 
 #[derive(Serialize)]
@@ -166,7 +185,15 @@ fn index_semantic_batch_blocking(
                 continue;
             }
         };
-        match embedding_is_current(&db, &root, &path, modified_unix, &model_key) {
+        let version = match crate::source_version::capture(&root, &path) {
+            Ok(version) => version,
+            Err(error) => {
+                result.failed += 1;
+                result.errors.push(format!("{path}: {error}"));
+                continue;
+            }
+        };
+        match embedding_is_current(&db, &root, &path, modified_unix, &model_key, &version) {
             Ok(true) => {
                 result.skipped += 1;
                 continue;
@@ -188,6 +215,7 @@ fn index_semantic_batch_blocking(
                     modified_unix,
                     &model_key,
                     &inference.values,
+                    &version,
                 ) {
                     result.failed += 1;
                     result.errors.push(format!("{path}: {error}"));
@@ -266,10 +294,12 @@ pub fn ai_find_similar_by_photo(
     let limit = limit.clamp(1, 100);
     let current_sha = crate::ai_models::validate_supported_clip_vision()?;
     let db = database()?;
+    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::prepare_scope(&db, &excluded)?;
     let query_blob: Vec<u8> = db
         .query_row(
-            "SELECT vector FROM semantic_embeddings
-             WHERE root=?1 AND path=?2 AND model_sha256=?3",
+            "SELECT a.vector FROM semantic_embeddings a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix JOIN ai_source_versions sv ON sv.root=a.root AND sv.path=a.path AND sv.version=m.source_version
+             WHERE a.root=?1 AND a.path=?2 AND model_sha256=?3",
             params![root, path, current_sha],
             |row| row.get(0),
         )
@@ -279,8 +309,8 @@ pub fn ai_find_similar_by_photo(
     let query = decode_f32(&query_blob)?;
     let mut statement = db
         .prepare(
-            "SELECT path, vector FROM semantic_embeddings
-             WHERE root=?1 AND model_sha256=?2 AND path<>?3",
+            "SELECT a.path, a.vector FROM semantic_embeddings a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix JOIN ai_source_versions sv ON sv.root=a.root AND sv.path=a.path AND sv.version=m.source_version
+             WHERE a.root=?1 AND model_sha256=?2 AND a.path<>?3",
         )
         .map_err(|e| e.to_string())?;
     let rows = statement
@@ -319,10 +349,12 @@ pub fn ai_search_semantic_text(
     let current_key = crate::ai_models::validate_supported_clip_bundle()?;
     let query_vector = crate::ai_text::run_semantic_text(&query, device.as_deref())?;
     let db = database()?;
+    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::prepare_scope(&db, &excluded)?;
     let mut statement = db
         .prepare(
-            "SELECT path, vector FROM semantic_embeddings
-             WHERE root=?1 AND model_sha256=?2",
+            "SELECT a.path, a.vector FROM semantic_embeddings a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix JOIN ai_source_versions sv ON sv.root=a.root AND sv.path=a.path AND sv.version=m.source_version
+             WHERE a.root=?1 AND model_sha256=?2",
         )
         .map_err(|e| e.to_string())?;
     let rows = statement
@@ -355,6 +387,8 @@ pub fn ai_embedding_status(root: String) -> Result<EmbeddingStatus, String> {
     let current_key = crate::ai_models::validate_supported_clip_vision()?;
     let current_sha = crate::ai_models::installed_model_sha256("semantic")?;
     let db = database()?;
+    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::prepare_scope(&db, &crate::ai_index::active_exclusions()?)?;
     let indexed: usize = db
         .query_row(
             "SELECT COUNT(*) FROM semantic_embeddings WHERE root=?1",
@@ -364,7 +398,7 @@ pub fn ai_embedding_status(root: String) -> Result<EmbeddingStatus, String> {
         .map_err(|e| e.to_string())? as usize;
     let stale: usize = db
         .query_row(
-            "SELECT COUNT(*) FROM semantic_embeddings WHERE root=?1 AND model_sha256<>?2",
+            "SELECT COUNT(*) FROM semantic_embeddings a WHERE a.root=?1 AND (a.model_sha256<>?2 OR NOT EXISTS(SELECT 1 FROM visible_media m JOIN ai_source_versions sv ON sv.root=m.root AND sv.path=m.path AND sv.version=m.source_version WHERE m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix))",
             params![root, current_key],
             |row| row.get::<_, i64>(0),
         )
@@ -397,21 +431,70 @@ impl IndexWorker {
         modified: i64,
         bytes: u64,
     ) -> Result<(), String> {
+        let version = crate::source_version::capture(root, path)?;
         crate::ai_index::verify_source(root, path, modified, bytes)?;
-        if embedding_is_current(&self.db, root, path, modified, &self.key)? {
+        if embedding_is_current(&self.db, root, path, modified, &self.key, &version)? {
             return Ok(());
         }
         let result =
             crate::ai_inference::run_semantic_image_with_session(&mut self.session, root, path)?;
         crate::ai_index::verify_source(root, path, modified, bytes)?;
-        store_embedding(&self.db, root, path, modified, &self.key, &result.values)?;
+        store_embedding(
+            &self.db,
+            root,
+            path,
+            modified,
+            &self.key,
+            &result.values,
+            &version,
+        )?;
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{cosine_similarity, decode_f32, encode_f32};
+    use super::*;
+
+    #[test]
+    fn replacement_with_preserved_mtime_replaces_vector_and_rejects_old_publication() {
+        let folder = std::env::temp_dir().join(format!(
+            "openphoto-embedding-version-{}",
+            crate::video_project::id()
+        ));
+        std::fs::create_dir_all(&folder).unwrap();
+        let file = folder.join("photo.jpg");
+        std::fs::write(&file, b"first").unwrap();
+        let time = file.metadata().unwrap().modified().unwrap();
+        let root = folder.to_str().unwrap();
+        let path = file.to_str().unwrap();
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE semantic_embeddings(root TEXT,path TEXT,modified_unix INTEGER,model_sha256 TEXT,dimensions INTEGER,vector BLOB,PRIMARY KEY(root,path));").unwrap();
+        crate::source_version::initialize(&db).unwrap();
+        let before = crate::source_version::capture(root, path).unwrap();
+        store_embedding(&db, root, path, 10, "model", &[1.; 512], &before).unwrap();
+        std::fs::write(&file, b"replacement has different size").unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&file)
+            .unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(time))
+            .unwrap();
+        let after = crate::source_version::capture(root, path).unwrap();
+        assert!(!embedding_is_current(&db, root, path, 10, "model", &after).unwrap());
+        assert!(store_embedding(&db, root, path, 10, "model", &[3.; 512], &before).is_err());
+        let blob: Vec<u8> = db
+            .query_row("SELECT vector FROM semantic_embeddings", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(decode_f32(&blob).unwrap(), vec![1.; 512]);
+        store_embedding(&db, root, path, 10, "model", &[2.; 512], &after).unwrap();
+        let blob: Vec<u8> = db
+            .query_row("SELECT vector FROM semantic_embeddings", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(decode_f32(&blob).unwrap(), vec![2.; 512]);
+        assert!(embedding_is_current(&db, root, path, 10, "model", &after).unwrap());
+        std::fs::remove_dir_all(folder).unwrap();
+    }
 
     #[test]
     fn cosine_similarity_ranks_identical_vectors_highest() {

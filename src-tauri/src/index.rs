@@ -9,6 +9,7 @@ use std::{
 };
 
 use crate::{scan_library, ScanResult};
+type PriorMedia = (i64, i64, Option<String>, Option<String>, Option<String>);
 
 pub(crate) fn database_path() -> Result<PathBuf, String> {
     let directory = dirs::data_local_dir()
@@ -63,6 +64,7 @@ fn database() -> Result<Connection, String> {
             .execute("ALTER TABLE media ADD COLUMN live_asset_id TEXT", [])
             .map_err(|e| e.to_string())?;
     }
+    crate::source_version::add_media_column(&connection)?;
     Ok(connection)
 }
 
@@ -79,7 +81,8 @@ pub fn saved_library(root: String) -> Result<ScanResult, String> {
     saved_library_from(&database()?, &root)
 }
 fn saved_library_from(db: &Connection, root: &str) -> Result<ScanResult, String> {
-    let mut statement = db.prepare("SELECT path,bytes,modified_unix,capture_local,live_asset_id FROM media WHERE root=?1 ORDER BY path LIMIT 100001").map_err(|e| e.to_string())?;
+    crate::source_version::add_media_column(db)?;
+    let mut statement = db.prepare("SELECT path,bytes,modified_unix,capture_local,live_asset_id,source_version FROM media WHERE root=?1 ORDER BY path LIMIT 100001").map_err(|e| e.to_string())?;
     let mut photos = statement
         .query_map([root], |row| {
             let path: String = row.get(0)?;
@@ -96,6 +99,7 @@ fn saved_library_from(db: &Connection, root: &str) -> Result<ScanResult, String>
                 modified_unix: row.get(2)?,
                 capture_local: row.get(3)?,
                 live_asset_id: row.get(4)?,
+                source_version: row.get(5)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -151,6 +155,7 @@ fn reconcile_scan(
     if scan.incomplete {
         return Ok(IndexedScan { scan, changes });
     }
+    crate::source_version::add_media_column(db)?;
     let transaction = db.transaction().map_err(|e| e.to_string())?;
     // Track the complete snapshot while preserving unchanged indexed rows.
     // This avoids tearing down and rebuilding the index on every sync.
@@ -162,9 +167,9 @@ fn reconcile_scan(
         .map_err(|e| e.to_string())?;
     // Fetch the prior snapshot once rather than executing one SELECT per media file.
     // This reduces SQLite round-trips significantly for large libraries.
-    let previous_entries: HashMap<String, (i64, i64, Option<String>, Option<String>)> = {
+    let previous_entries: HashMap<String, PriorMedia> = {
         let mut statement = transaction
-            .prepare("SELECT path, bytes, modified_unix, capture_local, live_asset_id FROM media WHERE root = ?1")
+            .prepare("SELECT path, bytes, modified_unix, capture_local, live_asset_id, source_version FROM media WHERE root = ?1")
             .map_err(|e| e.to_string())?;
         let rows = statement
             .query_map([&root], |row| {
@@ -175,6 +180,7 @@ fn reconcile_scan(
                         row.get::<_, i64>(2)?,
                         row.get::<_, Option<String>>(3)?,
                         row.get::<_, Option<String>>(4)?,
+                        row.get::<_, Option<String>>(5)?,
                     ),
                 ))
             })
@@ -187,26 +193,29 @@ fn reconcile_scan(
             .map_err(|e| e.to_string())?;
         let mut upsert = transaction
             .prepare(
-                "INSERT INTO media(root, path, bytes, modified_unix, capture_local, live_asset_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                "INSERT INTO media(root, path, bytes, modified_unix, capture_local, live_asset_id, source_version)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
                  ON CONFLICT(root, path) DO UPDATE SET
                      bytes = excluded.bytes,
                      modified_unix = excluded.modified_unix,
                      capture_local = excluded.capture_local,
-                     live_asset_id = excluded.live_asset_id
+                     live_asset_id = excluded.live_asset_id,
+                     source_version = excluded.source_version
                  WHERE media.bytes != excluded.bytes
                     OR media.modified_unix != excluded.modified_unix
                     OR media.capture_local IS NOT excluded.capture_local
-                    OR media.live_asset_id IS NOT excluded.live_asset_id",
+                    OR media.live_asset_id IS NOT excluded.live_asset_id
+                    OR media.source_version IS NOT excluded.source_version",
             )
             .map_err(|e| e.to_string())?;
         for photo in &scan.photos {
             match previous_entries.get(&photo.path) {
-                Some((bytes, modified, capture_local, live_asset_id)) => {
+                Some((bytes, modified, capture_local, live_asset_id, source_version)) => {
                     if *bytes != photo.bytes as i64
                         || *modified != photo.modified_unix as i64
                         || capture_local != &photo.capture_local
                         || live_asset_id != &photo.live_asset_id
+                        || source_version != &photo.source_version
                     {
                         changes.updated += 1;
                     } else {
@@ -223,7 +232,8 @@ fn reconcile_scan(
                     photo.bytes as i64,
                     photo.modified_unix as i64,
                     photo.capture_local,
-                    photo.live_asset_id
+                    photo.live_asset_id,
+                    photo.source_version
                 ])
                 .map_err(|e| e.to_string())?;
         }
@@ -324,19 +334,21 @@ pub fn update_indexed_path(root: String, path: String) -> Result<IncrementalChan
             .as_ref()
             .and_then(|resolved| crate::read_live_asset_id(resolved, &extension));
         db.execute(
-            "INSERT INTO media(root,path,bytes,modified_unix,capture_local,live_asset_id) VALUES (?1,?2,?3,?4,?5,?6)
+            "INSERT INTO media(root,path,bytes,modified_unix,capture_local,live_asset_id,source_version) VALUES (?1,?2,?3,?4,?5,?6,?7)
              ON CONFLICT(root,path) DO UPDATE SET
                 bytes=excluded.bytes,
                 modified_unix=excluded.modified_unix,
                 capture_local=excluded.capture_local,
-                live_asset_id=excluded.live_asset_id",
+                live_asset_id=excluded.live_asset_id,
+                source_version=excluded.source_version",
             params![
                 root,
                 path,
                 meta.len() as i64,
                 modified as i64,
                 capture_local,
-                live_asset_id
+                live_asset_id,
+                crate::source_version::read(actual.as_ref().ok_or("Source unavailable")?)?
             ],
         )
         .map_err(|e| e.to_string())?;

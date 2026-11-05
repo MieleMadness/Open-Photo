@@ -77,6 +77,7 @@ pub(crate) fn database() -> Result<Connection, String> {
               ON ocr_index(detector_key,recognizer_key);",
         )
         .map_err(|e| e.to_string())?;
+    crate::source_version::initialize(&connection)?;
     Ok(connection)
 }
 
@@ -376,7 +377,11 @@ fn index_is_current(
     modified: i64,
     detector_key: &str,
     recognizer_key: &str,
+    version: &str,
 ) -> Result<bool, String> {
+    if !crate::source_version::matches(db, root, path, version)? {
+        return Ok(false);
+    }
     db.query_row(
         "SELECT EXISTS(
             SELECT 1 FROM ocr_index
@@ -390,6 +395,7 @@ fn index_is_current(
     .map_err(|e| e.to_string())
 }
 
+#[allow(clippy::too_many_arguments)] // Publication includes the captured source version.
 fn store_result(
     db: &Connection,
     root: &str,
@@ -398,7 +404,10 @@ fn store_result(
     detector_key: &str,
     recognizer_key: &str,
     regions: &[OcrRegion],
+    version: &str,
 ) -> Result<(), String> {
+    let transaction = db.unchecked_transaction().map_err(|e| e.to_string())?;
+    let db = &transaction;
     let text = regions
         .iter()
         .map(|region| region.text.as_str())
@@ -425,6 +434,8 @@ fn store_result(
         ],
     )
     .map_err(|e| e.to_string())?;
+    crate::source_version::publish(db, root, path, version)?;
+    transaction.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -460,7 +471,23 @@ fn index_batch_blocking(
                 continue;
             }
         };
-        match index_is_current(&db, &root, &path, modified, &detector_key, &recognizer_key) {
+        let version = match crate::source_version::capture(&root, &path) {
+            Ok(version) => version,
+            Err(error) => {
+                result.failed += 1;
+                result.errors.push(format!("{path}: {error}"));
+                continue;
+            }
+        };
+        match index_is_current(
+            &db,
+            &root,
+            &path,
+            modified,
+            &detector_key,
+            &recognizer_key,
+            &version,
+        ) {
             Ok(true) => {
                 result.skipped += 1;
                 continue;
@@ -482,6 +509,7 @@ fn index_batch_blocking(
                     &detector_key,
                     &recognizer_key,
                     &regions,
+                    &version,
                 ) {
                     result.failed += 1;
                     result.errors.push(format!("{path}: {error}"));
@@ -562,6 +590,8 @@ pub fn ai_search_ocr(
     }
     let (_, recognizer_key) = crate::ai_models::validate_supported_ocr_bundle()?;
     let db = database()?;
+    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::prepare_scope(&db, &crate::ai_index::active_exclusions()?)?;
     search_index(&db, &roots, query, &recognizer_key, limit)
 }
 fn search_index(
@@ -580,9 +610,9 @@ fn search_index(
     );
     let mut statement = db
         .prepare(
-            "SELECT root,path,text FROM ocr_index
-             WHERE recognizer_key=?1 AND text LIKE ?2 ESCAPE '\\' AND root IN (SELECT value FROM json_each(?4))
-             ORDER BY modified_unix DESC
+            "SELECT a.root,a.path,a.text FROM ocr_index a JOIN visible_media m ON m.root=a.root AND m.path=a.path AND m.modified_unix=a.modified_unix JOIN ai_source_versions sv ON sv.root=a.root AND sv.path=a.path AND sv.version=m.source_version
+             WHERE recognizer_key=?1 AND text LIKE ?2 ESCAPE '\\' AND a.root IN (SELECT value FROM json_each(?4))
+             ORDER BY a.modified_unix DESC
              LIMIT ?3",
         )
         .map_err(|e| e.to_string())?;
@@ -640,6 +670,7 @@ impl IndexWorker {
         modified: i64,
         bytes: u64,
     ) -> Result<(), String> {
+        let version = crate::source_version::capture(root, path)?;
         crate::ai_index::verify_source(root, path, modified, bytes)?;
         if index_is_current(
             &self.db,
@@ -648,6 +679,7 @@ impl IndexWorker {
             modified,
             &self.first_key,
             &self.second_key,
+            &version,
         )? {
             return Ok(());
         }
@@ -664,6 +696,7 @@ impl IndexWorker {
             &self.first_key,
             &self.second_key,
             &records,
+            &version,
         )
     }
 }
@@ -688,6 +721,9 @@ mod tests {
             [],
         )
         .unwrap();
+        crate::source_version::initialize(&db).unwrap();
+        db.execute_batch("ATTACH DATABASE ':memory:' AS current_media; CREATE TABLE current_media.media(root TEXT,path TEXT,modified_unix INTEGER,source_version TEXT); INSERT INTO current_media.media VALUES('current','one',1,'fixture-v1'); INSERT INTO ai_source_versions VALUES('current','one','fixture-v1');").unwrap();
+        crate::search_providers::prepare_scope(&db, &[]).unwrap();
         let roots = vec!["current".into()];
         assert_eq!(
             search_index(&db, &roots, "invoice", "key", 1)
@@ -704,6 +740,76 @@ mod tests {
         assert!(search_index(&db, &roots, "C:\\_101%", "key", 10)
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn ocr_publication_replaces_text_only_for_the_captured_source() {
+        let folder = std::env::temp_dir().join(format!(
+            "openphoto-ocr-version-{}",
+            crate::video_project::id()
+        ));
+        std::fs::create_dir_all(&folder).unwrap();
+        let file = folder.join("photo.jpg");
+        std::fs::write(&file, b"first").unwrap();
+        let root = folder.to_str().unwrap();
+        let path = file.to_str().unwrap();
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE ocr_index(root TEXT,path TEXT,modified_unix INTEGER,detector_key TEXT,recognizer_key TEXT,text TEXT,regions_json TEXT,PRIMARY KEY(root,path));").unwrap();
+        crate::source_version::initialize(&db).unwrap();
+        let before = crate::source_version::capture(root, path).unwrap();
+        let region = |text: &str| OcrRegion {
+            x: 0.,
+            y: 0.,
+            width: 1.,
+            height: 1.,
+            text: text.into(),
+            confidence: 1.,
+        };
+        store_result(
+            &db,
+            root,
+            path,
+            10,
+            "detector",
+            "recognizer",
+            &[region("old text")],
+            &before,
+        )
+        .unwrap();
+        std::fs::write(&file, b"other").unwrap();
+        let after = crate::source_version::capture(root, path).unwrap();
+        assert!(!index_is_current(&db, root, path, 10, "detector", "recognizer", &after).unwrap());
+        assert!(store_result(
+            &db,
+            root,
+            path,
+            10,
+            "detector",
+            "recognizer",
+            &[region("wrong text")],
+            &before
+        )
+        .is_err());
+        let text: String = db
+            .query_row("SELECT text FROM ocr_index", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(text, "old text");
+        store_result(
+            &db,
+            root,
+            path,
+            10,
+            "detector",
+            "recognizer",
+            &[region("new text")],
+            &after,
+        )
+        .unwrap();
+        let text: String = db
+            .query_row("SELECT text FROM ocr_index", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(text, "new text");
+        std::fs::remove_dir_all(folder).unwrap();
     }
 
     #[test]
