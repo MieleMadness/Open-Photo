@@ -1,3 +1,22 @@
+## November 5, 2026 — Phase J persisted-draft safety checkpoint (experimental)
+
+**Verified and merged:** PRs [#66](https://github.com/MieleMadness/Open-Photo/pull/66), [#68](https://github.com/MieleMadness/Open-Photo/pull/68), [#69](https://github.com/MieleMadness/Open-Photo/pull/69), [#70](https://github.com/MieleMadness/Open-Photo/pull/70), [#71](https://github.com/MieleMadness/Open-Photo/pull/71), [#72](https://github.com/MieleMadness/Open-Photo/pull/72), [#73](https://github.com/MieleMadness/Open-Photo/pull/73), [#74](https://github.com/MieleMadness/Open-Photo/pull/74), [#75](https://github.com/MieleMadness/Open-Photo/pull/75), [#76](https://github.com/MieleMadness/Open-Photo/pull/76), [#77](https://github.com/MieleMadness/Open-Photo/pull/77) and [#78](https://github.com/MieleMadness/Open-Photo/pull/78) added *isolated* command/history, frame-preview seek, source/revision-bound draft snapshots, Rust wire validators, and in-memory SQLite atomic/CAS/recovery test fixtures. Combined CI verification is still required after the latest base merges.
+
+**Current validation:** [PR #79](https://github.com/MieleMadness/Open-Photo/pull/79) tightens native rational source-range checks for zero-length/reversed/malformed trims; exact-head CI is required before integration.
+
+| Phase J workstream | State | Next release gate |
+| --- | --- | --- |
+| Crossfade editing primitives | Pure/test-only merged | Integrate in active timeline with conflict messaging and feature-gated undo/autosave |
+| Preview seek clock | Pure/test-only merged | Real interactive preview parity with native exported frames/audio |
+| Versioned draft and source binding | Pure/test-only merged | Review schema migration, native source verification and crash recovery |
+| Atomic save/CAS | In-memory SQLite tests only | Real production DB migration, authoritative revision checks, rollback/recovery and old-client compatibility |
+| Native snapshot parsing | Rust test-only merged; rational trim hardening in PR #79 | Verify exact native source fingerprints and source-mark invariants |
+| Native crossfade render/export | Experimental/test-only | Real installed Windows SDR/VFR playback and export acceptance, safe fallback, no-overwrite checks |
+
+**Do not report production crossfades as enabled.** No user-facing transition controls, persistent schema migration, live preview or native export routing has shipped via these PRs. Existing hard-cut and dip-to-black behavior remains the supported path. Exact-head CI is an engineering gate, not a substitute for the real installed Windows acceptance report.
+
+---
+
 ## November 4, 2026 — Phase J preview-seek frame mapping (experimental)
 
 The `crossfadePreviewSeek` adapter maps a project playhead onto the discrete 30/60 FPS crossfade frame clock, returning source-relative trimmed frame offsets and the existing sampling weights. The project end is exclusive; no duplicate final frame is generated. Focused tests cover overlaps, hard-cut boundaries, fractional seeks and invalid positions.
