@@ -251,7 +251,10 @@ fn backup_hardlink_alias_blocks_save_without_modifying_linked_file() {
     assert!(error.contains("recovery file exists"));
     assert_eq!(fs::read(&fixture.sidecar).unwrap(), b"original-xmp");
     assert_eq!(fs::read(&other).unwrap(), b"external-hardlink-target");
-    assert_eq!(fs::read(fixture.backup()).unwrap(), b"external-hardlink-target");
+    assert_eq!(
+        fs::read(fixture.backup()).unwrap(),
+        b"external-hardlink-target"
+    );
     assert!(!fixture.temporary().exists());
 }
 
