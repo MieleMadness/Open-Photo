@@ -302,7 +302,7 @@ impl IndexWorker {
         crate::source_version::verify(root, path, &version)?;
         self.db.execute("INSERT OR REPLACE INTO video_frame_work VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",params![root,path,modified,bytes,model,next,seconds,sig.0 as i64,sig.1[0],sig.1[1],sig.1[2],vector]).map_err(|e|e.to_string())?;
         if next + 1 == plan.positions.len() {
-            self.publish(root, path, modified, bytes, &model)
+            self.publish(root, path, modified, bytes, &model, &version)
         } else {
             Ok(false)
         }
