@@ -1,4 +1,10 @@
-## 0.56.68 — XMP batch path safety (Windows validation pending)
+# 0.56.69 — Recovery artifact entry checks (development candidate)
+
+- Refuse already-existing XMP recovery filename entries using symlink-aware metadata, including dangling temporary and backup links that Path::exists() can conceal.
+- Add Unix-only synthetic regression checks ensuring dangling links are left untouched and no secondary recovery artifacts are staged; retain the existing create-new guard against ordinary filename collisions.
+- External-editor compare-to-publish races, power-loss recovery, and installed Windows junction checks remain unresolved in Issue #90; full Windows CI must pass before merging. No public release.
+
+### 0.56.68 — XMP batch path safety (Windows validation pending)
 
 - Inspect XMP sidecar directory entries without following links before treating a missing sidecar as safe to create; refuse non-file and dangling-linked entries.
 - Record an XML preservation failure against the affected item and continue the rest of the bulk-tag operation.
