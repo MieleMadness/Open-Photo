@@ -1,3 +1,9 @@
+## November 5, 2026 — Recovery status foundation (PR #111 pending)
+
+**Merged:** [#110](https://github.com/MieleMadness/Open-Photo/pull/110) passed exact-head frontend/Rust CI and extracted symlink-aware read-only XMP recovery inspection. **Pending:** #111 adds internal conservative recovery-entry classification (clear, temp, backup, both, unexpected) and tests; the production writer keeps blocking any non-clear entry and does not auto-select versions. [Issue #90](https://github.com/MieleMadness/Open-Photo/issues/90) remains open for Windows-safe successful-publication conflict prevention, crash/power-loss durability, and installed manual acceptance. Routine checks run without an installer.
+
+---
+
 ## November 5, 2026 — XMP recovery-readiness follow-up (PR #110 pending)
 
 **Verified and merged:** [#108](https://github.com/MieleMadness/Open-Photo/pull/108) (publish succeeded, acknowledgement failed) and [#109](https://github.com/MieleMadness/Open-Photo/pull/109) (ambiguous temp/backup artifacts with later external edits) passed exact-head frontend and Rust checks; neither adds automatic recovery or closes [Issue #90](https://github.com/MieleMadness/Open-Photo/issues/90). **Pending:** [#110](https://github.com/MieleMadness/Open-Photo/pull/110) extracts a read-only recovery-directory-entry inspection helper into production without changing its blocking policy; CI and review required before merge. No Windows installer requested. The compare-to-publish race and interrupted-write durability remain open.
