@@ -164,7 +164,9 @@ mod tests {
         assert_eq!(history_count, 0);
         // Production sequence_history has no new foreign key or change.
         let previous_history: String = db
-            .query_row("SELECT data FROM video_sequence_history", [], |row| row.get(0))
+            .query_row("SELECT data FROM video_sequence_history", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(previous_history, "old project");
     }
