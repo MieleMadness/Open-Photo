@@ -1,3 +1,8 @@
+# Recovery-path aliases (native regression candidate, PR #112)
+
+- Add synthetic hardlink backup-alias refusal coverage; check the linked target and original sidecar remain byte-identical.
+- Add Windows-only dangling temporary-link refusal coverage where Windows symlink privileges allow the fixture. A privilege-based skip is not a passing Windows junction acceptance test. No production write behavior changed and no installer requested.
+
 # XMP recovery inspection helper (development candidate, PR #110)
 
 - Factor the existing fail-closed `.openphoto.tmp`/`.openphoto.bak` directory-entry checks into an internal, strictly read-only inspection helper, preserving dangling-link and unknown-error behavior.
