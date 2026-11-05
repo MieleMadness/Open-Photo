@@ -41,6 +41,7 @@
     !insertmacro OpenPhotoDeleteDatabase "ai-embeddings.sqlite"
     !insertmacro OpenPhotoDeleteDatabase "ai-faces.sqlite"
     !insertmacro OpenPhotoDeleteDatabase "ai-ocr.sqlite"
+    !insertmacro OpenPhotoDeleteDatabase "ai-work.sqlite"
     ${If} ${FileExists} "$LOCALAPPDATA\Open-Photo\ai-models\*.*"
       ClearErrors
       RmDir /r "$LOCALAPPDATA\Open-Photo\ai-models"

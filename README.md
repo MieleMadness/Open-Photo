@@ -638,3 +638,6 @@ Fresh installations now start video playback at normal volume. A deliberately sa
 Automatic AI indexing, durable indexing counters/folder exclusions, viewer zoom/fullscreen improvements, the private vault and signed Preview updates remain planned in [the feedback roadmap](docs/AI_VIEWER_VAULT_ROADMAP.md). This release still uses the existing installer/update policy.
 
 AI source freshness uses one version containing size, precise modification time and a streamed SHA-256 digest. **Sync Now** upgrades older saved libraries; legacy AI results remain hidden until reindexed. Sync reads media content to detect replacements with preserved timestamps, so large libraries can take longer. Hashing uses bounded scratch memory, leaves sources untouched and keeps the previous saved snapshot if a source cannot be read consistently.
+
+Close and update installation wait for queued settings as well as project saves. If settings cannot be saved, keep the app open and use **Retry saving**; discarding project edits does not discard settings. Explicit uninstall data removal includes the AI indexing queue and its SQLite companion files.
+Embedded NEF/ARW previews use the shared 20,000-pixel edge, 50-megapixel and 256 MB decoder allocation limits, with a 75 MB encoded-preview cap. RAW orientation continues to come from the RAW metadata.

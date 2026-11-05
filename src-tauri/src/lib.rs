@@ -986,12 +986,16 @@ fn decode_raw_embedded_preview(path: &Path) -> Result<image::DynamicImage, Strin
     let preview = raw
         .largest_preview()
         .ok_or("RAW file does not contain a usable embedded preview")?;
+    if preview.byte_len() > image_decode::MAX_EMBEDDED_BYTES {
+        return Err("Embedded RAW previews are limited to 75 MB".into());
+    }
+    image_decode::validate_dimensions(preview.width(), preview.height())?;
     let orientation = preview.orientation();
     let bytes = raw
         .read_preview(&preview)
         .map_err(|e| format!("Unable to read embedded RAW preview: {e}"))?;
-    let image = image::load_from_memory(&bytes)
-        .map_err(|_| "Embedded RAW preview is not a supported image encoding".to_string())?;
+    let image = image_decode::decode_embedded(&bytes)
+        .map_err(|error| format!("Embedded RAW preview unavailable: {error}"))?;
     Ok(match orientation {
         RawOrientation::NoTransforms => image,
         RawOrientation::FlipHorizontal => image.fliph(),

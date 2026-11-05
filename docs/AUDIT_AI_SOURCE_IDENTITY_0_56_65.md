@@ -1,6 +1,6 @@
 # Audit F02 — Shared AI source identity (0.56.65)
 
-Based on desktop 86367d3 (0.56.63); separate from PR #82 (0.56.64). Integrate only after latest-baseline reconciliation and exact-head verification. No release publication.
+Originally based on desktop 86367d3 (0.56.63); now reconciled with merged PR #82 / desktop c67dc56e (0.56.64). Exact-head verification is required before integration. No release publication.
 
 ## Contract
 
@@ -16,6 +16,6 @@ Full hashing reads source content on Sync and during AI verification. Scratch sp
 
 ## Checks
 
-Local: 62 frontend files / 291 tests passed, TypeScript passed, production build passed, matching Rust formatter passed, and 15 native SELECT queries prepared against migrated schemas using SQLite. Native regressions added for preserved-timestamp content/size replacements, vector/text rollback and replacement, legacy ledgers, stale queue completion, and search visibility. Compilation, Clippy, native and real-model tests require exact-head Windows CI. Full installer acceptance and installed hands-on QA remain separate gates.
+Local after baseline reconciliation: 64 frontend files / 295 tests passed, TypeScript passed, production build passed, matching Rust formatter passed, and 15 native SELECT queries prepared against migrated schemas using SQLite. Native regressions added for preserved-timestamp content/size replacements, vector/text rollback and replacement, legacy ledgers, stale queue completion, and search visibility. Compilation, Clippy, native and real-model tests require exact-head Windows CI. Full installer acceptance and installed hands-on QA remain separate gates.
 
 Next audit work: settings startup recovery (F06), XMP recovery states/conflict tests (F07/R01), and the remaining native authorization and performance findings. Reassess each against current source before changing it.

@@ -2,6 +2,8 @@ import {invoke} from "@tauri-apps/api/core";
 
 const desktop=typeof window!=="undefined"&&"__TAURI_INTERNALS__" in window;
 let pending:Promise<unknown>=Promise.resolve();
+let settingsClosing=false;
+export function setSettingsClosing(value:boolean){settingsClosing=value;}
 const failures=new Map<string,string>();
 
 export async function hydrateSettings(){
@@ -16,6 +18,7 @@ export async function hydrateSettings(){
 }
 
 export function saveSetting(key:string,value:string){
+  if(settingsClosing)throw Error("The app is closing; keep it open before changing settings.");
   try{localStorage.setItem(key,value)}catch(error){report(error)}
   if(!desktop)return;
   // Preserve write order so a slow older write cannot replace newer metadata.

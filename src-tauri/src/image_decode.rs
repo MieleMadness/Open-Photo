@@ -2,6 +2,7 @@
 use image::{DynamicImage, ImageDecoder, ImageReader, Limits};
 use std::{
     fs,
+    io::{BufRead, Cursor, Seek},
     path::{Path, PathBuf},
     sync::{Mutex, OnceLock},
     time::SystemTime,
@@ -48,10 +49,40 @@ pub(crate) fn decode(path: &Path) -> Result<DynamicImage, String> {
     if fs::metadata(path).map_err(|e| e.to_string())?.len() > 250 * 1024 * 1024 {
         return Err("Image decoding is limited to files up to 250 MB".into());
     }
-    let mut reader = ImageReader::open(path)
+    let reader = ImageReader::open(path)
         .map_err(|e| e.to_string())?
         .with_guessed_format()
         .map_err(|e| e.to_string())?;
+    decode_reader(reader, true)
+}
+
+/// RAW metadata supplies orientation; do not apply embedded EXIF a second time.
+pub(crate) fn decode_embedded(bytes: &[u8]) -> Result<DynamicImage, String> {
+    if bytes.len() as u64 > MAX_EMBEDDED_BYTES {
+        return Err("Embedded RAW previews are limited to 75 MB".into());
+    }
+    let reader = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|e| e.to_string())?;
+    decode_reader(reader, false)
+}
+
+pub(crate) const MAX_EMBEDDED_BYTES: u64 = 75 * 1024 * 1024;
+
+pub(crate) fn validate_dimensions(width: u32, height: u32) -> Result<(), String> {
+    if width > 20_000 || height > 20_000 {
+        return Err("Image decoding is limited to 20,000 pixels per edge".into());
+    }
+    if u64::from(width) * u64::from(height) > MAX_PIXELS {
+        return Err("Image decoding is limited to 50 megapixels".into());
+    }
+    Ok(())
+}
+
+fn decode_reader<R: BufRead + Seek>(
+    mut reader: ImageReader<R>,
+    normalize_orientation: bool,
+) -> Result<DynamicImage, String> {
     let mut limits = Limits::default();
     limits.max_image_width = Some(20_000);
     limits.max_image_height = Some(20_000);
@@ -59,12 +90,12 @@ pub(crate) fn decode(path: &Path) -> Result<DynamicImage, String> {
     reader.limits(limits);
     let mut decoder = reader.into_decoder().map_err(|e| e.to_string())?;
     let (width, height) = decoder.dimensions();
-    if u64::from(width) * u64::from(height) > MAX_PIXELS {
-        return Err("Image decoding is limited to 50 megapixels".into());
-    }
+    validate_dimensions(width, height)?;
     let orientation = decoder.orientation().map_err(|e| e.to_string())?;
     let mut image = DynamicImage::from_decoder(decoder).map_err(|e| e.to_string())?;
-    image.apply_orientation(orientation);
+    if normalize_orientation {
+        image.apply_orientation(orientation);
+    }
     Ok(image)
 }
 
@@ -129,12 +160,32 @@ mod tests {
             std::fs::write(&source, &bytes).unwrap();
             let mut expected = baseline.clone();
             expected.apply_orientation(Orientation::from_exif(orientation).unwrap());
+            let embedded = decode_embedded(&bytes).unwrap();
+            assert_eq!(embedded.as_bytes(), baseline.as_bytes());
+            assert_eq!(embedded.dimensions(), baseline.dimensions());
             let actual = decode(&source).unwrap();
             assert_eq!(actual.dimensions(), expected.dimensions());
             assert_eq!(actual.as_bytes(), expected.as_bytes());
             assert_eq!(std::fs::read(&source).unwrap(), bytes);
         }
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn embedded_preview_limits_reject_oversized_headers() {
+        let mut bmp = vec![0_u8; 58];
+        bmp[..2].copy_from_slice(b"BM");
+        bmp[2..6].copy_from_slice(&58_u32.to_le_bytes());
+        bmp[10..14].copy_from_slice(&54_u32.to_le_bytes());
+        bmp[14..18].copy_from_slice(&40_u32.to_le_bytes());
+        bmp[18..22].copy_from_slice(&20_001_u32.to_le_bytes());
+        bmp[22..26].copy_from_slice(&1_u32.to_le_bytes());
+        bmp[26..28].copy_from_slice(&1_u16.to_le_bytes());
+        bmp[28..30].copy_from_slice(&24_u16.to_le_bytes());
+        assert!(decode_embedded(&bmp).is_err());
+        assert!(validate_dimensions(10_000, 5_001).is_err());
+        assert!(validate_dimensions(20_001, 1).is_err());
+        assert!(validate_dimensions(10_000, 5_000).is_ok());
     }
 
     #[test]
