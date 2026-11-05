@@ -57,3 +57,7 @@ The isolated `src-tauri/src/xmp_batch_preservation_tests.rs` module exercises a 
 ## 0.56.68 XMP batch safety follow-up (pending full Windows verification)
 
 The source-side batch path uses `symlink_metadata` instead of `exists()` before creating sidecars so dangling symlinks are not treated as missing, and a preservation failure is reported for its own photo without stopping the full batch. Native fixture tests check directory entries and (on Unix) a dangling link. These fixes do not resolve Issue #90's final compare-to-publish race, Windows reparse/root revocation and crash recovery; review those independently before shipping.
+
+## 0.56.69 follow-up candidate — recovery filename entry detection
+
+Before staging a managed XMP replacement, `symlink_metadata` now distinguishes genuinely absent temporary/backup directory entries from dangling links and refuses unknown inspection failures. Exclusive `create_new` creation still prevents a late ordinary filename collision. This is a focused failure-mode improvement only: it does **not** make the final sidecar compare and replace atomic or satisfy Issue #90's crash recovery and installed Windows path-race requirements.
