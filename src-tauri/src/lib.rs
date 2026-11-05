@@ -204,6 +204,20 @@ fn read_managed_tags(root: String, paths: Vec<String>) -> Result<Vec<ManagedTagE
 }
 
 fn replace_managed_sidecar(sidecar: &Path, expected: &str, contents: &str) -> Result<(), String> {
+    replace_managed_sidecar_with_publish(sidecar, expected, contents, atomic_replace)
+}
+
+// Test seam for a failing publish boundary. The production path always supplies
+// the same platform-specific atomic_replace function as before.
+fn replace_managed_sidecar_with_publish<F>(
+    sidecar: &Path,
+    expected: &str,
+    contents: &str,
+    publish: F,
+) -> Result<(), String>
+where
+    F: FnOnce(&Path, &Path) -> std::io::Result<()>,
+{
     let file_name = sidecar
         .file_name()
         .and_then(|name| name.to_str())
@@ -265,7 +279,7 @@ fn replace_managed_sidecar(sidecar: &Path, expected: &str, contents: &str) -> Re
         let _ = fs::remove_file(&backup);
         return Err("XMP changed outside Open-Photo; refresh before retrying".into());
     }
-    if let Err(error) = atomic_replace(&temp, sidecar) {
+    if let Err(error) = publish(&temp, sidecar) {
         let _ = fs::remove_file(&temp);
         return Err(format!(
             "Unable to replace XMP; recovery backup retained: {error}"
@@ -1387,17 +1401,29 @@ mod tests {
     use super::*;
     use std::{
         env, fs,
+        sync::atomic::{AtomicU64, Ordering},
         time::{SystemTime, UNIX_EPOCH},
     };
+
+    static NEXT_TEST_DIRECTORY: AtomicU64 = AtomicU64::new(0);
 
     fn temp_root() -> PathBuf {
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let dir = env::temp_dir().join(format!("openphoto-scan-{}-{}", std::process::id(), stamp));
-        fs::create_dir_all(&dir).unwrap();
-        dir
+        loop {
+            let ordinal = NEXT_TEST_DIRECTORY.fetch_add(1, Ordering::Relaxed);
+            let dir = env::temp_dir().join(format!(
+                "openphoto-scan-{}-{stamp}-{ordinal}",
+                std::process::id()
+            ));
+            match fs::create_dir(&dir) {
+                Ok(()) => return dir,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => panic!("Unable to create test directory {}: {error}", dir.display()),
+            }
+        }
     }
 
     #[test]
