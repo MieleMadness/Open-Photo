@@ -257,6 +257,30 @@ mod tests {
     }
 
     #[test]
+    fn verified_updates_keep_only_twenty_recoverable_drafts() {
+        let mut db = db();
+        let first = snapshot(&source(), 12);
+        assert_eq!(save(&mut db, 5, None, &source(), &first), Ok(1));
+        for revision in 1..=25 {
+            let candidate = snapshot(&source(), if revision % 2 == 0 { 12 } else { 15 });
+            assert_eq!(
+                save(&mut db, 5, Some(revision), &source(), &candidate),
+                Ok(revision + 1)
+            );
+        }
+        let (count, earliest, latest): (u64, u64, u64) = db
+            .query_row(
+                "SELECT COUNT(*), MIN(revision), MAX(revision)
+                 FROM crossfade_draft_history_test WHERE project_id='project-1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!((count, earliest, latest), (20, 6, 25));
+        assert_eq!(stored(&db).unwrap().0, 26);
+    }
+
+    #[test]
     fn failed_recovery_write_aborts_entire_validated_update() {
         let mut db = db();
         let first = snapshot(&source(), 12);
