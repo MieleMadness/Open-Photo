@@ -635,7 +635,7 @@ Fresh installations now start video playback at normal volume. A deliberately sa
 - **Folders / Collections:** use **List / Tiles**. Each section remembers its view per workspace. **Find Exact Duplicates** and **Find Similar Photos** are under Folders → Library cleanup; review never deletes media. Existing manual AI/text indexing tools are under Settings → Local content indexes.
 - **Search:** after about 400ms without typing, the full query runs, including local semantic matches when AI is enabled. Enter/Search starts immediately. Previous results stay visible with an updating state until the new query finishes; changing workspace or AI state discards incompatible evidence. **Clear search** restores browsing. Provider failures leave metadata matches available.
 
-Automatic AI indexing, durable indexing counters/folder exclusions, viewer zoom/fullscreen improvements, the private vault and signed Preview updates remain planned in [the feedback roadmap](docs/AI_VIEWER_VAULT_ROADMAP.md). This release still uses the existing installer/update policy.
+Automatic local AI indexing, counters/folder exclusions and expanded viewers are implemented. The private vault remains planned. Signed Preview updates still require channel publication and installed upgrade acceptance; see [the feedback roadmap](docs/AI_VIEWER_VAULT_ROADMAP.md).
 
 Close and update installation wait for queued settings as well as project saves. If settings cannot be saved, keep the app open and use **Retry saving**; discarding project edits does not discard settings. Explicit uninstall data removal includes the AI indexing queue and its SQLite companion files.
 Embedded NEF/ARW previews use the shared 20,000-pixel edge, 50-megapixel and 256 MB decoder allocation limits, with a 75 MB encoded-preview cap. RAW orientation continues to come from the RAW metadata.
@@ -646,3 +646,5 @@ AI source freshness uses one version containing size, precise modification time 
 Desktop settings load directly from SQLite into the live memory store. Large ratings, collections and workspace settings no longer need to fit in browser storage. Browser storage is used only for legacy migration and a bounded theme/accent cache; failures there do not block native startup or saving. **Retry saving** uses the latest live values.
 
 Map tooltips display filenames as literal text, including ampersands and markup-like characters.
+
+See [0.56.67 audit integration](docs/AUDIT_INTEGRATION_0_56_67.md) for the combined fixes and verification boundaries.
