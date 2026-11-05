@@ -231,7 +231,10 @@ fn pending_recovery_with_external_edit_never_chooses_a_winner_automatically() {
     for expected in ["original-xmp", "external-editor-update"] {
         let error = replace_managed_sidecar(&fixture.sidecar, expected, "retry-xmp").unwrap_err();
         assert!(error.contains("recovery file exists"));
-        assert_eq!(fs::read(&fixture.sidecar).unwrap(), b"external-editor-update");
+        assert_eq!(
+            fs::read(&fixture.sidecar).unwrap(),
+            b"external-editor-update"
+        );
         assert_eq!(fs::read(fixture.temporary()).unwrap(), b"openphoto-pending");
         assert_eq!(fs::read(fixture.backup()).unwrap(), b"original-xmp");
     }
