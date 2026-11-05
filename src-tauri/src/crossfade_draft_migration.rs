@@ -46,7 +46,7 @@ mod tests {
     fn existing_database() -> Connection {
         let db = Connection::open_in_memory().unwrap();
         db.execute_batch(
-            "PRAGMA foreign_keys=ON;
+            r#"PRAGMA foreign_keys=ON;
              CREATE TABLE video_sequences (
                 id TEXT PRIMARY KEY,
                 root TEXT NOT NULL,
@@ -66,7 +66,7 @@ mod tests {
                 VALUES ('project-1', 'C:/library', 'Legacy project', 7, '{\"schema_version\":3}', 100);
              INSERT INTO video_sequence_history
                 (project_id, revision, data)
-                VALUES ('project-1', 6, 'old project');",
+                VALUES ('project-1', 6, 'old project');"#,
         )
         .unwrap();
         db
