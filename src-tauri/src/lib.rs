@@ -1401,17 +1401,29 @@ mod tests {
     use super::*;
     use std::{
         env, fs,
+        sync::atomic::{AtomicU64, Ordering},
         time::{SystemTime, UNIX_EPOCH},
     };
+
+    static NEXT_TEST_DIRECTORY: AtomicU64 = AtomicU64::new(0);
 
     fn temp_root() -> PathBuf {
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let dir = env::temp_dir().join(format!("openphoto-scan-{}-{}", std::process::id(), stamp));
-        fs::create_dir_all(&dir).unwrap();
-        dir
+        loop {
+            let ordinal = NEXT_TEST_DIRECTORY.fetch_add(1, Ordering::Relaxed);
+            let dir = env::temp_dir().join(format!(
+                "openphoto-scan-{}-{stamp}-{ordinal}",
+                std::process::id()
+            ));
+            match fs::create_dir(&dir) {
+                Ok(()) => return dir,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => panic!("Unable to create test directory {}: {error}", dir.display()),
+            }
+        }
     }
 
     #[test]
