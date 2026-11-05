@@ -61,3 +61,7 @@ The source-side batch path uses `symlink_metadata` instead of `exists()` before 
 ## Stale-save and recovery-artifact native fixtures (test-only)
 
 The `src-tauri/src/xmp_conflict_state_tests.rs` suite checks sequential stale-save rejection: once a managed sidecar is updated, an operation with its old expected contents must fail, and a refreshed snapshot can write. Existing recovery-backup artifacts must block repeated writes; a Unix dangling backup symlink must not be followed or reused. These tests are synthetic and sequential. They do **not** establish atomic filesystem compare-and-swap, prove a crash-safe recovery state machine, or close the external editor's compare-to-publish race. Issue #90 remains open.
+
+## Installed Windows manual evidence
+
+The [installed XMP safety acceptance runbook](XMP_WINDOWS_INSTALLED_ACCEPTANCE.md) provides disposable-fixture procedures, before/after SHA-256 evidence, external-editor concurrency and root/junction tests, and signoff fields. It is a **procedure only**: no human Windows trial has been recorded, and passing Actions installer CI does not close Issue #90.
