@@ -1,3 +1,8 @@
+# 0.56.67 — Literal map filename labels
+
+- Render map tooltips through a text-only DOM element so filenames cannot be interpreted as HTML. Preserve marker selection and clustering.
+- Add regression coverage for entity-like and markup-like filenames.
+
 # 0.56.66 — Recover settings without browser-storage quota
 
 - Hydrate desktop settings directly into memory from SQLite and route settings readers through that store. Keep only bounded theme/accent bootstrap mirrors in browser storage.
