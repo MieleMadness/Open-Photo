@@ -49,3 +49,7 @@ This document does not close F07/R01. It does not authorize a release, migration
 The test-only `src-tauri/src/xmp_recovery_tests.rs` suite exercises the existing `replace_managed_sidecar` path with disposable synthetic sidecars: successful replacement and cleanup, same-length changed content detected before replacement, preexisting backup/temporary recovery files refusing writes, and malformed UTF-8 preserving bytes. It is registered under `#[cfg(test)]` in `lib.rs`.
 
 **Not yet covered:** deterministic replacement *between* final compare and atomic publish; power loss/rename injection; parent-directory durability; true concurrent external-process file replacement; junction/root revocation; installed Windows external-editor trials. These remain F07/R01 release blockers. Passing this regression suite must never be described as closing the full gate. No production XMP write behavior is changed by these tests.
+
+## Version 0.56.68 batch hardening (pending verification)
+
+The batch tag path now checks sidecar directory entries via `symlink_metadata` before choosing the create path, and treats an XMP-preservation failure as a per-item error. Tests cover a non-file sidecar while continuing the next file and a Unix dangling link. These changes do **not** close the sidecar compare-to-publish race, Windows junction/revocation or crash-recovery requirements. Review exact-head Windows CI and installed real-media evidence before release.
