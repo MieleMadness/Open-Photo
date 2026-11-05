@@ -101,3 +101,60 @@ fn malformed_utf8_existing_sidecar_is_never_replaced() {
     assert!(replace_managed_sidecar(&fixture.sidecar, "prior-xmp", "new-xmp").is_err());
     assert_eq!(fs::read(&fixture.sidecar).unwrap(), vec![0xff, 0xfe]);
 }
+
+#[test]
+fn batch_skips_nonfile_sidecar_without_blocking_other_photos() {
+    let fixture = Fixture::new("old");
+    let first = fixture.root.join("first.jpg");
+    let second = fixture.root.join("second.jpg");
+    fs::write(&first, b"untouched-one").unwrap();
+    fs::write(&second, b"untouched-two").unwrap();
+    fs::create_dir(fixture.root.join("first.jpg.xmp")).unwrap();
+
+    let result = crate::bulk_create_tags(
+        fixture.root.to_string_lossy().into_owned(),
+        vec![
+            first.to_string_lossy().into_owned(),
+            second.to_string_lossy().into_owned(),
+        ],
+        vec!["tag".into()],
+    )
+    .unwrap();
+
+    assert_eq!(result.created, 1);
+    assert_eq!(result.skipped, 1);
+    assert!(result.errors.is_empty());
+    assert_eq!(fs::read(&first).unwrap(), b"untouched-one");
+    assert_eq!(fs::read(&second).unwrap(), b"untouched-two");
+    assert!(fixture.root.join("first.jpg.xmp").is_dir());
+    assert!(fixture.root.join("second.jpg.xmp").is_file());
+}
+
+#[cfg(unix)]
+#[test]
+fn batch_does_not_follow_dangling_sidecar_symlink() {
+    use std::os::unix::fs::symlink;
+    let fixture = Fixture::new("old");
+    let source = fixture.root.join("photo.jpg");
+    fs::write(&source, b"untouched").unwrap();
+    let dangling_target = fixture.root.join("missing-target.xmp");
+    let link = fixture.root.join("photo.jpg.xmp");
+    symlink(&dangling_target, &link).unwrap();
+
+    let result = crate::bulk_create_tags(
+        fixture.root.to_string_lossy().into_owned(),
+        vec![source.to_string_lossy().into_owned()],
+        vec!["tag".into()],
+    )
+    .unwrap();
+
+    assert_eq!(result.created, 0);
+    assert_eq!(result.skipped, 1);
+    assert!(result.errors.is_empty());
+    assert!(fs::symlink_metadata(&link)
+        .unwrap()
+        .file_type()
+        .is_symlink());
+    assert!(!dangling_target.exists());
+    assert_eq!(fs::read(&source).unwrap(), b"untouched");
+}
