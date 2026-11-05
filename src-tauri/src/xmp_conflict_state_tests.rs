@@ -1,6 +1,6 @@
 //! Synthetic-only XMP writer regressions for stale snapshots and recovery artifacts.
 //! These tests document existing fail-closed behavior, not atomic compare-and-swap.
-use crate::{replace_managed_sidecar, replace_managed_sidecar_with_publish};
+use crate::{atomic_replace, replace_managed_sidecar, replace_managed_sidecar_with_publish};
 use std::{
     fs,
     path::PathBuf,
@@ -133,4 +133,35 @@ fn external_edit_before_failed_publish_keeps_external_bytes() {
     assert_eq!(fs::read(&fixture.sidecar).unwrap(), b"external-writer-data");
     assert_eq!(fs::read(fixture.backup()).unwrap(), b"expected-xmp");
     assert!(!fixture.temp().exists());
+}
+
+#[test]
+fn published_but_unacknowledged_save_retains_recovery_and_blocks_unreviewed_retry() {
+    let fixture = Fixture::new("original-xmp");
+    let result = replace_managed_sidecar_with_publish(
+        &fixture.sidecar,
+        "original-xmp",
+        "committed-xmp",
+        |staged, destination| {
+            // The rename succeeds, then the publisher reports an injected
+            // acknowledgement failure. Both versions must remain reviewable.
+            atomic_replace(staged, destination)?;
+            Err(std::io::Error::other("injected acknowledgement failure"))
+        },
+    );
+
+    assert!(result.unwrap_err().contains("recovery backup retained"));
+    assert_eq!(fs::read(&fixture.sidecar).unwrap(), b"committed-xmp");
+    assert_eq!(fs::read(fixture.backup()).unwrap(), b"original-xmp");
+    assert!(!fixture.temp().exists());
+
+    // A restart or repeated attempt with either snapshot must not decide
+    // which version to keep or discard the recovery evidence implicitly.
+    for snapshot in ["original-xmp", "committed-xmp"] {
+        let retry = replace_managed_sidecar(&fixture.sidecar, snapshot, "retry-xmp");
+        assert!(retry.unwrap_err().contains("recovery file exists"));
+        assert_eq!(fs::read(&fixture.sidecar).unwrap(), b"committed-xmp");
+        assert_eq!(fs::read(fixture.backup()).unwrap(), b"original-xmp");
+        assert!(!fixture.temp().exists());
+    }
 }
