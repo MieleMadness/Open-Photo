@@ -184,6 +184,4 @@ mod tests {
         let state = inspect_recovery_pair(&fixture.temp(), &fixture.backup()).unwrap();
         assert_eq!(state.entry_state(), RecoveryEntryState::TemporaryAndBackup);
         assert!(state.requires_review());
-    }
-
-}
+    }}
