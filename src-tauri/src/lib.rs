@@ -19,9 +19,9 @@ mod crossfade_audio_stream;
 #[cfg(test)]
 mod crossfade_clock;
 #[cfg(test)]
+mod crossfade_command;
 #[cfg(test)]
 mod crossfade_draft_record;
-mod crossfade_command;
 #[cfg(test)]
 mod crossfade_graph;
 #[cfg(test)]
