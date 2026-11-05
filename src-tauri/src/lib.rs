@@ -21,6 +21,8 @@ mod crossfade_clock;
 #[cfg(test)]
 mod crossfade_command;
 #[cfg(test)]
+mod crossfade_draft_atomic;
+#[cfg(test)]
 mod crossfade_draft_record;
 #[cfg(test)]
 mod crossfade_graph;
