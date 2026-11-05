@@ -239,3 +239,47 @@ fn pending_recovery_with_external_edit_never_chooses_a_winner_automatically() {
         assert_eq!(fs::read(fixture.backup()).unwrap(), b"original-xmp");
     }
 }
+
+#[test]
+fn backup_hardlink_alias_blocks_save_without_modifying_linked_file() {
+    let fixture = Fixture::new("original-xmp");
+    let other = fixture.root.join("other-sidecar.xmp");
+    fs::write(&other, b"external-hardlink-target").unwrap();
+    fs::hard_link(&other, fixture.backup()).unwrap();
+
+    let error = replace_managed_sidecar(&fixture.sidecar, "original-xmp", "new-xmp").unwrap_err();
+    assert!(error.contains("recovery file exists"));
+    assert_eq!(fs::read(&fixture.sidecar).unwrap(), b"original-xmp");
+    assert_eq!(fs::read(&other).unwrap(), b"external-hardlink-target");
+    assert_eq!(fs::read(fixture.backup()).unwrap(), b"external-hardlink-target");
+    assert!(!fixture.temporary().exists());
+}
+
+#[cfg(windows)]
+#[test]
+fn dangling_windows_temporary_symlink_blocks_save_when_symlinks_are_permitted() {
+    use std::os::windows::fs::symlink_file;
+
+    let fixture = Fixture::new("original-xmp");
+    let target = fixture.root.join("not-created-xmp");
+    match symlink_file(&target, fixture.temporary()) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+            // Creating symlinks requires Windows developer mode or privilege.
+            // This environment cannot establish the link-specific assertion.
+            eprintln!("Skipping Windows symlink fixture: permission denied");
+            return;
+        }
+        Err(error) => panic!("Unable to create disposable Windows symlink: {error}"),
+    }
+
+    let error = replace_managed_sidecar(&fixture.sidecar, "original-xmp", "new-xmp").unwrap_err();
+    assert!(error.contains("recovery file exists"));
+    assert_eq!(fs::read(&fixture.sidecar).unwrap(), b"original-xmp");
+    assert!(fs::symlink_metadata(fixture.temporary())
+        .unwrap()
+        .file_type()
+        .is_symlink());
+    assert!(!target.exists());
+    assert!(!fixture.backup().exists());
+}
