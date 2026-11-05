@@ -22,8 +22,8 @@ export function ProjectSaveGuard(){
   },[]);
   return <NoticeSurface>{exportBlocked&&<div className="storage-error" role="alert">An export is still running or starting. Wait for it to finish or cancel it in the export panel before closing.
     <button onClick={()=>setExportBlocked(false)}>Keep app open</button></div>}
-  {(error||saveError)&&<div className="storage-error" role="alert">Video project changes need attention: {saveError||error}
+  {(error||saveError)&&<div className="storage-error" role="alert">Saved changes need attention: {saveError||error}
     <button onClick={()=>{void flushProjects(true).then(()=>setError("")).catch(cause=>setError(String(cause)));}}>Retry project saves</button>
-    <button onClick={()=>{void withAppExitProtection(()=>getCurrentWindow().destroy(),true).catch(cause=>{if(cause instanceof ActiveVideoExportError)setExportBlocked(true);else setError(String(cause));});}}>Close without saving unsaved changes</button>
+    <button onClick={()=>{void withAppExitProtection(()=>getCurrentWindow().destroy(),true).catch(cause=>{if(cause instanceof ActiveVideoExportError)setExportBlocked(true);else setError(String(cause));});}}>Close without saving project changes</button>
   </div>}</NoticeSurface>;
 }
