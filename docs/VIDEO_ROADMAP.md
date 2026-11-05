@@ -1,3 +1,19 @@
+## November 5, 2026 — Consolidated 0.56.69 development and XMP integrity gate
+
+**Current merged application baseline:** `0.56.69` on `feature/desktop-v0.1.0`. Production recovery-directory-entry checking in [#98](https://github.com/MieleMadness/Open-Photo/pull/98) passed [full Windows CI #1386](https://github.com/MieleMadness/Open-Photo/actions/runs/42093820209), including installer/export/AI/uninstall automation. Later [#101](https://github.com/MieleMadness/Open-Photo/pull/101) added publish-error regressions and parallel-test fixture isolation; [#104](https://github.com/MieleMadness/Open-Photo/pull/104) added the [manual Windows XMP safety runbook](XMP_WINDOWS_INSTALLED_ACCEPTANCE.md). These are merged, not public releases. [#106](https://github.com/MieleMadness/Open-Photo/pull/106) is pending exact-head CI and contains an **ignored, intentionally failing** demonstration of the successful-rename external-editor race; **not** a fix or a passing release gate.
+
+| Next priority | Current state | Required next action |
+| --- | --- | --- |
+| Issue #90 compare-to-publish integrity | Still unsafe in a deterministic external-edit interleaving; ignored red gate PR #106 pending | Select and verify a Windows-safe publication/identity protocol, then turn regression into passing CI |
+| Persisted interrupted-write recovery | Recovery artifacts exist; no persisted crash-state machine or automatic ambiguity resolution | Prove stage/flush/publish/restart transitions with reversible, user-reviewable states |
+| Installed Windows XMP conflict/alias tests | Runbook merged; tests **not performed** | Exercise controlled external-editor concurrency, junction/reparse/root-revocation, verify original-media hashes |
+| Phase J production crossfades | Experimental/test-only; no persisted production renderer | Gate active UI/schema/preview/export on native parity and installed acceptance |
+| 10,000+ asset stress test | Owner deferred | Run before version 1.0 |
+
+**CI policy:** [#102](https://github.com/MieleMadness/Open-Photo/pull/102) requires opt-in `full-windows-ci` PR label or `workflow_dispatch full_windows=true` for installers; default PR and push verification does not produce an installer. This avoids unnecessary packaging but is not a substitute for installed Windows safety trials. Earlier dated sections below are historical checkpoints, **not the current PR or release status**.
+
+---
+
 ## November 5, 2026 — CI cost and opt-in installer policy
 
 **Merged development baseline:** 0.56.69, verified via full Windows [CI #1386](https://github.com/MieleMadness/Open-Photo/actions/runs/42093820209) and merged [PR #98](https://github.com/MieleMadness/Open-Photo/pull/98). Full Windows validation remains available, but the workflow now requires an explicit `full-windows-ci` label or manual `full_windows=true` input. Routine PRs and pushes no longer build installers. This reduces unnecessary CI cost without treating a checks-only green run as installed-app validation.
