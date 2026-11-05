@@ -10,6 +10,34 @@ fn fields(value: &Value, expected: &[&str]) -> bool {
     };
     map.len() == expected.len() && expected.iter().all(|key| map.contains_key(*key))
 }
+fn parse_decimal(input: &str, zero_allowed: bool) -> Option<u128> {
+    if input.is_empty()
+        || input.len() > 20
+        || (input.len() > 1 && input.starts_with('0'))
+        || !input.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    let number = input.parse::<u128>().ok()?;
+    if !zero_allowed && number == 0 {
+        return None;
+    }
+    Some(number)
+}
+
+fn rational_mark(value: &Value) -> Option<(u128, u128, u128)> {
+    if !fields(value, &["ticks", "time_base"]) {
+        return None;
+    }
+    let ticks = parse_decimal(value["ticks"].as_str()?, true)?;
+    let (numerator, denominator) = value["time_base"].as_str()?.split_once('/')?;
+    Some((
+        ticks,
+        parse_decimal(numerator, false)?,
+        parse_decimal(denominator, false)?,
+    ))
+}
+
 fn valid_source_identity(value: &Value, expected_ids: &[(&str, u64)]) -> bool {
     if !fields(value, &["version", "clips"]) || value["version"].as_u64() != Some(1) {
         return false;
@@ -43,33 +71,21 @@ fn valid_source_identity(value: &Value, expected_ids: &[(&str, u64)]) -> bool {
         {
             return false;
         }
-        for key in ["source_in", "source_out"] {
-            let mark = &clip[key];
-            if !fields(mark, &["ticks", "time_base"]) {
-                return false;
-            }
-            if mark["ticks"].as_str().is_none_or(|s| {
-                s.is_empty() || s.len() > 20 || !s.bytes().all(|b| b.is_ascii_digit())
-            }) {
-                return false;
-            }
-            if mark["time_base"].as_str().is_none_or(|base| {
-                let Some((numerator, denominator)) = base.split_once('/') else {
-                    return true;
-                };
-                numerator.is_empty()
-                    || denominator.is_empty()
-                    || numerator.len() > 20
-                    || denominator.len() > 20
-                    || numerator.starts_with('0')
-                    || denominator.starts_with('0')
-                    || !numerator.bytes().all(|b| b.is_ascii_digit())
-                    || !denominator.bytes().all(|b| b.is_ascii_digit())
-            }) {
-                return false;
-            }
-        }
-        true
+        let Some((in_ticks, in_num, in_den)) = rational_mark(&clip["source_in"]) else {
+            return false;
+        };
+        let Some((out_ticks, out_num, out_den)) = rational_mark(&clip["source_out"]) else {
+            return false;
+        };
+        // Compare exact rational marks without lossy floating point rounding.
+        // Fail closed on u128 overflow instead of incorrectly accepting a trim.
+        let left = in_ticks
+            .checked_mul(in_num)
+            .and_then(|value| value.checked_mul(out_den));
+        let right = out_ticks
+            .checked_mul(out_num)
+            .and_then(|value| value.checked_mul(in_den));
+        matches!((left, right), (Some(left), Some(right)) if right > left)
     })
 }
 
