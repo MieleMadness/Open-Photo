@@ -112,9 +112,10 @@ fn mixed_batch_merges_managed_xmp_but_keeps_foreign_sidecars_and_sources() {
 
     let managed_sidecar = fixture.root.join("managed.jpg.xmp");
     let existing = crate::render_openphoto_xmp(&["Existing".into()]);
+    let third_party = "<third:keep xmlns:third=\"urn:third-party\">Keep Me</third:keep>";
     let with_foreign_metadata = existing.replace(
         "</rdf:Description>",
-        "<third:keep xmlns:third=\"urn:third-party\">Keep Me</third:keep></rdf:Description>",
+        &format!("{third_party}</rdf:Description>"),
     );
     assert_ne!(with_foreign_metadata, existing);
     fs::write(&managed_sidecar, &with_foreign_metadata).unwrap();
@@ -131,15 +132,14 @@ fn mixed_batch_merges_managed_xmp_but_keeps_foreign_sidecars_and_sources() {
         ],
         vec!["New keyword".to_string()],
     );
-    let first = crate::bulk_create_tags(args.0.clone(), args.1.clone(), args.2.clone())
-        .unwrap();
+    let first = crate::bulk_create_tags(args.0.clone(), args.1.clone(), args.2.clone()).unwrap();
     assert_eq!(first.created, 0);
     assert_eq!(first.updated, 1);
     assert_eq!(first.skipped, 1);
     assert!(first.errors.is_empty());
 
     let written = fs::read_to_string(&managed_sidecar).unwrap();
-    assert!(written.contains("<third:keep xmlns:third=\"urn:third-party\">Keep Me</third:keep>"));
+    assert!(written.contains(third_party));
     assert_eq!(
         crate::openphoto_xmp_tags(&written).unwrap(),
         vec!["Existing", "New keyword"]
