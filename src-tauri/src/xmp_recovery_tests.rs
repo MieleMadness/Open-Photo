@@ -202,3 +202,40 @@ fn dangling_backup_symlink_is_detected_without_staging() {
     assert!(!target.exists());
     assert!(!fixture.temporary().exists());
 }
+
+#[test]
+fn staged_and_backed_up_unpublished_write_refuses_ambiguous_retries() {
+    let fixture = Fixture::new("original-xmp");
+    fs::write(fixture.temporary(), b"partially-staged-new-version").unwrap();
+    fs::write(fixture.backup(), b"original-xmp").unwrap();
+
+    for expected in ["original-xmp", "new-preview"] {
+        let error = replace_managed_sidecar(&fixture.sidecar, expected, "retry-xmp").unwrap_err();
+        assert!(error.contains("recovery file exists"));
+        assert_eq!(fs::read(&fixture.sidecar).unwrap(), b"original-xmp");
+        assert_eq!(
+            fs::read(fixture.temporary()).unwrap(),
+            b"partially-staged-new-version"
+        );
+        assert_eq!(fs::read(fixture.backup()).unwrap(), b"original-xmp");
+    }
+}
+
+#[test]
+fn pending_recovery_with_external_edit_never_chooses_a_winner_automatically() {
+    let fixture = Fixture::new("original-xmp");
+    fs::write(fixture.temporary(), b"openphoto-pending").unwrap();
+    fs::write(fixture.backup(), b"original-xmp").unwrap();
+    fs::write(&fixture.sidecar, b"external-editor-update").unwrap();
+
+    for expected in ["original-xmp", "external-editor-update"] {
+        let error = replace_managed_sidecar(&fixture.sidecar, expected, "retry-xmp").unwrap_err();
+        assert!(error.contains("recovery file exists"));
+        assert_eq!(
+            fs::read(&fixture.sidecar).unwrap(),
+            b"external-editor-update"
+        );
+        assert_eq!(fs::read(fixture.temporary()).unwrap(), b"openphoto-pending");
+        assert_eq!(fs::read(fixture.backup()).unwrap(), b"original-xmp");
+    }
+}
