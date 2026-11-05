@@ -210,10 +210,24 @@ fn replace_managed_sidecar(sidecar: &Path, expected: &str, contents: &str) -> Re
         .ok_or("Invalid XMP sidecar filename")?;
     let temp = sidecar.with_file_name(format!("{file_name}.openphoto.tmp"));
     let backup = sidecar.with_file_name(format!("{file_name}.openphoto.bak"));
-    if temp.exists() || backup.exists() {
-        return Err(
-            "Previous Open-Photo XMP recovery file exists; inspect it before retrying".into(),
-        );
+    // Check the directory entry itself: exists() would hide dangling symlinks.
+    // create_new remains the final guard if another process creates an entry later.
+    for recovery_path in [&temp, &backup] {
+        match fs::symlink_metadata(recovery_path) {
+            Ok(_) => {
+                return Err(
+                    "Previous Open-Photo XMP recovery file exists; inspect it before retrying"
+                        .into(),
+                );
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(format!(
+                    "Unable to inspect Open-Photo XMP recovery path {}: {error}",
+                    recovery_path.display()
+                ));
+            }
+        }
     }
 
     {

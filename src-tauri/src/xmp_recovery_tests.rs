@@ -158,3 +158,47 @@ fn batch_does_not_follow_dangling_sidecar_symlink() {
     assert!(!dangling_target.exists());
     assert_eq!(fs::read(&source).unwrap(), b"untouched");
 }
+
+#[cfg(unix)]
+#[test]
+fn dangling_temporary_symlink_is_detected_before_backup_creation() {
+    use std::os::unix::fs::symlink;
+    let fixture = Fixture::new("original-xmp");
+    let target = fixture.root.join("missing-target");
+    symlink(&target, fixture.temporary()).unwrap();
+
+    let error = replace_managed_sidecar(&fixture.sidecar, "original-xmp", "new-xmp").unwrap_err();
+    assert!(error.contains("recovery file exists"));
+    assert_eq!(
+        fs::read_to_string(&fixture.sidecar).unwrap(),
+        "original-xmp"
+    );
+    assert!(fs::symlink_metadata(fixture.temporary())
+        .unwrap()
+        .file_type()
+        .is_symlink());
+    assert!(!target.exists());
+    assert!(!fixture.backup().exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn dangling_backup_symlink_is_detected_without_staging() {
+    use std::os::unix::fs::symlink;
+    let fixture = Fixture::new("original-xmp");
+    let target = fixture.root.join("missing-recovery-target");
+    symlink(&target, fixture.backup()).unwrap();
+
+    let error = replace_managed_sidecar(&fixture.sidecar, "original-xmp", "new-xmp").unwrap_err();
+    assert!(error.contains("recovery file exists"));
+    assert_eq!(
+        fs::read_to_string(&fixture.sidecar).unwrap(),
+        "original-xmp"
+    );
+    assert!(fs::symlink_metadata(fixture.backup())
+        .unwrap()
+        .file_type()
+        .is_symlink());
+    assert!(!target.exists());
+    assert!(!fixture.temporary().exists());
+}

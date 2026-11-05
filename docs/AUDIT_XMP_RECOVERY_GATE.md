@@ -61,3 +61,7 @@ The source-side batch path uses `symlink_metadata` instead of `exists()` before 
 ## Stale-save and recovery-artifact native fixtures (test-only)
 
 The `src-tauri/src/xmp_conflict_state_tests.rs` suite checks sequential stale-save rejection: once a managed sidecar is updated, an operation with its old expected contents must fail, and a refreshed snapshot can write. Existing recovery-backup artifacts must block repeated writes; a Unix dangling backup symlink must not be followed or reused. These tests are synthetic and sequential. They do **not** establish atomic filesystem compare-and-swap, prove a crash-safe recovery state machine, or close the external editor's compare-to-publish race. Issue #90 remains open.
+
+## 0.56.69 follow-up candidate — recovery filename entry detection
+
+Before staging a managed XMP replacement, `symlink_metadata` now distinguishes genuinely absent temporary/backup directory entries from dangling links and refuses unknown inspection failures. Exclusive `create_new` creation still prevents a late ordinary filename collision. This is a focused failure-mode improvement only: it does **not** make the final sidecar compare and replace atomic or satisfy Issue #90's crash recovery and installed Windows path-race requirements.
