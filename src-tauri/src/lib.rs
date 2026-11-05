@@ -344,7 +344,9 @@ fn bulk_create_tags(
             Ok(_) => true,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
             Err(error) => {
-                output.errors.push(format!("{}: {error}", sidecar.display()));
+                output
+                    .errors
+                    .push(format!("{}: {error}", sidecar.display()));
                 continue;
             }
         };
