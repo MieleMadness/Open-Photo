@@ -2,7 +2,7 @@ import {cleanup,createEvent,fireEvent,render,screen} from "@testing-library/reac
 import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {EditorTimelineDivider,timelineSplitBounds} from "./EditorTimelineDivider";
 import {saveSetting} from "./userData";
-vi.mock("./userData",()=>({saveSetting:vi.fn((key:string,value:string)=>localStorage.setItem(key,value))}));
+vi.mock("./userData",()=>({readSetting:(key:string)=>localStorage.getItem(key),saveSetting:vi.fn((key:string,value:string)=>localStorage.setItem(key,value))}));
 beforeEach(()=>{localStorage.clear();vi.clearAllMocks();});
 afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 function setup(){const host={current:document.createElement("section")},onHeight=vi.fn();Object.defineProperty(host.current,"clientHeight",{value:800,configurable:true});return {...render(<EditorTimelineDivider host={host} onHeight={onHeight}/>),host,onHeight};}

@@ -1,3 +1,10 @@
+# 0.56.66 — Recover settings without browser-storage quota
+
+- Hydrate desktop settings directly into memory from SQLite and route settings readers through that store. Keep only bounded theme/accent bootstrap mirrors in browser storage.
+- Start normally when browser storage is full or unavailable; preserve native-load failures and retry without resetting saved metadata.
+- Retry exact latest memory values after persistence failures, including values that never fit in browser storage. Preserve close/update settings barriers.
+- Add large native-store, browser-quota, disabled-storage, failed-save/retry and restart regression coverage.
+
 # 0.56.65 — Consistent AI source freshness
 
 - Share a source version containing byte length, precise modification time and SHA-256 across saved media, queued work, semantic/OCR/People results, video staging and content search.

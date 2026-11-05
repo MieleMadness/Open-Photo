@@ -30,6 +30,6 @@ it("blocks discard on settings failure, permits retry, and restores durable valu
   saveSetting("openphoto.ratings",'{"photo":5}');const action=vi.fn(async()=>{});
   await expect(withAppExitProtection(action,true)).rejects.toThrow("Disk full");expect(action).not.toHaveBeenCalled();
   failed=false;await retrySettings();await withAppExitProtection(action);expect(action).toHaveBeenCalledOnce();
-  vi.resetModules();localStorage.clear();const {hydrateSettings}=await import("./userData");await hydrateSettings();
-  expect(localStorage.getItem("openphoto.ratings")).toBe('{"photo":5}');
+  vi.resetModules();localStorage.clear();const {hydrateSettings,readSetting}=await import("./userData");await hydrateSettings();
+  expect(readSetting("openphoto.ratings")).toBe('{"photo":5}');
 });
