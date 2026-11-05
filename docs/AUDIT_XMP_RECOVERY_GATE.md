@@ -43,3 +43,9 @@ Status: **test design only; no production XMP behavior changed**. Based on audit
 ## Release boundary
 
 This document does not close F07/R01. It does not authorize a release, migration, recovery cleanup or a production XMP write change. Track implementation and evidence in a subsequent focused PR. Keep crossfade production routing, vault and Immich expansion behind the existing stability gates.
+
+## Native regression baseline (follow-up)
+
+The test-only `src-tauri/src/xmp_recovery_tests.rs` suite exercises the existing `replace_managed_sidecar` path with disposable synthetic sidecars: successful replacement and cleanup, same-length changed content detected before replacement, preexisting backup/temporary recovery files refusing writes, and malformed UTF-8 preserving bytes. It is registered under `#[cfg(test)]` in `lib.rs`.
+
+**Not yet covered:** deterministic replacement *between* final compare and atomic publish; power loss/rename injection; parent-directory durability; true concurrent external-process file replacement; junction/root revocation; installed Windows external-editor trials. These remain F07/R01 release blockers. Passing this regression suite must never be described as closing the full gate. No production XMP write behavior is changed by these tests.
