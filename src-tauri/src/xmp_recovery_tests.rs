@@ -151,7 +151,10 @@ fn batch_does_not_follow_dangling_sidecar_symlink() {
     assert_eq!(result.created, 0);
     assert_eq!(result.skipped, 1);
     assert!(result.errors.is_empty());
-    assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+    assert!(fs::symlink_metadata(&link)
+        .unwrap()
+        .file_type()
+        .is_symlink());
     assert!(!dangling_target.exists());
     assert_eq!(fs::read(&source).unwrap(), b"untouched");
 }
