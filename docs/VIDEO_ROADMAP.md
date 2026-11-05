@@ -1,3 +1,9 @@
+## November 5, 2026 — XMP recovery-readiness follow-up (PR #110 pending)
+
+**Verified and merged:** [#108](https://github.com/MieleMadness/Open-Photo/pull/108) (publish succeeded, acknowledgement failed) and [#109](https://github.com/MieleMadness/Open-Photo/pull/109) (ambiguous temp/backup artifacts with later external edits) passed exact-head frontend and Rust checks; neither adds automatic recovery or closes [Issue #90](https://github.com/MieleMadness/Open-Photo/issues/90). **Pending:** [#110](https://github.com/MieleMadness/Open-Photo/pull/110) extracts a read-only recovery-directory-entry inspection helper into production without changing its blocking policy; CI and review required before merge. No Windows installer requested. The compare-to-publish race and interrupted-write durability remain open.
+
+---
+
 ## November 5, 2026 — Consolidated 0.56.69 development and XMP integrity gate
 
 **Current merged application baseline:** `0.56.69` on `feature/desktop-v0.1.0`. Production recovery-directory-entry checking in [#98](https://github.com/MieleMadness/Open-Photo/pull/98) passed [full Windows CI #1386](https://github.com/MieleMadness/Open-Photo/actions/runs/42093820209), including installer/export/AI/uninstall automation. Later [#101](https://github.com/MieleMadness/Open-Photo/pull/101) added publish-error regressions and parallel-test fixture isolation; [#104](https://github.com/MieleMadness/Open-Photo/pull/104) added the [manual Windows XMP safety runbook](XMP_WINDOWS_INSTALLED_ACCEPTANCE.md). These are merged, not public releases. [#106](https://github.com/MieleMadness/Open-Photo/pull/106) passed [CI #1400](https://github.com/MieleMadness/Open-Photo/actions/runs/42109846048) and merged an **ignored, intentionally failing** demonstration of the successful-rename external-editor race; **not** a fix or a passing release gate.
