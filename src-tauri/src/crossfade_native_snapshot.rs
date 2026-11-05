@@ -229,6 +229,61 @@ mod tests {
     }
 
     #[test]
+    fn rejects_reversed_equal_and_noncanonical_rational_trim_marks() {
+        let base = source();
+        let invalid = [
+            ("source_out", "ticks", "0"),
+            ("source_out", "ticks", "00"),
+            ("source_in", "ticks", "2000001"),
+            ("source_out", "ticks", "-2"),
+            ("source_out", "ticks", "999999999999999999999"),
+            ("source_out", "time_base", "0/1"),
+            ("source_out", "time_base", "1/0"),
+            ("source_out", "time_base", "01/1000000"),
+            ("source_out", "time_base", "1/01"),
+            ("source_out", "time_base", "1/1/2"),
+            ("source_out", "time_base", "1.0/1000000"),
+        ];
+        for (mark, field, value) in invalid {
+            let mut modified = base.clone();
+            modified["clips"][0][mark][field] = json!(value);
+            assert!(
+                validate_snapshot(
+                    &snapshot(&modified),
+                    5,
+                    &modified,
+                    "project-1",
+                    30,
+                    CLIPS
+                )
+                .is_err(),
+                "invalid mark {mark}.{field}={value}"
+            );
+        }
+    }
+
+    #[test]
+    fn supports_exact_mixed_time_bases_and_rejects_nonincreasing_ranges() {
+        let mut valid = source();
+        valid["clips"][0]["source_in"] = json!({"ticks":"1","time_base":"1/3"});
+        valid["clips"][0]["source_out"] = json!({"ticks":"2","time_base":"1/3"});
+        assert!(validate_snapshot(&snapshot(&valid), 5, &valid, "project-1", 30, CLIPS).is_ok());
+
+        let mut reversed = valid.clone();
+        reversed["clips"][0]["source_out"] =
+            json!({"ticks":"333333","time_base":"1/1000000"});
+        assert!(validate_snapshot(
+            &snapshot(&reversed),
+            5,
+            &reversed,
+            "project-1",
+            30,
+            CLIPS
+        )
+        .is_err());
+    }
+
+    #[test]
     fn rejects_corrupt_inner_draft_even_when_source_matches() {
         let mut corrupted: Value = serde_json::from_str(&snapshot(&source())).unwrap();
         corrupted["draft"] = json!("{}");
