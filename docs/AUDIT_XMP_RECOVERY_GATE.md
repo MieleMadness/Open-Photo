@@ -65,3 +65,9 @@ The `src-tauri/src/xmp_conflict_state_tests.rs` suite checks sequential stale-sa
 ## 0.56.69 follow-up candidate — recovery filename entry detection
 
 Before staging a managed XMP replacement, `symlink_metadata` now distinguishes genuinely absent temporary/backup directory entries from dangling links and refuses unknown inspection failures. Exclusive `create_new` creation still prevents a late ordinary filename collision. This is a focused failure-mode improvement only: it does **not** make the final sidecar compare and replace atomic or satisfy Issue #90's crash recovery and installed Windows path-race requirements.
+
+## Deterministic publish-error test seam (test-only, Issue #90)
+
+The native `replace_managed_sidecar_with_publish` helper keeps the production code path bound to the existing `atomic_replace` implementation. Test-only callbacks simulate a publication error after staging and backup are complete. The regression fixtures assert that (1) the old sidecar stays intact when publication fails, (2) the original backup remains for inspection, (3) staging is removed, (4) a subsequent save refuses the ambiguous recovery artifact, and (5) an external writer's changed sidecar bytes are not destroyed when the publish callback explicitly returns an error.
+
+**Limit:** This deliberately simulates **failed** publication. It does not demonstrate safety if an external writer modifies the destination and the OS replace succeeds, nor does it cover a crash, interrupted backup flush, Windows handle identity checks, parent directory durability, or installed external-editor concurrency. These are still unresolved under [Issue #90](https://github.com/MieleMadness/Open-Photo/issues/90).
