@@ -53,3 +53,7 @@ The test-only `src-tauri/src/xmp_recovery_tests.rs` suite exercises the existing
 ## Additional metadata-preservation regression (test-only)
 
 The isolated `src-tauri/src/xmp_batch_preservation_tests.rs` module exercises a mixed bulk-tag request: merge a managed Open-Photo sidecar while retaining unknown third-party XML, leave foreign-created sidecars byte-identical, keep both source photos byte-identical, and confirm a repeated operation is idempotent. A malformed XMP fixture must be skipped rather than repaired or rewritten. This is **not** an external-editor concurrency or crash-recovery test and does not close Issue #90.
+
+## Stale-save and recovery-artifact native fixtures (test-only)
+
+The `src-tauri/src/xmp_conflict_state_tests.rs` suite exercises serial stale-save rejection: once a managed sidecar has been successfully written, a second operation using the old expected content must reject its stale snapshot; an explicit refreshed expected snapshot can proceed. It also checks that a reserved backup artifact prevents repeated writes without mutation and that Unix dangling backup links cannot become recovery files. These are synthetic, sequential cases only: they **do not** close the race between comparison and publication, demonstrate atomic filesystem CAS, or prove installed Windows reparse safety. Issue #90 remains open.
