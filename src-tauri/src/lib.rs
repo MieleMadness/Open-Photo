@@ -31,6 +31,8 @@ mod crossfade_inputs;
 #[cfg(test)]
 mod crossfade_integrity;
 #[cfg(test)]
+mod crossfade_native_snapshot;
+#[cfg(test)]
 mod crossfade_pipeline;
 #[cfg(test)]
 mod crossfade_preflight;
