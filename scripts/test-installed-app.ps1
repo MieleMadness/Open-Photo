@@ -58,7 +58,7 @@ try {
 $dataRoot=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Open-Photo'
 New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
 $marker=[guid]::NewGuid().ToString('N')
-$databaseFiles=@('user-data.sqlite','media-index.sqlite','video-projects.sqlite','ai-embeddings.sqlite','ai-faces.sqlite','ai-ocr.sqlite')
+$databaseFiles=@('user-data.sqlite','media-index.sqlite','video-projects.sqlite','ai-embeddings.sqlite','ai-faces.sqlite','ai-ocr.sqlite','ai-work.sqlite')
 $ownedFiles=@()
 foreach ($database in $databaseFiles) {
     foreach ($suffix in @('','-wal','-shm','-journal')) {

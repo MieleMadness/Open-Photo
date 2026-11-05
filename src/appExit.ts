@@ -1,3 +1,4 @@
+import {flushSettings,setSettingsClosing} from "./userData";
 import {hasStartingVideoExport,refreshVideoExport,setAppClosing} from "./videoExport";
 import {discardProjectSaves,flushProjects,hasUnsavedProjects} from "./videoProject";
 
@@ -8,14 +9,16 @@ let exiting=false;
 // Window closure and updater installation must use the same save/export boundary.
 export async function withAppExitProtection(action:()=>Promise<unknown>,discardUnsaved=false){
   if(exiting)throw Error("A close or restart is already in progress.");
-  exiting=true;setAppClosing(true);
+  exiting=true;setAppClosing(true);setSettingsClosing(true);
   try{
     // Capture registration already in flight before awaiting a possibly older status.
     if(hasStartingVideoExport())throw new ActiveVideoExportError();
     const status=await refreshVideoExport();
     if(status?.active||hasStartingVideoExport())throw new ActiveVideoExportError();
+    // Settings are never discarded by the project-only discard option.
+    await flushSettings();
     if(discardUnsaved)discardProjectSaves();
     else if(hasUnsavedProjects())await flushProjects();
     await action();
-  }finally{exiting=false;setAppClosing(false);}
+  }finally{exiting=false;setAppClosing(false);setSettingsClosing(false);}
 }

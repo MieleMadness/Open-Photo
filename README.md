@@ -1,6 +1,6 @@
 File Details includes a location map below metadata for GPS-tagged photos. The Map view supports JPEG/TIFF/HEIC/HEIF and MOV/MP4 location discovery, media-type and capture-year filters. Map imagery requires internet; coordinates remain visible offline.
 
-> Development update: **0.56.63** retains automatic local AI indexing with counters/failures/folder exclusions, video-content search with matching times, expanded zoomable previews and a fullscreen library filmstrip. Signed Preview update support is prepared; channel publication and installed upgrade acceptance remain pending.
+> Development update: **0.56.64** retains automatic local AI indexing with counters/failures/folder exclusions, video-content search with matching times, expanded zoomable previews and a fullscreen library filmstrip. Signed Preview update support is prepared; channel publication and installed upgrade acceptance remain pending.
 
 Turn Local AI on in Settings to index known workspace media automatically; use manual **Sync** to discover new/changed files. The AI dashboard shows progress and failed files, with retries and **Don't index** per folder. Counters count source files (a Live still and motion can count separately). Video sampling can miss brief content; HEIC AI and HDR conversion remain unsupported. See [AI indexing](docs/AUTOMATIC_AI_INDEXING.md).
 
@@ -636,3 +636,6 @@ Fresh installations now start video playback at normal volume. A deliberately sa
 - **Search:** after about 400ms without typing, the full query runs, including local semantic matches when AI is enabled. Enter/Search starts immediately. Previous results stay visible with an updating state until the new query finishes; changing workspace or AI state discards incompatible evidence. **Clear search** restores browsing. Provider failures leave metadata matches available.
 
 Automatic AI indexing, durable indexing counters/folder exclusions, viewer zoom/fullscreen improvements, the private vault and signed Preview updates remain planned in [the feedback roadmap](docs/AI_VIEWER_VAULT_ROADMAP.md). This release still uses the existing installer/update policy.
+
+Close and update installation wait for queued settings as well as project saves. If settings cannot be saved, keep the app open and use **Retry saving**; discarding project edits does not discard settings. Explicit uninstall data removal includes the AI indexing queue and its SQLite companion files.
+Embedded NEF/ARW previews use the shared 20,000-pixel edge, 50-megapixel and 256 MB decoder allocation limits, with a 75 MB encoded-preview cap. RAW orientation continues to come from the RAW metadata.
