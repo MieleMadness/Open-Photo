@@ -82,6 +82,8 @@ mod video_timing;
 mod video_workspace;
 mod watch;
 mod xmp;
+#[cfg(test)]
+mod xmp_recovery_tests;
 use base64::Engine;
 use exif::{DateTime as ExifDateTime, In, Reader as ExifReader, Tag, Value};
 use nom_exif::{read_exif as read_nom_exif, EntryValue as NomEntryValue, ExifTag as NomExifTag};
