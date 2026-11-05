@@ -73,3 +73,9 @@ The native `replace_managed_sidecar_with_publish` helper keeps the production co
 **Limit:** This deliberately simulates **failed** publication. It does not demonstrate safety if an external writer modifies the destination and the OS replace succeeds, nor does it cover a crash, interrupted backup flush, Windows handle identity checks, parent directory durability, or installed external-editor concurrency. These are still unresolved under [Issue #90](https://github.com/MieleMadness/Open-Photo/issues/90).
 
 **Verification handoff:** The helper injection is a test seam, not an external-editor lock. Successful native fault-injection tests must be paired with deterministic real Windows compare-to-publish interleavings before any claim of no lost updates.
+
+## Deterministic compare-to-publish race red gate (ignored native fixture)
+
+The synthetic `src-tauri/src/xmp_publish_race_tests.rs` test injects an independent sidecar edit *inside* the publish callback after the writer's final pre-publish comparison, then invokes the real platform-specific `atomic_replace`. It asserts the desired invariant: **Open-Photo must refuse the operation and keep the external editor's new bytes**. The test is deliberately marked `#[ignore]` because the current implementation does not meet that invariant; passing ordinary CI means the ignored gate has **not** passed. To reproduce on a disposable environment, run `cargo test --manifest-path src-tauri/Cargo.toml --locked --lib xmp_publish_race_tests::external_edit_between_compare_and_successful_publish_must_not_be_lost -- --ignored --exact`. It is expected to fail until Issue #90 is fixed.
+
+This is a deterministic injected interleaving, **not** an installed Windows ExifTool or NTFS sharing-semantics acceptance trial. Do not close Issue #90 or interpret test registration as data-race remediation. No original user media is used.
