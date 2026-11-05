@@ -857,7 +857,7 @@ pub fn ai_people_groups(
     }
     let (_, embedder_key) = crate::ai_models::validate_supported_face_bundle()?;
     let mut db = database()?;
-    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::attach_current(&db, &crate::index::current_database_path()?)?;
     crate::search_providers::prepare_scope(&db, &crate::ai_index::active_exclusions()?)?;
     // Filter roots before applying the cap, so other workspaces cannot crowd this one out.
     let candidates = {
@@ -1004,7 +1004,7 @@ pub fn ai_face_index_status(roots: Vec<String>) -> Result<FaceIndexStatus, Strin
     let (detector_key, embedder_key) = crate::ai_models::validate_supported_face_bundle()?;
     let allowed: HashSet<String> = roots.into_iter().collect();
     let db = database()?;
-    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::attach_current(&db, &crate::index::current_database_path()?)?;
     crate::search_providers::prepare_scope(&db, &crate::ai_index::active_exclusions()?)?;
     let mut statement = db
         .prepare(

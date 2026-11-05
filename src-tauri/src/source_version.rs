@@ -20,6 +20,9 @@ pub(crate) fn read(path: &Path) -> Result<String, String> {
             break;
         }
         bytes += count as u64;
+        if bytes > before.len() {
+            return Err("Source grew while reading; Sync the library and retry".into());
+        }
         hash.update(&buffer[..count]);
     }
     let after = file.metadata().map_err(|e| e.to_string())?;

@@ -590,7 +590,7 @@ pub fn ai_search_ocr(
     }
     let (_, recognizer_key) = crate::ai_models::validate_supported_ocr_bundle()?;
     let db = database()?;
-    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::attach_current(&db, &crate::index::current_database_path()?)?;
     crate::search_providers::prepare_scope(&db, &crate::ai_index::active_exclusions()?)?;
     search_index(&db, &roots, query, &recognizer_key, limit)
 }

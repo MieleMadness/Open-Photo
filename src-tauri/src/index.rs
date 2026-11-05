@@ -18,6 +18,14 @@ pub(crate) fn database_path() -> Result<PathBuf, String> {
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     Ok(directory.join("media-index.sqlite"))
 }
+/// Upgrade an existing saved snapshot before content providers attach it read-only.
+pub(crate) fn current_database_path() -> Result<PathBuf, String> {
+    let path = database_path()?;
+    if path.is_file() {
+        database()?;
+    }
+    Ok(path)
+}
 fn database() -> Result<Connection, String> {
     let connection = Connection::open(database_path()?).map_err(|e| e.to_string())?;
     connection

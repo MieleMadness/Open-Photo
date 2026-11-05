@@ -75,12 +75,12 @@ fn initialize(db: &Connection) -> Result<(), String> {
             [],
         )
         .map_err(|e| e.to_string())?;
+        db.execute(
+            "UPDATE jobs SET status='pending' WHERE source_version='' AND status='indexed'",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
     }
-    db.execute(
-        "UPDATE jobs SET status='pending' WHERE source_version='' AND status='indexed'",
-        [],
-    )
-    .map_err(|e| e.to_string())?;
     Ok(())
 }
 pub(crate) fn normalized(path: &str) -> String {
@@ -706,6 +706,22 @@ mod tests {
             ),
         ]
     }
+    #[test]
+    fn migrating_legacy_queue_success_requires_reindexing() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE jobs(workspace TEXT,root TEXT,path TEXT,modified INTEGER,bytes INTEGER,service TEXT,model TEXT,status TEXT,error TEXT,attempted INTEGER,PRIMARY KEY(workspace,root,path,service)); INSERT INTO jobs VALUES('a','root','photo.jpg',10,42,'semantic','model','indexed',NULL,NULL);").unwrap();
+        initialize(&db).unwrap();
+        let state: String = db
+            .query_row("SELECT status FROM jobs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(state, "pending");
+        initialize(&db).unwrap();
+        let version: String = db
+            .query_row("SELECT source_version FROM jobs", [], |r| r.get(0))
+            .unwrap();
+        assert!(version.is_empty());
+    }
+
     #[test]
     fn changed_content_with_identical_size_and_seconds_requeues_and_rejects_old_completion() {
         let mut db = memory();

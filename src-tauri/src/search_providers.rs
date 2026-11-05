@@ -75,7 +75,7 @@ pub(crate) fn ocr(
 ) -> Result<Batch, String> {
     {
         let db = crate::ai_ocr::database()?;
-        attach_current(&db, &crate::index::database_path()?)?;
+        attach_current(&db, &crate::index::current_database_path()?)?;
         prepare_scope(&db, excluded)?;
         ocr_from(&db, roots, query, cancelled)
     }
@@ -157,7 +157,7 @@ pub(crate) fn people(
 ) -> Result<Batch, String> {
     {
         let db = crate::ai_faces::database()?;
-        attach_current(&db, &crate::index::database_path()?)?;
+        attach_current(&db, &crate::index::current_database_path()?)?;
         prepare_scope(&db, excluded)?;
         people_from(&db, roots, query, cancelled)
     }
@@ -257,7 +257,7 @@ pub(crate) fn semantic(
 ) -> Result<Batch, String> {
     {
         let db = crate::ai_embeddings::database()?;
-        attach_current(&db, &crate::index::database_path()?)?;
+        attach_current(&db, &crate::index::current_database_path()?)?;
         prepare_scope(&db, excluded)?;
         let mut photos = semantic_from(&db, roots, vector, &cancelled)?;
         let videos = video_semantic_from(&db, roots, vector, &cancelled)?;

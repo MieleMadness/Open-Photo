@@ -294,7 +294,7 @@ pub fn ai_find_similar_by_photo(
     let limit = limit.clamp(1, 100);
     let current_sha = crate::ai_models::validate_supported_clip_vision()?;
     let db = database()?;
-    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::attach_current(&db, &crate::index::current_database_path()?)?;
     crate::search_providers::prepare_scope(&db, &excluded)?;
     let query_blob: Vec<u8> = db
         .query_row(
@@ -349,7 +349,7 @@ pub fn ai_search_semantic_text(
     let current_key = crate::ai_models::validate_supported_clip_bundle()?;
     let query_vector = crate::ai_text::run_semantic_text(&query, device.as_deref())?;
     let db = database()?;
-    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::attach_current(&db, &crate::index::current_database_path()?)?;
     crate::search_providers::prepare_scope(&db, &excluded)?;
     let mut statement = db
         .prepare(
@@ -387,7 +387,7 @@ pub fn ai_embedding_status(root: String) -> Result<EmbeddingStatus, String> {
     let current_key = crate::ai_models::validate_supported_clip_vision()?;
     let current_sha = crate::ai_models::installed_model_sha256("semantic")?;
     let db = database()?;
-    crate::search_providers::attach_current(&db, &crate::index::database_path()?)?;
+    crate::search_providers::attach_current(&db, &crate::index::current_database_path()?)?;
     crate::search_providers::prepare_scope(&db, &crate::ai_index::active_exclusions()?)?;
     let indexed: usize = db
         .query_row(
