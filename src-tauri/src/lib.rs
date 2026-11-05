@@ -88,6 +88,7 @@ mod xmp_batch_preservation_tests;
 mod xmp_conflict_state_tests;
 #[cfg(test)]
 mod xmp_publish_race_tests;
+mod xmp_recovery_inventory;
 #[cfg(test)]
 mod xmp_recovery_tests;
 use base64::Engine;
@@ -226,24 +227,13 @@ where
         .ok_or("Invalid XMP sidecar filename")?;
     let temp = sidecar.with_file_name(format!("{file_name}.openphoto.tmp"));
     let backup = sidecar.with_file_name(format!("{file_name}.openphoto.bak"));
-    // Check the directory entry itself: exists() would hide dangling symlinks.
-    // create_new remains the final guard if another process creates an entry later.
-    for recovery_path in [&temp, &backup] {
-        match fs::symlink_metadata(recovery_path) {
-            Ok(_) => {
-                return Err(
-                    "Previous Open-Photo XMP recovery file exists; inspect it before retrying"
-                        .into(),
-                );
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(format!(
-                    "Unable to inspect Open-Photo XMP recovery path {}: {error}",
-                    recovery_path.display()
-                ));
-            }
-        }
+    // Inspect entries without following symlinks, preserving all existing
+    // recovery artifacts for user review rather than choosing a winner.
+    let recovery = xmp_recovery_inventory::inspect_recovery_pair(&temp, &backup)?;
+    if recovery.requires_review() {
+        return Err(
+            "Previous Open-Photo XMP recovery file exists; inspect it before retrying".into(),
+        );
     }
 
     {
