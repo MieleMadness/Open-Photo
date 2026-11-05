@@ -7,14 +7,41 @@ use std::{
     path::Path,
 };
 
+/// Conservative directory-entry state for future review UI. Presence does not
+/// establish that either file contains a valid, restorable XMP snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RecoveryEntryState {
+    Clear,
+    TemporaryOnly,
+    BackupOnly,
+    TemporaryAndBackup,
+    UnexpectedEntry,
+}
+
 pub(crate) struct RecoveryInventory {
     pub(crate) temporary: Option<Metadata>,
     pub(crate) backup: Option<Metadata>,
 }
 
 impl RecoveryInventory {
+    pub(crate) fn entry_state(&self) -> RecoveryEntryState {
+        if [self.temporary.as_ref(), self.backup.as_ref()]
+            .into_iter()
+            .flatten()
+            .any(|metadata| !metadata.file_type().is_file())
+        {
+            return RecoveryEntryState::UnexpectedEntry;
+        }
+        match (self.temporary.is_some(), self.backup.is_some()) {
+            (false, false) => RecoveryEntryState::Clear,
+            (true, false) => RecoveryEntryState::TemporaryOnly,
+            (false, true) => RecoveryEntryState::BackupOnly,
+            (true, true) => RecoveryEntryState::TemporaryAndBackup,
+        }
+    }
+
     pub(crate) fn requires_review(&self) -> bool {
-        self.temporary.is_some() || self.backup.is_some()
+        self.entry_state() != RecoveryEntryState::Clear
     }
 }
 
@@ -83,6 +110,7 @@ mod tests {
     fn missing_entries_are_not_recovery_artifacts() {
         let fixture = Fixture::new();
         let result = inspect_recovery_pair(&fixture.temp(), &fixture.backup()).unwrap();
+        assert_eq!(result.entry_state(), RecoveryEntryState::Clear);
         assert!(!result.requires_review());
         assert!(result.temporary.is_none());
         assert!(result.backup.is_none());
@@ -95,6 +123,7 @@ mod tests {
         fs::write(fixture.backup(), b"old-version").unwrap();
 
         let result = inspect_recovery_pair(&fixture.temp(), &fixture.backup()).unwrap();
+        assert_eq!(result.entry_state(), RecoveryEntryState::TemporaryAndBackup);
         assert!(result.requires_review());
         assert_eq!(result.temporary.unwrap().len(), 11);
         assert_eq!(result.backup.unwrap().len(), 11);
@@ -107,6 +136,7 @@ mod tests {
         let fixture = Fixture::new();
         fs::create_dir(fixture.backup()).unwrap();
         let result = inspect_recovery_pair(&fixture.temp(), &fixture.backup()).unwrap();
+        assert_eq!(result.entry_state(), RecoveryEntryState::UnexpectedEntry);
         assert!(result.requires_review());
         assert!(result.backup.unwrap().file_type().is_dir());
     }
@@ -120,9 +150,40 @@ mod tests {
         let absent = fixture.0.join("not-created");
         symlink(&absent, fixture.temp()).unwrap();
         let result = inspect_recovery_pair(&fixture.temp(), &fixture.backup()).unwrap();
+        assert_eq!(result.entry_state(), RecoveryEntryState::UnexpectedEntry);
         assert!(result.requires_review());
         assert!(result.temporary.unwrap().file_type().is_symlink());
         assert!(!absent.exists());
         assert!(result.backup.is_none());
     }
+    #[test]
+    fn temporary_only_is_reported_without_guessing_recoverability() {
+        let fixture = Fixture::new();
+        fs::write(fixture.temp(), b"pending").unwrap();
+        let state = inspect_recovery_pair(&fixture.temp(), &fixture.backup()).unwrap();
+        assert_eq!(state.entry_state(), RecoveryEntryState::TemporaryOnly);
+        assert!(state.requires_review());
+        assert_eq!(fs::read(fixture.temp()).unwrap(), b"pending");
+    }
+
+    #[test]
+    fn backup_only_is_reported_without_automatic_restore() {
+        let fixture = Fixture::new();
+        fs::write(fixture.backup(), b"prior").unwrap();
+        let state = inspect_recovery_pair(&fixture.temp(), &fixture.backup()).unwrap();
+        assert_eq!(state.entry_state(), RecoveryEntryState::BackupOnly);
+        assert!(state.requires_review());
+        assert_eq!(fs::read(fixture.backup()).unwrap(), b"prior");
+    }
+
+    #[test]
+    fn combined_artifacts_are_ambiguous_even_with_identical_bytes() {
+        let fixture = Fixture::new();
+        fs::write(fixture.temp(), b"same").unwrap();
+        fs::write(fixture.backup(), b"same").unwrap();
+        let state = inspect_recovery_pair(&fixture.temp(), &fixture.backup()).unwrap();
+        assert_eq!(state.entry_state(), RecoveryEntryState::TemporaryAndBackup);
+        assert!(state.requires_review());
+    }
+
 }
