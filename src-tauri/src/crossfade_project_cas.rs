@@ -181,7 +181,11 @@ mod tests {
         save(&mut db, "p", 5, None, "same").unwrap();
         assert_eq!(save(&mut db, "p", 5, Some(1), "same"), Ok(1));
         let count: i64 = db
-            .query_row("SELECT COUNT(*) FROM crossfade_draft_history_test", [], |row| row.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM crossfade_draft_history_test",
+                [],
+                |row| row.get(0),
+            )
             .unwrap();
         assert_eq!(count, 0);
     }
