@@ -97,16 +97,16 @@ Open-Photo treats your source media as protected content.
 
 ## Getting started as a tester
 
-Open-Photo does not yet have a formal public release channel. Windows installers are produced by the **Windows Desktop Build** GitHub Actions workflow after formatting, frontend build, Rust lint, regression tests and the Tauri installer build all pass.
+Open-Photo does not yet have a formal public release channel. **Normal pull requests and pushes run frontend and Rust verification without building a Windows installer.** An installer is produced **only when explicitly requested**, either by setting the `full-windows-ci` label on a PR whose installed behavior needs verification, or by manually running **Windows Desktop Build → Run workflow** with **full_windows** set to `true` (the default is `false`). The opted-in installer job still requires passing frontend/Rust checks and runs release video-export, installed AI, and uninstall acceptance.
 
 For a test build:
 
-1. Open the latest **green** Windows Desktop Build workflow.
-2. Download the generated Windows artifact.
+1. Find a successful **Windows Desktop Build** run that **explicitly included the full Windows verification job**, rather than a normal green checks-only run.
+2. Download its Windows installer artifact, if available.
 3. Extract the artifact and run the NSIS installer.
 4. Treat 0.x builds as development software and keep normal backups of your photo library.
 
-A red workflow means that development version should **not** be treated as the current verified build.
+**Why this is opt-in:** The full Windows run adds roughly 25–30 minutes of installation, export, and lifecycle verification after normal checks. It is appropriate for release candidates, packaging changes, installed-app regressions, and other specifically justified integration gates—not routine docs/test-only updates. A checks-only green run **does not** generate an installer or prove installed-app acceptance. A red workflow means its revision is not verified.
 
 ## Basic library workflow
 

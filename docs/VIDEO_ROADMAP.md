@@ -1,3 +1,11 @@
+## November 5, 2026 — CI cost and opt-in installer policy
+
+**Merged development baseline:** 0.56.69, verified via full Windows [CI #1386](https://github.com/MieleMadness/Open-Photo/actions/runs/42093820209) and merged [PR #98](https://github.com/MieleMadness/Open-Photo/pull/98). Full Windows validation remains available, but the workflow now requires an explicit `full-windows-ci` label or manual `full_windows=true` input. Routine PRs and pushes no longer build installers. This reduces unnecessary CI cost without treating a checks-only green run as installed-app validation.
+
+**Integration policy:** Require exact-head green frontend and native Rust checks for normal merges. Run the full installer/export/installed-AI/uninstall gate when explicitly requested, for release candidates, packaging/toolchain changes, or relevant installed-app safety investigations. Installed real-media/manual XMP conflict and Phase J acceptance remain distinct gates, not implied by automated CI. The 10,000+ library stress test remains pre-1.0.
+
+---
+
 ## November 5, 2026 — 0.56.68 XMP safety checkpoint and Phase J boundary
 
 **Current merged development baseline:** **0.56.68** on `feature/desktop-v0.1.0`. [PR #93](https://github.com/MieleMadness/Open-Photo/pull/93) passed exact-head [full Windows CI #1375](https://github.com/MieleMadness/Open-Photo/actions/runs/42081606891) and merged the XMP batch entry/path and per-item error hardening. PRs [#91](https://github.com/MieleMadness/Open-Photo/pull/91) and [#92](https://github.com/MieleMadness/Open-Photo/pull/92) previously merged documentation and foreign-metadata preservation tests. [PR #89](https://github.com/MieleMadness/Open-Photo/pull/89) was closed unmerged after being superseded by #93. [PR #95](https://github.com/MieleMadness/Open-Photo/pull/95) carries additional stale-snapshot/recovery-artifact tests and requires its own exact-head CI; no public release publication or interactive installed-Windows acceptance is claimed.

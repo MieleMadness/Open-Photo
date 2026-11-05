@@ -1,3 +1,9 @@
+# CI policy — Opt-in Windows installer builds (development)
+
+- Ordinary pull requests and pushes to main run frontend build/tests, Rust formatting/Clippy/native tests, and real-model staging acceptance **without building or uploading a Windows installer**.
+- Building the NSIS installer plus release video export, installed AI, and uninstall checks now requires an explicitly applied `full-windows-ci` PR label or `workflow_dispatch` with `full_windows=true` (default false). This retains the full safety gate when needed but avoids ~25–30 minutes of unnecessary packaging on ordinary runs.
+- Update tester instructions to distinguish a passing checks-only run from an opted-in installer artifact. No public release and no change to user media handling.
+
 # 0.56.69 — Recovery artifact entry checks (development candidate)
 
 - Refuse already-existing XMP recovery filename entries using symlink-aware metadata, including dangling temporary and backup links that Path::exists() can conceal.

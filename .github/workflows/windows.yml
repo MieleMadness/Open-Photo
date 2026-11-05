@@ -7,6 +7,12 @@ on:
     branches: [main, feature/desktop-v0.1.0]
     types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
+    inputs:
+      full_windows:
+        description: 'Build installer and run complete Windows installed-app verification'
+        type: boolean
+        required: true
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -87,16 +93,18 @@ jobs:
             '- **Rust:** formatting, Clippy and native regression tests'
             ''
             '### Which checks ran?'
-            '- Pull requests: frontend + native validation on every update'
-            '- Full installer, release video export, installed AI, and uninstall lifecycle: main branch, manual run, or PR label full-windows-ci'
+            '- Ordinary pull requests and pushes: frontend + native validation; **no installer**'
+            '- Full installer + video export + installed AI/uninstall: only an explicit full-windows-ci PR label or manual workflow_dispatch full_windows=true'
             ''
-            'For a full installer on this PR, add the full-windows-ci label (or manually dispatch the workflow on its branch).'
+            'Request full Windows verification only for release candidates or a change that genuinely needs installed-app acceptance. Dispatching the workflow with its default input does **not** build an installer.'
           ) | Add-Content -Path $env:GITHUB_STEP_SUMMARY
 
 
   windows:
     name: Build on Windows (full verification)
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-windows-ci')
+    # Packaging is always opt-in: ordinary PRs and main pushes run checks only.
+    # A maintainer can explicitly request packaging via a PR label or manual input.
+    if: (github.event_name == 'workflow_dispatch' && inputs.full_windows) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-windows-ci'))
     needs: [frontend, rust]
     runs-on: windows-2022
     steps:
