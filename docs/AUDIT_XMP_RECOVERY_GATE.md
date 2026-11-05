@@ -49,3 +49,7 @@ This document does not close F07/R01. It does not authorize a release, migration
 The test-only `src-tauri/src/xmp_recovery_tests.rs` suite exercises the existing `replace_managed_sidecar` path with disposable synthetic sidecars: successful replacement and cleanup, same-length changed content detected before replacement, preexisting backup/temporary recovery files refusing writes, and malformed UTF-8 preserving bytes. It is registered under `#[cfg(test)]` in `lib.rs`.
 
 **Not yet covered:** deterministic replacement *between* final compare and atomic publish; power loss/rename injection; parent-directory durability; true concurrent external-process file replacement; junction/root revocation; installed Windows external-editor trials. These remain F07/R01 release blockers. Passing this regression suite must never be described as closing the full gate. No production XMP write behavior is changed by these tests.
+
+## Additional metadata-preservation regression (test-only)
+
+The isolated `src-tauri/src/xmp_batch_preservation_tests.rs` module exercises a mixed bulk-tag request: merge a managed Open-Photo sidecar while retaining unknown third-party XML, leave foreign-created sidecars byte-identical, keep both source photos byte-identical, and confirm a repeated operation is idempotent. A malformed XMP fixture must be skipped rather than repaired or rewritten. This is **not** an external-editor concurrency or crash-recovery test and does not close Issue #90.
