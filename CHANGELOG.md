@@ -1,3 +1,13 @@
+# XMP experiment verification follow-up
+
+- Require successful Windows replacement to publish staged bytes and consume the staged file; retain full test diagnostics in CI.
+- Recognize Windows privilege error 1314 when the symlink fixture cannot be created. This skips only unavailable fixture coverage.
+
+# Windows file sharing experiment (development candidate, PR #115)
+
+- Characterize a held Windows read handle that disallows new write sharing and observe ReplaceFileW behavior on disposable XMP sidecars. This does not guarantee safety against pre-existing external writable handles, aliases, or cross-process successful-publication races.
+- No production file-write changes, no installer, no release.
+
 # Recovery-path aliases (native regression candidate, PR #113)
 
 - Add synthetic hardlink backup-alias refusal coverage; check the linked target and original sidecar remain byte-identical.
