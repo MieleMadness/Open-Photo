@@ -92,6 +92,8 @@ mod xmp_recovery_inventory;
 #[cfg(test)]
 mod xmp_recovery_tests;
 #[cfg(all(test, windows))]
+mod xmp_windows_preexisting_writer_tests;
+#[cfg(all(test, windows))]
 mod xmp_windows_sharing_tests;
 use base64::Engine;
 use exif::{DateTime as ExifDateTime, In, Reader as ExifReader, Tag, Value};
