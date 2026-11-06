@@ -1,3 +1,137 @@
+## November 6, 2026 — Phase J resumed-session frame/sample seeking
+
+Local source **0.56.83** adds gated native seek descriptions over freshly verified
+selected manifests. They map video/photo parts, global title IDs and exact 48 kHz
+audio slices, preserving subframe added-track edges and independent envelopes.
+Frame/sample endpoints are exclusive; results bind session/project identity.
+See [session seek mapping](PHASE_J_SESSION_SEEK.md).
+
+Next: bounded preview requests, cancellation and delivery-time stale-result
+rejection, then gated decode/composition integration. This mapper performs no
+playback or mixing. Native linear versus older experimental equal-power audio,
+compositor policy, physical source verification, migration/import and real-footage/
+installed-Windows parity remain gates. No active production preview/export,
+install, push, upload or remote CI is implied. XMP's 0.56.76 handoff is preserved.
+
+---
+
+## November 6, 2026 — Phase J saved session checkpoints and recovery
+
+Local source **0.56.82** adds gated append-only checkpoints, explicit latest
+resume and historical recovery into a separate session. Selected and inactive
+history manifests are revalidated; expected latest receipts reject conflicting
+saves, and stable recovery selections avoid duplicate copies after lost replies.
+Three process-exit trials distinguish committed checkpoints from retained but
+uncheckpointed edits. See [session checkpoints](PHASE_J_SESSION_CHECKPOINTS.md).
+
+Next: shared preview/seek frame and sample mapping for resumed mixed-layer plans.
+Edit and checkpoint remain separate test-only operations; production scheduling,
+retention, migration/import, authorization/source verification and real-footage/
+installed-Windows parity remain gates. No active production editor/render route,
+install, push, upload or remote CI is implied. The XMP 0.56.76 handoff is preserved.
+
+---
+
+## November 6, 2026 — Phase J gated editor sessions and undo/redo
+
+Local source **0.56.81** adds test-only session selection, revision-checked
+crossfade edits and undo/redo over immutable mixed-layer manifests. Current and
+target snapshots are revalidated, no-ops retain history, new branches clear redo,
+and failures preserve session state until commit. Undo retains 20 changes without
+deleting snapshots. See the [editor-session contract](PHASE_J_EDITOR_SESSION.md).
+
+Next: durable session checkpoints and explicit resume/recovery, then shared
+preview/seek mapping for selected mixed-layer plans. Current session history is
+in memory, and no production editor/command/rendering route is enabled.
+Storage/import/authorization, source verification, preview/export parity and
+real-footage/installed-Windows acceptance remain gates. No install, push, upload
+or remote CI is implied; the XMP 0.56.76 handoff is preserved.
+
+---
+
+## November 6, 2026 — Phase J gated immutable mixed-layer manifests
+
+Local source **0.56.80** saves versioned mixed-layer manifests and revalidates
+them against the actual native project plus a recomputed frame/sample plan.
+Immutable content IDs preserve different proposals and make unchanged retries
+duplicate-free. Same-revision metadata edits, corrupt/future records and unknown
+schemas fail while stored records remain intact. See the [manifest contract](PHASE_J_LAYER_MANIFEST.md).
+
+Next: gated editor-session selection, revision-checked edits and undo/redo using
+these manifests. There is no active editor head or mixed-layer recovery UI yet.
+Production storage/import/authorization, source verification, preview/export
+parity and real-footage/installed-Windows gates remain pending. No install,
+upload, push or remote CI is implied; the XMP 0.56.76 handoff is preserved.
+
+---
+
+## November 6, 2026 — Phase J gated mixed-media/layer clock
+
+Local source **0.56.79** implements proposed photo/title/audio/dip timing in a
+test-only native planner, with a read-only saved-project binding. Photos use the
+same cumulative frame allocation; titles and added audio keep absolute times;
+dips and overlaps share a two-clear-frame budget. Layer overruns and conflicting
+transitions fail explicitly. See [layer timing rules](PHASE_J_LAYER_TIMING.md).
+
+Next: define a versioned mixed-layer manifest and stale-plan validation before
+editor/undo integration. The existing v1 snapshot storage still refuses mixed
+layers. Compositor order, source verification, preview/export parity, listening
+and real-footage/installed-Windows acceptance remain production gates. No active
+crossfades, installation, upload or remote CI is implied.
+
+---
+
+## November 6, 2026 — Phase J gated storage/recovery contract
+
+Local source **0.56.78** adds component-versioned disposable draft/history/copy
+storage, payload checksums, bounded history reads and explicit recovery into a
+separate copy. Unknown/unversioned/partial schemas are retained and refused;
+selection changes invalidate recovery, and lost-reply retries return one copy.
+Seven abrupt child-process exits exercise draft/copy transaction boundaries.
+See the [storage/recovery contract](PHASE_J_STORAGE_RECOVERY_CONTRACT.md).
+
+This remains `cfg(test)` groundwork with no production migration or activation.
+Next: define the overlap clock for photos, titles, audio and existing dips, then
+extend native binding tests. Authorized production storage/import, editor/undo,
+preview/export parity and real-footage/installed-Windows gates remain pending.
+The XMP 0.56.76 handoff is preserved; no install, upload or remote CI is implied.
+
+---
+
+## November 6, 2026 — Phase J native saved-project binding groundwork
+
+Local source **0.56.77** adds a gated adapter backed by the actual sequence reader,
+storage schema and frame allocation, plus disposable file-backed draft/history
+tests. It binds drafts to saved root/project, complete stored JSON hash, native
+source descriptors and project/draft revisions. See [Phase J saved-project binding](PHASE_J_SAVED_PROJECT_BINDING.md).
+This is `cfg(test)` groundwork: no production migration, active transition UI,
+preview/export routing, installation, upload or remote CI is implied.
+
+Next: review production storage/old-client/recovery policy and the overlapping
+clock's treatment of photos, titles, audio and existing dips. Those cases are
+currently rejected by the experimental adapter rather than partially copied.
+The real-footage and installed-Windows production-enablement gates remain in force.
+
+---
+
+## November 6, 2026 — local XMP closeout and next coding track
+
+Local candidate **0.56.76** implements reviewed no-overwrite Apply, persisted
+explicit recovery, full-source bindings, complete intent rechecks, background
+workers, paged/offline review and staging observations. See [XMP closeout](XMP_CLOSEOUT.md)
+for current evidence and outstanding installed/durability gates. No remote CI,
+merge, installation or publication is implied by local verification. The dated
+PR states and old ignored race gates below are historical, not current status.
+
+The next coding track is **Phase J production crossfade groundwork**: review
+production schema/recovery and source binding, then integrate editor/undo,
+preview-clock and native-export parity. Existing hard-cut/dip behavior remains
+the supported fallback. Do not enable production crossfades or release the XMP
+candidate without their respective acceptance gates. The owner-deferred 10,000+
+media stress test remains a pre-1.0 requirement, not an XMP feature to add now.
+
+---
+
 ## November 5, 2026 — Windows XMP sharing experiment (PR #115 pending)
 
 [PR #113](https://github.com/MieleMadness/Open-Photo/pull/113) merged after passing native/frontend CI, adding link-alias recovery tests. Follow-up [PR #115](https://github.com/MieleMadness/Open-Photo/pull/115) characterizes Windows share modes and ReplaceFileW with synthetic files; it is **not** a production external-editor race fix. [Issue #90](https://github.com/MieleMadness/Open-Photo/issues/90) remains open. See [sharing experiment notes](XMP_WINDOWS_SHARING_EXPERIMENT.md). No Windows installer requested.

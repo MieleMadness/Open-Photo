@@ -1,6 +1,10 @@
 # XMP sidecar recovery and external-editor conflict gate (F07/R01)
 
-Status: **test design only; no production XMP behavior changed**. Based on audit integration 0.56.67 (PR #86, head `c34255b`). This checklist must be converted to executable native fault-injection tests before production changes merge. Do not claim an XMP recovery defect has been reproduced until a fixture fails.
+Historical test design based on audit integration 0.56.67 (PR #86, head `c34255b`).
+The implemented local protocol, active regressions and remaining acceptance gates
+are now consolidated in [XMP closeout](XMP_CLOSEOUT.md). Keep the cases below as
+historical requirements; old statements about ignored race fixtures and absent
+persisted recovery are superseded by the local checkpoint, not by a remote release.
 
 ## Safety invariants
 
