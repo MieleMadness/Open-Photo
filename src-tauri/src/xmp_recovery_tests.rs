@@ -267,10 +267,13 @@ fn dangling_windows_temporary_symlink_blocks_save_when_symlinks_are_permitted() 
     let target = fixture.root.join("not-created-xmp");
     match symlink_file(&target, fixture.temporary()) {
         Ok(()) => {}
-        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+        Err(error)
+            if error.kind() == std::io::ErrorKind::PermissionDenied
+                || error.raw_os_error() == Some(1314) =>
+        {
             // Creating symlinks requires Windows developer mode or privilege.
             // This environment cannot establish the link-specific assertion.
-            eprintln!("Skipping Windows symlink fixture: permission denied");
+            eprintln!("Skipping Windows symlink fixture: {error}");
             return;
         }
         Err(error) => panic!("Unable to create disposable Windows symlink: {error}"),

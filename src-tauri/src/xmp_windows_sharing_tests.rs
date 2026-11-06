@@ -98,17 +98,17 @@ fn replacement_with_read_guard_is_characterized_without_assuming_cas() {
     // against previously opened external writable handles.
     let result = crate::atomic_replace(&fixture.staged, &fixture.destination);
     let bytes = fs::read(&fixture.destination).unwrap();
+    if result.is_ok() {
+        assert_eq!(bytes, b"staged-sidecar-bytes");
+        assert!(
+            !fixture.staged.exists(),
+            "Successful replacement must consume the staged file"
+        );
+    }
     assert!(
         bytes == b"original-sidecar-bytes" || bytes == b"staged-sidecar-bytes",
         "No partially replaced destination is acceptable: {bytes:?}"
     );
-    eprintln!(
-        "Windows ReplaceFileW with held read handle: {}",
-        if result.is_ok() {
-            "succeeded"
-        } else {
-            "failed"
-        }
-    );
+    eprintln!("Windows ReplaceFileW with held read handle: {result:?}");
     drop(guard);
 }
