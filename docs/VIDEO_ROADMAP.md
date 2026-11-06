@@ -1,3 +1,9 @@
+## November 5, 2026 — Pre-existing Windows writer ordering (PR #116 pending)
+
+Separate synthetic native test [#116](https://github.com/MieleMadness/Open-Photo/pull/116) explores the *writer opened first* ordering for a possible future Windows XMP no-write-sharing guard. It must reject guard acquisition until the existing writable handle closes. This is not safe final publication or root/identity validation; Issue #90 remains open. No Windows installer requested.
+
+---
+
 ## November 5, 2026 — Recovery status foundation (PR #111 pending)
 
 **Merged:** [#110](https://github.com/MieleMadness/Open-Photo/pull/110) passed exact-head frontend/Rust CI and extracted symlink-aware read-only XMP recovery inspection. **Pending:** #111 adds internal conservative recovery-entry classification (clear, temp, backup, both, unexpected) and tests; the production writer keeps blocking any non-clear entry and does not auto-select versions. [Issue #90](https://github.com/MieleMadness/Open-Photo/issues/90) remains open for Windows-safe successful-publication conflict prevention, crash/power-loss durability, and installed manual acceptance. Routine checks run without an installer.
