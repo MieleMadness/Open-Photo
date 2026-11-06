@@ -1,5 +1,7 @@
 File Details includes a location map below metadata for GPS-tagged photos. The Map view supports JPEG/TIFF/HEIC/HEIF and MOV/MP4 location discovery, media-type and capture-year filters. Map imagery requires internet; coordinates remain visible offline.
 
+XMP recovery inspection requires an accessible parent directory before treating a recovery entry as absent. A missing or invalid parent blocks inspection instead of clearing the recovery guard.
+
 > Development update: **0.56.67** retains automatic local AI indexing with counters/failures/folder exclusions, video-content search with matching times, expanded zoomable previews and a fullscreen library filmstrip. Signed Preview update support is prepared; channel publication and installed upgrade acceptance remain pending.
 
 Turn Local AI on in Settings to index known workspace media automatically; use manual **Sync** to discover new/changed files. The AI dashboard shows progress and failed files, with retries and **Don't index** per folder. Counters count source files (a Live still and motion can count separately). Video sampling can miss brief content; HEIC AI and HDR conversion remain unsupported. See [AI indexing](docs/AUTOMATIC_AI_INDEXING.md).
