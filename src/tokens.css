@@ -1,0 +1,96 @@
+/* Shared light/dark design tokens. Keep color roles distinct. */
+:root {
+  font-family: var(--font-ui);
+  font-synthesis: none;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light;
+  --bg: #f8f6fb;
+  --surface: #fff;
+  --surface-muted: #f3eff8;
+  --text: #251b30;
+  --muted: #6e6378;
+  --line: #e9e3ef;
+  --line-strong: #d9cfe4;
+  --primary: #6727ad;
+  --primary-hover: #552092;
+  --primary-soft: #f1e8fa;
+  --green: #28b678;
+  --green-soft: #e8f9f0;
+  --danger: #a12b38;
+  --danger-soft: #fff1f0;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --control-height: 42px;
+  --sidebar-width: 250px;
+  --sidebar-collapsed-width: 72px;
+  --sidebar-row-height: 42px;
+  --shadow: 0 8px 30px rgba(48,26,67,.055);
+  --shadow-hover: 0 12px 34px rgba(48,26,67,.11);
+  --motion-fast: 140ms;
+  --motion-normal: 220ms;
+  --ease-standard: cubic-bezier(.2,.8,.2,1);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --content-readable: 720px;
+  --on-primary: #fff;
+  --accent-text: #6727ad;
+  --success-text: #17613f;
+  --font-ui: "Segoe UI",system-ui,sans-serif;
+  --type-body: .875rem;
+  --type-caption: .75rem
+}:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #18131e;
+  --surface: #231b2d;
+  --surface-muted: #31253e;
+  --text: #f7f2fb;
+  --muted: #b5a8c3;
+  --line: #3d304b;
+  --line-strong: #564367;
+  --primary: #a975e8;
+  --primary-hover: #be92f3;
+  --primary-soft: #3d2b55;
+  --green: #43d79b;
+  --green-soft: #203e34;
+  --danger: #ff9ba7;
+  --danger-soft: #46252d;
+  --shadow: 0 8px 30px rgba(0,0,0,.16);
+  --shadow-hover: 0 14px 38px rgba(0,0,0,.24);
+  --on-primary: #20102e;
+  --accent-text: #d8b7ff;
+  --success-text: #43d79b
+}
+
+/* User-selectable accent palettes. Purple remains the default. */
+:root[data-accent="blue"] {
+  --primary:#2563eb; --primary-hover:#1d4ed8; --primary-soft:#e8f0ff; --accent-text:#1d4ed8;
+}
+:root[data-accent="teal"] {
+  --primary:#0f766e; --primary-hover:#0b5f59; --primary-soft:#e5f6f4; --accent-text:#0b655e;
+}
+:root[data-accent="green"] {
+  --primary:#15803d; --primary-hover:#116b33; --primary-soft:#e8f7ed; --accent-text:#126b36;
+}
+:root[data-accent="rose"] {
+  --primary:#be185d; --primary-hover:#9f1239; --primary-soft:#fce7f0; --accent-text:#a91450;
+}
+:root[data-theme="dark"][data-accent="blue"] {
+  --primary:#60a5fa; --primary-hover:#93c5fd; --primary-soft:#1e365a; --accent-text:#a8ceff; --on-primary:#0b1c35;
+}
+:root[data-theme="dark"][data-accent="teal"] {
+  --primary:#5eead4; --primary-hover:#99f6e4; --primary-soft:#183f3b; --accent-text:#8cf4e3; --on-primary:#082d29;
+}
+:root[data-theme="dark"][data-accent="green"] {
+  --primary:#4ade80; --primary-hover:#86efac; --primary-soft:#1d402a; --accent-text:#8bf2ad; --on-primary:#0a2b17;
+}
+:root[data-theme="dark"][data-accent="rose"] {
+  --primary:#fb7185; --primary-hover:#fda4af; --primary-soft:#4a2430; --accent-text:#ffabb7; --on-primary:#361018;
+}

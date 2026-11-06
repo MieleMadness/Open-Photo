@@ -1,0 +1,163 @@
+name: Publish signed Preview update
+
+run-name: "Publish Open-Photo ${{ inputs.version }} Preview"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Preview patch version matching package.json, e.g. 0.56.23"
+        required: true
+        type: string
+      notes:
+        description: "Release notes shown in Open-Photo"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: openphoto-preview-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Validate, sign, test, and publish
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/desktop-v0.1.0'
+    runs-on: windows-2022
+    env:
+      OPENPHOTO_UPDATE_CHANNEL: preview
+      OPENPHOTO_UPDATER_PUBLIC_KEY: ${{ secrets.OPENPHOTO_UPDATER_PUBLIC_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_NOTES: ${{ inputs.notes }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Validate Preview release gate
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -notin @("refs/heads/main","refs/heads/feature/desktop-v0.1.0")) { throw "Choose a trusted maintained branch." }
+          if ($env:RELEASE_VERSION -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw "Preview releases require a numeric MAJOR.MINOR.PATCH version." }
+          if ([string]::IsNullOrWhiteSpace($env:OPENPHOTO_UPDATER_PUBLIC_KEY)) { throw "OPENPHOTO_UPDATER_PUBLIC_KEY is not configured." }
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) { throw "TAURI_SIGNING_PRIVATE_KEY is not configured." }
+
+          $npm = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tauri = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $cargo = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "([^"]+)"' | Select-Object -First 1).Matches.Groups[1].Value
+          if ($npm -ne $env:RELEASE_VERSION -or $tauri -ne $env:RELEASE_VERSION -or $cargo -ne $env:RELEASE_VERSION) {
+            throw "package.json, tauri.conf.json, Cargo.toml, and the requested release version must match."
+          }
+
+          gh release view "preview-v$env:RELEASE_VERSION" *> $null
+          if ($LASTEXITCODE -eq 0) { throw "Release v$env:RELEASE_VERSION already exists." }
+          $global:LASTEXITCODE = 0
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22.23.0'
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.1'
+          components: rustfmt, clippy
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: stable-release
+
+      - run: npm ci --no-audit --no-fund
+
+      - uses: actions/cache@v6.1.0
+        with:
+          path: src-tauri/target/ai-model-cache
+          key: ai-models-v1-${{ hashFiles('config/ai-models.json') }}
+
+      - run: npm run prepare:models
+      - run: npm run prepare:video
+      - run: npm run tauri icon assets/app-icon.svg
+      - run: npm test
+      - run: npm run build
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Enable updater artifacts for this signed Preview build
+        shell: pwsh
+        run: |
+          $config = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $config.bundle.createUpdaterArtifacts = $true
+          $config | ConvertTo-Json -Depth 20 | Set-Content src-tauri/tauri.conf.json -Encoding utf8
+
+      - name: Build signed Windows updater
+        run: npm run tauri build -- -- --locked
+
+      - name: Verify optimized video export
+        shell: pwsh
+        run: ./scripts/accept-video.ps1 -OutputDirectory "$env:RUNNER_TEMP/openphoto-preview-video" -MachineLabel "GitHub Windows 2022 Preview runner"
+
+      - name: Verify installed app lifecycle
+        shell: pwsh
+        run: |
+          $installer = "src-tauri/target/release/bundle/nsis/Open-Photo_${env:RELEASE_VERSION}_x64-setup.exe"
+          ./scripts/test-installed-app.ps1 -Installer $installer -ReportDirectory "$env:RUNNER_TEMP/openphoto-preview-installed"
+
+      - name: Build static updater manifest
+        shell: pwsh
+        run: |
+          $installer = "src-tauri/target/release/bundle/nsis/Open-Photo_${env:RELEASE_VERSION}_x64-setup.exe"
+          $signaturePath = "$installer.sig"
+          if (!(Test-Path $installer)) { throw "Signed installer not found: $installer" }
+          if (!(Test-Path $signaturePath)) { throw "Updater signature not found: $signaturePath" }
+
+          $signature = (Get-Content $signaturePath -Raw).Trim()
+          if ([string]::IsNullOrWhiteSpace($signature)) { throw "Updater signature is empty." }
+
+          $assetName = [System.IO.Path]::GetFileName($installer)
+          $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/preview-v$env:RELEASE_VERSION/$assetName"
+          $manifest = @{
+            version = $env:RELEASE_VERSION
+            notes = $env:RELEASE_NOTES
+            pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{
+              "windows-x86_64" = @{ signature = $signature; url = $url }
+              "windows-x86_64-nsis" = @{ signature = $signature; url = $url }
+            }
+          }
+          $manifest | ConvertTo-Json -Depth 8 -Compress | Set-Content latest.json -Encoding utf8
+          $env:RELEASE_NOTES | Set-Content release-notes.md -Encoding utf8
+
+      - name: Publish signed Preview release
+        shell: pwsh
+        run: |
+          $installer = "src-tauri/target/release/bundle/nsis/Open-Photo_${env:RELEASE_VERSION}_x64-setup.exe"
+          $signaturePath = "$installer.sig"
+          gh release create "preview-v$env:RELEASE_VERSION" $installer $signaturePath --target "$env:GITHUB_SHA" --title "Open-Photo $env:RELEASE_VERSION Preview" --notes-file release-notes.md --prerelease
+
+      - name: Publish Preview updater channel
+        shell: pwsh
+        run: |
+          gh release view "preview-channel" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            $global:LASTEXITCODE = 0
+            gh release create "preview-channel" latest.json --target "$env:GITHUB_SHA" --title "Open-Photo Preview update channel" --notes "Machine-readable signed Preview updater channel. Published Preview releases only." --prerelease
+          } else {
+            gh release upload "preview-channel" latest.json --clobber
+          }
+
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: open-photo-preview-validation-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/openphoto-preview-installed/*.json
+            ${{ runner.temp }}/openphoto-preview-video/*.json
+          if-no-files-found: error
