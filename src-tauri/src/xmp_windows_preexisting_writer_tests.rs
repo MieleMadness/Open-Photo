@@ -58,8 +58,8 @@ fn preexisting_writable_handle_blocks_later_no_write_share_guard() {
         .read(true)
         .share_mode(FILE_SHARE_READ | FILE_SHARE_DELETE)
         .open(&fixture.sidecar);
-    let error = result
-        .expect_err("Pre-existing writer must prevent acquiring a no-write-share guard");
+    let error =
+        result.expect_err("Pre-existing writer must prevent acquiring a no-write-share guard");
     assert_eq!(error.raw_os_error(), Some(32));
 
     assert_eq!(fs::read(&fixture.sidecar).unwrap(), b"external-base");
