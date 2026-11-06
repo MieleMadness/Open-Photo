@@ -1,3 +1,8 @@
+# Windows XMP share-mode experiment (development test candidate, PR #114)
+
+- Add synthetic Windows-native tests for a held read handle blocking new writers and for characterizing `ReplaceFileW` while that handle remains open.
+- Record precise gaps: existing external writers, file identity, reparse aliases, OS crash durability, and installed-app acceptance. No production XMP write modification or installer build.
+
 # XMP recovery status classification (development candidate, PR #111)
 
 - Internal read-only recovery inspection now distinguishes clear, temporary-only, backup-only, both-present and unexpected filesystem entries, all conservatively. Existing production behavior continues to block all non-clear entries without deleting or restoring files.
