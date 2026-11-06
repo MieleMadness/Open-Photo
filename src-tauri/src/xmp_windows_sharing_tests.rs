@@ -104,7 +104,11 @@ fn replacement_with_read_guard_is_characterized_without_assuming_cas() {
     );
     eprintln!(
         "Windows ReplaceFileW with held read handle: {}",
-        if result.is_ok() { "succeeded" } else { "failed" }
+        if result.is_ok() {
+            "succeeded"
+        } else {
+            "failed"
+        }
     );
     drop(guard);
 }
