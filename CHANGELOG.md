@@ -1,3 +1,7 @@
+# XMP recovery parent inspection (development candidate)
+
+- Reject missing or invalid recovery-parent directories when Windows reports a child entry as absent. Cover both temporary and backup inspection positions without modifying fixture bytes.
+
 # Recovery-path aliases (native regression candidate, PR #113)
 
 - Add synthetic hardlink backup-alias refusal coverage; check the linked target and original sidecar remain byte-identical.
