@@ -1,3 +1,9 @@
+## November 5, 2026 — Windows XMP sharing protocol characterization (PR #114 pending)
+
+[PR #114](https://github.com/MieleMadness/Open-Photo/pull/114) adds test-only Windows file-share-mode characterization to explore a possible future handle-bound publication guard. This is **not** an external-editor CAS implementation: existing writable handles, rename races, NTFS reparse aliases and real installed-editor trials remain Issue #90 release blockers. See [the test scope](XMP_WINDOWS_SHARING_EXPERIMENT.md). No Windows installer was requested.
+
+---
+
 ## November 5, 2026 — Recovery status foundation (PR #111 pending)
 
 **Merged:** [#110](https://github.com/MieleMadness/Open-Photo/pull/110) passed exact-head frontend/Rust CI and extracted symlink-aware read-only XMP recovery inspection. **Pending:** #111 adds internal conservative recovery-entry classification (clear, temp, backup, both, unexpected) and tests; the production writer keeps blocking any non-clear entry and does not auto-select versions. [Issue #90](https://github.com/MieleMadness/Open-Photo/issues/90) remains open for Windows-safe successful-publication conflict prevention, crash/power-loss durability, and installed manual acceptance. Routine checks run without an installer.
