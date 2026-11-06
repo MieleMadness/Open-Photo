@@ -7,6 +7,9 @@
 
 - Characterize a held Windows read handle that disallows new write sharing and observe ReplaceFileW behavior on disposable XMP sidecars. This does not guarantee safety against pre-existing external writable handles, aliases, or cross-process successful-publication races.
 - No production file-write changes, no installer, no release.
+# XMP recovery parent inspection (development candidate)
+
+- Reject missing or invalid recovery-parent directories when Windows reports a child entry as absent. Cover both temporary and backup inspection positions without modifying fixture bytes.
 
 # Recovery-path aliases (native regression candidate, PR #113)
 

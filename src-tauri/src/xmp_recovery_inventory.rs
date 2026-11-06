@@ -48,7 +48,21 @@ impl RecoveryInventory {
 fn inspect_entry(path: &Path) -> Result<Option<Metadata>, String> {
     match fs::symlink_metadata(path) {
         Ok(metadata) => Ok(Some(metadata)),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            // Windows can report a missing child when its parent is a file.
+            // Only an inspectable directory establishes an absent entry.
+            let parent = path
+                .parent()
+                .filter(|parent| !parent.as_os_str().is_empty())
+                .unwrap_or_else(|| Path::new("."));
+            match fs::metadata(parent) {
+                Ok(metadata) if metadata.is_dir() => Ok(None),
+                _ => Err(format!(
+                    "Unable to inspect Open-Photo XMP recovery parent {}",
+                    parent.display()
+                )),
+            }
+        }
         Err(error) => Err(format!(
             "Unable to inspect Open-Photo XMP recovery path {}: {error}",
             path.display()
@@ -114,6 +128,22 @@ mod tests {
         assert!(!result.requires_review());
         assert!(result.temporary.is_none());
         assert!(result.backup.is_none());
+    }
+
+    #[test]
+    fn inaccessible_directory_structure_is_an_error_not_a_clear_inventory() {
+        let fixture = Fixture::new();
+        let blocked_parent = fixture.0.join("file-instead-of-directory");
+        fs::write(&blocked_parent, b"preserve-parent").unwrap();
+        let blocked_entry = blocked_parent.join("recovery.tmp");
+
+        // Exercise both inspection positions: a clear first entry must not
+        // suppress an error inspecting the second entry.
+        assert!(inspect_recovery_pair(&blocked_entry, &fixture.backup()).is_err());
+        assert!(inspect_recovery_pair(&fixture.temp(), &blocked_entry).is_err());
+        assert_eq!(fs::read(&blocked_parent).unwrap(), b"preserve-parent");
+        assert!(!fixture.temp().exists());
+        assert!(!fixture.backup().exists());
     }
 
     #[test]
