@@ -11,6 +11,11 @@
 
 - Reject missing or invalid recovery-parent directories when Windows reports a child entry as absent. Cover both temporary and backup inspection positions without modifying fixture bytes.
 
+# Windows pre-existing XMP writer sharing check (development test candidate, PR #116)
+
+- Synthetic Windows-native test verifies a no-write-sharing guard cannot be acquired while a different process-compatible writable handle is already open. The test also checks that opening succeeds after that writer closes.
+- Test-only; does not implement a production lock, guarantee external-editor compare-to-publish safety, or request a Windows installer.
+
 # Recovery-path aliases (native regression candidate, PR #113)
 
 - Add synthetic hardlink backup-alias refusal coverage; check the linked target and original sidecar remain byte-identical.
