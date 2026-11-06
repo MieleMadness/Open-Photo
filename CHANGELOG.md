@@ -1,3 +1,9 @@
+# Recovery-path aliases (native regression candidate, PR #113)
+
+- Add synthetic hardlink backup-alias refusal coverage; check the linked target and original sidecar remain byte-identical.
+- Add Windows-only dangling temporary-link refusal coverage where Windows symlink privileges allow the fixture. A privilege-based skip is not a passing Windows junction acceptance test. No production write behavior changed and no installer requested.
+
+
 # XMP recovery status classification (development candidate, PR #111)
 
 - Internal read-only recovery inspection now distinguishes clear, temporary-only, backup-only, both-present and unexpected filesystem entries, all conservatively. Existing production behavior continues to block all non-clear entries without deleting or restoring files.
