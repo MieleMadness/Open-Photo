@@ -95,3 +95,7 @@ The internal `xmp_recovery_inventory` helper inspects both temporary and backup 
 ## Conservative recovery-entry status (Issue #90)
 
 A read-only `RecoveryEntryState` classifies observed on-disk entries as `Clear`, `TemporaryOnly`, `BackupOnly`, `TemporaryAndBackup`, or `UnexpectedEntry` (directory or symlink). The existing production block-on-recovery rule now derives from `entry_state != Clear`, without changing which entries are refused or performing any cleanup. Native tests cover missing, isolated, paired, directory and Unix dangling-link entries, plus retaining all existing bytes. Classification is **not** a validated XMP snapshot, crash journal, user choice, persisted recovery state or proof against concurrent replacement.
+
+## Recovery hardlink and native Windows dangling-link regression fixtures
+
+The synthetic recovery test suite includes a backup directory entry that is a hardlink alias to a different file. It asserts that the writer refuses the operation and leaves the linked file, sidecar, and alias bytes unchanged. A Windows-only fixture attempts a dangling temporary-file symlink and asserts rejection by the same symlink-aware inventory. Windows configurations lacking symlink creation privilege **skip that link-specific assertion with a diagnostic**; such a skip is not Windows junction/reparse-point acceptance evidence. These tests do not resolve the external-editor successful-publication race or authenticate the registered root.
