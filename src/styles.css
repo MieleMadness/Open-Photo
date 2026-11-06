@@ -32,7 +32,7 @@ button:disabled {
   opacity: .55;
   cursor: not-allowed
 }
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible {
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible,.xmp-recovery h2:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 3px
 }
@@ -2574,3 +2574,20 @@ select {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+.xmp-recovery { margin-block: 1.5rem; max-width: 75rem; }
+.xmp-recovery > p { max-width: 70ch; }
+.xmp-recovery ul { padding-inline-start: 1.25rem; }
+.xmp-recovery li { margin-block: .75rem; overflow-wrap: anywhere; }
+.xmp-recovery li button { margin-inline-end: var(--space-2); margin-block-start: var(--space-2); }
+.xmp-review-pages { align-items: center; margin-block: 1rem; }
+.xmp-review-pages p { margin: 0; }
+.xmp-review-detail { margin-block: 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: 12px; }
+.xmp-review-unavailable { margin-block: var(--space-3); max-width: 70ch; }
+.xmp-stage-files { margin-block: var(--space-3); }
+.xmp-stage-files summary { padding-block: var(--space-2); }
+.xmp-stage-files p { max-width: 70ch; margin-block: var(--space-2); }
+.xmp-review-versions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
+.xmp-review-detail pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 20rem; overflow: auto; font-size: .8125rem; }
+.xmp-review-detail button { margin-block: .5rem; margin-inline-end: .5rem; }
+@media(max-width:800px) { .xmp-review-versions { grid-template-columns: minmax(0,1fr); } }

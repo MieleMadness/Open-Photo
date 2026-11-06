@@ -32,6 +32,8 @@ mod crossfade_inputs;
 #[cfg(test)]
 mod crossfade_integrity;
 #[cfg(test)]
+mod crossfade_layer_clock;
+#[cfg(test)]
 mod crossfade_native_snapshot;
 #[cfg(test)]
 mod crossfade_pipeline;
@@ -91,6 +93,8 @@ mod xmp_publish_race_tests;
 mod xmp_recovery_inventory;
 #[cfg(test)]
 mod xmp_recovery_tests;
+mod xmp_staging_inventory;
+mod xmp_transactions;
 #[cfg(all(test, windows))]
 mod xmp_windows_sharing_tests;
 use base64::Engine;
@@ -98,9 +102,11 @@ use exif::{DateTime as ExifDateTime, In, Reader as ExifReader, Tag, Value};
 use nom_exif::{read_exif as read_nom_exif, EntryValue as NomEntryValue, ExifTag as NomExifTag};
 use raw_files::{Orientation as RawOrientation, RawFile};
 use serde::Serialize;
+#[cfg(test)]
+use std::io::Write;
 use std::{
     collections::{HashMap, VecDeque},
-    io::{BufReader, Cursor, Read, Seek, SeekFrom, Write},
+    io::{BufReader, Cursor, Read, Seek, SeekFrom},
     sync::{Mutex, OnceLock},
 };
 use std::{
@@ -141,6 +147,7 @@ fn xml_escape(value: &str) -> String {
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
 }
+#[cfg(test)]
 #[derive(Serialize)]
 struct BulkTagResult {
     created: usize,
@@ -208,12 +215,14 @@ fn read_managed_tags(root: String, paths: Vec<String>) -> Result<Vec<ManagedTagE
     Ok(entries)
 }
 
+#[cfg(test)]
 fn replace_managed_sidecar(sidecar: &Path, expected: &str, contents: &str) -> Result<(), String> {
     replace_managed_sidecar_with_publish(sidecar, expected, contents, atomic_replace)
 }
 
-// Test seam for a failing publish boundary. The production path always supplies
-// the same platform-specific atomic_replace function as before.
+// Historical replacement regression seam only. Runtime XMP commands use
+// xmp_transactions with protected-original moves and no-overwrite publication.
+#[cfg(test)]
 fn replace_managed_sidecar_with_publish<F>(
     sidecar: &Path,
     expected: &str,
@@ -287,7 +296,7 @@ where
     Ok(())
 }
 
-#[cfg(windows)]
+#[cfg(all(test, windows))]
 fn atomic_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
     let source: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
@@ -314,7 +323,7 @@ fn atomic_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(all(test, not(windows)))]
 fn atomic_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
     fs::rename(source, destination)
 }
@@ -323,7 +332,7 @@ static XMP_WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 /// Create new Open-Photo XMP sidecars or merge keywords into sidecars that
 /// Open-Photo owns. Unknown/foreign XMP files are never overwritten.
-#[tauri::command]
+#[cfg(test)]
 fn bulk_create_tags(
     root: String,
     paths: Vec<String>,
@@ -1367,7 +1376,14 @@ pub fn run() {
             user_data::save_user_data,
             user_data::export_user_data,
             ai_faces::ai_name_person,
-            bulk_create_tags,
+            xmp_transactions::bulk_create_tags,
+            xmp_transactions::xmp_reviews,
+            xmp_transactions::xmp_review_page,
+            xmp_transactions::xmp_review_record,
+            xmp_transactions::xmp_review_snapshot,
+            xmp_transactions::xmp_review_decide,
+            xmp_transactions::xmp_review_apply,
+            xmp_transactions::xmp_review_restore,
             read_managed_tags,
             edit_export::export_edited_copy,
             edit_export::preview_edited_photo,

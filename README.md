@@ -1,6 +1,16 @@
+## Current local development (unreleased)
+
+Local source **0.56.83** maps working and resumed test-only sessions onto the shared preview frame/sample clock. Seek descriptions identify active clips, global titles and exact audio slices, including tracks starting inside a frame, after revalidating the selected plan. Production storage, editor controls, decoding, active crossfades and preview/export routing remain gated. See [session seek mapping](docs/PHASE_J_SESSION_SEEK.md), [session checkpoints and recovery](docs/PHASE_J_SESSION_CHECKPOINTS.md) and [mixed-layer manifests](docs/PHASE_J_LAYER_MANIFEST.md).
+
+## Local XMP safety update (unreleased)
+
+Local candidate **0.56.76** consolidates the XMP safety work and final audit. It includes full-source checksums, complete persisted-intent rechecks, background saves, paged reviews, offline stored documents and read-only staging observations. See the [local closeout and acceptance gates](docs/XMP_CLOSEOUT.md) for final evidence and the updated installer handoff. The earlier 0.56.70 handoff is historical; installed-app, uninstall, power-loss and release acceptance remain pending.
+
+Adding tags now creates new sidecars without overwriting a competing file. For existing managed sidecars, proposed merges are saved for review under **Tags → XMP changes to review**. Review the versions, confirm the comparison and choose **Apply reviewed changes**. The previous sidecar is preserved and competing files are never overwritten. Saves can briefly leave the destination name absent; interrupted saves can explicitly restore a verified original into an empty path after fresh review and confirmation. Unverifiable recovery files remain blocked for manual inspection. Completed-save history and journal-only cancellation remain available. [Step 3 validation](docs/XMP_STEP_3_VALIDATION.md) records real ExifTool trials and the remaining installed-app gates. See [local XMP transactions](docs/XMP_LOCAL_TRANSACTIONS.md) for behavior, validation and remaining acceptance gates.
+
 File Details includes a location map below metadata for GPS-tagged photos. The Map view supports JPEG/TIFF/HEIC/HEIF and MOV/MP4 location discovery, media-type and capture-year filters. Map imagery requires internet; coordinates remain visible offline.
 
-> Development update: **0.56.67** retains automatic local AI indexing with counters/failures/folder exclusions, video-content search with matching times, expanded zoomable previews and a fullscreen library filmstrip. Signed Preview update support is prepared; channel publication and installed upgrade acceptance remain pending.
+> Earlier feature checkpoint: **0.56.67** added automatic local AI indexing with counters/failures/folder exclusions, video-content search with matching times, expanded zoomable previews and a fullscreen library filmstrip. Signed Preview update support is prepared; channel publication and installed upgrade acceptance remain pending.
 
 Turn Local AI on in Settings to index known workspace media automatically; use manual **Sync** to discover new/changed files. The AI dashboard shows progress and failed files, with retries and **Don't index** per folder. Counters count source files (a Live still and motion can count separately). Video sampling can miss brief content; HEIC AI and HDR conversion remain unsupported. See [AI indexing](docs/AUTOMATIC_AI_INDEXING.md).
 
@@ -648,3 +658,12 @@ Desktop settings load directly from SQLite into the live memory store. Large rat
 Map tooltips display filenames as literal text, including ampersands and markup-like characters.
 
 See [0.56.67 audit integration](docs/AUDIT_INTEGRATION_0_56_67.md) for the combined fixes and verification boundaries.
+
+The native XMP safety suite now includes bounded independent-process Windows
+replacement experiments. See [sharing characterization](docs/XMP_WINDOWS_SHARING_EXPERIMENT.md)
+and [remaining publication gates](docs/XMP_PUBLICATION_PROTOCOL.md). These checks
+are development evidence; the production external-editor race remains open.
+
+Additional local Windows XMP experiments cover writer-first process coordination,
+hardlink file identities and parent-directory rename/rebinding. The experiment
+notes distinguish observed sharing behavior from pending production guarantees.

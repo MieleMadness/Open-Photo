@@ -1,8 +1,10 @@
 # XMP publication protocol: engineering gates
 
-Status: proposed verification sequence, not an implemented protocol. Issue #90
-remains open. The current writer can overwrite an external edit between its
-last content comparison and successful publication.
+Historical engineering proposal against the older writer. The current local
+implementation and verified boundary are recorded in [XMP closeout](XMP_CLOSEOUT.md).
+The previously ignored successful-publication race gate now exercises the
+production no-overwrite protocol; these earlier design notes are not its status.
+The installed/durability requirements from Issue #90 remain unverified locally.
 
 ## Evidence available
 
@@ -17,7 +19,11 @@ last content comparison and successful publication.
   refer to different files after a rename. Do not promote these experiments to
   production locking without the gates below.
 
-## Next synthetic experiments
+## Synthetic verification sequence
+
+Local synthetic coverage now exists for steps 1, 2 and 4, and for the hardlink
+and parent-directory rename portions of step 3. Junction/reparse changes,
+registered-root authorization and the production boundary remain pending.
 
 1. Hold the guard, then have an independent process replace the destination
    using a separate staged file. Record the operation result, bytes read from
@@ -66,3 +72,51 @@ combined-commit CI, then full Windows installer and installed NTFS trials.
 Include network/removable filesystem refusal behavior. Passing fast CI is not
 installed acceptance or power-loss evidence. Keep Phase J production crossfade
 acceptance and the deferred pre-1.0 media stress test as separate gates.
+
+## November 5 continuation
+
+Added executable independent-process characterization for synthetic experiment
+steps 1 and 2 in `xmp_windows_sharing_tests`: retained-handle versus pathname
+bytes after external replacement, and external/own publication refusal with
+delete sharing denied. See `XMP_WINDOWS_SHARING_EXPERIMENT.md` for exact scope.
+These tests do not implement the production publication boundary. Additional
+identity and writer-first coverage is recorded in the continuation below;
+crash and installed gates remain open. Phase J acceptance remains separate.
+
+## Local continuation: additional process and identity gates
+
+The synthetic suite now covers step 4's writer-first independent process, plus
+step 3's hardlink identity and parent-directory rename/rebinding cases. Identity
+comparisons use GetFileInformationByHandle volume serial and file index through
+live handles; identical content does not substitute for identity. The local
+parent rename is refused while its child-file guard remains open; rebinding is
+exercised only after releasing it. See the experiment document for boundaries.
+Junction/reparse/root-authorization and production publication remain open.
+
+## Local production routing checkpoint
+
+See [XMP_LOCAL_TRANSACTIONS.md](XMP_LOCAL_TRANSACTIONS.md). The runtime command now
+journals existing-sidecar proposals and refuses automatic replacement; the old
+replace helper exists only in historical tests. New sidecars use verified owned
+staging and native handle-relative no-overwrite publication. Recovery review,
+registered-folder identity checks and fault/abrupt-process restart tests are
+implemented locally. The conservative refusal path is not a usable automatic
+replacement protocol; Issue #90 and installed/power-loss gates remain open.
+
+## November 6 — reviewed Apply implementation
+
+The local step 2 protocol is implemented in xmp_transactions: retain the old
+sidecar under a protected-handle recovery rename, then publish the reviewed
+candidate without overwriting any new destination. This is a two-phase namespace
+change with a possible absence interval, not a single atomic replacement.
+See [XMP_REVIEWED_APPLY.md](XMP_REVIEWED_APPLY.md) for exact semantics, review
+bindings, recovered findings and local production-boundary evidence. Installed
+and power-loss acceptance remain open; this is not a release or Issue #90 closure.
+
+## Step 3 checkpoint
+
+The race gate now executes the production interleaving without being ignored.
+Explicit guarded original restoration, abrupt-process/repeated recovery checks
+and a real ExifTool matrix passed locally. See
+[XMP_STEP_3_VALIDATION.md](XMP_STEP_3_VALIDATION.md) for exact scope, the test-only
+cleanup fix and remaining step 4 / durability gates. No release is authorized.

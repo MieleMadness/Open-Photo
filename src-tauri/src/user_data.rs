@@ -2,7 +2,7 @@
 use rusqlite::{params, Connection};
 use std::collections::BTreeMap;
 
-fn database() -> Result<Connection, String> {
+pub(crate) fn database() -> Result<Connection, String> {
     let directory = dirs::data_local_dir()
         .ok_or("Local data directory unavailable")?
         .join("Open-Photo");
@@ -26,7 +26,7 @@ fn database() -> Result<Connection, String> {
 pub(crate) fn workspace_roots(id: &str) -> Result<Vec<String>, String> {
     workspace_roots_from(&database()?, id)
 }
-fn workspace_roots_from(db: &Connection, id: &str) -> Result<Vec<String>, String> {
+pub(crate) fn workspace_roots_from(db: &Connection, id: &str) -> Result<Vec<String>, String> {
     #[derive(serde::Deserialize)]
     struct Workspace {
         id: String,
