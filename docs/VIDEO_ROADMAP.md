@@ -1,3 +1,9 @@
+## November 5, 2026 — Windows XMP sharing experiment (PR #115 pending)
+
+[PR #113](https://github.com/MieleMadness/Open-Photo/pull/113) merged after passing native/frontend CI, adding link-alias recovery tests. Follow-up [PR #115](https://github.com/MieleMadness/Open-Photo/pull/115) characterizes Windows share modes and ReplaceFileW with synthetic files; it is **not** a production external-editor race fix. [Issue #90](https://github.com/MieleMadness/Open-Photo/issues/90) remains open. See [sharing experiment notes](XMP_WINDOWS_SHARING_EXPERIMENT.md). No Windows installer requested.
+
+---
+
 ## November 5, 2026 — Recovery status foundation (PR #111 pending)
 
 **Merged:** [#110](https://github.com/MieleMadness/Open-Photo/pull/110) passed exact-head frontend/Rust CI and extracted symlink-aware read-only XMP recovery inspection. **Pending:** #111 adds internal conservative recovery-entry classification (clear, temp, backup, both, unexpected) and tests; the production writer keeps blocking any non-clear entry and does not auto-select versions. [Issue #90](https://github.com/MieleMadness/Open-Photo/issues/90) remains open for Windows-safe successful-publication conflict prevention, crash/power-loss durability, and installed manual acceptance. Routine checks run without an installer.
