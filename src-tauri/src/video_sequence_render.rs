@@ -1,4 +1,8 @@
 //! Bounded hard-cut compiler: one source decoder at a time, one video encode per clip.
+#[cfg(all(test, windows))]
+include!("crossfade_preview_part_decoder.rs");
+#[cfg(all(test, windows))]
+include!("crossfade_preview_titles.rs");
 use crate::{
     video_engine, video_probe, video_project,
     video_render::{self, ExportSize, Plan, RenderOptions},
@@ -334,13 +338,7 @@ fn part_args(
             "anullsrc=r=48000:cl=stereo".into(),
         ]);
     }
-    let filter = format!(
-        "trim=start=0:end={:.9},setpts=PTS-STARTPTS,fps=fps={fps}:start_time=0,tpad=stop_mode=clone:stop_duration={:.9},trim=end_frame={frames},setpts=N/({fps}*TB),{},scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setsar=1{}",
-        prepared.duration,
-        duration + 1.0 / f64::from(fps),
-        prepared.filter,
-        titles_filter
-    );
+    let filter = normalized_video_filter(prepared, frames, fps, &titles_filter);
     args.extend([
         "-map".into(),
         format!("0:{}", prepared.video_stream).into(),
@@ -395,6 +393,23 @@ fn part_args(
     ]);
     progress_args(&mut args, output, "matroska", max_bytes);
     args
+}
+
+// One normalization graph for encoded parts and the gated RGB part decoder.
+fn normalized_video_filter(
+    prepared: &PartSource,
+    frames: u64,
+    fps: u32,
+    titles_filter: &str,
+) -> String {
+    let duration = frames as f64 / f64::from(fps);
+    format!(
+        "trim=start=0:end={:.9},setpts=PTS-STARTPTS,fps=fps={fps}:start_time=0,tpad=stop_mode=clone:stop_duration={:.9},trim=end_frame={frames},setpts=N/({fps}*TB),{},scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setsar=1{}",
+        prepared.duration,
+        duration + 1.0 / f64::from(fps),
+        prepared.filter,
+        titles_filter
+    )
 }
 
 pub(crate) fn build_preview(

@@ -89,3 +89,8 @@ preview/export parity and installed-Windows acceptance.
 
 The XMP 0.56.76 handoff is preserved. No installer, installation, push, upload or
 remote CI is included in this local backend-only increment.
+
+The subsequent 0.56.84 [preview request groundwork](PHASE_J_PREVIEW_REQUESTS.md)
+adds bounded scheduling metadata, cooperative cancellation and start/completion/
+consumer eligibility checks around this seek map. It does not connect a decoder
+or alter the seek timing policy. Results above remain the 0.56.83 milestone.

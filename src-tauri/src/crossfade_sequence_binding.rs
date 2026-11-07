@@ -233,6 +233,13 @@ include!("crossfade_layer_manifest.rs");
 include!("crossfade_editor_session.rs");
 include!("crossfade_session_checkpoint.rs");
 include!("crossfade_session_seek.rs");
+include!("crossfade_preview_requests.rs");
+#[cfg(windows)]
+include!("crossfade_preview_decode.rs");
+#[cfg(windows)]
+include!("crossfade_composed_preview.rs");
+#[cfg(windows)]
+include!("crossfade_av_preview.rs");
 
 #[cfg(test)]
 mod tests {
@@ -612,4 +619,11 @@ mod tests {
     include!("crossfade_editor_session_tests.rs");
     include!("crossfade_session_checkpoint_tests.rs");
     include!("crossfade_session_seek_tests.rs");
+    include!("crossfade_preview_requests_tests.rs");
+    #[cfg(windows)]
+    include!("crossfade_preview_decode_tests.rs");
+    #[cfg(windows)]
+    include!("crossfade_composed_preview_tests.rs");
+    #[cfg(windows)]
+    include!("crossfade_av_preview_tests.rs");
 }

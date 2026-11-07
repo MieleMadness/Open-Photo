@@ -1,4 +1,5 @@
 @import "./tokens.css";
+@import "./library.css";
 * {
   box-sizing: border-box;
   scrollbar-width: thin;
@@ -769,12 +770,11 @@ dd {
   text-align: left;
   color: var(--text);
   box-shadow: 0 1px 2px rgba(30,20,40,.03);
-  transition: border-color var(--motion-fast),box-shadow var(--motion-normal),transform var(--motion-normal) var(--ease-standard)
+  transition: border-color var(--motion-fast),box-shadow var(--motion-fast)
 }
 .photo-tile:hover {
   border-color: color-mix(in srgb,var(--primary) 48%,var(--line));
-  box-shadow: var(--shadow-hover);
-  transform: translateY(-2px)
+  box-shadow: var(--shadow-hover)
 }
 .photo-tile>.photo-image,.photo-tile>.photo-fallback {
   width: 100%;
@@ -1765,7 +1765,7 @@ select {
   color: var(--text)
 }
 @media(hover:hover) {
-  .icon-button:hover,.theme-option:hover,.folder-item:hover,.file-row:hover,.photo-tile:hover,.video-filmstrip button:hover {
+  .icon-button:hover,.theme-option:hover,.folder-item:hover,.file-row:hover,.video-filmstrip button:hover {
     will-change: transform;
   }
 }

@@ -1,3 +1,50 @@
+## Unreleased engineering increment — workspace-bound Phase J previews
+
+- Connect authoritative workspace admission to gated visual/title/PCM preview composition using per-asset source roots, including photos and standalone audio in a second folder.
+- Bind the entire selected document to opaque native authorization, retain decoded source pins, recheck access after composition and at consumption, and reject delivery through the legacy authorization-free entry point.
+- Cover mid-composition/final workspace revocation, document mismatch and worker-slot cleanup with real-engine regressions. Production storage, editor activation, export parity and installed acceptance remain required; phase 3 is not complete.
+
+## Unreleased engineering increment — Phase J workspace admission
+
+- Start phase 3 with a test-only read-only bridge to native workspace-owned projects, complete stored document/binding receipts and fresh-root/source checks. Cover revoked ownership, multiple roots, stale edits and preservation of unsupported future schemas. Production integration and release gates remain open; see docs/PHASE_J_PRODUCTION_INTEGRATION.md.
+
+## Unreleased engineering increment — Phase J titles and audio
+
+- Add gated post-transition global title rendering and exact 48 kHz stereo PCM windows, with sample-centered linear crossfade/track envelopes, mute/gain and final clipping counters.
+- Retain independent audio-source pins, bounded decoding, source-change rejection, cancellation and final stale-result checks. Add real-engine pixel/sample regressions; see docs/PHASE_J_TITLES_AUDIO.md for policies, prototype bounds and phase 3 acceptance gaps. No production activation, installer or release update.
+
+## Unreleased engineering increment — Phase J visual composition
+
+- Connect verified frame decoding to clock-weighted RGB dissolves and discrete dips; retain source ownership, worker-slot lifetime and final stale-delivery checks.
+- Add real-frame, dip, supersession and bundled-FFmpeg RGB reference regressions. Full native verification: 429 passed, eight opt-in modes skipped; Clippy passed. Production YUV export policy remains an explicit phase 3 gate. No installer/release update.
+
+## 0.56.86 — local library reliability and accessibility candidate (unreleased)
+
+- Carry source fingerprints through renderer/native preview requests and caches, recheck source identity and reject stale results. Cover preserved-size/timestamp changes for images, HEIC reads and video posters.
+- Bind duplicate/similarity/health tasks to their workspace and request; select actual source-root/directory identities, with direct-file scope and a visible reset action.
+- Add keyboard map markers, paged/filterable coordinate results, token-based marker styling and linear GPS-year lookup.
+- Validate organizational settings at one repository boundary and preserve malformed/future data behind explicit validated recovery. Extract the preview service and scoped task ownership from App.
+- Decode HEIC in a bounded dedicated worker with pixel guards, thumbnail-sized output, cancellation/timeout disposal and the production CSP; move native image preview IO off the command thread.
+- Preserve the concurrent 0.56.85 Phase J work. See docs/LIBRARY_RELIABILITY.md for verification and release gates; no install, upload or publication is implied.
+
+## 0.56.85 — Phase J gated real preview-input decoder (unreleased)
+
+- Decode actual normalized video/photo frames from verified saved-project sources, pin Windows originals through typed-result ownership and validate exact RGB geometry/byte counts.
+- Extract the existing part normalization filter unchanged for reuse by encoded parts and the test-only decoder; reuse source preparation, edits, photo transparency flattening, bounded bundled processes and guarded scratch cleanup.
+- Share completion eligibility between opaque test payloads and typed decoded inputs, discard obsolete work and keep final typed-result checks. Limit this experiment to short/bounded inputs; no composed preview, titles, PCM audio or production route is enabled.
+- Add seven real-engine regressions for trim/frame positions, overlap inputs, photo alpha, source locking/integrity, mid-decode project changes, cancellation and bounds. Correct the disposable fixture canvas before the passing targeted run.
+- Local validation run passed: 420 native tests, 332 frontend tests, TypeScript/Vite build, Clippy with warnings denied, relevant Rust formatting and scoped diff whitespace checks. Eight explicit native acceptance modes were not selected. Concurrent library/HEIC edits in the shared workspace are separate; repository-wide whitespace checks report their App/styles EOF blank lines.
+- Remain local with 0.56.84; no new push/remote CI, installer or installation. Preserve the XMP 0.56.76 handoff.
+
+## 0.56.84 — Phase J bounded preview requests and stale-result rejection (unreleased)
+
+- Add a test-only coordinator over verified session seeks, retaining one active worker slot and one latest pending request; coalesce identical frame/session bindings and cooperatively cancel obsolete work without prematurely reusing its worker slot.
+- Revalidate native state at admission, start and completion, discard superseded results/errors, bound accepted payloads and expose final consumer checks for changed generation, session, folder/project and document bindings.
+- Reject foreign/duplicate completions, preserve newer work on old cancellation, close safely on generation exhaustion and cancel owned tokens during normal or poisoned-state drop.
+- Add seven lifecycle regressions including a 500-request burst and a channel-coordinated simulated worker. No actual decoder/executor or production UI/render route is connected.
+- Local checks passed: 413 native tests, 332 frontend tests, TypeScript/Vite build, Clippy with warnings denied, Rust formatting and diff whitespace checks. Eight explicit native acceptance modes were not selected.
+- This increment remains local; the previously pushed 0.56.83 PR #121 passed fast CI #1434. No new push/remote CI, installer or installation; XMP 0.56.76 handoff preserved.
+
 ## 0.56.83 — Phase J resumed-session preview seek mapping (unreleased)
 
 - Add test-only native seek descriptions for working/resumed mixed-layer sessions, revalidating the selected manifest and echoing session/project identity for later delivery checks.

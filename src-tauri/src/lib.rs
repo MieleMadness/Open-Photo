@@ -9,6 +9,8 @@ mod ai_runtime;
 mod ai_text;
 mod ai_validation;
 mod cache_disk;
+#[cfg(test)]
+mod crossfade_visual_compositor;
 mod source_version;
 // Crossfade frame-clock parity fixture only; no active renderer changes.
 #[cfg(test)]
@@ -59,6 +61,9 @@ mod image_decode;
 mod index;
 mod media_jobs;
 mod media_stream;
+#[cfg(test)]
+mod preview_identity_tests;
+mod preview_source;
 mod safe_output;
 mod search;
 mod search_providers;
@@ -1066,7 +1071,22 @@ fn decode_raw_embedded_preview(path: &Path) -> Result<image::DynamicImage, Strin
 /// Read a bounded local iPhone media file for on-device preview or playback.
 /// The media stays on the user's machine; originals are never rewritten.
 #[tauri::command]
-fn read_iphone_media(root: String, path: String) -> Result<String, String> {
+async fn read_iphone_media(
+    root: String,
+    path: String,
+    expected_source_version: Option<String>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        read_iphone_media_sync(root, path, expected_source_version)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+fn read_iphone_media_sync(
+    root: String,
+    path: String,
+    expected_source_version: Option<String>,
+) -> Result<String, String> {
     let file = safe_media_path(&root, &path)?;
     let extension = file
         .extension()
@@ -1082,12 +1102,39 @@ fn read_iphone_media(root: String, path: String) -> Result<String, String> {
             "Inline playback is limited to 48 MB; use the Windows player for larger videos".into(),
         );
     }
-    let bytes = fs::read(file).map_err(|e| e.to_string())?;
+    let source = preview_source::PreviewSource::capture(&file, expected_source_version.as_deref())?;
+    let mut bytes = Vec::new();
+    fs::File::open(&file)
+        .map_err(|e| e.to_string())?
+        .take(48 * 1024 * 1024 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > 48 * 1024 * 1024 {
+        return Err("HEIC preview input exceeds 48 MB".into());
+    }
+    source.verify()?;
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
 #[tauri::command]
-fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, String> {
+async fn preview_image(
+    root: String,
+    path: String,
+    max_edge: u32,
+    expected_source_version: Option<String>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        preview_image_sync(root, path, max_edge, expected_source_version)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+fn preview_image_sync(
+    root: String,
+    path: String,
+    max_edge: u32,
+    expected_source_version: Option<String>,
+) -> Result<String, String> {
     let file = safe_media_path(&root, &path)?;
     let extension = file
         .extension()
@@ -1106,29 +1153,24 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
             max_source_bytes / (1024 * 1024)
         ));
     }
-    let modified = fs::metadata(&file)
+    let source = preview_source::PreviewSource::capture(&file, expected_source_version.as_deref())?;
+    let edge = max_edge.clamp(64, 1920);
+    let key = format!("oriented-v3:{}:{}:{edge}", file.display(), source.version);
+    let cached = cache()
+        .lock()
         .ok()
-        .and_then(|m| m.modified().ok())
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    let key = format!(
-        "oriented-v2:{}:{size}:{modified}:{}",
-        file.display(),
-        max_edge
-    );
-    if let Ok(guard) = cache().lock() {
-        if let Some(image) = guard.0.get(&key) {
-            return Ok(image.clone());
-        }
+        .and_then(|guard| guard.0.get(&key).cloned());
+    if let Some(image) = cached {
+        source.verify()?;
+        return Ok(image);
     }
     if let Some(bytes) = cache_disk::read(&key) {
+        source.verify()?;
         return Ok(format!(
             "data:image/png;base64,{}",
             base64::engine::general_purpose::STANDARD.encode(bytes)
         ));
     }
-    let edge = max_edge.clamp(64, 1920);
     let decoded = if matches!(extension.as_str(), "nef" | "arw") {
         decode_raw_embedded_preview(&file)?
     } else {
@@ -1140,6 +1182,7 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
         .write_to(&mut bytes, image::ImageFormat::Png)
         .map_err(|e| e.to_string())?;
     let png = bytes.into_inner();
+    source.verify()?;
     cache_disk::write(&key, &png);
     let result = format!(
         "data:image/png;base64,{}",
@@ -1417,7 +1460,7 @@ mod tests {
 
     static NEXT_TEST_DIRECTORY: AtomicU64 = AtomicU64::new(0);
 
-    fn temp_root() -> PathBuf {
+    pub(super) fn temp_root() -> PathBuf {
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -1495,10 +1538,11 @@ mod tests {
         let other = temp_root();
         let image = other.join("photo.jpg");
         fs::write(&image, b"test").unwrap();
-        let result = preview_image(
+        let result = preview_image_sync(
             root.to_string_lossy().into_owned(),
             image.to_string_lossy().into_owned(),
             400,
+            None,
         );
         assert!(result.is_err());
         fs::remove_dir_all(root).unwrap();

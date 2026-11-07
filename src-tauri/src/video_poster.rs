@@ -32,13 +32,14 @@ fn signature(source: &Path) -> Result<(u64, u128), String> {
             .as_nanos(),
     ))
 }
+#[cfg(test)]
 pub(crate) fn poster(
     engine: &Path,
     root: &str,
     path: &str,
     max_edge: u32,
 ) -> Result<String, String> {
-    frame_at(engine, root, path, max_edge, None)
+    frame_at(engine, root, path, max_edge, None, None)
 }
 
 fn frame_at(
@@ -47,9 +48,11 @@ fn frame_at(
     path: &str,
     max_edge: u32,
     requested: Option<f64>,
+    expected_source_version: Option<&str>,
 ) -> Result<String, String> {
     let source = media_stream::validated_video(root, path)?;
     let before = signature(&source)?;
+    let identity = crate::preview_source::PreviewSource::capture(&source, expected_source_version)?;
     let edge = max_edge.clamp(64, 640);
     if requested.is_some_and(|s| !s.is_finite() || s < 0.0 || s > 7200.0) {
         return Err("Invalid filmstrip timestamp".into());
@@ -58,14 +61,13 @@ fn frame_at(
         .map(|s| format!("{s:.3}"))
         .unwrap_or_else(|| "poster".into());
     let key = format!(
-        "video-frame-v2:{}:{}:{}:{}:{edge}:{time_key}",
+        "video-frame-v3:{}:{}:{}:{edge}:{time_key}",
         video_engine::VERSION,
         source.display(),
-        before.0,
-        before.1
+        identity.version
     );
-    let bytes = if let Some(bytes) = cache_disk::read(&key) {
-        bytes
+    let (bytes, generated) = if let Some(bytes) = cache_disk::read(&key) {
+        (bytes, false)
     } else {
         let info = video_probe::probe(engine, &source, || false)?;
         if info.hdr {
@@ -134,9 +136,12 @@ fn frame_at(
         if signature(&source)? != before {
             return Err("Video changed while its poster was generated".into());
         }
-        cache_disk::write(&key, &bytes);
-        bytes
+        (bytes, true)
     };
+    identity.verify()?;
+    if generated {
+        cache_disk::write(&key, &bytes);
+    }
     Ok(format!(
         "data:image/png;base64,{}",
         base64::engine::general_purpose::STANDARD.encode(bytes)
@@ -150,6 +155,7 @@ pub async fn video_poster(
     path: String,
     max_edge: u32,
     for_player: Option<bool>,
+    expected_source_version: Option<String>,
 ) -> Result<String, String> {
     let engine = video_engine::directory(&app)?;
     // A large library's queued thumbnails must not delay the selected player's poster.
@@ -165,7 +171,14 @@ pub async fn video_poster(
         .map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let _permit = permit;
-        poster(&engine, &root, &path, max_edge)
+        frame_at(
+            &engine,
+            &root,
+            &path,
+            max_edge,
+            None,
+            expected_source_version.as_deref(),
+        )
     })
     .await
     .map_err(|e| e.to_string())?
@@ -192,7 +205,7 @@ pub async fn video_timeline_frame(
         .map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         let _permit = permit;
-        frame_at(&engine, &root, &path, 160, Some(seconds))
+        frame_at(&engine, &root, &path, 160, Some(seconds), None)
     })
     .await
     .map_err(|e| e.to_string())?

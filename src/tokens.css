@@ -15,6 +15,8 @@
   --primary: #6727ad;
   --primary-hover: #552092;
   --primary-soft: #f1e8fa;
+  --map-marker-border: var(--accent-text);
+  --map-marker-fill: var(--primary);
   --green: #28b678;
   --green-soft: #e8f9f0;
   --danger: #a12b38;

@@ -129,6 +129,23 @@ pub(crate) fn run_until(
     })
 }
 
+#[cfg(all(test, windows))]
+pub(crate) fn run_preview_in(
+    executable: &Path,
+    args: &[&std::ffi::OsStr],
+    directory: &Path,
+    cancel: impl Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    run_reader_in(
+        executable,
+        args,
+        Duration::from_secs(30),
+        cancel,
+        |reader, overflow| collect(reader, 4 * 1024 * 1024, overflow),
+        Some(directory),
+    )
+}
+
 #[derive(Clone, Copy, Default)]
 pub(crate) struct Progress {
     pub seconds: f64,

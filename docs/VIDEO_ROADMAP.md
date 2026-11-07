@@ -1,3 +1,35 @@
+## November 6, 2026 — Phase J gated real preview-input decoding
+
+Local source **0.56.85** runs the bundled decoder on verified/pinned sources,
+reuses the current normalization graph and returns one/two bounded RGB inputs
+for the selected video/photo frames. Typed completion preserves source ownership
+and discards stale or cancelled work. See [real preview-input decoding](PHASE_J_PREVIEW_DECODE.md).
+
+Next: compose the verified inputs using dissolve/dip timing, then global titles
+and PCM audio-window processing. Raw inputs are not display-ready previews.
+The short-input decoder remains Windows/test-only; production source/root
+authorization, migration/import, policy review, real-footage parity and installed
+acceptance remain gates. 0.56.84/85 are local, with no new push or remote CI;
+0.56.83 remains the last pushed tree. XMP's 0.56.76 handoff is preserved.
+
+---
+
+## November 6, 2026 — Phase J bounded preview request lifecycle
+
+Local source **0.56.84** adds test-only request coalescing, one active worker plus
+one latest pending seek, cooperative cancellation and revalidation before start,
+completion and final consumer handoff. Old cancellations/completions cannot take
+ownership from newer work. See [bounded preview requests](PHASE_J_PREVIEW_REQUESTS.md).
+
+Next: a gated decode executor with verified sources, bounded normalized parts,
+decoded-payload validation and composition. No real decode/playback executor or
+production UI route is connected. Storage/import/source authorization, audio/title
+policy, real-footage preview/export parity and installed-Windows gates remain.
+This local branch is not pushed; 0.56.83 remains in draft PR #121 with passing
+fast CI #1434 and installer checks skipped. XMP's 0.56.76 handoff is preserved.
+
+---
+
 ## November 6, 2026 — Phase J resumed-session frame/sample seeking
 
 Local source **0.56.83** adds gated native seek descriptions over freshly verified

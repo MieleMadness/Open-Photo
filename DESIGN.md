@@ -31,7 +31,7 @@ Open-Photo is an offline-first Windows media organizer and basic editor. Its wor
 
 Check 1220 × 780 and 800 × 580, light/dark, empty and populated libraries, long filenames, ratings, multiple thumbnail sizes, keyboard-only dialogs, invalid forms, missing sources, and save/export recovery. Use short media fixtures; long-form work is deferred to 1.x. Native playback/export and OS accessibility checks remain distinct from browser fixtures.
 
-The audit fixes do not implement Phase 7 clip sequencing or combined export. Keep those capability claims accurate until they ship.
+Historical audit checkpoint: sequencing and combined export were added afterward. Current behavior and acceptance are recorded in docs/LIBRARY_RELIABILITY.md; this old checkpoint is not the current capability matrix.
 
 ## Shared editing workflow — 0.56.7
 
@@ -41,7 +41,7 @@ In 0.56.8 the same stage shows one compiled continuous preview, with its playhea
 
 ## Unified discovery — 0.56.11
 
-Keep one Library search field. Metadata/cached evidence updates while typing; Search/Enter explicitly adds image-content inference. Use the existing controls/tokens and a compact status/help disclosure, with visible strongest-match text in existing tile/list metadata and full reasons in File Details. Relevance is a real sort choice; clearing a search restores browsing order. Preserve current matches while extending a query, disclose partial providers, and cancel stale work without disturbing the newest request. Do not add separate OCR/semantic result pages or decorative search cards.
+Keep one Library search field. Metadata/cached evidence updates while typing; semantic inference runs after the typing debounce when Local AI is enabled. Search/Enter requests an immediate retry. Use the existing controls/tokens and a compact status/help disclosure, with visible strongest-match text in existing tile/list metadata and full reasons in File Details. Relevance is a real sort choice; clearing a search restores browsing order. Preserve current matches while extending a query, disclose partial providers, and cancel stale work without disturbing the newest request. Do not add separate OCR/semantic result pages or decorative search cards.
 
 ## Compact navigation and section labels — 0.56.12
 

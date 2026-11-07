@@ -1,6 +1,20 @@
+## Local Phase J production integration (in progress)
+
+Phase 3 now connects authoritative workspace admission and per-asset roots to composed visual/title/PCM previews. It retains original-source locks and rejects revoked or changed workspace access after composition and before consumption. This remains test-only; production storage, editor controls and export parity are unfinished. See [phase 3 progress and remaining gates](docs/PHASE_J_PRODUCTION_INTEGRATION.md).
+
+## Local Phase J titles and audio (test-only)
+
+Phase 2 now renders global titles after transitions and mixes exact 48 kHz stereo windows with linear fades, mute/gain, source pins and clipping reports. See [titles/audio policy](docs/PHASE_J_TITLES_AUDIO.md). Production editor/export parity and installed/listening acceptance remain phase 3 gates; the existing installer is unchanged.
+
+## Earlier Phase J visual checkpoint (test-only)
+
+Phase 1 now composes verified video/photo frames, RGB dissolves and discrete dips with retained source pins and stale-result checks. See [visual composition](docs/PHASE_J_VISUAL_COMPOSITION.md) and the [three-phase plan](docs/PHASE_J_THREE_PHASE_PLAN.md). Phase 1 remains visual-only; the gated phase 2 path now supplies titles/audio. Production editor/export integration remains later work.
+
 ## Current local development (unreleased)
 
-Local source **0.56.83** maps working and resumed test-only sessions onto the shared preview frame/sample clock. Seek descriptions identify active clips, global titles and exact audio slices, including tracks starting inside a frame, after revalidating the selected plan. Production storage, editor controls, decoding, active crossfades and preview/export routing remain gated. See [session seek mapping](docs/PHASE_J_SESSION_SEEK.md), [session checkpoints and recovery](docs/PHASE_J_SESSION_CHECKPOINTS.md) and [mixed-layer manifests](docs/PHASE_J_LAYER_MANIFEST.md).
+Local source **0.56.86** adds content-versioned previews, workspace-bound analysis, exact folder selection, keyboard map browsing, validated settings recovery and bounded HEIC decoding. See the [current capability and acceptance matrix](docs/LIBRARY_RELIABILITY.md). This is a local release candidate; installed acceptance and publication are separate gates.
+
+The retained Phase J **0.56.85** groundwork connects the test-only request coordinator to real Windows video/photo decoding. It verifies and pins selected sources, reuses shared normalization and returns bounded RGB inputs for the requested frames. These inputs are not yet a composed preview: transitions, titles, audio and production playback/export integration remain gated. See [real preview-input decoding](docs/PHASE_J_PREVIEW_DECODE.md), [bounded preview requests](docs/PHASE_J_PREVIEW_REQUESTS.md) and [session seek mapping](docs/PHASE_J_SESSION_SEEK.md).
 
 ## Local XMP safety update (unreleased)
 
@@ -59,8 +73,8 @@ Open-Photo uses one shared visual system across the photo library, settings, loc
 | Local folder scanning | ✅ Working | Recursive, read-only source scan with path validation |
 | Multiple workspace folders | ✅ Working | One workspace can include multiple local roots |
 | Persistent media index | ✅ Working | SQLite index under local app data |
-| Incremental folder updates | ✅ Working | Native watcher plus safe full-scan fallback |
-| Manual and periodic sync | ✅ Working | Manual Sync Now and optional 2-minute auto-sync |
+| Filesystem discovery | ✅ Manual | Sync discovers changes; automatic watching is disabled |
+| Manual sync | ✅ Working | Sync in Library or Sync now in Folders; no periodic rescan |
 | Grid/list library views | ✅ Working | Unified ranked search, media filters, sorting, thumbnail-size control |
 | Local thumbnail cache | ✅ Working | Bounded disk cache; originals are not changed |
 | Ratings and favorites | ✅ Working | 1–5 stars stored as local Open-Photo state; 5 stars acts as Favorite |
