@@ -14,6 +14,8 @@ use std::{
 };
 
 type Bindings = BTreeMap<String, String>;
+#[cfg(test)]
+include!("phase_j_workspace_admission.rs");
 struct Record {
     project: Sequence,
     revision: u64,
@@ -961,6 +963,7 @@ fn recover(
 #[cfg(test)]
 mod tests {
     use super::*;
+    include!("phase_j_workspace_admission_tests.rs");
     #[test]
     fn still_projects_roundtrip_duration_relink_history_and_failed_batches_without_changing_sources(
     ) {

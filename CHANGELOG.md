@@ -1,3 +1,192 @@
+## 0.56.87 — title editing validation and keyboard fixes (unreleased)
+
+- Replace the incorrectly escaped title control-character expressions with one Unicode-aware validator shared by the editor and project validation. Accept ordinary letters, punctuation and up to 100 Unicode scalar values; reject native-incompatible controls and unpaired surrogates.
+- Make Escape discard the local draft without a blur commit, preserve the next edit, and keep Enter from ending active IME composition. Retain invalid drafts with accessible correction feedback so the existing output guard blocks stale export. Add component and project-validation regressions.
+
+## Unreleased engineering increment — workspace-bound Phase J previews
+
+- Connect authoritative workspace admission to gated visual/title/PCM preview composition using per-asset source roots, including photos and standalone audio in a second folder.
+- Bind the entire selected document to opaque native authorization, retain decoded source pins, recheck access after composition and at consumption, and reject delivery through the legacy authorization-free entry point.
+- Cover mid-composition/final workspace revocation, document mismatch and worker-slot cleanup with real-engine regressions. Production storage, editor activation, export parity and installed acceptance remain required; phase 3 is not complete.
+
+## Unreleased engineering increment — Phase J workspace admission
+
+- Start phase 3 with a test-only read-only bridge to native workspace-owned projects, complete stored document/binding receipts and fresh-root/source checks. Cover revoked ownership, multiple roots, stale edits and preservation of unsupported future schemas. Production integration and release gates remain open; see docs/PHASE_J_PRODUCTION_INTEGRATION.md.
+
+## Unreleased engineering increment — Phase J titles and audio
+
+- Add gated post-transition global title rendering and exact 48 kHz stereo PCM windows, with sample-centered linear crossfade/track envelopes, mute/gain and final clipping counters.
+- Retain independent audio-source pins, bounded decoding, source-change rejection, cancellation and final stale-result checks. Add real-engine pixel/sample regressions; see docs/PHASE_J_TITLES_AUDIO.md for policies, prototype bounds and phase 3 acceptance gaps. No production activation, installer or release update.
+
+## Unreleased engineering increment — Phase J visual composition
+
+- Connect verified frame decoding to clock-weighted RGB dissolves and discrete dips; retain source ownership, worker-slot lifetime and final stale-delivery checks.
+- Add real-frame, dip, supersession and bundled-FFmpeg RGB reference regressions. Full native verification: 429 passed, eight opt-in modes skipped; Clippy passed. Production YUV export policy remains an explicit phase 3 gate. No installer/release update.
+
+## 0.56.86 — local library reliability and accessibility candidate (unreleased)
+
+- Carry source fingerprints through renderer/native preview requests and caches, recheck source identity and reject stale results. Cover preserved-size/timestamp changes for images, HEIC reads and video posters.
+- Bind duplicate/similarity/health tasks to their workspace and request; select actual source-root/directory identities, with direct-file scope and a visible reset action.
+- Add keyboard map markers, paged/filterable coordinate results, token-based marker styling and linear GPS-year lookup.
+- Validate organizational settings at one repository boundary and preserve malformed/future data behind explicit validated recovery. Extract the preview service and scoped task ownership from App.
+- Decode HEIC in a bounded dedicated worker with pixel guards, thumbnail-sized output, cancellation/timeout disposal and the production CSP; move native image preview IO off the command thread.
+- Preserve the concurrent 0.56.85 Phase J work. See docs/LIBRARY_RELIABILITY.md for verification and release gates; no install, upload or publication is implied.
+
+## 0.56.85 — Phase J gated real preview-input decoder (unreleased)
+
+- Decode actual normalized video/photo frames from verified saved-project sources, pin Windows originals through typed-result ownership and validate exact RGB geometry/byte counts.
+- Extract the existing part normalization filter unchanged for reuse by encoded parts and the test-only decoder; reuse source preparation, edits, photo transparency flattening, bounded bundled processes and guarded scratch cleanup.
+- Share completion eligibility between opaque test payloads and typed decoded inputs, discard obsolete work and keep final typed-result checks. Limit this experiment to short/bounded inputs; no composed preview, titles, PCM audio or production route is enabled.
+- Add seven real-engine regressions for trim/frame positions, overlap inputs, photo alpha, source locking/integrity, mid-decode project changes, cancellation and bounds. Correct the disposable fixture canvas before the passing targeted run.
+- Local validation run passed: 420 native tests, 332 frontend tests, TypeScript/Vite build, Clippy with warnings denied, relevant Rust formatting and scoped diff whitespace checks. Eight explicit native acceptance modes were not selected. Concurrent library/HEIC edits in the shared workspace are separate; repository-wide whitespace checks report their App/styles EOF blank lines.
+- Remain local with 0.56.84; no new push/remote CI, installer or installation. Preserve the XMP 0.56.76 handoff.
+
+## 0.56.84 — Phase J bounded preview requests and stale-result rejection (unreleased)
+
+- Add a test-only coordinator over verified session seeks, retaining one active worker slot and one latest pending request; coalesce identical frame/session bindings and cooperatively cancel obsolete work without prematurely reusing its worker slot.
+- Revalidate native state at admission, start and completion, discard superseded results/errors, bound accepted payloads and expose final consumer checks for changed generation, session, folder/project and document bindings.
+- Reject foreign/duplicate completions, preserve newer work on old cancellation, close safely on generation exhaustion and cancel owned tokens during normal or poisoned-state drop.
+- Add seven lifecycle regressions including a 500-request burst and a channel-coordinated simulated worker. No actual decoder/executor or production UI/render route is connected.
+- Local checks passed: 413 native tests, 332 frontend tests, TypeScript/Vite build, Clippy with warnings denied, Rust formatting and diff whitespace checks. Eight explicit native acceptance modes were not selected.
+- This increment remains local; the previously pushed 0.56.83 PR #121 passed fast CI #1434. No new push/remote CI, installer or installation; XMP 0.56.76 handoff preserved.
+
+## 0.56.83 — Phase J resumed-session preview seek mapping (unreleased)
+
+- Add test-only native seek descriptions for working/resumed mixed-layer sessions, revalidating the selected manifest and echoing session/project identity for later delivery checks.
+- Map one/two active video/photo parts, exact sample-center video weights, global title ranges and 48 kHz audio windows. Preserve subframe added-track starts/ends, independent gain/fades, silence/mute and video-only dip budgets.
+- Define linear sample-centered audio envelopes in the native graph's preliminary direction; document the older TypeScript equal-power proposal and keep physical PCM/listening parity gated.
+- Add seven regressions for transition/title endpoints, audio slices/gains, photos/dips, full 30/60 fps timeline coverage, invalid/exclusive-end seeks and read-only stale/corrupt-session handling.
+- Local checks passed: 406 native tests, 332 frontend tests, TypeScript/Vite build, Clippy with warnings denied, Rust formatting and diff whitespace checks. Eight explicit native acceptance modes were not selected.
+- No production command/UI/decode/render activation, installer, installation, push, upload or remote CI. Preserve the XMP 0.56.76 handoff.
+
+## 0.56.82 — Phase J saved session checkpoints and explicit recovery (unreleased)
+
+- Add test-only append-only session checkpoints binding selection, session revision, undo/redo and recovery provenance to the authoritative project and all referenced manifests.
+- Require expected latest receipts, reject conflicting writers, support explicit latest resume and recover a reviewed historical checkpoint into a separate stable session ID without replacing the original.
+- Bound payload/history reads, preserve unknown/corrupt/stale data, roll back failed writes and acknowledge committed retries without duplicate records. Keep edit and checkpoint operations explicitly separate.
+- Add eight regressions, including three actual checkpoint process-exit boundaries, for resume/history, concurrency, recovery, faults, strict records/schema validation and retained unsaved manifests.
+- Local checks passed: 399 native tests, 332 frontend tests, TypeScript/Vite build, Clippy with warnings denied, Rust formatting and diff whitespace checks. Eight explicit native acceptance modes were not selected.
+- Remain test-only with no production activation, installer, installation, push, upload or remote CI. Preserve the XMP 0.56.76 handoff.
+
+## 0.56.81 — Phase J gated editor sessions and undo/redo (unreleased)
+
+- Add test-only native sessions over immutable mixed-layer manifests, with explicit selection, adjacent crossfade add/change/remove and undo/redo.
+- Require exact session/revision/current-plan receipts, revalidate current and target snapshots, preserve no-op revision/redo state, clear redo on new branches and bound undo to 20 changes without deleting snapshots.
+- Commit immutable records before installing session state; roll back pre-commit failures and fence obsolete retries after a lost reply. Session selection/history remain in memory; no durable session recovery claim.
+- Add seven regressions for editing, selection, history, invalid/stale/corrupt requests, revision limits, fault/reopen behavior and snapshot retention. Preserve existing video-only draft/recovery and active production behavior.
+- Local checks passed: 391 native tests, 332 frontend tests, TypeScript/Vite build, Clippy with warnings denied, Rust formatting and diff whitespace checks. Eight explicit native acceptance modes were not selected.
+- No production command/UI/rendering activation, installer, installation, push, upload or remote CI. Preserve the XMP 0.56.76 handoff.
+
+## 0.56.80 — Phase J immutable mixed-layer manifests (unreleased)
+
+- Add strict versioned mixed-layer manifests binding exact saved project JSON, native root/project/revision and canonical boundaries to a recomputed frame/sample plan.
+- Persist immutable content-addressed records in a separate disposable test schema. Preserve distinct proposals, canonicalize JSON retries and refuse stale, forged, corrupt, unknown-format or changed-schema records without replacement.
+- Add eight regressions covering mixed-layer cold reopens, full metadata binding, input validation, scoped/corrupt/future records, rollback and three actual process-exit boundaries. Keep the video-only draft/recovery format separate.
+- Local checks passed: 384 native tests, 332 frontend tests, TypeScript/Vite build, Clippy with warnings denied, Rust formatting and diff whitespace checks. Eight explicit native acceptance modes were not selected.
+- Remain test-only: no production migration, editor integration, active crossfade route, installer, installation, push, upload or remote CI. Preserve the XMP 0.56.76 handoff.
+
+## 0.56.79 — Phase J mixed-media and layer timing groundwork (unreleased)
+
+- Add a test-only native planner using actual cumulative clip frames and the overlap clock for video/photo and still-only sequences, with exact 48 kHz project sample spans.
+- Keep titles and added audio at absolute project positions, reject shortened-timeline overruns and quantization collapse, and preserve mute/gain/source/fade bounds.
+- Reserve dip and crossfade envelopes together with two clear frames; reject both transition types at the same cut. Document the proposed post-transition global-title composition policy for later review.
+- Add eight timing/binding regressions and a read-only saved-plan adapter bound to the actual root/project, revision and complete stored JSON hash. Keep the v1 persisted draft adapter's mixed-layer restrictions intact.
+- Local checks passed: 376 native tests, 332 frontend tests, build, Clippy with warnings denied, Rust formatting and diff whitespace checks; final targeted rerun passed all 27 adapter tests. Eight explicit acceptance modes were not selected.
+- No active crossfade route, production migration, installer, installation, push, upload or remote CI. XMP 0.56.76 handoff preserved.
+
+## 0.56.78 — Phase J gated storage and recovery contract (unreleased)
+
+- Add a component-owned v1 storage contract to the test-only saved-project adapter; preserve and refuse future, unversioned or incomplete schemas without changing production database versions or project JSON.
+- Check draft/history/copy payload hashes and project bindings, page retained history and recover a verified selection into a separate copy while preserving the current draft.
+- Recheck selection changes atomically and return the same verified copy on committed retries, including after a lost reply. Keep history/copies append-only; production retention and migration remain open gates.
+- Add nine tests, including seven abrupt child-process exits, for schema compatibility, corruption, scoped selection, rollback, retry identity and bounded history reads.
+- Local checks: 368 native tests and 332 frontend tests passed; frontend build, Clippy with warnings denied, Rust formatting and diff whitespace checks passed. Eight explicit native acceptance modes were not selected. No production crossfade enablement, installer, installation, push, upload or remote CI.
+
+## 0.56.77 — Phase J saved-project binding groundwork (unreleased)
+
+- Connect experimental draft validators to the real native sequence reader/schema and cumulative frame allocation in a test-only adapter.
+- Bind detached file-backed drafts to authoritative root/project, stored document hash and revisions; reject stale/corrupt writes and loads, preserve no-op revisions and roll back draft/history changes together.
+- Add ten regressions for native binding, cold reopens, independent connections, rollback, unsupported layers/media, legacy v2 reads and safe revision/identity checks.
+- Preserve the XMP 0.56.76 handoff and all active editor/render/export behavior. No production migration, active crossfade route, installer, upload or release.
+- Local checks passed: 359 native tests, 332 frontend tests, build, Clippy and formatting. Eight explicit acceptance modes were not run in this update; production enablement remains gated.
+
+## 0.56.76 — local XMP audit and closeout candidate (unreleased)
+
+- Reproduce and fix incomplete intent revalidation between SQLite transactions. Compare every recorded binding before new-sidecar publication, reviewed Apply and restoration; recheck the prepared operation's registered-folder identity.
+- Add four regressions covering 40 journal/folder mutation variations, retaining the failing pre-fix reproduction as separate audit evidence.
+- Consolidate current XMP behavior and roadmap status, preserve historical checkpoints and prepare an updated local installer/source handoff.
+- Installed real-media/lifecycle/power-loss acceptance and remote CI remain pending. No personal-profile installation, upload, issue closure or public release.
+- Final local checks passed: 349 native tests, 332 frontend tests, real ExifTool matrix, Clippy, formatting, four browser suites and fresh 0.56.76 installer packaging. Seven other explicit acceptance modes remain unrun.
+
+## 0.56.75 — read-only XMP staging observations (unreleased)
+
+- Expose possible retained staging filenames, entry types, sizes and inspection errors during authorized current-file review, with strict operation-name filtering and bounded scans.
+- Mark entries as unverified, report incomplete results, avoid reading staged contents or following links, and offer no cleanup/promotion actions.
+- Keep advisory observations outside approval fingerprints and write authorization. Verify preservation through handled failures, actual process exit, cold reopen, retry and explicit original restoration.
+- Preserve the existing 0.56.70 installer and keep work local; installed acceptance and publication remain pending.
+- Local checks passed: 345 native tests, 332 frontend tests, the separately selected real ExifTool matrix, build, Clippy, formatting and light/dark/narrow browser fixtures. Seven other explicit acceptance modes remain unrun.
+
+## 0.56.74 — inspect saved XMP documents while offline (unreleased)
+
+- Load stored originals/proposals before live verification and retain them when the source or folder is unavailable, with a readable verification notice and separate retry states.
+- Check stored record identity before live reads, discard old-workspace replies, clear consent on retry and keep file-changing decisions blocked without fresh verification.
+- Verify retained documents and journal-only cancellation after root removal, plus denial after workspace deletion. Interrupted saves retain their existing recovery restrictions.
+- Local checks passed: 338 native tests, 328 frontend tests, build, Clippy, formatting and light/dark/narrow browser fixtures. Eight explicit acceptance modes remain unrun. No installer change, installation, upload or release.
+
+## 0.56.73 — paged XMP reviews and lazy snapshots (unreleased)
+
+- Browse pending reviews and completed history in 50-summary pages without the former 1,000-record ceiling; load stored XML only when opening an operation.
+- Add workspace-scoped page/detail commands and additive ordering indexes, retaining the legacy list command for compatibility.
+- Clear approval on page changes, reset paging on refresh/history/workspace changes, ignore late results and retain navigation after page errors.
+- Verify 336 native tests, 321 frontend tests, build, Clippy, formatting and light/dark/narrow browser fixtures. Eight explicit acceptance modes remain unrun. No installer change, installation, upload or release.
+
+## 0.56.72 — background XMP verification and saves (unreleased)
+
+- Dispatch all six XMP commands to asynchronous blocking workers, including full-file checksums, SQLite work and save-lock waits.
+- Serialize review decisions with tag creation, Apply and restoration so cancellation cannot interleave with new-sidecar publication.
+- Preserve confirmed writes when a reply is dropped; report worker failures and require restart/review if a panic poisons the save lock.
+- Add disposable native scheduling, dropped-reply, failure/recovery and publication-lock regression tests. No replacement installer, installation, upload or release.
+- Local checks passed: 331 native tests, 315 frontend tests, build, Clippy and formatting. Eight explicit acceptance modes were not run in this update; installed-app acceptance remains pending.
+
+## 0.56.71 — XMP source-content binding and local fixtures (unreleased)
+
+- Persist full-source SHA-256 checksums through protected read-only handles and bind fresh comparisons to both recorded and observed content.
+- Block Apply/restoration after source-content changes, including same-identity/size/timestamp edits, and block legacy proposals without silently backfilling their checksums.
+- Add native restart/migration/restore/streaming/sharing regressions and a new-directory-only synthetic PNG/XMP fixture generator with a checksum verifier.
+- Local validation: 326 native and 315 frontend tests, the separately selected real ExifTool matrix, frontend build, Clippy and formatting passed. Seven other explicit acceptance modes remain unrun.
+- Keep the 0.56.70 installer/snapshot unchanged. This is local source work; installed-app acceptance, remote CI and release remain pending.
+
+## 0.56.70 — local XMP installer test candidate (unreleased)
+
+- Align application/package/workflow versions for the local Windows installer candidate.
+- Prepare an installer handoff with a hashed source snapshot, build evidence and a disposable-Windows acceptance checklist.
+- Keep installed WebView2, installed AI/runtime, video export, uninstall and power-loss acceptance explicitly pending. No installation on the personal profile, upload, remote CI or release.
+
+## XMP step 3 — editor and explicit-recovery validation (unreleased)
+
+- Add confirmed restoration of a verified recovery original into a currently empty sidecar path. Bind approval to backup identity/hash and source/folder versions; retain both journal snapshots and refuse any competing file.
+- Persist restoration intent/acknowledgement and cover repeated recovery after real Apply/restore process exits. Corrupt, replaced, missing, aliased and unsafe recovery entries remain blocked.
+- Activate the existing successful-publication race gate against the runtime protocol, preserving its external-edit interleaving.
+- Pass an explicit ExifTool 13.61 source-runtime matrix covering earlier edits, guarded replacement/in-place refusal, Apply-gap winners, later edits and recovery-gap winners.
+- Fix temporary test database cleanup and process-ID reuse collisions without deleting failed-run evidence.
+- Local checks: 315 frontend tests, 320 default native tests, the separately selected ExifTool matrix, build, lint, formatting and visual fixtures passed. Seven other explicit acceptance modes and installed-Windows/power-loss acceptance remain pending. Nothing uploaded or released.
+
+## Reviewed XMP Apply — local step 2 (unreleased)
+
+- Add explicit reviewed Apply with proposal, source, folder and sidecar identity/version checks. Preserve the old sidecar using its protected handle, then publish the candidate only to a free name; never overwrite a competing editor's file.
+- Isolate hash-damaged records, allow journal-only cancellation after media moves/folder removal, and expose completed saves and decisions for inspection.
+- Retain ambiguous interruptions and recovery originals. A fresh current-file review can acknowledge an interrupted save without applying it again. The two-phase save can briefly leave a name absent and does not claim power-loss atomicity.
+- Verify separate-process writer/replacement refusal and a live junction-conversion attempt at the production boundary, plus fault and cold-restart coverage.
+- Local validation: 310 frontend and 313 native tests passed; eight acceptance skips remain. Build, lint, formatting and browser fixtures passed. No upload, installer or release.
+
+## Local XMP transactions and recovery (unreleased)
+
+- Add saved-workspace authorization, Windows file/folder identity checks and refusal for junctions, file aliases, alternate streams and unsupported storage.
+- Add a FULL-sync SQLite operation journal containing original/proposed snapshots, hashes, identities and explicit review decisions.
+- Create new sidecars through verified staging and handle-relative no-overwrite publication. Existing sidecars receive reviewable proposals instead of automatic replacement.
+- Add Tags recovery controls and stale-decision protection. Preserve legacy artifacts and ambiguous interruptions.
+- Add fault injection and abrupt-process/cold-restart coverage. Local checks: 304 frontend tests, 295 native tests (eight acceptance skips), build, formatting and Clippy passed. No release or installed acceptance claimed.
+
 # XMP experiment verification follow-up
 
 - Require successful Windows replacement to publish staged bytes and consume the staged file; retain full test diagnostics in CI.
@@ -1691,3 +1880,22 @@ The following remain active roadmap items and should not be represented as finis
 - metadata-based Apple Live Photo pairing;
 - Immich API synchronization and person mapping;
 - formal public licensing/release.
+
+## Independent-process XMP sharing characterization (development)
+
+- Add bounded separate-process tests for replacement under delete-sharing and
+  delete-denying read guards, including retained-handle/pathname byte comparison,
+  child execution/status verification, staged-candidate preservation and source
+  SHA-256 checks. These experiments leave the production writer unchanged.
+- Issue #90 remains open; identity, crash recovery and installed Windows gates
+  remain outstanding. No release or installer is produced.
+
+## Local XMP safety continuation
+
+- Add writer-first cross-process refusal/fresh-read checks with explicit process
+  coordination and bounded child cleanup.
+- Add hardlink and parent-directory identity experiments using Windows handle
+  identities and disposable-source SHA-256 checks. Parent rename refusal while
+  the file is open is checked before exercising post-release path rebinding.
+- Production save behavior and release version remain unchanged; Issue #90's
+  production conflict-prevention and installed acceptance gates remain open.

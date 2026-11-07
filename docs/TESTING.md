@@ -93,7 +93,9 @@ Before release, commit `package-lock.json` and `Cargo.lock`, use `npm ci`, and d
 - Regression coverage: repeat application does not overwrite the first sidecar and original image bytes are unchanged.
 - Future work: metadata-aware merge for existing sidecars, tag removal, undo, filesystem event refresh, UI interaction tests, thumbnail disk-cache migration and EXIF display. Until metadata merge is tested against Immich 3.3.5, **do not** overwrite existing XMP.
 
-## Incremental media-index milestone
+## Historical incremental media-index milestone
+
+These milestone notes record earlier behavior. For current scope and acceptance use [LIBRARY_RELIABILITY.md](LIBRARY_RELIABILITY.md).
 
 - `scan_indexed` persists a per-root snapshot in the user's local Open-Photo SQLite data directory.
 - Complete scans replace the previous index snapshot transactionally. Truncated scans are returned but not persisted as complete snapshots.
@@ -103,7 +105,9 @@ Before release, commit `package-lock.json` and `Cargo.lock`, use `npm ci`, and d
 - The initial exact-duplicate unit test verifies same-content/different-content fixtures. Expand coverage for media renames, root overlap, inaccessible files, and cross-root duplicates.
 - Immich 3.3.5 connectivity and semantic AI search are still future work.
 
-## Native folder watching milestone
+## Historical native folder watching milestone
+
+Watching and automatic rescan timers are currently disabled. These earlier milestone notes do not describe current discovery behavior.
 
 - Auto-sync preference persists locally across application restarts.
 - Native Windows recursive filesystem notifications trigger a debounced indexed rescan after approximately 1.5 seconds.

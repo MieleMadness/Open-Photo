@@ -1,5 +1,9 @@
+import {readStructuredSetting,type Collection,type SmartRule} from "./settingsRepository";
+import {mapCaptureYears} from "./mapDiscovery";
 import {virtualRows} from "./virtualRows";
-import {ThumbnailCache} from "./thumbnailCache";
+import {LibraryThumbnail as PhotoThumb} from "./LibraryThumbnail";
+import {useScopedTask} from "./useScopedTask";
+import {libraryFolderChoices,matchesLibraryFolder,folderIdentity,folderLabel,type FolderSelection} from "./libraryFolderSelection";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type UIEvent } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -13,6 +17,7 @@ import {LibraryFolders} from "./LibraryFolders";
 import {workspaceFolders,initialWorkspace,type Workspace} from "./libraryWorkspace";
 import {useUnifiedSearch} from "./useUnifiedSearch";
 import {SearchStatus} from "./SearchStatus";
+import {XmpRecovery} from "./XmpRecovery";
 import {useManagedTags} from "./useManagedTags";
 import {readMetadataBatches} from "./metadataBatches";
 import {readSetting,saveSetting,retrySettings} from "./userData";
@@ -27,13 +32,11 @@ import {workspaceProject,type LoadedSequence} from "./videoSequence";
 import {VideoExportPanel} from "./VideoExportPanel";
 import {ProjectSaveGuard} from "./ProjectSaveGuard";
 import {Modal,TaskForm,ErrorNotice,NoticeTarget,NoticeSurface,NoticeHostSetter} from "./Ui";
-import { IPhonePicture, IPhoneMotion } from "./IPhoneMedia";
+import { IPhoneMotion } from "./IPhoneMedia";
 import {UpdateSettingsCard,UpdateToast,useAppUpdater} from "./appUpdater";
 import { Play, Images, FolderOpen, Users, Tags, Settings2, Search, Monitor, ShieldCheck, ImageOff, HardDrive, ChevronRight, X, LayoutGrid, List, ZoomIn, ZoomOut, ArrowUpDown, MapPin, CalendarDays, Heart, Clapperboard, Library } from "lucide-react";
 
 type View = "editor" | "library" | "folders" | "collections" | "timeline" | "memories" | "map" | "people" | "tags" | "settings";
-type Collection = {id:string;workspaceId:string;name:string;paths:string[]};
-type SmartRule = {id:string;workspaceId:string;name:string;minRating:number;type:"all"|"photo"|"video";minMB:number};
 
 type Theme = "light" | "dark" | "system";
 type Accent = "purple" | "blue" | "teal" | "green" | "rose";
@@ -46,7 +49,7 @@ const ACCENTS:{id:Accent;label:string;color:string}[]=[
 ];
 type PhotoView = "grid" | "list";
 type SortBy = "relevance" | "name" | "newest" | "oldest" | "largest" | "smallest";
-type Photo = { path: string; name: string; extension: string; bytes: number; modified_unix: number; capture_local?: string | null; live_asset_id?: string | null; libraryRoot?: string };
+type Photo = { path: string; name: string; extension: string; bytes: number; modified_unix: number; source_version?: string | null; capture_local?: string | null; live_asset_id?: string | null; libraryRoot?: string };
 type ScanResult = { photos: Photo[]; scanned_files: number; truncated: boolean; incomplete?:boolean; errors?:string[] };
 type PersonFace = {root:string;path:string;face_index:number;x:number;y:number;width:number;height:number;score:number};
 type PersonGroup = {id:string;name?:string;legacy_id?:string;members:PersonFace[]};
@@ -129,7 +132,7 @@ export default function App() {
   const [peopleGroups,setPeopleGroups]=useState<PersonGroup[]>([]);
   const [peopleStatus,setPeopleStatus]=useState<FaceIndexStatus|null>(null);
   const [peopleMessage,setPeopleMessage]=useState("");
-  const [peopleNames,setPeopleNames]=useState<Record<string,string>>(()=>{try{return JSON.parse(readSetting("openphoto.peopleNames")||"{}") as Record<string,string>}catch{return {}}});
+  const [peopleNames,setPeopleNames]=useState(()=>readStructuredSetting("peopleNames"));
   useEffect(()=>saveSetting("openphoto.peopleNames",JSON.stringify(peopleNames)),[peopleNames]);
   const [aiRuntime,setAiRuntime]=useState<{directml_compiled:boolean;directml_available:boolean;automatic_policy:string;cpu_fallback:boolean}|null>(null);
   const refreshModels=async()=>{setAiModelBusy(true);try{setAiModels(await invoke<AiModelInfo[]>("ai_model_status"));}catch(e){setAiModelMessage(String(e));}finally{setAiModelBusy(false);}};
@@ -151,12 +154,12 @@ export default function App() {
   const [aiDevice,setAiDevice]=useState<"auto"|"cpu">(()=>readSetting("openphoto.ai.device")==="cpu"?"cpu":"auto");
   useEffect(()=>saveSetting("openphoto.ai.optin",String(aiOptIn)),[aiOptIn]);
   useEffect(()=>saveSetting("openphoto.ai.device",aiDevice),[aiDevice]);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>(()=>{try{return JSON.parse(readSetting("openphoto.workspaces")||"[]") as Workspace[]}catch{return []}});
+  const [workspaces,setWorkspaces]=useState(()=>readStructuredSetting("workspaces"));
   const [activeWorkspace,setActiveWorkspace] = useState<string>(()=>readSetting("openphoto.activeWorkspace")||"");
-  const [folderFilter,setFolderFilter] = useState("");
+  const [folderFilter,setFolderFilter] = useState<FolderSelection|null>(null);
   const [folderView,setFolderView]=useBrowseView(activeWorkspace,"folders"),[collectionView,setCollectionView]=useBrowseView(activeWorkspace,"collections");
   const [collectionFilter,setCollectionFilter]=useState("");
-  const [collections,setCollections]=useState<Collection[]>(()=>{try{return JSON.parse(readSetting("openphoto.collections")||"[]") as Collection[]}catch{return []}});
+  const [collections,setCollections]=useState(()=>readStructuredSetting("collections"));
   useEffect(()=>saveSetting("openphoto.collections",JSON.stringify(collections)),[collections]);
   const [geoPoints,setGeoPoints]=useState<PhotoLocation[]>([]);
   const [geoBusy,setGeoBusy]=useState(false);
@@ -166,28 +169,19 @@ export default function App() {
   const syncGeneration=useRef(0);
   useEffect(()=>{saveSetting("openphoto.autosync","false");if(isDesktop)void invoke("set_watched_folders",{roots:[]}).catch(e=>setError(String(e)));},[]);
   const [lastSync,setLastSync]=useState("");
-  const [healthReport,setHealthReport]=useState<{indexed:number;available:number;missing:number;inaccessible:number;modified:number}|null>(null);
-  const [healthError,setHealthError]=useState("");
-  const [healthBusy,setHealthBusy]=useState(false);
+  const libraryTaskScope=JSON.stringify([activeWorkspace,workspaceFolders(workspaces.find(item=>item.id===activeWorkspace)),syncGeneration.current]);
+  const healthTask=useScopedTask<{indexed:number;available:number;missing:number;inaccessible:number;modified:number}>(libraryTaskScope);
+  const healthReport=healthTask.value,healthError=healthTask.error,healthBusy=healthTask.busy;
   const [syncChanges,setSyncChanges]=useState<{added:number;updated:number;unchanged:number;removed:number;incomplete:boolean}|null>(null);
-  const [duplicates, setDuplicates] = useState<{paths:string[];bytes:number}[]>([]);
-  const [duplicateBusy, setDuplicateBusy] = useState(false);
-  const [duplicateReview,setDuplicateReview]=useState<Record<string,string>>(()=>{
-    try {
-      const stored=JSON.parse(readSetting("openphoto.duplicateReview")||"{}") as Record<string,unknown>;
-      return Object.fromEntries(Object.entries(stored).filter((entry):entry is [string,string]=>typeof entry[1]==="string"));
-    } catch { return {}; }
-  });
+  const duplicateTask=useScopedTask<{paths:string[];bytes:number}[]>(libraryTaskScope);
+  const similarTask=useScopedTask<{paths:string[];max_distance:number}[]>(libraryTaskScope);
+  const duplicates=duplicateTask.value||[],similarGroups=similarTask.value||[];
+  const duplicateBusy=duplicateTask.busy||similarTask.busy,analysisError=duplicateTask.error||similarTask.error;
+  const [duplicateReview,setDuplicateReview]=useState(()=>readStructuredSetting("duplicateReview"));
   useEffect(()=>saveSetting("openphoto.duplicateReview",JSON.stringify(duplicateReview)),[duplicateReview]);
-  const [similarGroups,setSimilarGroups]=useState<{paths:string[];max_distance:number}[]>([]);
   const [mediaType,setMediaType] = useState<"all"|"photo"|"video">("all");
   const [organizeFilter,setOrganizeFilter] = useState<"all"|"favorites"|"rated">("all");
-  const [photoRatings,setPhotoRatings] = useState<Record<string,number>>(()=>{
-    try {
-      const saved=JSON.parse(readSetting("openphoto.ratings")||"{}") as Record<string,number>;
-      return Object.fromEntries(Object.entries(saved).filter(([,rating])=>Number.isInteger(rating)&&rating>=0&&rating<=5));
-    } catch { return {}; }
-  });
+  const [photoRatings,setPhotoRatings]=useState(()=>readStructuredSetting("ratings"));
   useEffect(()=>saveSetting("openphoto.ratings",JSON.stringify(photoRatings)),[photoRatings]);
   const ratePhoto=(path:string,rating:number)=>setPhotoRatings(previous=>({...previous,[path]:previous[path]===rating?0:rating}));
   const [theme, setTheme] = useState<Theme>(() => (readSetting("openphoto.theme") as Theme) || "system");
@@ -204,12 +198,7 @@ export default function App() {
   const [tagRefreshKey,setTagRefreshKey]=useState(0);
   const {managedTags,tagIndexBusy,tagIndexError}=useManagedTags(result?.photos,root,activeWorkspace,isDesktop&&(view==="tags"||!!selectedTag||!!query.trim()),tagRefreshKey);
   const [selectedSmartRule,setSelectedSmartRule]=useState("");
-  const [smartRules,setSmartRules]=useState<SmartRule[]>(()=>{
-    try {
-      const saved=JSON.parse(readSetting("openphoto.smartRules")||"[]") as SmartRule[];
-      return Array.isArray(saved)?saved.filter(item=>typeof item.id==="string"&&typeof item.name==="string"&&["all","photo","video"].includes(item.type)&&Number.isInteger(item.minRating)&&item.minRating>=0&&item.minRating<=5&&Number.isFinite(item.minMB)&&item.minMB>=0):[];
-    }catch{return [];}
-  });
+  const [smartRules,setSmartRules]=useState(()=>readStructuredSetting("smartRules"));
   useEffect(()=>saveSetting("openphoto.smartRules",JSON.stringify(smartRules)),[smartRules]);
   const [photoView, setPhotoView] = useState<PhotoView>("grid");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
@@ -371,19 +360,11 @@ export default function App() {
   };
   const inspectDuplicates=async()=>{
     if(!result)return;
-    setDuplicateBusy(true);setError("");
-    try{
-      const groups=await invoke<{paths:string[];bytes:number}[]>("find_workspace_duplicates",{roots,paths:result.photos.map(p=>p.path)});
-      setDuplicates(groups);
-    }catch(e){setError(String(e))}finally{setDuplicateBusy(false)}
+    await duplicateTask.run(()=>invoke("find_workspace_duplicates",{roots,paths:result.photos.map(p=>p.path)}));
   };
   const inspectSimilar=async()=>{
     if(!result)return;
-    setDuplicateBusy(true);setError("");
-    try{
-      const matches=await invoke<{paths:string[];max_distance:number}[]>("find_similar_photos",{roots,paths:result.photos.map(p=>p.path)});
-      setSimilarGroups(matches);
-    }catch(e){setError(String(e))}finally{setDuplicateBusy(false)}
+    await similarTask.run(()=>invoke("find_similar_photos",{roots,paths:result.photos.map(p=>p.path)}));
   };
   editorWorkspace.current=activeWorkspace;
   const workspace = workspaces.find(w=>w.id===activeWorkspace);
@@ -413,6 +394,7 @@ export default function App() {
     if (!isDesktop || !paths.length || syncRunning.current===syncGeneration.current) return;
     const generation=syncGeneration.current;
     syncRunning.current=generation;
+    duplicateTask.reset();similarTask.reset();healthTask.reset();
     setBusy(true); setError("");
     try {
       const scans = await Promise.allSettled(paths.map(async path=>{
@@ -433,7 +415,7 @@ export default function App() {
       const scanErrors=[...failures.map(x=>String(x.reason)),...success.flatMap(s=>s.value.errors||[])];
       if(scanErrors.length)setError(scanErrors.slice(0,10).join("; "));
       if(!restore)setSyncChanges(success.reduce<{added:number;updated:number;unchanged:number;removed:number;incomplete:boolean}>((summary,entry)=>({added:summary.added+entry.value.changes.added,updated:summary.updated+entry.value.changes.updated,unchanged:summary.unchanged+entry.value.changes.unchanged,removed:summary.removed+entry.value.changes.removed,incomplete:summary.incomplete||entry.value.changes.incomplete}),{added:0,updated:0,unchanged:0,removed:0,incomplete:false}));else setSyncChanges(null);
-      if(!restore)setLastSync(new Date().toLocaleString());setDuplicates([]);setSimilarGroups([]);
+      if(!restore)setLastSync(new Date().toLocaleString());duplicateTask.reset();similarTask.reset();
     } catch(e){if(generation===syncGeneration.current)setError(String(e))}finally{if(syncRunning.current===generation)syncRunning.current=null;if(generation===syncGeneration.current)setBusy(false)}
   };
   const chooseFolder = async () => {
@@ -446,15 +428,16 @@ export default function App() {
       const nextRoots=[...new Set([...(current?.roots?.length?current.roots:current?.root?[current.root]:[]),path])];
       setWorkspaces(old=>old.some(w=>w.id===id)?old.map(w=>w.id===id?{...w,root:nextRoots[0],roots:nextRoots}:w):[...old,{id,name:`Workspace ${old.length+1}`,root:path,roots:nextRoots}]);
       syncGeneration.current+=1;
-      setActiveWorkspace(id);setRoot(nextRoots[0]);setSelection([]);setSelected(null);setFolderFilter("");setSelectedTag("");
+      setActiveWorkspace(id);setRoot(nextRoots[0]);setSelection([]);setSelected(null);setFolderFilter(null);setSelectedTag("");
       await syncFolders(nextRoots);
     }catch(e){setError(String(e))}
   };
   const activateWorkspace=async(item:Workspace)=>{
     syncGeneration.current+=1;
+    healthTask.reset();
     aiCancelRequested.current=true;aiEpoch.current+=1;
-    setEditorInitial(null);setEditorError("");setView("library");setActiveWorkspace(item.id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter("");setSelectedTag("");setPeopleGroups([]);setCollectionFilter("");setSelectedSmartRule("");setPeopleStatus(null);
-    setAiSimilar([]);setDuplicates([]);setSimilarGroups([]);setLastSync("");setSyncChanges(null);setError("");
+    setEditorInitial(null);setEditorError("");setView("library");setActiveWorkspace(item.id);setRoot(item.root);setSelection([]);setSelected(null);setResult(null);setFolderFilter(null);setSelectedTag("");setPeopleGroups([]);setCollectionFilter("");setSelectedSmartRule("");setPeopleStatus(null);
+    setAiSimilar([]);duplicateTask.reset();similarTask.reset();setLastSync("");setSyncChanges(null);setError("");
     const folders=workspaceFolders(item);
     if(folders.length)await syncFolders(folders,true);else setBusy(false);
   };
@@ -479,7 +462,7 @@ export default function App() {
     aiCancelRequested.current=true;aiEpoch.current+=1;
     setLastSync("");setSyncChanges(null);
     setWorkspaces(old=>old.map(item=>item.id===activeWorkspace?{...item,root:remaining[0]||"",roots:remaining}:item));
-    setRoot(remaining[0]||"");setResult(null);setSelection([]);setSelected(null);setFolderFilter("");setSelectedTag("");setCollectionFilter("");setSelectedSmartRule("");setPeopleGroups([]);setPeopleStatus(null);setAiSimilar([]);setDuplicates([]);setSimilarGroups([]);setSimilarGroups([]);
+    setRoot(remaining[0]||"");setResult(null);setSelection([]);setSelected(null);setFolderFilter(null);setSelectedTag("");setCollectionFilter("");setSelectedSmartRule("");setPeopleGroups([]);setPeopleStatus(null);setAiSimilar([]);duplicateTask.reset();similarTask.reset();similarTask.reset();
     if(remaining.length)void syncFolders(remaining,true);else setBusy(false);
   }
   useEffect(()=>{
@@ -508,8 +491,8 @@ export default function App() {
       return mapYearFilter==="all"||String(photoDate(photo).getFullYear())===mapYearFilter;
     });
   },[geoPoints,result,mapMediaFilter,mapYearFilter]);
-  const mapYears=useMemo(()=>[...new Set((result?.photos||[]).filter(photo=>geoPoints.some(point=>point.path===photo.path)).map(photo=>String(photoDate(photo).getFullYear())))].sort().reverse(),[result,geoPoints]);
-  const folders=useMemo(()=>[...new Set((result?.photos||[]).map(p=>p.path.slice(0,Math.max(p.path.lastIndexOf("\\"),p.path.lastIndexOf("/"))).replace(p.libraryRoot||root,"").replace(/^[\\/]/,"")||"(root)"))].sort(),[result,root]);
+  const mapYears=useMemo(()=>mapCaptureYears(result?.photos||[],geoPoints,photo=>photoDate(photo).getFullYear()),[result,geoPoints]);
+  const folders=useMemo(()=>libraryFolderChoices(result?.photos||[],root),[result,root]);
   // Prefer Apple's shared Live Photo content identifier when available.
   // Exporters sometimes strip it, so unmatched files retain the conservative
   // same-folder + same-stem fallback. Source files remain separate and read-only.
@@ -634,7 +617,7 @@ export default function App() {
         (mediaType === "video" || !hiddenLiveVideos.has(p.path)) &&
         (!discovery.active||!!discovery.match(p)) &&
         (organizeFilter === "all" || (organizeFilter === "favorites" ? photoRatings[p.path] === 5 : (photoRatings[p.path] || 0) > 0)) &&
-        (!folderFilter || p.path.includes(folderFilter)) &&
+        matchesLibraryFolder(p,root,folderFilter) &&
         (!currentCollection || currentCollection.paths.includes(p.path)) &&
         (mediaType === "all" || (mediaType === "video" ? video : !video));
     }) || [];
@@ -648,7 +631,7 @@ export default function App() {
         case "smallest": return a.bytes - b.bytes || a.path.localeCompare(b.path);
       }
     });
-  }, [result, query, discovery.results, sortBy, folderFilter, mediaType, smartFilter, smartRules, selectedSmartRule, activeWorkspace, organizeFilter, photoRatings, currentCollection, hiddenLiveVideos, timelineMonth, memoryYear, selectedTag, managedTags]);
+  }, [result, root, query, discovery.results, sortBy, folderFilter, mediaType, smartFilter, smartRules, selectedSmartRule, activeWorkspace, organizeFilter, photoRatings, currentCollection, hiddenLiveVideos, timelineMonth, memoryYear, selectedTag, managedTags]);
   const scrollFrame=useRef<number|null>(null);
   useLayoutEffect(() => {if(scrollFrame.current!==null){cancelAnimationFrame(scrollFrame.current);scrollFrame.current=null;}if(gridHost)gridHost.scrollTop=0;setScrollTop(0);}, [gridHost,query,sortBy,photoView,tileSize,root,folderFilter,mediaType,organizeFilter,smartFilter,timelineMonth,memoryYear,selectedTag]);
   const handleLibraryScroll=(event:UIEvent<HTMLDivElement>)=>{
@@ -685,25 +668,25 @@ export default function App() {
     if (!root || !selection.length || !tagText.trim()) return;
     const tags = [...new Set(tagText.split(",").map(x=>x.trim()).filter(Boolean))];
     if (!tags.length) return;
-    if (!window.confirm(`Add ${tags.join(", ")} to ${selection.length} selected items? Open-Photo can create new sidecars or merge into sidecars it manages. Foreign/unknown XMP files will be skipped, and originals are never modified.`)) return;
+    if (!window.confirm(`Add ${tags.join(", ")} to ${selection.length} selected items? Open-Photo creates new sidecars and saves proposed merges for review without replacing existing sidecars. Foreign/unknown XMP files will be skipped, and originals are never modified.`)) return;
     setApplying(true); setTagMessage("");
     try {
       const generation=syncGeneration.current;
       const photosByPath=new Map(result?.photos.map(photo=>[photo.path,photo]));
       const selectedPaths=selection.map(path=>({path,libraryRoot:photosByPath.get(path)?.libraryRoot||root}));
       const {values:outcomes,errors:batchErrors}=await readMetadataBatches(selectedPaths,root,1000,async(parent,paths)=>[
-        await invoke<{created:number;updated:number;skipped:number;errors:string[]}>("bulk_create_tags",{root:parent,paths,tags})
+        await invoke<{created:number;updated:number;skipped:number;review:number;errors:string[]}>("bulk_create_tags",{workspace:activeWorkspace,root:parent,paths,tags})
       ]);
       if(generation!==syncGeneration.current)return;
-      const r={created:outcomes.reduce((n,x)=>n+x.created,0),updated:outcomes.reduce((n,x)=>n+x.updated,0),skipped:outcomes.reduce((n,x)=>n+x.skipped,0),errors:[...batchErrors,...outcomes.flatMap(x=>x.errors)]};
-      setTagMessage(`Created ${r.created} sidecars; updated ${r.updated}; skipped ${r.skipped}. ${r.errors.length ? r.errors.slice(0,3).join("; ") : ""}`);
-      if(r.created+r.updated>0)setTagRefreshKey(value=>value+1);
+      const r={created:outcomes.reduce((n,x)=>n+x.created,0),updated:outcomes.reduce((n,x)=>n+x.updated,0),review:outcomes.reduce((n,x)=>n+(x.review||0),0),skipped:outcomes.reduce((n,x)=>n+x.skipped,0),errors:[...batchErrors,...outcomes.flatMap(x=>x.errors)]};
+      setTagMessage(`Created ${r.created} sidecars; updated ${r.updated}; saved for review ${r.review}; skipped ${r.skipped}. ${r.errors.length ? r.errors.slice(0,3).join("; ") : ""}`);
+      if(r.created+r.updated+r.review>0)setTagRefreshKey(value=>value+1);
       if(!r.errors.length)setSelection([]);
     } catch(e) { setTagMessage(String(e)); } finally {setApplying(false);}
   };
   const bytes = result?.photos.reduce((n, p) => n + p.bytes, 0) || 0;
   const selectedBytes=result?.photos.filter(photo=>selection.includes(photo.path)).reduce((n,photo)=>n+photo.bytes,0)||0;
-  function clearLibraryFilters(){updateSearch("");setFolderFilter("");setCollectionFilter("");setMediaType("all");setOrganizeFilter("all");setSmartFilter("");setSelectedSmartRule("");setTimelineMonth("");setMemoryYear(null);setSelectedTag("");}
+  function clearLibraryFilters(){updateSearch("");setFolderFilter(null);setCollectionFilter("");setMediaType("all");setOrganizeFilter("all");setSmartFilter("");setSelectedSmartRule("");setTimelineMonth("");setMemoryYear(null);setSelectedTag("");}
   async function openSelectedVideoEditor(){
     if(!selected)return;const workspaceAtStart=activeWorkspace;setEditorError("");setEditorBusy(true);
     try{const value=await workspaceProject(activeWorkspace,{type:"open_source",path:selected.path});if(editorWorkspace.current===workspaceAtStart){setEditorInitial(value);setSelected(null);setView("editor");}}
@@ -747,13 +730,14 @@ export default function App() {
             </div>
             {result && selection.length>0 && <div className="selection-toolbar"><span>{selection.length} selected · {formatBytes(selectedBytes)}</span><button className="secondary-button" disabled={editorBusy} onClick={()=>void openSequenceEditor()}>Create video from selection…</button><button className="secondary-button" onClick={()=>setSelection([])}>Clear selection</button><input aria-label="New XMP tags (comma separated)" placeholder="Tags separated by commas" value={tagText} onChange={e=>setTagText(e.target.value)}/><button className="primary-button" disabled={!selection.length || !tagText.trim() || applying} onClick={applyTags}>{applying?"Writing…":"Add / merge XMP tags"}</button></div>}
             {result && livePhotoPairs>0 && <p className="results-note">{livePhotoPairs} iPhone Live Photo pair{livePhotoPairs===1?"":"s"} found · {livePhotoPairing.metadataPairs} matched by Apple asset ID · {livePhotoPairing.fallbackPairs} matched by filename fallback. Original image and video files remain separate.</p>}
-            {tagMessage&&<p role="status" className="results-note">{tagMessage}</p>}
+            {tagMessage&&<div><p role="status" className="results-note">{tagMessage}</p><button className="secondary-button" onClick={()=>setView("tags")}>Review saved XMP changes</button></div>}
             {error && <ErrorNotice title="The library could not finish this action" error={error}/>}
             {busy && <div className="empty"><div className="empty-symbol"><Images size={28}/></div><h3>Scanning your folder</h3><p>Reading file names and sizes. No photos are being changed.</p></div>}
             {!busy && !result && <div className="empty"><div className="empty-symbol"><ImageOff size={32}/></div><h3>Your library starts here</h3><p>Choose a folder containing photos or videos. Open-Photo keeps them in place and shows local previews.</p><button className="secondary-button" onClick={chooseFolder}><FolderOpen size={16}/> Add media folder</button></div>}
             {(smartFilter || selectedSmartRule) && view==="library" && <div className="selection-toolbar"><strong>Smart collection: {selectedSmartRule ? smartRules.find(rule=>rule.id===selectedSmartRule)?.name : smartFilter==="recent"?"Last 30 days":smartFilter==="thisDay"?"On this day":smartFilter==="thisMonth"?"This month in past years":smartFilter==="unrated"?"Unrated media":"Large media"}</strong><button className="secondary-button" onClick={()=>{setSmartFilter("");setSelectedSmartRule("")}}>Show all media</button></div>}
             {timelineMonth && view==="library" && <div className="selection-toolbar"><strong>Timeline month: {new Date(Number(timelineMonth.slice(0,4)),Number(timelineMonth.slice(5,7))-1,1).toLocaleDateString(undefined,{year:"numeric",month:"long"})}</strong><button className="secondary-button" onClick={()=>setTimelineMonth("")}>Show all months</button></div>}
             {memoryYear!==null && view==="library" && <div className="selection-toolbar"><strong>Memory year: {memoryYear}</strong><button className="secondary-button" onClick={()=>setMemoryYear(null)}>Show all years</button></div>}
+            {folderFilter&&view==="library"&&<div className="selection-toolbar"><strong>Folder: {folderLabel(folderFilter,roots.length>1)}</strong><span>Files directly in this folder</span><button className="secondary-button" onClick={()=>setFolderFilter(null)}>Show all folders</button></div>}
             {selectedTag && view==="library" && <div className="selection-toolbar"><strong>Tag: {selectedTag}</strong>{tagIndexBusy&&<span role="status">Refreshing tags…</span>}{tagIndexError&&<span role="alert">{tagIndexError}</span>}<button className="secondary-button" onClick={()=>setSelectedTag("")}>Show all tags</button></div>}
 
             {discovery.active&&<SearchStatus busy={discovery.busy} readingTags={tagIndexBusy} tagError={tagIndexError} error={discovery.parsed.error} warnings={discovery.warnings} count={visible.length}/>}
@@ -765,7 +749,7 @@ export default function App() {
           </section>
         </>}
         {view === "editor" && <><VideoSequences roots={roots} workspaceId={activeWorkspace} initial={editorInitial} onBack={()=>setView("library")}/></>}
-        {view === "folders" && <><PageHeading eyebrow="LIBRARY ORGANIZATION" title="Folders & Workspaces" description={<>Choose a workspace, manage its source folders, and review indexing status in one place.</>}/><section className="folder-management-card"><div className="sync-toolbar"><strong>{roots.length} source folder{roots.length===1?"":"s"}</strong><button className="primary-button" onClick={chooseFolder} disabled={busy}>{busy?"Scanning…":"+ Add folder"}</button><button className="secondary-button" disabled={!roots.length||busy} onClick={()=>syncFolders(roots)}>{busy?"Scanning…":"Sync now"}</button>{lastSync&&<small>Last synced: {lastSync}</small>}{syncChanges&&<small>{`Changes: +${syncChanges.added} added, ${syncChanges.updated} updated, ${syncChanges.unchanged} unchanged, ${syncChanges.removed} removed${syncChanges.incomplete?" (partial scan)":""}`}</small>}</div><LibraryFolders roots={roots} onRemove={removeLibraryFolder}/></section>{error&&<ErrorNotice title="The folder action could not finish" error={error}/>}<h2>Library cleanup</h2>{result && <div className="duplicate-bar"><button className="secondary-button" disabled={duplicateBusy||!result||!roots.length} onClick={inspectDuplicates}>Find Exact Duplicates</button><button className="secondary-button" disabled={duplicateBusy||!result||!roots.length} onClick={inspectSimilar}>Find Similar Photos</button>{duplicateBusy&&<span>Analyzing local files…</span>}{duplicates.length>0&&<span>{duplicates.length} identical-file groups</span>}{similarGroups.length>0&&<span>{similarGroups.length} visually similar groups</span>}{[...duplicates.map(group=>({paths:group.paths,label:"Identical files"})),...similarGroups.map(group=>({paths:group.paths,label:"Visually similar photos"}))].map((group,i)=><div className="duplicate-group" key={i}><strong>{group.label} · {group.paths.length} files</strong><p>Inspect each candidate and optionally mark one to keep. This review never deletes or moves a file.</p>{group.paths.map(path=><div key={path} className="collection-row"><small className="break-anywhere">{duplicateReview[group.paths.join("|")]===path?"✓ Preferred copy · ":""}{path}</small><button className="secondary-button" onClick={()=>{const candidate=result?.photos.find(photo=>photo.path===path);if(candidate)setSelected(candidate);else setError("This file is not in the current library view.")}}>Preview</button><button className="secondary-button" aria-pressed={duplicateReview[group.paths.join("|")]===path} onClick={()=>setDuplicateReview(previous=>({...previous,[group.paths.join("|")]:path}))}>Mark to keep</button></div>)}</div>)}</div>}<div className="browse-heading"><h2>Browse folders</h2><BrowseView label="Folder view" value={folderView} onChange={setFolderView}/></div><p>Choose a folder to filter the Media library without moving any files.</p><div className={`folder-list browse-items ${folderView}`}>{folders.map(folder=><button key={folder} className="folder-item" onClick={()=>{setFolderFilter(folder==="(root)"?"":folder);setView("library")}}><FolderOpen size={20}/>{folder}<ChevronRight size={16}/></button>)}{folders.length===0&&<p>Open a workspace folder to browse its subfolders.</p>}</div></>}
+        {view === "folders" && <><PageHeading eyebrow="LIBRARY ORGANIZATION" title="Folders & Workspaces" description={<>Choose a workspace, manage its source folders, and review indexing status in one place.</>}/><section className="folder-management-card"><div className="sync-toolbar"><strong>{roots.length} source folder{roots.length===1?"":"s"}</strong><button className="primary-button" onClick={chooseFolder} disabled={busy}>{busy?"Scanning…":"+ Add folder"}</button><button className="secondary-button" disabled={!roots.length||busy} onClick={()=>syncFolders(roots)}>{busy?"Scanning…":"Sync now"}</button>{lastSync&&<small>Last synced: {lastSync}</small>}{syncChanges&&<small>{`Changes: +${syncChanges.added} added, ${syncChanges.updated} updated, ${syncChanges.unchanged} unchanged, ${syncChanges.removed} removed${syncChanges.incomplete?" (partial scan)":""}`}</small>}</div><LibraryFolders roots={roots} onRemove={removeLibraryFolder}/></section>{(error||analysisError)&&<ErrorNotice title="The folder action could not finish" error={error||analysisError}/>}<h2>Library cleanup</h2>{result && <div className="duplicate-bar"><button className="secondary-button" disabled={duplicateBusy||!result||!roots.length} onClick={inspectDuplicates}>Find Exact Duplicates</button><button className="secondary-button" disabled={duplicateBusy||!result||!roots.length} onClick={inspectSimilar}>Find Similar Photos</button>{duplicateBusy&&<span>Analyzing local files…</span>}{duplicates.length>0&&<span>{duplicates.length} identical-file groups</span>}{similarGroups.length>0&&<span>{similarGroups.length} visually similar groups</span>}{[...duplicates.map(group=>({paths:group.paths,label:"Identical files"})),...similarGroups.map(group=>({paths:group.paths,label:"Visually similar photos"}))].map((group,i)=><div className="duplicate-group" key={i}><strong>{group.label} · {group.paths.length} files</strong><p>Inspect each candidate and optionally mark one to keep. This review never deletes or moves a file.</p>{group.paths.map(path=><div key={path} className="collection-row"><small className="break-anywhere">{duplicateReview[group.paths.join("|")]===path?"✓ Preferred copy · ":""}{path}</small><button className="secondary-button" onClick={()=>{const candidate=result?.photos.find(photo=>photo.path===path);if(candidate)setSelected(candidate);else setError("This file is not in the current library view.")}}>Preview</button><button className="secondary-button" aria-pressed={duplicateReview[group.paths.join("|")]===path} onClick={()=>setDuplicateReview(previous=>({...previous,[group.paths.join("|")]:path}))}>Mark to keep</button></div>)}</div>)}</div>}<div className="browse-heading"><h2>Browse folders</h2><BrowseView label="Folder view" value={folderView} onChange={setFolderView}/></div><p>Choose a folder to show its files directly. Nested folders are listed separately; no files are moved.</p><div className={`folder-list browse-items ${folderView}`}>{folders.map(folder=><button key={folderIdentity(folder)} className="folder-item" title={folder.root+(folder.directory?"/"+folder.directory:"")} onClick={()=>{setFolderFilter(folder);setView("library")}}><FolderOpen size={20}/>{folderLabel(folder,roots.length>1)}<ChevronRight size={16}/></button>)}{folders.length===0&&<p>Open a workspace folder to browse its subfolders.</p>}</div></>}
         {view === "map" && <><PageHeading eyebrow="PHOTO LOCATIONS" title="Map" description={<>Zoom and explore GPS-tagged photos and videos from your current workspace. Select a marker to preview the media.</>}/>{error&&<div role="alert" className="error">{error}</div>}{geoBusy?<div className="results-note" role="status">Reading embedded GPS locations…</div>:<div className="results-note">{geoPoints.length} media location{geoPoints.length===1?"":"s"} found · JPEG/TIFF/HEIC and MOV/MP4 GPS metadata is supported where present.</div>}{root&&result&&!geoBusy&&geoPoints.length>0&&<div className="map-filter-bar" aria-label="Map filters" style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:12}}><label>Media <select aria-label="Map media type" value={mapMediaFilter} onChange={event=>setMapMediaFilter(event.target.value as "all"|"photo"|"video")}><option value="all">All media</option><option value="photo">Photos</option><option value="video">Videos</option></select></label><label>Capture year <select aria-label="Map capture year" value={mapYearFilter} onChange={event=>setMapYearFilter(event.target.value)}><option value="all">All years</option>{mapYears.map(year=><option key={year} value={year}>{year}</option>)}</select></label><span role="status">{mapMedia.length} matching location{mapMedia.length===1?"":"s"}</span></div>}{root&&result&&!geoBusy&&mapMedia.length>0?<PhotoMap points={mapMedia} onChoose={path=>{const photo=result.photos.find(p=>p.path===path);if(photo)setSelected(photo)}}/>:<div className="placeholder-panel"><div className="empty-symbol"><MapPin size={30}/></div><h2>{root&&result?(geoBusy?"Finding media locations…":geoPoints.length?"No locations match your filters":"No GPS locations found"):"No map data yet"}</h2><p>{root&&result?"Only media with embedded GPS coordinates appears on the map. Some files may not contain location metadata.":"Open a workspace and scan a media folder to discover GPS-tagged photos and videos."}</p></div>}</>}
         {view === "collections" && <PageHeading eyebrow="VIRTUAL ORGANIZATION" title="Collections" description={<>Group and filter media without moving or duplicating the original files.</>} actions={<BrowseView label="Collection view" value={collectionView} onChange={setCollectionView}/>}/>}
         {view === "collections" && <><h2>Smart collections</h2><p>Dynamic, read-only views prefer embedded capture dates when available and fall back to file modified dates. Nothing is moved or duplicated.</p><div className={`folder-list browse-items ${collectionView}`}>{([{id:"recent",name:"Captured in the last 30 days"},{id:"thisDay",name:"On this day in previous years"},{id:"large",name:"Large media (50 MB or more)"},{id:"unrated",name:"Media not yet rated"},{id:"thisMonth",name:"This month in previous years"}] as const).map(item=><button className="folder-item" key={item.id} onClick={()=>{setSelectedTag("");setMemoryYear(null);setTimelineMonth("");setSmartFilter(item.id);setSelectedSmartRule("");setCollectionFilter("");setQuery("");setView("library")}}><Images size={18}/>{item.name}<ChevronRight size={16}/></button>)}</div></>}
@@ -774,8 +758,8 @@ export default function App() {
         {view === "timeline" && <><PageHeading eyebrow="BY CAPTURE DATE" title="By date" description={<>Select a month to open only media from that capture month. EXIF still-image dates and QuickTime MOV/MP4/M4V dates are preferred; file modified time is the fallback.</>}/><div className="folder-list">{[...new Set([...(result?.photos||[])].sort((a,b)=>photoTime(b)-photoTime(a)).map(photoMonthKey))].map(monthKey=>{const [year,month]=monthKey.split("-").map(Number);const label=new Date(year,month-1,1).toLocaleDateString(undefined,{year:"numeric",month:"long"});return <button className="folder-item" key={monthKey} onClick={()=>{setSelectedTag("");setMemoryYear(null);setTimelineMonth(monthKey);setSmartFilter("");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setSortBy("newest");setView("library")}}>{label}</button>})}</div></>}
         {view === "memories" && <><PageHeading eyebrow="ON THIS DAY" title="Memories" description={<>Revisit photos and videos captured on {new Date().toLocaleDateString(undefined,{month:"long",day:"numeric"})} in previous years. Embedded EXIF and QuickTime dates are preferred, with file modified time used only as a fallback.</>}/><div className="selection-toolbar"><strong>{onThisDayMemories.reduce((count,group)=>count+group.photos.length,0)} memories across {onThisDayMemories.length} past years</strong><button className="primary-button" disabled={!onThisDayMemories.length} onClick={()=>{setSelectedTag("");setMemoryYear(null);setTimelineMonth("");setSmartFilter("thisDay");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setSortBy("newest");setView("library")}}>Open all On This Day</button><button className="secondary-button" onClick={()=>{setSelectedTag("");setMemoryYear(null);setTimelineMonth("");setSmartFilter("thisMonth");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setSortBy("newest");setView("library")}}>This month in past years</button></div>{onThisDayMemories.length===0?<div className="placeholder-panel"><div className="empty-symbol"><Images size={30}/></div><h2>No memories for today yet</h2><p>Open-Photo will show past-year matches here when your indexed library contains media captured on today’s month and day.</p></div>:<div className="folder-list">{onThisDayMemories.map(group=><div className="settings-card" key={group.year}><div><h2>{new Date().getFullYear()-group.year} years ago · {group.year}</h2><p>{group.photos.length} item{group.photos.length===1?"":"s"} from this day.</p><button className="secondary-button" onClick={()=>{setMemoryYear(group.year);setTimelineMonth("");setSmartFilter("");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setSortBy("newest");setView("library")}}>Browse all media from {group.year}</button></div><div className="folder-list">{group.photos.slice(0,12).map(photo=><button className="folder-item" key={photo.path} onClick={()=>setSelected(photo)}><Images size={18}/>{photo.name} · {photoDate(photo).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})}</button>)}</div>{group.photos.length>12&&<small>Showing the first 12 of {group.photos.length} memories from {group.year}.</small>}</div>)}</div>}<h2>All years</h2><p>Jump into any capture year in the current workspace, even when there are no On This Day matches.</p><div className="folder-list">{memoryYears.map(item=><button className="folder-item" key={item.year} onClick={()=>{setMemoryYear(item.year);setTimelineMonth("");setSmartFilter("");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setSortBy("newest");setView("library")}}><Images size={18}/><span>{item.year} · {item.count.toLocaleString()} item{item.count===1?"":"s"}<small>{item.exif.toLocaleString()} EXIF · {item.quicktime.toLocaleString()} QuickTime · {item.fallback.toLocaleString()} modified fallback</small></span><ChevronRight size={16}/></button>)}{memoryYears.length===0&&<p>Open a workspace and scan media to browse memories by year.</p>}</div></>}
         {view === "people" && <PeopleView aiOptIn={aiOptIn} ready={peopleReady} status={peopleStatus} busy={!!aiIndex.report?.running} hasLibrary={!!result} message={peopleMessage} groups={peopleGroups.map(group=>({...group,members:group.members.filter(member=>!isAiExcluded(member.path,aiIndex.report?.folders))})).filter(group=>group.members.length>0)} names={peopleNames} onOpenSettings={()=>setView("settings")} onIndex={()=>void indexPeopleWorkspace()} onRefresh={()=>void refreshPeople()} onName={(id,name)=>invoke("ai_name_person",{id,name}).then(()=>{setPeopleNames(previous=>({...previous,[id]:name}));setPeopleGroups(previous=>previous.map(group=>group.id===id?{...group,name}:group))}).catch(e=>{setPeopleMessage(String(e));throw e;})} onOpenPhoto={path=>{const candidate=result?.photos.find(photo=>photo.path===path);if(candidate)setSelected(candidate)}}/>}
-        {view === "tags" && <><PageHeading eyebrow="PORTABLE METADATA" title="Tags" description={<>Browse keywords stored in Open-Photo-managed XMP sidecars. Use / to build hierarchy, for example People/Family/Marc or Places/Florida/Tampa.</>}/>{tagIndexBusy&&<div className="results-note" role="status">Reading managed XMP sidecars…</div>}{tagIndexError&&<div role="alert" className="error">{tagIndexError}</div>}<div className="selection-toolbar"><strong>{tagBranches.length} tag branch{tagBranches.length===1?"":"es"}</strong><button className="secondary-button" disabled={!result||tagIndexBusy} onClick={()=>setTagRefreshKey(value=>value+1)}>Refresh tags</button></div><div className="folder-list">{tagBranches.map(item=><button className="folder-item" key={item.tag} style={{paddingLeft:Math.min(48,12+(item.depth-1)*18)}} onClick={()=>{setSelectedTag(item.tag);setMemoryYear(null);setTimelineMonth("");setSmartFilter("");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setView("library")}}><Tags size={18}/><span>{item.tag.split("/").at(-1)}<small>{item.tag} · {item.count} item{item.count===1?"":"s"}</small></span><ChevronRight size={16}/></button>)}{!tagIndexBusy&&tagBranches.length===0&&<div className="placeholder-panel"><div className="empty-symbol"><Tags size={30}/></div><h2>No Open-Photo tags yet</h2><p>Select media in the Library and use Add / merge XMP tags. Hierarchical tags use / between levels.</p></div>}</div></>}
-        {view === "settings" && <div className="settings-view"><PageHeading eyebrow="PREFERENCES" title="Settings" description={<>Manage appearance, local AI, backups, updates, and library health.</>}/><div className="settings-card"><div><h2>Accent color</h2><p>Choose the app accent used for selected items, buttons, focus states, and highlights.</p></div><div className="accent-picker" role="group" aria-label="Accent color">{ACCENTS.map(item=><button key={item.id} className={accent===item.id?"accent-swatch selected":"accent-swatch"} aria-label={item.label+" accent"} aria-pressed={accent===item.id} title={item.label} onClick={()=>setAccent(item.id)}><span style={{background:item.color}}/><small>{item.label}</small></button>)}</div></div><UpdateSettingsCard updater={appUpdater}/><div className="settings-card"><div><h2>Library metadata backup</h2><p>Save ratings, collections, workspace settings, and saved person names to a separate JSON backup.</p></div><div><button className="secondary-button" onClick={()=>void exportMetadataBackup()}>Export metadata backup</button>{backupMessage&&<p className="results-note" role="status">{backupMessage}</p>}</div></div><LocalAiSettings enabled={aiOptIn} onChange={setAiEnabled} models={aiModels} busy={aiModelBusy} message={aiModelMessage} onRefresh={()=>void refreshModels()} onCheck={()=>void runAiSelfCheck()} checking={aiValidationBusy} runtime={aiRuntime} device={aiDevice} onDeviceChange={setAiDevice}/><AiDashboard key={activeWorkspace} report={aiIndex.report} error={aiIndex.error} enabled={aiOptIn} onExclude={aiIndex.exclude} onRetry={aiIndex.retry} onFailures={aiIndex.failures}/><div className="settings-card"><div><h2>Workspace backup</h2><p>Export selected workspace settings, folder references and virtual collections to JSON. Photo and video files are not copied.</p></div><button className="secondary-button" disabled={!activeWorkspace} onClick={exportWorkspace}>Export Workspace JSON</button></div><div className="settings-card"><div><h2>Library health check</h2><p>Inspect indexed files for missing, inaccessible, or modified items. This is read-only and never removes your media or index records.</p>{healthReport&&<p>{healthReport.indexed} indexed · {healthReport.available} available · {healthReport.missing} missing · {healthReport.inaccessible} inaccessible · {healthReport.modified} changed since indexing</p>}{healthError&&<p role="alert" className="error">{healthError}</p>}</div><button className="secondary-button" disabled={healthBusy||!root} onClick={()=>{setHealthBusy(true);setHealthError("");invoke<{indexed:number;available:number;missing:number;inaccessible:number;modified:number}>("library_health",{root}).then(setHealthReport).catch(e=>setHealthError(String(e))).finally(()=>setHealthBusy(false))}}>{healthBusy?"Checking…":"Check library health"}</button></div><div className="settings-card"><div><h2>File safety</h2><p>Original media stays read-only. Adding tags can create sidecars or merge keywords into Open-Photo-managed XMP files. Foreign sidecars are skipped. Edits and exports save separate copies; original photos and videos are never deleted or overwritten.</p></div><span className="safety-pill">Protected</span></div></div>}
+        {view === "tags" && <><PageHeading eyebrow="PORTABLE METADATA" title="Tags" description={<>Browse keywords stored in Open-Photo-managed XMP sidecars. Use / to build hierarchy, for example People/Family/Marc or Places/Florida/Tampa.</>}/><XmpRecovery key={activeWorkspace} workspace={activeWorkspace} refresh={tagRefreshKey} onChanged={()=>setTagRefreshKey(value=>value+1)}/>{tagIndexBusy&&<div className="results-note" role="status">Reading managed XMP sidecars…</div>}{tagIndexError&&<div role="alert" className="error">{tagIndexError}</div>}<div className="selection-toolbar"><strong>{tagBranches.length} tag branch{tagBranches.length===1?"":"es"}</strong><button className="secondary-button" disabled={!result||tagIndexBusy} onClick={()=>setTagRefreshKey(value=>value+1)}>Refresh tags</button></div><div className="folder-list">{tagBranches.map(item=><button className="folder-item" key={item.tag} style={{paddingLeft:Math.min(48,12+(item.depth-1)*18)}} onClick={()=>{setSelectedTag(item.tag);setMemoryYear(null);setTimelineMonth("");setSmartFilter("");setSelectedSmartRule("");setCollectionFilter("");setQuery("");setView("library")}}><Tags size={18}/><span>{item.tag.split("/").at(-1)}<small>{item.tag} · {item.count} item{item.count===1?"":"s"}</small></span><ChevronRight size={16}/></button>)}{!tagIndexBusy&&tagBranches.length===0&&<div className="placeholder-panel"><div className="empty-symbol"><Tags size={30}/></div><h2>No Open-Photo tags yet</h2><p>Select media in the Library and use Add / merge XMP tags. Hierarchical tags use / between levels.</p></div>}</div></>}
+        {view === "settings" && <div className="settings-view"><PageHeading eyebrow="PREFERENCES" title="Settings" description={<>Manage appearance, local AI, backups, updates, and library health.</>}/><div className="settings-card"><div><h2>Accent color</h2><p>Choose the app accent used for selected items, buttons, focus states, and highlights.</p></div><div className="accent-picker" role="group" aria-label="Accent color">{ACCENTS.map(item=><button key={item.id} className={accent===item.id?"accent-swatch selected":"accent-swatch"} aria-label={item.label+" accent"} aria-pressed={accent===item.id} title={item.label} onClick={()=>setAccent(item.id)}><span style={{background:item.color}}/><small>{item.label}</small></button>)}</div></div><UpdateSettingsCard updater={appUpdater}/><div className="settings-card"><div><h2>Library metadata backup</h2><p>Save ratings, collections, workspace settings, and saved person names to a separate JSON backup.</p></div><div><button className="secondary-button" onClick={()=>void exportMetadataBackup()}>Export metadata backup</button>{backupMessage&&<p className="results-note" role="status">{backupMessage}</p>}</div></div><LocalAiSettings enabled={aiOptIn} onChange={setAiEnabled} models={aiModels} busy={aiModelBusy} message={aiModelMessage} onRefresh={()=>void refreshModels()} onCheck={()=>void runAiSelfCheck()} checking={aiValidationBusy} runtime={aiRuntime} device={aiDevice} onDeviceChange={setAiDevice}/><AiDashboard key={activeWorkspace} report={aiIndex.report} error={aiIndex.error} enabled={aiOptIn} onExclude={aiIndex.exclude} onRetry={aiIndex.retry} onFailures={aiIndex.failures}/><div className="settings-card"><div><h2>Workspace backup</h2><p>Export selected workspace settings, folder references and virtual collections to JSON. Photo and video files are not copied.</p></div><button className="secondary-button" disabled={!activeWorkspace} onClick={exportWorkspace}>Export Workspace JSON</button></div><div className="settings-card"><div><h2>Library health check</h2><p>Inspect indexed files for missing, inaccessible, or modified items. This is read-only and never removes your media or index records.</p>{healthReport&&<p>Checked folder: {root}<br/>{healthReport.indexed} indexed · {healthReport.available} available · {healthReport.missing} missing · {healthReport.inaccessible} inaccessible · {healthReport.modified} changed since indexing</p>}{healthError&&<p role="alert" className="error">{healthError}</p>}</div><button className="secondary-button" disabled={healthBusy||!root} onClick={()=>void healthTask.run(()=>invoke("library_health",{root}))}>{healthBusy?"Checking…":"Check library health"}</button></div><div className="settings-card"><div><h2>File safety</h2><p>Original media stays read-only. Adding tags creates new sidecars or saves proposed changes for review. Existing sidecars are never replaced automatically. Foreign sidecars are skipped. Edits and exports save separate copies; original photos and videos are never deleted or overwritten.</p></div><span className="safety-pill">Protected</span></div></div>}
       </main>
     </div>
     {form&&<TaskForm title={form==="workspace"?"Create workspace":form==="smart"?"Create smart collection":"Create collection"} submitLabel="Create" onClose={()=>setForm(null)} fields={form==="smart"?[
@@ -800,59 +784,3 @@ function Placeholder({title,subtitle,icon:Icon,description}:{title:string;subtit
   return <><PageHeading eyebrow="COMING SOON" title={title} description={<>{subtitle}</>}/><div className="placeholder-panel"><div className="empty-symbol"><Icon size={30}/></div><h2>Built for the long term</h2><p>{description}</p></div></>;
 }
 function formatBytes(n:number){if(n<1024)return n+" B";const u=["KB","MB","GB","TB"];let i=-1;do{n/=1024;i++}while(n>=1024&&i<u.length-1);return n.toFixed(n<10?1:0)+" "+u[i];}
-
-type LibraryPreviewJob={key:string;started:boolean;cancelled:boolean;listeners:Set<(value?:string)=>void>;run:()=>Promise<void>};
-const libraryPreviewQueue:LibraryPreviewJob[]=[];
-const libraryPreviewPending=new Map<string,LibraryPreviewJob>();
-const libraryPreviewCache=new ThumbnailCache();
-let libraryPreviewActive=0;
-function pumpLibraryPreviews(){
-  while(libraryPreviewActive<3&&libraryPreviewQueue.length){
-    const job=libraryPreviewQueue.shift()!;
-    if(job.cancelled)continue;
-    job.started=true;libraryPreviewActive++;
-    void job.run().finally(()=>{
-      libraryPreviewActive--;
-      if(libraryPreviewPending.get(job.key)===job)libraryPreviewPending.delete(job.key);
-      pumpLibraryPreviews();
-    });
-  }
-}
-function PhotoThumb({root,photo,maxEdge,hoverVideoPath}:{root:string;photo:Photo;maxEdge:number;hoverVideoPath?:string}) {
-  const [src,setSrc] = useState("");
-  const [failed,setFailed] = useState(false);
-  const [hovering,setHovering]=useState(false),[hoverSrc,setHoverSrc]=useState("");
-  useEffect(() => {
-    let active = true;
-    setSrc(""); setFailed(false);
-    if (!isDesktop || !root || ["heic","heif"].includes(photo.extension)) return;
-    const command=["mov","mp4","m4v","avi","mkv","webm"].includes(photo.extension.toLowerCase())?"video_poster":"preview_image";
-    const key=JSON.stringify([root,photo.path,photo.bytes,photo.modified_unix,maxEdge,command]);
-    const cached=libraryPreviewCache.get(key);
-    if(cached){setSrc(cached);return;}
-    const listener=(value?:string)=>{if(!active)return;if(value)setSrc(value);else setFailed(true);};
-    let job=libraryPreviewPending.get(key);
-    if(!job){
-      job={key,started:false,cancelled:false,listeners:new Set(),run:async()=>{
-        let data:string|undefined;
-        try{const result=await invoke<string>(command,{root,path:photo.path,maxEdge});if(typeof result==="string"&&result){data=result;libraryPreviewCache.set(key,result);}}
-        catch{/* Failed previews retain their existing placeholder. */}
-        for(const notify of job!.listeners)notify(data);
-      }};
-      libraryPreviewPending.set(key,job);
-      libraryPreviewQueue.push(job);
-    }
-    job.listeners.add(listener);
-    pumpLibraryPreviews();
-    return ()=>{active=false;job!.listeners.delete(listener);if(!job!.started&&job!.listeners.size===0){job!.cancelled=true;if(libraryPreviewPending.get(key)===job)libraryPreviewPending.delete(key);}};
-  },[root,photo.path,photo.bytes,photo.modified_unix,maxEdge]);
-  useEffect(()=>{
-    let active=true;
-    if(!hovering||!hoverVideoPath||!isDesktop||!root){setHoverSrc("");return()=>{active=false};}
-    void invoke<string>("video_source",{root,path:hoverVideoPath}).then(path=>{if(active)setHoverSrc(convertFileSrc(path));}).catch(()=>{if(active)setHoverSrc("");});
-    return()=>{active=false};
-  },[hovering,hoverVideoPath,root]);
-  const still=["heic","heif"].includes(photo.extension)?<IPhonePicture root={root} path={photo.path} name={photo.name}/>:src?<img className="photo-image" src={src} alt={photo.name} loading="lazy"/>:<div className="photo-fallback"><Images size={28}/><small>{failed ? "Preview unavailable" : "Loading preview…"}</small></div>;
-  if(!hoverVideoPath)return still;
-  return <span className="library-hover-preview" onPointerEnter={()=>setHovering(true)} onPointerLeave={()=>setHovering(false)}>{still}{hovering&&hoverSrc&&<video className="library-hover-video" src={hoverSrc} muted loop autoPlay playsInline preload="metadata" aria-label={"Preview "+photo.name}/>}</span>;
-}
