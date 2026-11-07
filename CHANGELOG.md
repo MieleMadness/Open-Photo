@@ -1,3 +1,8 @@
+## 0.56.87 — title editing validation and keyboard fixes (unreleased)
+
+- Replace the incorrectly escaped title control-character expressions with one Unicode-aware validator shared by the editor and project validation. Accept ordinary letters, punctuation and up to 100 Unicode scalar values; reject native-incompatible controls and unpaired surrogates.
+- Make Escape discard the local draft without a blur commit, preserve the next edit, and keep Enter from ending active IME composition. Retain invalid drafts with accessible correction feedback so the existing output guard blocks stale export. Add component and project-validation regressions.
+
 ## Unreleased engineering increment — workspace-bound Phase J previews
 
 - Connect authoritative workspace admission to gated visual/title/PCM preview composition using per-asset source roots, including photos and standalone audio in a second folder.

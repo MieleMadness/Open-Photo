@@ -1,3 +1,7 @@
+## Title editing fixes in 0.56.87
+
+Title text now uses the same Unicode counting and control-character policy as native project validation. Escape cancels a draft without saving it; Enter respects active IME composition. Invalid drafts stay visible with correction feedback and block rendering/export until corrected or canceled.
+
 ## Local Phase J production integration (in progress)
 
 Phase 3 now connects authoritative workspace admission and per-asset roots to composed visual/title/PCM previews. It retains original-source locks and rejects revoked or changed workspace access after composition and before consumption. This remains test-only; production storage, editor controls and export parity are unfinished. See [phase 3 progress and remaining gates](docs/PHASE_J_PRODUCTION_INTEGRATION.md).
