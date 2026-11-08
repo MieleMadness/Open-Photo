@@ -1,3 +1,7 @@
+## Independent vault review candidate — 0.56.94
+
+The gated private vault is isolated on development baseline 6f91e5e, with no dependency on the paused Phase J changes or draft PR #122. See [Phase K](PHASE_K_VAULT.md) for implemented behavior, test provenance and remaining gates. Local implementation is not release sign-off.
+
 ## November 3, 2026 — Active roadmap status (development, not release sign-off)
 
 **Source of truth:** the active development branch (`feature/desktop-v0.1.0`) includes the fast/full Windows CI optimization merged as PR #14. The latest documented application checkpoint is **0.56.63**. Later editor changes remain in draft pull requests; do not label them shipped.

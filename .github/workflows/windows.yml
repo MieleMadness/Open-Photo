@@ -76,6 +76,8 @@ jobs:
       - run: npm run tauri icon assets/app-icon.svg
       - name: Rust lint (Clippy)
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Compile gated vault acceptance feature
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked --features private-vault
       - name: Native Rust regression tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked -- --show-output
       - name: Short real-model video staging and resume acceptance
@@ -145,10 +147,11 @@ jobs:
           $version=(Get-Content package.json -Raw | ConvertFrom-Json).version
           ./scripts/test-installed-app.ps1 -Installer "src-tauri/target/release/bundle/nsis/Open-Photo_${version}_x64-setup.exe" -ReportDirectory "$env:RUNNER_TEMP/openphoto-installed-acceptance"
       - uses: actions/upload-artifact@v7.0.2
+        if: always()
         with:
           name: open-photo-installed-validation-${{ github.run_number }}
-          path: ${{ runner.temp }}/openphoto-installed-acceptance/*.json
-          if-no-files-found: error
+          path: ${{ runner.temp }}/openphoto-installed-acceptance/*
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: open-photo-video-validation-${{ github.run_number }}
