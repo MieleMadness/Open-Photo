@@ -23,3 +23,8 @@ it("remembers the menu width while keeping workspace, navigation and appearance 
   expect(screen.getByRole("button",{name:"Expand menu"})).toBeTruthy();
   fireEvent.click(screen.getByRole("button",{name:"Expand menu"}));expect(saveSetting).toHaveBeenLastCalledWith("openphoto.sidebarCollapsed","false");
 });
+
+it("opens one vault entry after three version clicks and supports keyboard access in the collapsed rail",()=>{
+ const onVault=vi.fn();render(<AppSidebar items={[]} view="library" onNavigate={()=>{}} workspaces={[]} workspace="" onWorkspace={()=>{}} onCreateWorkspace={()=>{}} theme="light" onTheme={()=>{}} version="0.56.89" onVault={onVault}/>);
+ const entry=screen.getByRole("button",{name:"Open-Photo version; press Enter for private vault"});fireEvent.click(entry);fireEvent.click(entry);expect(onVault).not.toHaveBeenCalled();fireEvent.click(entry);expect(onVault).toHaveBeenCalledOnce();fireEvent.keyDown(entry,{key:"Enter"});expect(onVault).toHaveBeenCalledTimes(2);fireEvent.click(screen.getByRole("button",{name:"Collapse menu"}));fireEvent.keyDown(screen.getByRole("button",{name:"Open-Photo version; press Enter for private vault"}),{key:" "});expect(onVault).toHaveBeenCalledTimes(3);
+});

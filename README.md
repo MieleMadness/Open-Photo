@@ -1,3 +1,17 @@
+## Private vault local preview in 0.56.94
+
+A new account-bound private vault is implemented locally. Triple-click the app version, or focus that control and press Enter/Space, to open setup/unlock. Copy supported photos/videos into encrypted storage, view them through an authenticated no-store media channel, lock automatically, change the PIN/passphrase, and save/restore encrypted backups. Originals outside the vault stay accessible. Recovery requires the same Windows account and PIN/passphrase; there is no forgotten-PIN bypass.
+
+Local hardening binds queued authentication, revocations and lock notifications to native session generations. Locking cancels older requests; delayed responses cannot revoke a newer unlock.
+
+Encrypted backups now authenticate the complete closed staged archive before publication, including its exact header, every copied object/chunk and plaintext digest. Verification remains cancellable and bounded in memory; failed archives are not published.
+
+New image imports use the verified image header for their media type, including renamed files; disguised unsupported image formats are refused. Passphrase length validation now matches the native UTF-8 budget and explains oversized input before submission.
+
+Cold-process recovery tests now cover eleven partial-write/publication boundaries, plus persistent Windows metadata sharing denial. See the [disposable Windows acceptance matrix](docs/PHASE_K_WINDOWS_ACCEPTANCE.md) for the remaining installed checks.
+
+Windows debug and explicit `private-vault` acceptance builds expose the local preview. Default release activation remains gated on security review and disposable installed acceptance. The encrypted vault is retained during normal uninstall and ordinary app-data cleanup. See [the plan, threat model, limits and verification](docs/PHASE_K_VAULT.md). Phase J release validation remains paused; its local changes are retained.
+
 File Details includes a location map below metadata for GPS-tagged photos. The Map view supports JPEG/TIFF/HEIC/HEIF and MOV/MP4 location discovery, media-type and capture-year filters. Map imagery requires internet; coordinates remain visible offline.
 
 > Development update: **0.56.67** retains automatic local AI indexing with counters/failures/folder exclusions, video-content search with matching times, expanded zoomable previews and a fullscreen library filmstrip. Signed Preview update support is prepared; channel publication and installed upgrade acceptance remain pending.

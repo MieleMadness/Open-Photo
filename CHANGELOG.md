@@ -1,3 +1,44 @@
+## 0.56.94 — independent vault review candidate (unreleased)
+
+- Isolate the gated vault from local Phase J work on development baseline 6f91e5e. Prior 0.56.89–0.56.93 entries below describe local vault development checkpoints, not releases.
+- Add explicit acceptance-feature compilation and release-mode native vault tests beside installed DLLs on guarded disposable runners; archive diagnostics and verify vault plus throttle state after each uninstall mode. Independent security and hands-on Windows review remain release gates.
+
+## 0.56.93 — verify staged encrypted backups before publication (unreleased)
+
+- Authenticate the closed staged backup itself before publication: exact header/length, each object's format, authenticated chunks, full plaintext digest and archive EOF. Keep chunk-sized buffers and zeroizing plaintext owners.
+- Share sequential object verification between imports, restore and backup validation. Copy ciphertext from pinned source files, then authenticate the resulting archive; retain two streaming passes instead of adding a third source pass.
+- Require successful closed-file verification and a final authorization check before no-overwrite publication. Add corruption/truncation/trailing-data/cancellation regressions that verify failed staging cannot be committed and existing backups/sources remain unchanged.
+- Preserve the v1 archive format, account-bound recovery and gated release status. No installed acceptance or remote run is included.
+
+## 0.56.92 — vault image typing and Unicode validation (unreleased)
+
+- Derive new photo imports' MIME type from the verified JPEG/PNG/WebP/GIF/BMP header, preserving original filenames and bytes. Reject unsupported image formats disguised with supported extensions before publishing ciphertext/catalog entries.
+- Match frontend passphrase limits to the native 256-byte UTF-8 budget, with a useful oversized-input error. Keep Unicode scalar-count minimums and pasted credentials.
+- Add renamed-image, malformed/disguised-format, protocol-header, backup/restore metadata and Unicode boundary regressions. Existing catalogs are preserved without automatic rewriting; this fixes new imports.
+- Keep default release access gated pending independent review and disposable installed acceptance. Phase J validation remains paused.
+
+## 0.56.91 — vault crash-recovery acceptance coverage (unreleased)
+
+- Add cold-process recovery tests at eleven partial-write/publication boundaries across encrypted import, PIN rewrap, backup and restore. Exit child test processes without Rust destructors; verify complete catalogs, usable PINs, original bytes and unpublished destinations after restart.
+- Exercise persistent Windows metadata sharing denial: failed import/PIN publication preserves the original catalog, credential and source, cleans handled staging, and succeeds after releasing the obstruction.
+- Confine crash hooks to test builds and marked disposable synthetic fixtures; bound child lifetime. Keep encrypted crash leftovers unadopted and preserved.
+- Prepare a concrete installed-Windows acceptance matrix covering lifecycle, media, account-bound recovery, cache inspection, disk-full/sharing errors and installation retention. These checks are not represented as executed; release activation remains gated.
+
+## 0.56.90 — vault cancellation and session-generation hardening (unreleased)
+
+- Capture authentication generations before native worker queuing and cancel frontend authentication still waiting for workspace persistence after Lock/close.
+- Give each unlock a unique generation, scope obsolete-response cleanup to its token, and prevent stale workspace/watchdog validation or delayed lock notifications from revoking a replacement session.
+- Require structured native lock acknowledgements and use mutable CNG authenticated-cipher metadata with a null empty-AAD pointer.
+- Add regression coverage for queued authentication, delayed validation, scoped revocation and frontend lock handling. Keep release access gated; installed acceptance and independent security review remain outstanding.
+
+## 0.56.89 — account-bound private vault local preview (unreleased)
+
+- Plan and implement a native Windows vault using CNG AES-256-GCM, PBKDF2-HMAC-SHA256, current-user DPAPI and zeroizing secret owners. Encrypt private names and per-item keys in a versioned catalog; preserve unsupported formats without reset.
+- Add setup/unlock, persisted wrong-PIN throttling, PIN changes, copy-only encrypted imports, authenticated photo/video range viewing and encrypted account-bound backup/restore. Keep originals and refuse existing restore destinations/output collisions.
+- Add native inactivity/workspace/Windows-session lock handling, cancellation epochs, process leases and no-store/no-referrer media responses. No plaintext media files, normal preview-cache grants, AI indexing or decrypted export/delete are introduced.
+- Add the version triple-click entry and keyboard equivalent, protected-focus dialog, recovery disclosure, private viewing and lock cleanup. Reuse existing tokens and bring password inputs into the shared control styling.
+- Retain encrypted vault data during ordinary uninstall/app-data cleanup and prepare disposable installer preservation checks. Default release access stays gated pending security and installed acceptance; no installer or remote checks were run for this local preview.
+
 # XMP experiment verification follow-up
 
 - Require successful Windows replacement to publish staged bytes and consume the staged file; retain full test diagnostics in CI.

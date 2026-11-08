@@ -89,6 +89,9 @@ pub fn saved_library(root: String) -> Result<ScanResult, String> {
     saved_library_from(&database()?, &root)
 }
 fn saved_library_from(db: &Connection, root: &str) -> Result<ScanResult, String> {
+    if crate::vault::excluded_path(Path::new(root)) {
+        return Err("Private vault storage is excluded from Library".into());
+    }
     crate::source_version::add_media_column(db)?;
     let mut statement = db.prepare("SELECT path,bytes,modified_unix,capture_local,live_asset_id,source_version FROM media WHERE root=?1 ORDER BY path LIMIT 100001").map_err(|e| e.to_string())?;
     let mut photos = statement

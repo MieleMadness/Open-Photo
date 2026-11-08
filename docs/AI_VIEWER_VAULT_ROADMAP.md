@@ -1,3 +1,7 @@
+## Independent vault review candidate — 0.56.94
+
+The gated private vault is isolated on development baseline 6f91e5e, with no dependency on the paused Phase J changes or draft PR #122. See [Phase K](PHASE_K_VAULT.md) for implemented behavior, test provenance and remaining gates. Local implementation is not release sign-off.
+
 # AI, media viewer and private vault roadmap
 
 ## Implementation checkpoint — 0.56.23
