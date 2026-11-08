@@ -1,3 +1,4 @@
+import {PrivateVault} from "./PrivateVault";
 import {virtualRows} from "./virtualRows";
 import {ThumbnailCache} from "./thumbnailCache";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type UIEvent } from "react";
@@ -103,6 +104,7 @@ function photoDateSource(photo:Photo):"EXIF metadata"|"QuickTime metadata"|"File
 }
 
 export default function App() {
+  const [vaultOpen,setVaultOpen]=useState(false);
   const [view, setView] = useState<View>("library");
   const [editorInitial,setEditorInitial]=useState<LoadedSequence|null>(null);
   const [editorBusy,setEditorBusy]=useState(false),[editorError,setEditorError]=useState("");
@@ -724,7 +726,7 @@ export default function App() {
     {storageError&&<NoticeSurface><ErrorNotice title="Your latest changes could not be saved" error={storageError}><button className="secondary-button" onClick={()=>void retrySettings().then(()=>setStorageError("")).catch(e=>setStorageError(String(e)))}>Retry saving</button></ErrorNotice></NoticeSurface>}
     </div><div className="app-shell">
 
-    <AppSidebar items={NAV} view={view} onNavigate={next=>{if(next==="editor"){setEditorInitial(null);setEditorError("");}setView(next);}} workspaces={workspaces} workspace={activeWorkspace} onWorkspace={id=>{void openWorkspace(id);}} onCreateWorkspace={createWorkspace} theme={theme} onTheme={setTheme} version={appUpdater.currentVersion}/>
+    <AppSidebar items={NAV} view={view} onNavigate={next=>{if(next==="editor"){setEditorInitial(null);setEditorError("");}setView(next);}} workspaces={workspaces} workspace={activeWorkspace} onWorkspace={id=>{void openWorkspace(id);}} onCreateWorkspace={createWorkspace} theme={theme} onTheme={setTheme} version={appUpdater.currentVersion} onVault={()=>setVaultOpen(true)}/>{vaultOpen&&<PrivateVault key={activeWorkspace} onClose={()=>setVaultOpen(false)}/>}
 
 
     <div className="main" ref={mainPane}>
