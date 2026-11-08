@@ -1,4 +1,4 @@
-//! Future true crossfade frame-clock contract. Not connected to the active renderer.
+//! Shared crossfade frame-clock contract for native proposals and composition.
 //! Source and project frames stay integer-valued until presentation.
 use std::collections::HashSet;
 
@@ -36,7 +36,7 @@ pub(crate) struct Clock<'a> {
 }
 
 /// The same adjacency, two-clean-frames and total-frame policy as crossfadeClock.ts.
-/// No schema/rendering changes are made by calling this test-only foundation.
+/// Clock construction does not read sources or change stored documents.
 pub(crate) fn compile<'a>(
     clips: &[ClipClock<'a>],
     edges: &[Boundary<'a>],

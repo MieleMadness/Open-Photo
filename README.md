@@ -1,6 +1,60 @@
+## Consolidated development candidate — 0.56.95
+
+Library reliability/XMP safety, Phase J editor integration and the account-bound private vault now share one review branch. The merge preserves both native services, sidebar entry, recovery surfaces, styles and acceptance feature flags. Default release rendering/vault access remain gated.
+
+Hands-on/live application testing is deferred until closer to V1 at the user's request. Development continues with automated tests, mocked browser checks and exact-head CI. Earlier separate-branch installer results are historical evidence, not combined-candidate release sign-off. See [the consolidation checkpoint and queue](docs/CONSOLIDATION_0_56_95.md).
+
+## Private vault local preview in 0.56.93
+
+A new account-bound private vault is implemented locally. Triple-click the app version, or focus that control and press Enter/Space, to open setup/unlock. Copy supported photos/videos into encrypted storage, view them through an authenticated no-store media channel, lock automatically, change the PIN/passphrase, and save/restore encrypted backups. Originals outside the vault stay accessible. Recovery requires the same Windows account and PIN/passphrase; there is no forgotten-PIN bypass.
+
+Local hardening binds queued authentication, revocations and lock notifications to native session generations. Locking cancels older requests; delayed responses cannot revoke a newer unlock.
+
+Encrypted backups now authenticate the complete closed staged archive before publication, including its exact header, every copied object/chunk and plaintext digest. Verification remains cancellable and bounded in memory; failed archives are not published.
+
+New image imports use the verified image header for their media type, including renamed files; disguised unsupported image formats are refused. Passphrase length validation now matches the native UTF-8 budget and explains oversized input before submission.
+
+Cold-process recovery tests now cover eleven partial-write/publication boundaries, plus persistent Windows metadata sharing denial. See the [disposable Windows acceptance matrix](docs/PHASE_K_WINDOWS_ACCEPTANCE.md) for the remaining installed checks.
+
+Windows debug and explicit `private-vault` acceptance builds expose the local preview. Default release activation remains gated on security review and disposable installed acceptance. The encrypted vault is retained during normal uninstall and ordinary app-data cleanup. See [the plan, threat model, limits and verification](docs/PHASE_K_VAULT.md). Phase J release validation remains paused; its local changes are retained.
+
+## Local Phase J integration in 0.56.88
+
+The existing video editor now has a **Crossfade proposal** disclosure in Canvas. Proposals save independently of the source timeline with undo/redo, explicit rebase, immutable recovery, and complete portable project copies. Preview and export share the existing player, cancellation queue and no-overwrite output pipeline. Native authorization checks saved workspace ownership, exact document/binding receipts, canonical media roots and verified source handles.
+
+Crossfade rendering is available in Windows debug builds and explicit `phase-j-preview` acceptance builds. Default release builds keep it disabled pending installed acceptance. Saving/recovering proposals remains available. Local implementation is not release acceptance; see [Phase 3 status, policy and remaining gates](docs/PHASE_J_PRODUCTION_INTEGRATION.md).
+
+## Title editing fixes in 0.56.87
+
+Title text now uses the same Unicode counting and control-character policy as native project validation. Escape cancels a draft without saving it; Enter respects active IME composition. Invalid drafts stay visible with correction feedback and block rendering/export until corrected or canceled.
+
+## Local Phase J production integration (in progress)
+
+The earlier test-only bridge established authoritative workspace admission and per-asset roots for composed visual/title/PCM previews. Version 0.56.88 adds a separate production store and gated editor/render integration; the prototype tables are not production persistence. See [phase 3 progress and remaining gates](docs/PHASE_J_PRODUCTION_INTEGRATION.md).
+
+## Local Phase J titles and audio (test-only)
+
+Phase 2 now renders global titles after transitions and mixes exact 48 kHz stereo windows with linear fades, mute/gain, source pins and clipping reports. See [titles/audio policy](docs/PHASE_J_TITLES_AUDIO.md). Production editor/export parity and installed/listening acceptance remain phase 3 gates; the existing installer is unchanged.
+
+## Earlier Phase J visual checkpoint (test-only)
+
+Phase 1 now composes verified video/photo frames, RGB dissolves and discrete dips with retained source pins and stale-result checks. See [visual composition](docs/PHASE_J_VISUAL_COMPOSITION.md) and the [three-phase plan](docs/PHASE_J_THREE_PHASE_PLAN.md). Phase 1 remains visual-only; the gated phase 2 path now supplies titles/audio. Production editor/export integration remains later work.
+
+## Current local development (unreleased)
+
+Local source **0.56.86** adds content-versioned previews, workspace-bound analysis, exact folder selection, keyboard map browsing, validated settings recovery and bounded HEIC decoding. See the [current capability and acceptance matrix](docs/LIBRARY_RELIABILITY.md). This is a local release candidate; installed acceptance and publication are separate gates.
+
+The retained Phase J **0.56.85** groundwork connects the test-only request coordinator to real Windows video/photo decoding. It verifies and pins selected sources, reuses shared normalization and returns bounded RGB inputs for the requested frames. These inputs are not yet a composed preview: transitions, titles, audio and production playback/export integration remain gated. See [real preview-input decoding](docs/PHASE_J_PREVIEW_DECODE.md), [bounded preview requests](docs/PHASE_J_PREVIEW_REQUESTS.md) and [session seek mapping](docs/PHASE_J_SESSION_SEEK.md).
+
+## Local XMP safety update (unreleased)
+
+Local candidate **0.56.76** consolidates the XMP safety work and final audit. It includes full-source checksums, complete persisted-intent rechecks, background saves, paged reviews, offline stored documents and read-only staging observations. See the [local closeout and acceptance gates](docs/XMP_CLOSEOUT.md) for final evidence and the updated installer handoff. The earlier 0.56.70 handoff is historical; installed-app, uninstall, power-loss and release acceptance remain pending.
+
+Adding tags now creates new sidecars without overwriting a competing file. For existing managed sidecars, proposed merges are saved for review under **Tags → XMP changes to review**. Review the versions, confirm the comparison and choose **Apply reviewed changes**. The previous sidecar is preserved and competing files are never overwritten. Saves can briefly leave the destination name absent; interrupted saves can explicitly restore a verified original into an empty path after fresh review and confirmation. Unverifiable recovery files remain blocked for manual inspection. Completed-save history and journal-only cancellation remain available. [Step 3 validation](docs/XMP_STEP_3_VALIDATION.md) records real ExifTool trials and the remaining installed-app gates. See [local XMP transactions](docs/XMP_LOCAL_TRANSACTIONS.md) for behavior, validation and remaining acceptance gates.
+
 File Details includes a location map below metadata for GPS-tagged photos. The Map view supports JPEG/TIFF/HEIC/HEIF and MOV/MP4 location discovery, media-type and capture-year filters. Map imagery requires internet; coordinates remain visible offline.
 
-> Development update: **0.56.67** retains automatic local AI indexing with counters/failures/folder exclusions, video-content search with matching times, expanded zoomable previews and a fullscreen library filmstrip. Signed Preview update support is prepared; channel publication and installed upgrade acceptance remain pending.
+> Earlier feature checkpoint: **0.56.67** added automatic local AI indexing with counters/failures/folder exclusions, video-content search with matching times, expanded zoomable previews and a fullscreen library filmstrip. Signed Preview update support is prepared; channel publication and installed upgrade acceptance remain pending.
 
 Turn Local AI on in Settings to index known workspace media automatically; use manual **Sync** to discover new/changed files. The AI dashboard shows progress and failed files, with retries and **Don't index** per folder. Counters count source files (a Live still and motion can count separately). Video sampling can miss brief content; HEIC AI and HDR conversion remain unsupported. See [AI indexing](docs/AUTOMATIC_AI_INDEXING.md).
 
@@ -49,8 +103,8 @@ Open-Photo uses one shared visual system across the photo library, settings, loc
 | Local folder scanning | ✅ Working | Recursive, read-only source scan with path validation |
 | Multiple workspace folders | ✅ Working | One workspace can include multiple local roots |
 | Persistent media index | ✅ Working | SQLite index under local app data |
-| Incremental folder updates | ✅ Working | Native watcher plus safe full-scan fallback |
-| Manual and periodic sync | ✅ Working | Manual Sync Now and optional 2-minute auto-sync |
+| Filesystem discovery | ✅ Manual | Sync discovers changes; automatic watching is disabled |
+| Manual sync | ✅ Working | Sync in Library or Sync now in Folders; no periodic rescan |
 | Grid/list library views | ✅ Working | Unified ranked search, media filters, sorting, thumbnail-size control |
 | Local thumbnail cache | ✅ Working | Bounded disk cache; originals are not changed |
 | Ratings and favorites | ✅ Working | 1–5 stars stored as local Open-Photo state; 5 stars acts as Favorite |
@@ -635,7 +689,7 @@ Fresh installations now start video playback at normal volume. A deliberately sa
 - **Folders / Collections:** use **List / Tiles**. Each section remembers its view per workspace. **Find Exact Duplicates** and **Find Similar Photos** are under Folders → Library cleanup; review never deletes media. Existing manual AI/text indexing tools are under Settings → Local content indexes.
 - **Search:** after about 400ms without typing, the full query runs, including local semantic matches when AI is enabled. Enter/Search starts immediately. Previous results stay visible with an updating state until the new query finishes; changing workspace or AI state discards incompatible evidence. **Clear search** restores browsing. Provider failures leave metadata matches available.
 
-Automatic local AI indexing, counters/folder exclusions and expanded viewers are implemented. The private vault remains planned. Signed Preview updates still require channel publication and installed upgrade acceptance; see [the feedback roadmap](docs/AI_VIEWER_VAULT_ROADMAP.md).
+Automatic local AI indexing, counters/folder exclusions and expanded viewers are implemented. The account-bound private vault is implemented as a gated local preview; see [Phase K](docs/PHASE_K_VAULT.md). Signed Preview updates still require channel publication and installed upgrade acceptance; see [the feedback roadmap](docs/AI_VIEWER_VAULT_ROADMAP.md).
 
 Close and update installation wait for queued settings as well as project saves. If settings cannot be saved, keep the app open and use **Retry saving**; discarding project edits does not discard settings. Explicit uninstall data removal includes the AI indexing queue and its SQLite companion files.
 Embedded NEF/ARW previews use the shared 20,000-pixel edge, 50-megapixel and 256 MB decoder allocation limits, with a 75 MB encoded-preview cap. RAW orientation continues to come from the RAW metadata.
@@ -648,3 +702,12 @@ Desktop settings load directly from SQLite into the live memory store. Large rat
 Map tooltips display filenames as literal text, including ampersands and markup-like characters.
 
 See [0.56.67 audit integration](docs/AUDIT_INTEGRATION_0_56_67.md) for the combined fixes and verification boundaries.
+
+The native XMP safety suite now includes bounded independent-process Windows
+replacement experiments. See [sharing characterization](docs/XMP_WINDOWS_SHARING_EXPERIMENT.md)
+and [remaining publication gates](docs/XMP_PUBLICATION_PROTOCOL.md). These checks
+are development evidence; the production external-editor race remains open.
+
+Additional local Windows XMP experiments cover writer-first process coordination,
+hardlink file identities and parent-directory rename/rebinding. The experiment
+notes distinguish observed sharing behavior from pending production guarantees.

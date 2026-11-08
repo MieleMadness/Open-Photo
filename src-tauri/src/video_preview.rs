@@ -32,6 +32,11 @@ pub struct PreviewAssets {
     pub info: VideoInfo,
     pub filmstrip: Vec<FilmFrame>,
     pub warnings: Vec<String>,
+    #[serde(skip)]
+    pub(crate) transition: Option<crate::video_workspace::transitions::RenderBinding>,
+    #[cfg(windows)]
+    #[serde(skip)]
+    pub(crate) source_ownership: Option<Arc<crate::crossfade_windows_guard::PinnedMedia>>,
 }
 #[derive(Clone, Serialize)]
 pub struct PreviewStatus {
@@ -295,6 +300,9 @@ pub(crate) fn build_assets(
         return Err("Video preview cancelled".into());
     }
     Ok(PreviewAssets {
+        transition: None,
+        #[cfg(windows)]
+        source_ownership: None,
         source: playback.to_string_lossy().into_owned(),
         proxy,
         info,
@@ -332,9 +340,24 @@ pub fn start_video_project_preview(
     )
 }
 
+pub(crate) fn start_transition_preview(
+    app: tauri::AppHandle,
+    jobs: tauri::State<'_, PreviewJobs>,
+    request: crate::video_workspace::transitions::TransitionRenderRequest,
+) -> Result<String, String> {
+    request.validate()?;
+    start_job(
+        app,
+        jobs,
+        PathBuf::new(),
+        true,
+        Some(ProjectPreview::Transition(request)),
+    )
+}
 enum ProjectPreview {
     Single(String, Box<crate::video_project::Project>),
     Sequence(Box<crate::video_sequence_render::Snapshot>),
+    Transition(crate::video_workspace::transitions::TransitionRenderRequest),
 }
 pub(crate) fn start_sequence_preview(
     app: tauri::AppHandle,
@@ -411,6 +434,18 @@ fn start_job(
                             || cancelled(&job),
                         )?
                     }
+                    Some(ProjectPreview::Transition(request)) => {
+                        let snapshot =
+                            crate::video_workspace::transitions::snapshot_request(request, || {
+                                cancelled(&job)
+                            })?;
+                        crate::video_sequence_render::build_preview(
+                            &engine,
+                            &snapshot,
+                            &directory,
+                            || cancelled(&job),
+                        )?
+                    }
                     None => build_assets(&engine, &source, &directory, proxy, || cancelled(&job))?,
                 };
                 if cancelled(&job) {
@@ -441,16 +476,40 @@ fn start_job(
     Ok(id)
 }
 #[tauri::command]
-pub fn video_preview_status(
+pub async fn video_preview_status(
     jobs: tauri::State<'_, PreviewJobs>,
     id: String,
 ) -> Result<PreviewStatus, String> {
-    let current = jobs.current.lock().map_err(|e| e.to_string())?;
-    let job = current
+    let job = jobs
+        .current
+        .lock()
+        .map_err(|e| e.to_string())?
         .as_ref()
         .filter(|job| job.id == id)
+        .cloned()
         .ok_or("Video preview no longer active")?;
     let result = job.status.lock().map_err(|e| e.to_string())?.clone();
+    if let Some(binding) = result.result.as_ref().and_then(|r| r.transition.clone()) {
+        #[cfg(windows)]
+        if result
+            .result
+            .as_ref()
+            .and_then(|r| r.source_ownership.as_ref())
+            .is_none_or(|pins| pins.count() == 0)
+        {
+            jobs.cancel(&id)?;
+            return Err("Transition preview lost its source ownership".into());
+        }
+        let current = tauri::async_runtime::spawn_blocking(move || binding.current())
+            .await
+            .map_err(|e| e.to_string())?;
+        if !matches!(current, Ok(true)) {
+            jobs.cancel(&id)?;
+            return Err(current.err().unwrap_or_else(|| {
+                "Workspace or transitions changed; rebuild the preview".into()
+            }));
+        }
+    }
     Ok(result)
 }
 #[tauri::command]

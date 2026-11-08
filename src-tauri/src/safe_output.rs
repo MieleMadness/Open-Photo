@@ -12,10 +12,21 @@ pub(crate) struct StagedOutput {
     temporary: PathBuf,
     destination: PathBuf,
     file: Option<File>,
+    verified_closed: bool,
 }
 
 impl StagedOutput {
     pub fn new(destination: &Path) -> Result<Self, String> {
+        Self::prepare(destination, false, crate::vault::excluded_path)
+    }
+    pub(crate) fn new_ciphertext(target: &crate::vault::CiphertextTarget) -> Result<Self, String> {
+        Self::prepare(target.path(), true, crate::vault::excluded_path)
+    }
+    fn prepare(
+        destination: &Path,
+        ciphertext: bool,
+        private: impl Fn(&Path) -> bool,
+    ) -> Result<Self, String> {
         let parent = fs::canonicalize(
             destination
                 .parent()
@@ -23,6 +34,9 @@ impl StagedOutput {
         )
         .map_err(|e| e.to_string())?;
         let destination = parent.join(destination.file_name().ok_or("Choose an output filename")?);
+        if !ciphertext && private(&destination) {
+            return Err("Private vault storage accepts only encrypted vault objects. Choose another output folder.".into());
+        }
         if destination.exists() {
             return Err("That output already exists; choose a new filename".into());
         }
@@ -44,6 +58,7 @@ impl StagedOutput {
             temporary,
             destination,
             file: Some(file),
+            verified_closed: false,
         })
     }
 
@@ -56,8 +71,23 @@ impl StagedOutput {
         &self.temporary
     }
 
-    pub fn commit(mut self) -> Result<PathBuf, String> {
+    /// Close native writers before verification acquires a read-only ownership handle.
+    pub(crate) fn verify_closed(
+        &mut self,
+        verify: impl FnOnce(&Path) -> Result<(), String>,
+    ) -> Result<(), String> {
         self.file().sync_all().map_err(|e| e.to_string())?;
+        self.file.take();
+        verify(&self.temporary)?;
+        self.verified_closed = true;
+        Ok(())
+    }
+    pub fn commit(mut self) -> Result<PathBuf, String> {
+        if let Some(file) = self.file.as_ref() {
+            file.sync_all().map_err(|e| e.to_string())?;
+        } else if !self.verified_closed {
+            return Err("Staged output has not passed closed-file verification".into());
+        }
         self.file.take();
         publish(&self.temporary, &self.destination).map_err(|e| e.to_string())?;
         Ok(self.destination.clone())
@@ -102,6 +132,22 @@ fn publish(source: &Path, destination: &Path) -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn ordinary_outputs_cannot_create_plaintext_inside_private_storage() {
+        let root = std::env::temp_dir().join(format!(
+            "openphoto-private-output-{}",
+            crate::video_project::id()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let canonical = std::fs::canonicalize(&root).unwrap();
+        let destination = root.join("plaintext.jpg");
+        assert!(
+            super::StagedOutput::prepare(&destination, false, |path| path.starts_with(&canonical))
+                .is_err()
+        );
+        assert!(std::fs::read_dir(&root).unwrap().next().is_none());
+        std::fs::remove_dir(root).unwrap();
+    }
     use super::*;
     use std::io::Write;
 

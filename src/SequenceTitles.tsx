@@ -1,16 +1,19 @@
-import {useEffect,useState} from "react";
+import {useEffect,useId,useRef,useState} from "react";
+import {validTitleText} from "./titleText";
 import {type SequenceSession,type TitleOverlay} from "./videoSequence";
 import {projectDuration} from "./timelineCommands";
 
 /** Edit locally until blur so temporarily blank text does not invalidate a saved project. */
 function TitleTextInput({title,onCommit}:{title:TitleOverlay;onCommit:(text:string)=>void}){
   const [draft,setDraft]=useState(title.text);
+  const cancelled=useRef(false);
+  const errorId=useId(),invalid=!validTitleText(draft);
   useEffect(()=>setDraft(title.text),[title.id,title.text]);
   function finish(){
-    if(draft.trim()&&draft.length<=100&&!/[\\x00-\\x1f\\x7f]/.test(draft))onCommit(draft);
-    else setDraft(title.text);
+    if(cancelled.current){cancelled.current=false;return;}
+    if(validTitleText(draft))onCommit(draft);
   }
-  return <input aria-label="Title text" value={draft} maxLength={100} required onChange={event=>setDraft(event.target.value)} onBlur={finish} onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();event.currentTarget.blur();}if(event.key==="Escape"){setDraft(title.text);event.currentTarget.blur();}}}/>;
+  return <><input aria-label="Title text" value={draft} maxLength={200} required aria-invalid={invalid||undefined} aria-describedby={invalid?errorId:undefined} onFocus={()=>{cancelled.current=false;}} onChange={event=>setDraft(event.target.value)} onBlur={finish} onKeyDown={event=>{if(event.nativeEvent.isComposing)return;if(event.key==="Enter"){event.preventDefault();event.currentTarget.blur();}if(event.key==="Escape"){event.preventDefault();cancelled.current=true;setDraft(title.text);event.currentTarget.blur();}}}/>{invalid&&<span id={errorId} role="status">Use 1–100 characters without control characters. Press Escape to cancel.</span>}</>;
 }
 
 /** Simple, always-visible controls; timeline title range is measured in project seconds. */

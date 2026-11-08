@@ -3127,7 +3127,7 @@ dependencies = [
 
 [[package]]
 name = "open-photo"
-version = "0.56.69"
+version = "0.56.95"
 dependencies = [
  "base64 0.22.1",
  "dirs 5.0.1",
@@ -3150,6 +3150,7 @@ dependencies = [
  "tokenizers",
  "tokio",
  "windows-sys 0.61.2",
+ "zeroize",
 ]
 
 [[package]]

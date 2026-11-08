@@ -9,7 +9,11 @@ mod ai_runtime;
 mod ai_text;
 mod ai_validation;
 mod cache_disk;
+#[cfg(test)]
+mod crossfade_visual_compositor;
+mod sequence_frame_seek;
 mod source_version;
+mod vault;
 // Crossfade frame-clock parity fixture only; no active renderer changes.
 #[cfg(test)]
 mod crossfade_audio_count;
@@ -17,7 +21,6 @@ mod crossfade_audio_count;
 mod crossfade_audio_fixture;
 #[cfg(test)]
 mod crossfade_audio_stream;
-#[cfg(test)]
 mod crossfade_clock;
 #[cfg(test)]
 mod crossfade_command;
@@ -31,6 +34,7 @@ mod crossfade_graph;
 mod crossfade_inputs;
 #[cfg(test)]
 mod crossfade_integrity;
+mod crossfade_layer_clock;
 #[cfg(test)]
 mod crossfade_native_snapshot;
 #[cfg(test)]
@@ -49,7 +53,7 @@ mod crossfade_scratch;
 mod crossfade_snapshot;
 #[cfg(test)]
 mod crossfade_staging;
-#[cfg(all(test, windows))]
+#[cfg(windows)]
 mod crossfade_windows_guard;
 mod edit_export;
 mod geo;
@@ -57,6 +61,9 @@ mod image_decode;
 mod index;
 mod media_jobs;
 mod media_stream;
+#[cfg(test)]
+mod preview_identity_tests;
+mod preview_source;
 mod safe_output;
 mod search;
 mod search_providers;
@@ -91,6 +98,8 @@ mod xmp_publish_race_tests;
 mod xmp_recovery_inventory;
 #[cfg(test)]
 mod xmp_recovery_tests;
+mod xmp_staging_inventory;
+mod xmp_transactions;
 #[cfg(all(test, windows))]
 mod xmp_windows_sharing_tests;
 use base64::Engine;
@@ -98,9 +107,11 @@ use exif::{DateTime as ExifDateTime, In, Reader as ExifReader, Tag, Value};
 use nom_exif::{read_exif as read_nom_exif, EntryValue as NomEntryValue, ExifTag as NomExifTag};
 use raw_files::{Orientation as RawOrientation, RawFile};
 use serde::Serialize;
+#[cfg(test)]
+use std::io::Write;
 use std::{
     collections::{HashMap, VecDeque},
-    io::{BufReader, Cursor, Read, Seek, SeekFrom, Write},
+    io::{BufReader, Cursor, Read, Seek, SeekFrom},
     sync::{Mutex, OnceLock},
 };
 use std::{
@@ -120,6 +131,9 @@ fn cache() -> &'static Mutex<PreviewCache> {
 fn safe_media_path(root: &str, path: &str) -> Result<PathBuf, String> {
     let root = fs::canonicalize(root).map_err(|_| "Library folder not found".to_string())?;
     let file = fs::canonicalize(path).map_err(|_| "Photo not found".to_string())?;
+    if vault::excluded_path(&file) {
+        return Err("Private vault storage is unavailable to normal media commands".into());
+    }
     if !file.starts_with(root) || !file.is_file() {
         return Err("Photo is outside the selected library".into());
     }
@@ -141,6 +155,7 @@ fn xml_escape(value: &str) -> String {
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
 }
+#[cfg(test)]
 #[derive(Serialize)]
 struct BulkTagResult {
     created: usize,
@@ -208,12 +223,14 @@ fn read_managed_tags(root: String, paths: Vec<String>) -> Result<Vec<ManagedTagE
     Ok(entries)
 }
 
+#[cfg(test)]
 fn replace_managed_sidecar(sidecar: &Path, expected: &str, contents: &str) -> Result<(), String> {
     replace_managed_sidecar_with_publish(sidecar, expected, contents, atomic_replace)
 }
 
-// Test seam for a failing publish boundary. The production path always supplies
-// the same platform-specific atomic_replace function as before.
+// Historical replacement regression seam only. Runtime XMP commands use
+// xmp_transactions with protected-original moves and no-overwrite publication.
+#[cfg(test)]
 fn replace_managed_sidecar_with_publish<F>(
     sidecar: &Path,
     expected: &str,
@@ -287,7 +304,7 @@ where
     Ok(())
 }
 
-#[cfg(windows)]
+#[cfg(all(test, windows))]
 fn atomic_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
     let source: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
@@ -314,7 +331,7 @@ fn atomic_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(all(test, not(windows)))]
 fn atomic_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
     fs::rename(source, destination)
 }
@@ -323,7 +340,7 @@ static XMP_WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 /// Create new Open-Photo XMP sidecars or merge keywords into sidecars that
 /// Open-Photo owns. Unknown/foreign XMP files are never overwritten.
-#[tauri::command]
+#[cfg(test)]
 fn bulk_create_tags(
     root: String,
     paths: Vec<String>,
@@ -921,6 +938,9 @@ fn read_capture_local(path: &Path, extension: &str) -> Option<String> {
 #[tauri::command]
 fn scan_library(root: String) -> Result<ScanResult, String> {
     let root_path = Path::new(&root);
+    if vault::excluded_path(root_path) {
+        return Err("Private vault storage cannot be scanned as a library folder".into());
+    }
     if !root_path.is_dir() {
         return Err("Please select an existing directory.".to_string());
     }
@@ -963,6 +983,9 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
             }
             let path = entry.path();
             if kind.is_dir() {
+                if vault::excluded_path(&path) {
+                    continue;
+                }
                 pending.push(path);
                 continue;
             }
@@ -1057,7 +1080,22 @@ fn decode_raw_embedded_preview(path: &Path) -> Result<image::DynamicImage, Strin
 /// Read a bounded local iPhone media file for on-device preview or playback.
 /// The media stays on the user's machine; originals are never rewritten.
 #[tauri::command]
-fn read_iphone_media(root: String, path: String) -> Result<String, String> {
+async fn read_iphone_media(
+    root: String,
+    path: String,
+    expected_source_version: Option<String>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        read_iphone_media_sync(root, path, expected_source_version)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+fn read_iphone_media_sync(
+    root: String,
+    path: String,
+    expected_source_version: Option<String>,
+) -> Result<String, String> {
     let file = safe_media_path(&root, &path)?;
     let extension = file
         .extension()
@@ -1073,12 +1111,39 @@ fn read_iphone_media(root: String, path: String) -> Result<String, String> {
             "Inline playback is limited to 48 MB; use the Windows player for larger videos".into(),
         );
     }
-    let bytes = fs::read(file).map_err(|e| e.to_string())?;
+    let source = preview_source::PreviewSource::capture(&file, expected_source_version.as_deref())?;
+    let mut bytes = Vec::new();
+    fs::File::open(&file)
+        .map_err(|e| e.to_string())?
+        .take(48 * 1024 * 1024 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > 48 * 1024 * 1024 {
+        return Err("HEIC preview input exceeds 48 MB".into());
+    }
+    source.verify()?;
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
 #[tauri::command]
-fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, String> {
+async fn preview_image(
+    root: String,
+    path: String,
+    max_edge: u32,
+    expected_source_version: Option<String>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        preview_image_sync(root, path, max_edge, expected_source_version)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+fn preview_image_sync(
+    root: String,
+    path: String,
+    max_edge: u32,
+    expected_source_version: Option<String>,
+) -> Result<String, String> {
     let file = safe_media_path(&root, &path)?;
     let extension = file
         .extension()
@@ -1097,29 +1162,24 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
             max_source_bytes / (1024 * 1024)
         ));
     }
-    let modified = fs::metadata(&file)
+    let source = preview_source::PreviewSource::capture(&file, expected_source_version.as_deref())?;
+    let edge = max_edge.clamp(64, 1920);
+    let key = format!("oriented-v3:{}:{}:{edge}", file.display(), source.version);
+    let cached = cache()
+        .lock()
         .ok()
-        .and_then(|m| m.modified().ok())
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    let key = format!(
-        "oriented-v2:{}:{size}:{modified}:{}",
-        file.display(),
-        max_edge
-    );
-    if let Ok(guard) = cache().lock() {
-        if let Some(image) = guard.0.get(&key) {
-            return Ok(image.clone());
-        }
+        .and_then(|guard| guard.0.get(&key).cloned());
+    if let Some(image) = cached {
+        source.verify()?;
+        return Ok(image);
     }
     if let Some(bytes) = cache_disk::read(&key) {
+        source.verify()?;
         return Ok(format!(
             "data:image/png;base64,{}",
             base64::engine::general_purpose::STANDARD.encode(bytes)
         ));
     }
-    let edge = max_edge.clamp(64, 1920);
     let decoded = if matches!(extension.as_str(), "nef" | "arw") {
         decode_raw_embedded_preview(&file)?
     } else {
@@ -1131,6 +1191,7 @@ fn preview_image(root: String, path: String, max_edge: u32) -> Result<String, St
         .write_to(&mut bytes, image::ImageFormat::Png)
         .map_err(|e| e.to_string())?;
     let png = bytes.into_inner();
+    source.verify()?;
     cache_disk::write(&key, &png);
     let result = format!(
         "data:image/png;base64,{}",
@@ -1174,7 +1235,7 @@ fn updater_channel_status() -> Result<UpdaterChannelStatus, String> {
 #[tauri::command]
 fn set_update_channel(channel: String) -> Result<UpdaterChannelStatus, String> {
     update_channel::endpoint(&channel)?;
-    user_data::save_user_data("openphoto.updateChannel".into(), channel)?;
+    user_data::save("openphoto.updateChannel".into(), channel)?;
     updater_channel_status()
 }
 
@@ -1272,6 +1333,43 @@ pub fn run() {
         .build();
 
     tauri::Builder::default()
+        .register_asynchronous_uri_scheme_protocol("vault", |context, request, responder| {
+            use tauri::{Emitter, Manager};
+            let app = context.app_handle().clone();
+            let gate = app
+                .state::<std::sync::Arc<vault::VaultState>>()
+                .stream_gate
+                .clone();
+            tauri::async_runtime::spawn(async move {
+                let Ok(_permit) = gate.acquire_owned().await else {
+                    responder.respond(
+                        tauri::http::Response::builder()
+                            .status(503)
+                            .header("Cache-Control", "no-store")
+                            .body(Vec::<u8>::new())
+                            .unwrap_or_default(),
+                    );
+                    return;
+                };
+                let failed_app = app.clone();
+                let response = tauri::async_runtime::spawn_blocking(move || {
+                    vault::transfer_protocol(&app, request)
+                })
+                .await
+                .unwrap_or_else(|_| {
+                    let notice = failed_app
+                        .state::<std::sync::Arc<vault::VaultState>>()
+                        .lock_notice();
+                    let _ = failed_app.emit("vault-locked", notice);
+                    tauri::http::Response::builder()
+                        .status(500)
+                        .header("Cache-Control", "no-store")
+                        .body(Vec::new())
+                        .unwrap_or_default()
+                });
+                responder.respond(response);
+            });
+        })
         .plugin(updater)
         .setup(|app| {
             use tauri::Manager;
@@ -1281,6 +1379,17 @@ pub fn run() {
                 app.path().resource_dir()?.join("bundled-ai")
             };
             ai_models::configure_bundled_directory(directory);
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                use tauri::{Emitter, Manager};
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    let vault = handle.state::<std::sync::Arc<vault::VaultState>>();
+                    if let Some(notice) = vault.watchdog_notice() {
+                        let _ = handle.emit("vault-locked", notice);
+                    }
+                }
+            });
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
@@ -1290,9 +1399,11 @@ pub fn run() {
         .manage(video_preview::PreviewJobs::default())
         .manage(video_poster::PosterJobs::default())
         .manage(video_export::ExportJobs::default())
+        .manage(std::sync::Arc::new(vault::VaultState::default()))
         .manage(search::SearchState::default())
         .manage(ai_index::AiIndexState::default())
         .invoke_handler(tauri::generate_handler![
+            vault::vault_command,
             search::search_workspace_evidence,
             search::cancel_workspace_search,
             ai_index::pause_ai_index,
@@ -1336,6 +1447,12 @@ pub fn run() {
             video_sequence::create_video_sequence,
             video_workspace::workspace_video_projects,
             video_workspace::edit_workspace_video_project,
+            video_workspace::transitions::edit_workspace_video_transitions,
+            video_workspace::transitions::start_workspace_transition_preview,
+            video_workspace::transitions::start_workspace_transition_export,
+            video_workspace::transitions::workspace_transition_capabilities,
+            video_workspace::transitions::write_transition_proposal_copy,
+            video_workspace::transitions::recover_workspace_transition_project,
             video_workspace::workspace_audio_waveform,
             video_workspace::save_workspace_video_project,
             video_workspace::workspace_video_history,
@@ -1367,7 +1484,14 @@ pub fn run() {
             user_data::save_user_data,
             user_data::export_user_data,
             ai_faces::ai_name_person,
-            bulk_create_tags,
+            xmp_transactions::bulk_create_tags,
+            xmp_transactions::xmp_reviews,
+            xmp_transactions::xmp_review_page,
+            xmp_transactions::xmp_review_record,
+            xmp_transactions::xmp_review_snapshot,
+            xmp_transactions::xmp_review_decide,
+            xmp_transactions::xmp_review_apply,
+            xmp_transactions::xmp_review_restore,
             read_managed_tags,
             edit_export::export_edited_copy,
             edit_export::preview_edited_photo,
@@ -1386,6 +1510,17 @@ pub fn run() {
             watch::set_watched_folders,
             similar::find_similar_photos
         ])
+        .on_window_event(|window, event| {
+            if matches!(
+                event,
+                tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
+            ) {
+                use tauri::{Emitter, Manager};
+                let state = window.state::<std::sync::Arc<vault::VaultState>>();
+                let notice = state.lock_notice();
+                let _ = window.emit("vault-locked", notice);
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running Open-Photo");
 }
@@ -1401,7 +1536,7 @@ mod tests {
 
     static NEXT_TEST_DIRECTORY: AtomicU64 = AtomicU64::new(0);
 
-    fn temp_root() -> PathBuf {
+    pub(super) fn temp_root() -> PathBuf {
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -1479,10 +1614,11 @@ mod tests {
         let other = temp_root();
         let image = other.join("photo.jpg");
         fs::write(&image, b"test").unwrap();
-        let result = preview_image(
+        let result = preview_image_sync(
             root.to_string_lossy().into_owned(),
             image.to_string_lossy().into_owned(),
             400,
+            None,
         );
         assert!(result.is_err());
         fs::remove_dir_all(root).unwrap();

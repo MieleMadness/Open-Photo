@@ -56,6 +56,8 @@
         StrCpy $R9 1
       ${EndIf}
     ${EndIf}
+    ; Encrypted private-vault-v1 and vault-attempts-v1.json are intentionally retained,
+    ; including during ordinary app-data cleanup. They contain user-owned vault copies.
     ; Never recursively remove this parent: it may also be the install directory
     ; and may contain other files that do not belong to Open-Photo.
     RmDir "$LOCALAPPDATA\Open-Photo"

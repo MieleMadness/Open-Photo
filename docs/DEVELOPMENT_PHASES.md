@@ -1,3 +1,11 @@
+## Consolidated development candidate — 0.56.95
+
+Library reliability/XMP safety, Phase J editor integration and the account-bound private vault now share one review branch. The merge preserves both native services, sidebar entry, recovery surfaces, styles and acceptance feature flags. Default release rendering/vault access remain gated.
+
+Hands-on/live application testing is deferred until closer to V1 at the user's request. Development continues with automated tests, mocked browser checks and exact-head CI. Earlier separate-branch installer results are historical evidence, not combined-candidate release sign-off. See [the consolidation checkpoint and queue](CONSOLIDATION_0_56_95.md).
+
+Earlier checkpoints below are historical and do not override the current queue/testing policy.
+
 ## November 3, 2026 — Active roadmap status (development, not release sign-off)
 
 **Source of truth:** the active development branch (`feature/desktop-v0.1.0`) includes the fast/full Windows CI optimization merged as PR #14. The latest documented application checkpoint is **0.56.63**. Later editor changes remain in draft pull requests; do not label them shipped.

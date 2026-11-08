@@ -12,7 +12,7 @@ export function EditorInspector({open,tab,onTab,onClose,clip,canvas}:{open:boole
       event.preventDefault();const next=event.key==="Home"?0:event.key==="End"?1:(index+(event.key==="ArrowRight"?1:-1)+2)%2;
       onTab(tabs[next].id);event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
     }}>{item.label}</button>)}</div>
-    <div role="tabpanel" id={`${id}-clip`} aria-labelledby={`${id}-clip-tab`} hidden={tab!=="clip"}>{clip}</div>
-    <div role="tabpanel" id={`${id}-canvas`} aria-labelledby={`${id}-canvas-tab`} hidden={tab!=="canvas"}>{canvas}</div>
+    <div role="tabpanel" data-inspector-panel="clip" id={`${id}-clip`} aria-labelledby={`${id}-clip-tab`} hidden={tab!=="clip"}>{clip}</div>
+    <div role="tabpanel" data-inspector-panel="canvas" id={`${id}-canvas`} aria-labelledby={`${id}-canvas-tab`} hidden={tab!=="canvas"}>{canvas}</div>
   </aside>;
 }

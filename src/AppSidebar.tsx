@@ -1,13 +1,16 @@
-import {useEffect,useState} from "react";
-import {ChevronRight,Images,Layers3,Moon,PanelLeftClose,PanelLeftOpen,Sun,type LucideIcon} from "lucide-react";
+import {useEffect,useRef,useState} from "react";
+import {Info,ChevronRight,Images,Layers3,Moon,PanelLeftClose,PanelLeftOpen,Sun,type LucideIcon} from "lucide-react";
 import type {Workspace} from "./libraryWorkspace";
 import {readSetting,saveSetting} from "./userData";
 
-type Props<T extends string>={items:{id:T;title:string;icon:LucideIcon}[];view:T;onNavigate:(view:T)=>void;workspaces:Workspace[];workspace:string;onWorkspace:(id:string)=>void;onCreateWorkspace:()=>void;theme:string;onTheme:(theme:"light"|"dark")=>void;version:string};
+type Props<T extends string>={items:{id:T;title:string;icon:LucideIcon}[];view:T;onNavigate:(view:T)=>void;workspaces:Workspace[];workspace:string;onWorkspace:(id:string)=>void;onCreateWorkspace:()=>void;theme:string;onTheme:(theme:"light"|"dark")=>void;version:string;onVault?:()=>void};
 /** Width is an explicit app preference. Compact rows never stretch with the window height. */
-export function AppSidebar<T extends string>({items,view,onNavigate,workspaces,workspace,onWorkspace,onCreateWorkspace,theme,onTheme,version}:Props<T>){
+export function AppSidebar<T extends string>({items,view,onNavigate,workspaces,workspace,onWorkspace,onCreateWorkspace,theme,onTheme,version,onVault}:Props<T>){
   const [collapsed,setCollapsed]=useState(()=>readSetting("openphoto.sidebarCollapsed")==="true");
   useEffect(()=>saveSetting("openphoto.sidebarCollapsed",String(collapsed)),[collapsed]);
+  const clicks=useRef({count:0,time:0});
+  function versionClick(){const now=Date.now();clicks.current={count:now-clicks.current.time<=800?clicks.current.count+1:1,time:now};if(clicks.current.count>=3){clicks.current.count=0;onVault?.();}}
+  const versionButton=<button type="button" className={collapsed?"icon-button vault-version-collapsed":"vault-version"} aria-label="Open-Photo version; press Enter for private vault" title={collapsed?`${version?`v${version}`:"Development preview"} · Private vault: Enter or triple-click`:"Private vault: Enter or triple-click"} onClick={versionClick} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();clicks.current.count=0;onVault?.();}}}>{collapsed?<Info size={18}/>:version?`v${version} preview`:"Development preview"}</button>;
   const workspaceName=workspaces.find(w=>w.id===workspace)?.name||"Select a workspace";
   return <aside className="sidebar" data-collapsed={collapsed} aria-label="Application sidebar">
     <div className="sidebar-header"><div className="brand" aria-label="Open-Photo"><div className="brand-mark"><Images size={23}/></div><div className="brand-copy"><strong>Open-Photo</strong><small>YOUR PHOTO LIBRARY</small></div></div>
@@ -16,6 +19,6 @@ export function AppSidebar<T extends string>({items,view,onNavigate,workspaces,w
     <div className="sidebar-workspace" title={`Workspace: ${workspaceName}`}><label><span className="workspace-label">Workspace</span><span className="workspace-picker"><Layers3 className="workspace-picker-icon" size={20} aria-hidden="true"/><select className="workspace-select" aria-label="Active workspace" value={workspace} onChange={event=>event.target.value==="__new__"?onCreateWorkspace():onWorkspace(event.target.value)}><option value="">Select a workspace</option>{workspaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}<option value="__new__">+ Add new workspace…</option></select></span></label></div>
     <nav id="app-navigation" className="sidebar-nav" aria-label="Main navigation">{items.map(({id,title,icon:Icon})=><button key={id} className={view===id?"nav-button active":"nav-button"} onClick={()=>onNavigate(id)} title={title} aria-label={title} aria-current={view===id?"page":undefined}><Icon size={18}/><span className="nav-label">{title}</span>{view===id&&<ChevronRight size={16} className="nav-chevron"/>}</button>)}</nav>
     <div className="sidebar-theme" aria-label="Appearance"><span className="sidebar-label">APPEARANCE</span><div className="theme-options sidebar-theme-options">{([{id:"light",label:"Light",Icon:Sun},{id:"dark",label:"Dark",Icon:Moon}] as const).map(({id,label,Icon})=><button key={id} className={theme===id?"theme-option selected":"theme-option"} onClick={()=>onTheme(id)} title={label} aria-label={label} aria-pressed={theme===id}><Icon size={16}/><span className="theme-label">{label}</span></button>)}</div></div>
-    <div className="sidebar-footer">Open-Photo <span>{version?`v${version} preview`:"Development preview"}</span></div>
+    {collapsed?versionButton:<div className="sidebar-footer">Open-Photo {versionButton}</div>}
   </aside>;
 }

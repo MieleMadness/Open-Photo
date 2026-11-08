@@ -1,6 +1,7 @@
 import {useSyncExternalStore} from "react";
 import {invoke} from "@tauri-apps/api/core";
 import type {VideoProject} from "./videoProject";
+import type {TransitionRenderRequest} from "./workspaceTransitions";
 export type ExportSize="project"|"hd1080"|"uhd4k";
 /** The display mirrors native resolution caps; native validation remains authoritative. */
 export function exportCanvas(canvas:VideoProject["output"],preset:ExportSize){
@@ -23,6 +24,9 @@ export async function startVideoExport(root:string,project:VideoProject,options:
 }
 export async function startWorkspaceVideoExport(workspaceId:string,id:string,expectedRevision:number,title:string,options:{destination:string;size:ExportSize;acknowledge_first_audio:boolean}){
   return startExport("start_workspace_video_export",{workspaceId,id,expectedRevision,options},title,options.destination);
+}
+export async function startWorkspaceTransitionExport(request:TransitionRenderRequest,title:string,options:{destination:string;size:ExportSize;acknowledge_first_audio:boolean}){
+  return startExport("start_workspace_transition_export",{request,options},title,options.destination);
 }
 async function startExport(command:string,args:Record<string,unknown>,title:string,destination:string){
   if(appClosing)throw Error("The app is closing; start export after keeping it open.");

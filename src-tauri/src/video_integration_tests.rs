@@ -183,6 +183,60 @@ fn fingerprint(path: &Path) -> Vec<u8> {
 }
 
 #[test]
+fn video_posters_invalidate_same_size_sources_with_preserved_timestamps() {
+    let fixture = Fixture::new();
+    let source = fixture.0.join("identity.avi");
+    let generate = |color: &str| {
+        ffmpeg(
+            &[
+                "-y", "-v", "error", "-f", "lavfi", "-i", color, "-c:v", "rawvideo", "-pix_fmt",
+                "bgr24", "-f", "avi",
+            ],
+            &source,
+        )
+    };
+    generate("color=c=red:s=64x48:r=1:d=1");
+    let original = fs::read(&source).unwrap();
+    let modified = source.metadata().unwrap().modified().unwrap();
+    let first = crate::video_poster::poster(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        source.to_str().unwrap(),
+        160,
+    )
+    .unwrap();
+    assert_eq!(
+        first,
+        crate::video_poster::poster(
+            &engine(),
+            fixture.0.to_str().unwrap(),
+            source.to_str().unwrap(),
+            160
+        )
+        .unwrap()
+    );
+    assert_eq!(fs::read(&source).unwrap(), original);
+    generate("color=c=blue:s=64x48:r=1:d=1");
+    fs::File::options()
+        .write(true)
+        .open(&source)
+        .unwrap()
+        .set_times(fs::FileTimes::new().set_modified(modified))
+        .unwrap();
+    assert_eq!(source.metadata().unwrap().len(), original.len() as u64);
+    let current = fs::read(&source).unwrap();
+    let second = crate::video_poster::poster(
+        &engine(),
+        fixture.0.to_str().unwrap(),
+        source.to_str().unwrap(),
+        160,
+    )
+    .unwrap();
+    assert_ne!(first, second);
+    assert_eq!(fs::read(&source).unwrap(), current);
+}
+
+#[test]
 fn inspects_real_unicode_phone_video_with_and_without_audio_without_modification() {
     let fixture = Fixture::new();
     for audio in [false, true] {

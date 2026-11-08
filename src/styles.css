@@ -1,4 +1,5 @@
 @import "./tokens.css";
+@import "./library.css";
 * {
   box-sizing: border-box;
   scrollbar-width: thin;
@@ -32,7 +33,7 @@ button:disabled {
   opacity: .55;
   cursor: not-allowed
 }
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible {
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible,.xmp-recovery h2:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 3px
 }
@@ -769,12 +770,11 @@ dd {
   text-align: left;
   color: var(--text);
   box-shadow: 0 1px 2px rgba(30,20,40,.03);
-  transition: border-color var(--motion-fast),box-shadow var(--motion-normal),transform var(--motion-normal) var(--ease-standard)
+  transition: border-color var(--motion-fast),box-shadow var(--motion-fast)
 }
 .photo-tile:hover {
   border-color: color-mix(in srgb,var(--primary) 48%,var(--line));
-  box-shadow: var(--shadow-hover);
-  transform: translateY(-2px)
+  box-shadow: var(--shadow-hover)
 }
 .photo-tile>.photo-image,.photo-tile>.photo-fallback {
   width: 100%;
@@ -1538,7 +1538,7 @@ dd {
   color: var(--muted);
   line-height: 1.5
 }
-select,input[type="text"],input[type="search"],input[type="number"],textarea {
+select,input[type="password"],input[type="text"],input[type="search"],input[type="number"],textarea {
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--text);
@@ -1547,10 +1547,10 @@ select,input[type="text"],input[type="search"],input[type="number"],textarea {
   min-height: var(--control-height);
   padding: 9px var(--space-3);
 }
-select:hover,input[type="text"]:hover,input[type="search"]:hover,input[type="number"]:hover,textarea:hover {
+select:hover,input[type="password"]:hover,input[type="text"]:hover,input[type="search"]:hover,input[type="number"]:hover,textarea:hover {
   border-color: var(--line-strong)
 }
-select:focus,input[type="text"]:focus,input[type="search"]:focus,input[type="number"]:focus,textarea:focus {
+select:focus,input[type="password"]:focus,input[type="text"]:focus,input[type="search"]:focus,input[type="number"]:focus,textarea:focus {
   border-color: var(--accent-text);
   box-shadow: 0 0 0 3px color-mix(in srgb,var(--primary) 12%,transparent);
 }
@@ -1765,7 +1765,7 @@ select {
   color: var(--text)
 }
 @media(hover:hover) {
-  .icon-button:hover,.theme-option:hover,.folder-item:hover,.file-row:hover,.photo-tile:hover,.video-filmstrip button:hover {
+  .icon-button:hover,.theme-option:hover,.folder-item:hover,.file-row:hover,.video-filmstrip button:hover {
     will-change: transform;
   }
 }
@@ -2574,3 +2574,48 @@ select {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+.xmp-recovery { margin-block: 1.5rem; max-width: 75rem; }
+.xmp-recovery > p { max-width: 70ch; }
+.xmp-recovery ul { padding-inline-start: 1.25rem; }
+.xmp-recovery li { margin-block: .75rem; overflow-wrap: anywhere; }
+.xmp-recovery li button { margin-inline-end: var(--space-2); margin-block-start: var(--space-2); }
+.xmp-review-pages { align-items: center; margin-block: 1rem; }
+.xmp-review-pages p { margin: 0; }
+.xmp-review-detail { margin-block: 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: 12px; }
+.xmp-review-unavailable { margin-block: var(--space-3); max-width: 70ch; }
+.xmp-stage-files { margin-block: var(--space-3); }
+.xmp-stage-files summary { padding-block: var(--space-2); }
+.xmp-stage-files p { max-width: 70ch; margin-block: var(--space-2); }
+.xmp-review-versions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
+.xmp-review-detail pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 20rem; overflow: auto; font-size: .8125rem; }
+.xmp-review-detail button { margin-block: .5rem; margin-inline-end: .5rem; }
+@media(max-width:800px) { .xmp-review-versions { grid-template-columns: minmax(0,1fr); } }
+
+/* Protected vault tasks reuse native dialog modality and the established desktop tokens. */
+.vault-version{border:0;background:transparent;color:var(--muted);padding:0;min-height:32px;font:inherit;cursor:pointer;}
+.vault-version:hover{color:var(--text);}
+.vault-version:focus-visible{outline:2px solid var(--accent-text);outline-offset:3px;}
+.vault-version-collapsed{margin-inline:auto;flex-shrink:0;}
+.vault-dialog{width:min(1020px,calc(100vw - 32px));max-height:calc(100dvh - 32px);margin:auto;padding:var(--space-6);overflow:auto;background:var(--surface);color:var(--text);border-radius:var(--radius-lg);}
+.vault-private-surface{display:flex;flex-direction:column;gap:var(--space-4);min-width:0;}
+.vault-heading{display:flex;justify-content:space-between;gap:var(--space-4);align-items:flex-start;}
+.vault-heading h2{margin:0;}
+.vault-heading p{margin:var(--space-2) 0 0;color:var(--muted);}
+.vault-actions,.vault-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2);}
+.vault-credentials{max-width:560px;display:flex;flex-direction:column;gap:var(--space-4);}
+.vault-credentials h3,.vault-credentials p,.vault-copy-note{margin:0;}
+.vault-credentials .vault-check{display:flex;align-items:flex-start;gap:var(--space-2);}
+.vault-check input{width:auto;flex-shrink:0;margin-top:4px;}
+.vault-empty{padding:var(--space-6) 0;max-width:65ch;}
+.vault-browser{display:grid;grid-template-columns:minmax(200px,280px) minmax(0,1fr);gap:var(--space-5);min-width:0;}
+.vault-list ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--space-2);max-height:420px;overflow:auto;}
+.vault-list button{width:100%;display:flex;flex-direction:column;align-items:flex-start;text-align:left;white-space:normal;overflow-wrap:anywhere;gap:var(--space-1);}
+.vault-list button[aria-pressed="true"]{background:var(--primary-soft);border-color:var(--accent-text);}
+.vault-list small{color:var(--muted);}
+.vault-viewer{min-width:0;}
+.vault-viewer h3{overflow-wrap:anywhere;}
+.vault-viewer img,.vault-viewer video{display:block;max-width:100%;width:100%;max-height:440px;object-fit:contain;background:var(--surface-muted);}
+@media(max-width:860px){.vault-dialog{padding:var(--space-4);}.vault-browser{grid-template-columns:minmax(160px,220px) minmax(0,1fr);gap:var(--space-3);}}
+
+.vault-auth-dialog{width:min(620px,calc(100vw - 32px));}

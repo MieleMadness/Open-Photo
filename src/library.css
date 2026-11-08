@@ -1,0 +1,12 @@
+/* Library-specific interaction surfaces; foundations stay in tokens.css. */
+.map-location-list { margin-block:var(--space-4); }
+.map-location-list>label { display:grid; gap:var(--space-2); max-width:480px; }
+.map-location-list input { min-height:var(--control-height); min-width:0; }
+.map-location-list ul { list-style:none; padding:0; display:grid; gap:var(--space-2); }
+.map-location-list li,.map-location-list button { min-width:0; }
+.map-location-list li button { display:grid; width:100%; text-align:start; white-space:normal; overflow-wrap:anywhere; }
+.map-location-list small { color:var(--muted); }
+.leaflet-interactive:focus-visible { outline:3px solid var(--accent-text); outline-offset:3px; }
+.folder-item { overflow-wrap:anywhere; }
+.settings-repair-field { display:grid; gap:var(--space-2); margin-block:var(--space-4); }
+.settings-repair-field textarea { min-height:180px; width:100%; font-family:var(--font-ui); }

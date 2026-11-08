@@ -1,4 +1,7 @@
 //! Multi-asset documents share durable project storage, but never overwrite v1 drafts.
+#[cfg(test)]
+#[path = "crossfade_sequence_binding.rs"]
+mod phase_j_sequence_binding;
 use crate::{
     sequence_media::{self, Asset, Media},
     video_engine, video_probe,

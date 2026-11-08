@@ -5,11 +5,12 @@ import {markSeconds,markTime} from "./videoTime";
 import {invoke} from "@tauri-apps/api/core";
 import {assetTimeBase,assetDuration,videoInfo,type SequenceAsset} from "./sequenceMedia";
 import {flushSettings} from "./userData";
+import {validTitleText} from "./titleText";
 export type TitleOverlay={id:string;text:string;start_seconds:number;end_seconds:number;x_percent:number;y_percent:number};
 export type AudioTrack={id:string;asset_id:string;start_seconds:number;source_in_seconds:number;duration_seconds:number;gain_percent:number;fade_in_seconds:number;fade_out_seconds:number};
 export type AudioOnlySource={id:string;relative_path:string;sha256:string;bytes:number;info:{duration_seconds:number;stream:number;codec:string;channels:number;sample_rate:number}};
 export type SequenceProject={transitions?:CutTransition[];titles?:TitleOverlay[];audio_tracks?:AudioTrack[];audio_sources?:AudioOnlySource[];schema_version:3;id:string;title:string;assets:SequenceAsset[];clips:VideoProject["clips"];output:VideoProject["output"];frame_rate:30|60};
-export type LoadedSequence={project:SequenceProject;revision:number;sources:{asset_id:string;path:string|null;root?:string|null;status:string}[]};
+export type LoadedSequence={project:SequenceProject;revision:number;sources:{asset_id:string;path:string|null;root?:string|null;status:string}[];transition_proposal?:boolean};
 export function validSequence(project:SequenceProject){
   if(!project.title.trim()||project.title.length>200)return "Enter a project name of up to 200 characters.";
   const titles=project.titles||[];
@@ -17,7 +18,7 @@ export function validSequence(project:SequenceProject){
   const total=project.clips.reduce((sum,clip)=>sum+markSeconds(clip.source_out)-markSeconds(clip.source_in),0);
   const seen=new Set<string>();
   for(const title of titles){
-    if(!/^[a-zA-Z0-9-]{1,120}$/.test(title.id)||seen.has(title.id)||!title.text.trim()||title.text.length>100||/[\\x00-\\x1f\\x7f]/.test(title.text)||!Number.isFinite(title.start_seconds)||!Number.isFinite(title.end_seconds)||title.start_seconds<0||title.end_seconds<=title.start_seconds||title.end_seconds>total+0.000001||!Number.isInteger(title.x_percent)||!Number.isInteger(title.y_percent)||title.x_percent<0||title.x_percent>100||title.y_percent<0||title.y_percent>100)return "Correct title timing, text or position.";
+    if(!/^[a-zA-Z0-9-]{1,120}$/.test(title.id)||seen.has(title.id)||!validTitleText(title.text)||!Number.isFinite(title.start_seconds)||!Number.isFinite(title.end_seconds)||title.start_seconds<0||title.end_seconds<=title.start_seconds||title.end_seconds>total+0.000001||!Number.isInteger(title.x_percent)||!Number.isInteger(title.y_percent)||title.x_percent<0||title.x_percent>100||title.y_percent<0||title.y_percent>100)return "Correct title timing, text or position.";
     seen.add(title.id);
   }
   const sources=project.audio_sources||[];

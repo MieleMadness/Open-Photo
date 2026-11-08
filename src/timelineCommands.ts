@@ -1,5 +1,5 @@
 import {retainAdjacentTransitions,type CutTransition} from "./cutTransitions";
-import {assetTimeBase,assetDuration,usesFrameClock} from "./sequenceMedia";
+import {assetTimeBase,assetDuration,usesSequenceFrameClock} from "./sequenceMedia";
 import {defaultEdits,type VideoProject} from "./videoProject";
 import {markSeconds,markTime} from "./videoTime";
 import {validSequence,type SequenceProject} from "./videoSequence";
@@ -19,7 +19,7 @@ export type TimelineCommand=
 /** Sequence order owns placement. Linked source audio is part of each clip's edits. */
 export function timelineEntries(project:SequenceProject):TimelineEntry[]{
   let position=0,sourceTotal=0;
-  return project.clips.map(clip=>{const start=position;sourceTotal+=markSeconds(clip.source_out)-markSeconds(clip.source_in);position=usesFrameClock(project.clips,project.assets)?Math.round(sourceTotal*project.frame_rate)/project.frame_rate:sourceTotal;return {clip,start,end:position,duration:position-start};});
+  return project.clips.map(clip=>{const start=position;sourceTotal+=markSeconds(clip.source_out)-markSeconds(clip.source_in);position=usesSequenceFrameClock(project)?Math.round(sourceTotal*project.frame_rate)/project.frame_rate:sourceTotal;return {clip,start,end:position,duration:position-start};});
 }
 export function projectDuration(project:SequenceProject):number{return timelineEntries(project).at(-1)?.end||0;}
 

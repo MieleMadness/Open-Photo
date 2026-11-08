@@ -1,4 +1,4 @@
-//! Test-only Windows file-handle protection for normalized media during FFmpeg.
+//! Windows file-handle protection for normalized media during FFmpeg.
 //! Read sharing explicitly excludes concurrent writers and delete/rename
 //! requests until the guard is dropped.
 use sha2::{Digest, Sha256};

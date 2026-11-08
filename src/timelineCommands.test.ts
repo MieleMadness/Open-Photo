@@ -8,6 +8,14 @@ function project():SequenceProject{
   const info={duration_seconds:2,codec:"h264",width:96,height:64,time_base:"1/90000",frame_rate:"30/1",nominal_frame_rate:"30/1",sample_aspect_ratio:"1:1",rotation_degrees:0,color_transfer:null,hdr:false,audio:[],warnings:[]};
   return {schema_version:3,id:"p",title:"Short assembly",assets:["one","two"].map((id,i)=>({id,relative_path:`${id}.mp4`,sha256:String(i+1).repeat(64),bytes:100,media:{kind:"video" as const,info}})),clips:["one","two"].map(id=>({id,asset_id:id,source_in:markTime(0,info.time_base),source_out:markTime(2,info.time_base),edits:defaultEdits()})),output:{width:1920,height:1080,fit:"fit"},frame_rate:30};
 }
+it("uses the native project clock for a single video with titles or layered audio",()=>{
+  const p=project();p.clips=p.clips.slice(0,1);p.clips[0].source_out=markTime(1.01,"1/90000");
+  expect(projectDuration(p)).toBe(1.01);
+  p.titles=[{id:"title",text:"Title",start_seconds:0,end_seconds:0.5,x_percent:50,y_percent:50}];
+  expect(projectDuration(p)).toBe(1);
+  p.titles=[];p.audio_tracks=[{id:"track",asset_id:"one",start_seconds:0,source_in_seconds:0,duration_seconds:0.5,gain_percent:100,fade_in_seconds:0,fade_out_seconds:0}];
+  expect(projectDuration(p)).toBe(1);
+});
 it("extends, splits and reorders a still clip on the shared frame clock without changing its asset",()=>{
   const p=project();p.assets.push({id:"photo",relative_path:"still.jpg",sha256:"3".repeat(64),bytes:200,media:{kind:"photo",width:96,height:64}});
   const appended=editTimeline(p,{type:"append",assetId:"photo",newId:"still"}),extended=editTimeline(appended,{type:"trim",clipId:"still",start:0,end:5});

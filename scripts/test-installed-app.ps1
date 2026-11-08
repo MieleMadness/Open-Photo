@@ -44,7 +44,7 @@ try {
     $env:OPENPHOTO_AI_ACCEPTANCE_OUTPUT=Join-Path $ReportDirectory 'ai-inference.json'
     Push-Location $projectRoot
     try {
-        $messages=& cargo test --release --manifest-path src-tauri/Cargo.toml --locked --lib --no-run --message-format=json
+        $messages=& cargo test --release --manifest-path src-tauri/Cargo.toml --locked --features private-vault --lib --no-run --message-format=json
         if ($LASTEXITCODE -ne 0) {throw 'Cannot build installed AI inference acceptance'}
         $artifacts=@($messages | ForEach-Object {$_ | ConvertFrom-Json} | Where-Object {$_.reason -eq 'compiler-artifact' -and $_.target.name -eq 'open_photo_lib' -and $_.profile.test -and $_.executable})
         if ($artifacts.Count -ne 1) {throw 'Expected exactly one native acceptance executable'}
@@ -53,6 +53,12 @@ try {
         $env:PATH="$env:SystemRoot/System32;$env:SystemRoot"
         & $acceptanceExecutable ai_models::tests::bundled_ai_models_acceptance --exact --ignored --nocapture --test-threads=1
         if ($LASTEXITCODE -ne 0) {throw 'Installed AI inference acceptance failed'}
+        # Acceptance-only executable, separate from the default-gated installed app.
+        # Every vault test uses disposable synthetic roots; this is not WebView/GUI acceptance.
+        & $acceptanceExecutable vault:: --nocapture --test-threads=1 *> (Join-Path $ReportDirectory 'vault-native.log')
+        if ($LASTEXITCODE -ne 0) {throw 'Installed-runtime native vault acceptance failed'}
+        [ordered]@{app_version=(Get-Content (Join-Path $projectRoot 'package.json') -Raw|ConvertFrom-Json).version;acceptance_feature='private-vault';native_vault_exit_code=0;scope='Release-mode native vault tests beside installed DLLs using synthetic disposable data; no GUI/cache/playback acceptance claim'} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ReportDirectory 'vault-native.json') -Encoding utf8
+
     } finally {Pop-Location}
 } finally {$env:OPENPHOTO_AI_BUNDLE_DIRECTORY=$previousBundle;$env:OPENPHOTO_AI_ACCEPTANCE_OUTPUT=$previousReport;$env:PATH=$previousPath;if (Test-Path -LiteralPath $acceptanceExecutable) {Remove-Item -LiteralPath $acceptanceExecutable}}
 $dataRoot=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Open-Photo'
@@ -80,8 +86,18 @@ foreach ($base in @([Environment]::GetFolderPath('LocalApplicationData'),[Enviro
 }
 # This unknown media file inside the old app-data parent must survive every cleanup.
 $media=Join-Path $dataRoot 'keep-original-installer-acceptance.mp4';[IO.File]::WriteAllText($media,$marker)
+# Opaque synthetic vault data is user-owned and must survive ordinary app-data cleanup.
+$vaultDirectory=Join-Path $dataRoot 'private-vault-v1'
+New-Item -ItemType Directory -Force -Path $vaultDirectory | Out-Null
+$vaultSentinel=Join-Path $vaultDirectory 'state.opv'
+if (Test-Path -LiteralPath $vaultSentinel) {throw 'Refusing to overwrite existing encrypted vault fixture'}
+[IO.File]::WriteAllText($vaultSentinel,$marker)
+$vaultAttempts=Join-Path $dataRoot 'vault-attempts-v1.json'
+if (Test-Path -LiteralPath $vaultAttempts) {throw 'Refusing to overwrite existing vault attempt tracking'}
+[IO.File]::WriteAllText($vaultAttempts,$marker)
+
 function Assert-Kept {
-    foreach ($file in $ownedFiles+$browserFiles+@($media)) {if (!(Test-Path -LiteralPath $file) -or [IO.File]::ReadAllText($file) -ne $marker) {throw "Retained-data acceptance failed: $file"}}
+    foreach ($file in $ownedFiles+$browserFiles+@($media,$vaultSentinel,$vaultAttempts)) {if (!(Test-Path -LiteralPath $file) -or [IO.File]::ReadAllText($file) -ne $marker) {throw "Retained-data acceptance failed: $file"}}
 }
 Run-Uninstaller -Options @('/UPDATE','/PURGEAPPDATA=1');Assert-Kept
 Run-Installer
@@ -90,5 +106,7 @@ Run-Installer
 Run-Uninstaller -Options @('/PURGEAPPDATA=1')
 foreach ($file in $ownedFiles+$browserFiles) {if (Test-Path -LiteralPath $file) {throw "Explicit app-data cleanup left a managed file: $file"}}
 if (!(Test-Path -LiteralPath $media) -or [IO.File]::ReadAllText($media) -ne $marker) {throw 'Original-media preservation acceptance failed'}
-[ordered]@{app_version=(Get-Content (Join-Path $projectRoot 'package.json') -Raw|ConvertFrom-Json).version;models_installed_and_verified=$manifest.models.Count;native_runtime_files_verified=$runtime.files.Count;update_retains_data=$true;default_uninstall_retains_data=$true;explicit_cleanup_removes_managed_data=$true;original_media_preserved=$true;scope='Disposable GitHub-hosted Windows installer lifecycle; no GUI playback or AI accuracy claim'} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ReportDirectory 'installer-lifecycle.json') -Encoding utf8
+if (!(Test-Path -LiteralPath $vaultSentinel) -or [IO.File]::ReadAllText($vaultSentinel) -ne $marker) {throw 'Encrypted vault preservation acceptance failed'}
+if (!(Test-Path -LiteralPath $vaultAttempts) -or [IO.File]::ReadAllText($vaultAttempts) -ne $marker) {throw 'Vault attempt tracking preservation acceptance failed'}
+[ordered]@{vault_attempts_preserved=$true;encrypted_vault_preserved=$true;app_version=(Get-Content (Join-Path $projectRoot 'package.json') -Raw|ConvertFrom-Json).version;models_installed_and_verified=$manifest.models.Count;native_runtime_files_verified=$runtime.files.Count;update_retains_data=$true;default_uninstall_retains_data=$true;explicit_cleanup_removes_managed_data=$true;original_media_preserved=$true;scope='Disposable GitHub-hosted Windows installer lifecycle; no GUI playback or AI accuracy claim'} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ReportDirectory 'installer-lifecycle.json') -Encoding utf8
 Write-Output "Installed AI and uninstall lifecycle acceptance passed: $ReportDirectory"

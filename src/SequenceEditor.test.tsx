@@ -1,3 +1,4 @@
+import {StrictMode} from "react";
 import {videoInfo} from "./sequenceMedia";
 import {act,cleanup,fireEvent,render,screen,waitFor} from "@testing-library/react";
 import {afterEach,beforeEach,expect,it,vi} from "vitest";
@@ -20,6 +21,12 @@ beforeEach(()=>{vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(
 });});
 afterEach(async()=>{cleanup();discardProjectSaves();vi.mocked(invoke).mockResolvedValue(null);await refreshVideoExport();vi.resetAllMocks();});
 function editor(loaded=value()){return render(<VideoSequences roots={["/library"]} workspaceId="workspace" initial={loaded}/>);}
+it("enables the project clock for a single video carrying a title",async()=>{
+  const loaded=value();loaded.project.titles=[{id:"title",text:"A title",start_seconds:0,end_seconds:1,x_percent:50,y_percent:50}];
+  editor(loaded);await screen.findByDisplayValue("My edit");
+  expect((screen.getByLabelText("Sequence frame rate") as HTMLSelectElement).disabled).toBe(false);
+  expect(screen.getByText(/The rendered project uses 30 fps/)).toBeTruthy();
+});
 it("uses the same timeline and controller for one source and added sources",async()=>{
   editor();await screen.findByDisplayValue("My edit");expect(screen.getByRole("button",{name:"Clip 1: source.mp4"})).toBeTruthy();
   expect((screen.getByRole("button",{name:"Export project MP4…"}) as HTMLButtonElement).disabled).toBe(false);
@@ -114,4 +121,32 @@ it("keeps export presets outside the saved project and exports the whole joined 
 it("does not require an unused missing bin source to render the timeline",async()=>{
   const loaded=value(),unused={...structuredClone(loaded.project.assets[0]),id:"unused",relative_path:"offline.mp4",sha256:"1".repeat(64)};loaded.project.assets.push(unused);loaded.sources.push({asset_id:unused.id,path:null,root:null,status:"Offline"});
   editor(loaded);await screen.findByDisplayValue("My edit");expect((screen.getByRole("button",{name:"Export project MP4…"}) as HTMLButtonElement).disabled).toBe(false);
+});
+function proposalState(loaded:LoadedSequence,revision=1,frames=6){
+  const project={revision:loaded.revision,hash:"a".repeat(64)},edges=frames?[{from_clip_id:"c",to_clip_id:"c2",frames}]:[];
+  return {project,revision,record:{schema_version:1,timing_policy:1,workspace:"workspace",project_id:"p",revision,project,edges,recovered_from:null},stale:false,history:[{revision,supported:true}],timing:{fps:30,total_frames:600-frames,total_samples:(600-frames)*1600,clips:[{id:"c",asset_id:"a",photo:false,linked_audio:false,gain_percent:100,frames:{start:0,end:300},samples:{start:0,end:480000},dip_in_frames:0,dip_out_frames:0},{id:"c2",asset_id:"a",photo:false,linked_audio:false,gain_percent:100,frames:{start:300-frames,end:600-frames},samples:{start:(300-frames)*1600,end:(600-frames)*1600},dip_in_frames:0,dip_out_frames:0}],titles:[],audio:[]},seek:null,portable:null};
+}
+function crossfadeValue(){const loaded=value();loaded.project.clips.push({...structuredClone(loaded.project.clips[0]),id:"c2"});loaded.transition_proposal=true;return loaded;}
+it("saves proposal edits through exact receipts and preserves an invalid frame draft",async()=>{
+  const loaded=crossfadeValue(),fallback=vi.mocked(invoke).getMockImplementation()!;let state=proposalState(loaded);
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{if(command==="workspace_transition_capabilities")return {rendering:true,reason:null};if(command==="edit_workspace_video_transitions"){const action=(args as {action:{type:string;edges?:{frames:number}[]}}).action;if(action.type==="save")state=proposalState(loaded,state.revision+1,action.edges?.[0]?.frames||0);return state;}return fallback(command,args);});
+  render(<StrictMode><VideoSequences roots={["/library"]} workspaceId="workspace" initial={loaded}/></StrictMode>);await screen.findByDisplayValue("My edit");fireEvent.click(screen.getByRole("button",{name:"Canvas"}));const frames=await screen.findByLabelText("Crossfade duration (frames)");await waitFor(()=>expect((frames as HTMLInputElement).disabled).toBe(false));
+  expect((frames as HTMLInputElement).max).toBe("298");
+  fireEvent.change(frames,{target:{value:"12"}});fireEvent.blur(frames);await act(async()=>flushProjects());
+  expect(invoke).toHaveBeenCalledWith("edit_workspace_video_transitions",expect.objectContaining({action:expect.objectContaining({type:"save",expected_revision:1,expected_project:{revision:1,hash:"a".repeat(64)},edges:[{from_clip_id:"c",to_clip_id:"c2",frames:12}]})}));
+  fireEvent.change(frames,{target:{value:"0"}});fireEvent.blur(frames);expect(frames.getAttribute("aria-invalid")).toBe("true");
+  fireEvent.click(screen.getByRole("button",{name:"Preview crossfades"}));await screen.findByText(/Correct the highlighted field/);expect(invoke).not.toHaveBeenCalledWith("start_workspace_transition_preview",expect.anything());expect((frames as HTMLInputElement).value).toBe("0");
+});
+it("renders the proposal in the existing player and uses its shorter read-only timeline",async()=>{
+  const loaded=crossfadeValue(),fallback=vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{if(command==="workspace_transition_capabilities")return {rendering:true,reason:null};if(command==="edit_workspace_video_transitions")return proposalState(loaded);if(command==="start_workspace_transition_preview")return "crossfade-preview";if(command==="video_preview_status")return {state:"complete",error:null,result:{source:"crossfade.mp4",warnings:[]}};return fallback(command,args);});
+  editor(loaded);await screen.findByDisplayValue("My edit");fireEvent.click(screen.getByRole("button",{name:"Canvas"}));const preview=await screen.findByRole("button",{name:"Preview crossfades"});await waitFor(()=>expect((preview as HTMLButtonElement).disabled).toBe(false));fireEvent.click(preview);
+  await screen.findByLabelText("Crossfade project preview");expect(screen.getAllByLabelText("Crossfade project preview")).toHaveLength(1);expect(screen.getByRole("heading",{name:"Crossfade timeline"})).toBeTruthy();expect((screen.getByRole("button",{name:"Append selected media"}) as HTMLButtonElement).disabled).toBe(true);expect(screen.getByRole("slider",{name:"Project playhead"}).getAttribute("max")).toBe("19.8");
+  expect(invoke).toHaveBeenCalledWith("start_workspace_transition_preview",{request:{workspace_id:"workspace",id:"p",expected_project:{revision:1,hash:"a".repeat(64)},expected_revision:1}});
+  fireEvent.click(screen.getByRole("button",{name:"Return to source timeline"}));await screen.findByRole("heading",{name:"Timeline"});expect(invoke).toHaveBeenCalledWith("cancel_video_preview",{id:"crossfade-preview"});
+});
+it("keeps proposal rendering gated and preserves unsupported records on load failure",async()=>{
+  const loaded=crossfadeValue(),fallback=vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async(command,args)=>{if(command==="workspace_transition_capabilities")return {rendering:false,reason:"Crossfade playback is unavailable in this build."};if(command==="edit_workspace_video_transitions")return {...proposalState(loaded),record:{schema_version:99}};return fallback(command,args);});
+  editor(loaded);await screen.findByText(/Unsupported or inconsistent transition draft/);expect(screen.queryByRole("button",{name:"Preview crossfades"})).toBeNull();expect(vi.mocked(invoke).mock.calls.filter(([command,args])=>command==="edit_workspace_video_transitions"&&(args as {action:{type:string}}).action.type!=="load")).toHaveLength(0);
 });
