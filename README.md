@@ -1,3 +1,9 @@
+## Local Phase J integration in 0.56.88
+
+The existing video editor now has a **Crossfade proposal** disclosure in Canvas. Proposals save independently of the source timeline with undo/redo, explicit rebase, immutable recovery, and complete portable project copies. Preview and export share the existing player, cancellation queue and no-overwrite output pipeline. Native authorization checks saved workspace ownership, exact document/binding receipts, canonical media roots and verified source handles.
+
+Crossfade rendering is available in Windows debug builds and explicit `phase-j-preview` acceptance builds. Default release builds keep it disabled pending installed acceptance. Saving/recovering proposals remains available. Local implementation is not release acceptance; see [Phase 3 status, policy and remaining gates](docs/PHASE_J_PRODUCTION_INTEGRATION.md).
+
 ## Title editing fixes in 0.56.87
 
 Title text now uses the same Unicode counting and control-character policy as native project validation. Escape cancels a draft without saving it; Enter respects active IME composition. Invalid drafts stay visible with correction feedback and block rendering/export until corrected or canceled.

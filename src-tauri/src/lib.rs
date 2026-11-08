@@ -11,6 +11,7 @@ mod ai_validation;
 mod cache_disk;
 #[cfg(test)]
 mod crossfade_visual_compositor;
+mod sequence_frame_seek;
 mod source_version;
 // Crossfade frame-clock parity fixture only; no active renderer changes.
 #[cfg(test)]
@@ -19,7 +20,6 @@ mod crossfade_audio_count;
 mod crossfade_audio_fixture;
 #[cfg(test)]
 mod crossfade_audio_stream;
-#[cfg(test)]
 mod crossfade_clock;
 #[cfg(test)]
 mod crossfade_command;
@@ -33,7 +33,6 @@ mod crossfade_graph;
 mod crossfade_inputs;
 #[cfg(test)]
 mod crossfade_integrity;
-#[cfg(test)]
 mod crossfade_layer_clock;
 #[cfg(test)]
 mod crossfade_native_snapshot;
@@ -53,7 +52,7 @@ mod crossfade_scratch;
 mod crossfade_snapshot;
 #[cfg(test)]
 mod crossfade_staging;
-#[cfg(all(test, windows))]
+#[cfg(windows)]
 mod crossfade_windows_guard;
 mod edit_export;
 mod geo;
@@ -1388,6 +1387,12 @@ pub fn run() {
             video_sequence::create_video_sequence,
             video_workspace::workspace_video_projects,
             video_workspace::edit_workspace_video_project,
+            video_workspace::transitions::edit_workspace_video_transitions,
+            video_workspace::transitions::start_workspace_transition_preview,
+            video_workspace::transitions::start_workspace_transition_export,
+            video_workspace::transitions::workspace_transition_capabilities,
+            video_workspace::transitions::write_transition_proposal_copy,
+            video_workspace::transitions::recover_workspace_transition_project,
             video_workspace::workspace_audio_waveform,
             video_workspace::save_workspace_video_project,
             video_workspace::workspace_video_history,

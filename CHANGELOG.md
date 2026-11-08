@@ -1,3 +1,12 @@
+## 0.56.88 — local Phase J production integration (unreleased)
+
+- Add workspace-owned, versioned crossfade proposals with exact project/hash receipts, compare-and-swap saves, immutable revisions and deduplicated full timeline snapshots. Recovery survives expiration of the source timeline's rolling history. Unknown formats are preserved and refused.
+- Connect Canvas proposal controls to the existing autosave/undo/close guard, preview player and export owner. Add explicit rebase, portable JSON import/export, historical project copies and shorter read-only preview timing. Invalid drafts remain visible and block stale output.
+- Compile bounded RGB overlap handles between separately encoded clip bodies. Preview/export use complementary frame/sample-centered weights, global titles after dips/blends, exact 48 kHz delays/fades and one final audio clamp. No accumulated timeline re-encoding.
+- Queue source hashing under the cancellable native video worker. Retain Windows read-only source handles and recheck workspace, complete project/binding receipts and canonical roots before delivery/publication. Preserve originals and no-overwrite output.
+- Fix the single-video added-audio render fast path, added-audio-only source revalidation, frame-rate controls for layered single clips and quantized title end boundaries.
+- Keep default release crossfade rendering disabled pending installed acceptance; Windows debug and explicit `phase-j-preview` builds expose the validation path. No push, installer run, CI update or release is part of this local increment.
+
 ## 0.56.87 — title editing validation and keyboard fixes (unreleased)
 
 - Replace the incorrectly escaped title control-character expressions with one Unicode-aware validator shared by the editor and project validation. Accept ordinary letters, punctuation and up to 100 Unicode scalar values; reject native-incompatible controls and unpaired surrogates.

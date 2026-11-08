@@ -1108,3 +1108,17 @@
 .timeline-transition-inspector p { margin:0; color:var(--muted); font-size:var(--type-caption); }
 .timeline-transition-inspector label { display:grid; gap:var(--space-1); max-width:250px; }
 .timeline-transition-inspector input { min-width:0; width:100%; }
+
+/* Overlap placement uses the native proposal clock; source editing remains on its own timeline. */
+.timeline-clips[data-overlap="true"]{position:relative;display:block;min-height:148px;}
+.timeline-clips[data-overlap="true"]>li{box-sizing:border-box;min-width:0;height:68px;}
+.timeline-clips[data-overlap="true"] .timeline-transition-button{display:none;}
+.crossfade-proposal{padding-block:var(--space-3);border-block-start:1px solid var(--line);}
+.crossfade-proposal summary{cursor:pointer;font-weight:600;}
+.crossfade-proposal .video-transport{flex-wrap:wrap;gap:8px;}
+.crossfade-proposal select,.crossfade-proposal textarea{max-width:100%;}
+.crossfade-proposal textarea{width:100%;min-height:120px;}
+
+.timeline-clips[data-overlap="true"] .timeline-clip{height:68px;}
+.timeline-clips[data-overlap="true"] .editor-poster,.timeline-clips[data-overlap="true"] .editor-poster img{height:28px;}
+.timeline-clips[data-overlap="true"] .timeline-clip-duration{top:28px;}

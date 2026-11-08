@@ -29,6 +29,9 @@ pub(crate) fn build(
     let info = video_render::validate_output(engine, &plan, &output, &cancel)?;
     video_project::source(root, p, &cancel)?;
     Ok(PreviewAssets {
+        transition: None,
+        #[cfg(windows)]
+        source_ownership: None,
         source: output.to_string_lossy().into_owned(),
         proxy: true,
         info,

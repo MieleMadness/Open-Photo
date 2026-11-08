@@ -3,6 +3,10 @@
 include!("crossfade_preview_part_decoder.rs");
 #[cfg(all(test, windows))]
 include!("crossfade_preview_titles.rs");
+include!("sequence_audio_filter.rs");
+include!("sequence_mux.rs");
+#[cfg(windows)]
+include!("sequence_crossfade_render.rs");
 use crate::{
     video_engine, video_probe, video_project,
     video_render::{self, ExportSize, Plan, RenderOptions},
@@ -23,10 +27,28 @@ use std::{
 pub struct Snapshot {
     pub project: Sequence,
     pub roots: BTreeMap<String, String>,
+    pub(crate) transition: Option<crate::video_workspace::transitions::RenderBinding>,
 }
 impl Snapshot {
     pub fn validate(&self) -> Result<(), String> {
+        self.validate_with_cancel(&|| false)
+    }
+    pub(crate) fn validate_with_cancel(&self, cancel: &impl Fn() -> bool) -> Result<(), String> {
         crate::video_sequence::validate(&self.project)?;
+        if let Some(binding) = &self.transition {
+            crate::crossfade_layer_clock::plan(
+                &self.project,
+                &binding
+                    .edges
+                    .iter()
+                    .map(|edge| crate::crossfade_clock::Boundary {
+                        from_clip_id: &edge.from_clip_id,
+                        to_clip_id: &edge.to_clip_id,
+                        frames: edge.frames,
+                    })
+                    .collect::<Vec<_>>(),
+            )?;
+        }
         for source in &self.project.audio_sources {
             let root = self
                 .roots
@@ -38,7 +60,7 @@ impl Snapshot {
                     .join(&source.relative_path)
                     .to_string_lossy(),
             )?;
-            let (bytes, hash) = video_project::fingerprint(&path, || false)?;
+            let (bytes, hash) = video_project::fingerprint(&path, cancel)?;
             if bytes != source.bytes || hash != source.sha256 {
                 return Err("Independent audio file has changed; relink the original".into());
             }
@@ -76,8 +98,19 @@ impl Snapshot {
         ))
     }
     pub fn revalidate(&self, cancel: impl Fn() -> bool) -> Result<(), String> {
+        if let Some(binding) = &self.transition {
+            if !binding.current()? {
+                return Err("Transition preview or export became stale".into());
+            }
+        }
         for asset in &self.project.assets {
-            if !self.project.clips.iter().any(|c| c.asset_id == asset.id) {
+            if !self.project.clips.iter().any(|c| c.asset_id == asset.id)
+                && !self
+                    .project
+                    .audio_tracks
+                    .iter()
+                    .any(|track| track.asset_id == asset.id)
+            {
                 continue;
             }
             let root = self
@@ -111,9 +144,29 @@ impl Snapshot {
                 return Err("Independent audio file changed; relink the original.".into());
             }
         }
+        if let Some(binding) = &self.transition {
+            if !binding.current()? {
+                return Err("Transition preview or export became stale".into());
+            }
+        }
         Ok(())
     }
     pub fn duration(&self) -> Result<f64, String> {
+        if let Some(binding) = &self.transition {
+            let timing = crate::crossfade_layer_clock::plan(
+                &self.project,
+                &binding
+                    .edges
+                    .iter()
+                    .map(|edge| crate::crossfade_clock::Boundary {
+                        from_clip_id: &edge.from_clip_id,
+                        to_clip_id: &edge.to_clip_id,
+                        frames: edge.frames,
+                    })
+                    .collect::<Vec<_>>(),
+            )?;
+            return Ok(timing.total_frames as f64 / f64::from(timing.fps));
+        }
         self.project
             .clips
             .iter()
@@ -186,19 +239,39 @@ impl Drop for Scratch {
 pub struct Compiled {
     pub plan: Plan,
     pub encoded_fraction: f64,
+    authorization: Option<crate::video_workspace::transitions::RenderBinding>,
+    #[cfg(windows)]
+    segment_pins: Vec<crate::crossfade_windows_guard::PinnedMedia>,
     scratch: Option<Scratch>,
+    #[cfg(windows)]
+    source_pins: Option<std::sync::Arc<crate::crossfade_windows_guard::PinnedMedia>>,
 }
 impl Compiled {
     pub fn single(plan: Plan) -> Self {
         Self {
             plan,
             encoded_fraction: 0.0,
+            authorization: None,
+            #[cfg(windows)]
+            segment_pins: vec![],
             scratch: None,
+            #[cfg(windows)]
+            source_pins: None,
         }
     }
     pub fn close(&mut self) -> Result<(), String> {
+        #[cfg(windows)]
+        self.segment_pins.clear();
         if let Some(scratch) = &mut self.scratch {
             scratch.close()?;
+        }
+        Ok(())
+    }
+    pub(crate) fn verify_authorization(&self) -> Result<(), String> {
+        if let Some(binding) = &self.authorization {
+            if !binding.current()? {
+                return Err("Project or workspace changed before publication".into());
+            }
         }
         Ok(())
     }
@@ -266,6 +339,12 @@ impl PartSource {
         }
     }
 }
+#[derive(Clone, Copy)]
+struct PartSegment {
+    start: u64,
+    end: u64,
+    rgb: bool,
+}
 struct PartOptions<'a> {
     frames: u64,
     fps: u32,
@@ -274,6 +353,7 @@ struct PartOptions<'a> {
     output: &'a Path,
     max_bytes: u64,
     titles_filter: String,
+    segment: Option<PartSegment>,
 }
 fn part_args(
     prepared: &PartSource,
@@ -288,8 +368,14 @@ fn part_args(
         output,
         max_bytes,
         titles_filter,
+        segment,
     } = options;
-    let duration = frames as f64 / f64::from(fps);
+    let selected = segment.unwrap_or(PartSegment {
+        start: 0,
+        end: frames,
+        rgb: false,
+    });
+    let duration = (selected.end - selected.start) as f64 / f64::from(fps);
     let samples = frames * 48000 / u64::from(fps);
     let mut args: Vec<OsString> = [
         "-nostdin",
@@ -338,7 +424,16 @@ fn part_args(
             "anullsrc=r=48000:cl=stereo".into(),
         ]);
     }
-    let filter = normalized_video_filter(prepared, frames, fps, &titles_filter);
+    let mut filter = normalized_video_filter(prepared, frames, fps, &titles_filter);
+    if segment.is_some() {
+        filter.push_str(&format!(
+            ",trim=start_frame={}:end_frame={},setpts=N/({fps}*TB)",
+            selected.start, selected.end
+        ));
+    }
+    if selected.rgb {
+        filter.push_str(",format=bgr0");
+    }
     args.extend([
         "-map".into(),
         format!("0:{}", prepared.video_stream).into(),
@@ -346,12 +441,19 @@ fn part_args(
         filter.into(),
     ]);
     if audio {
-        let (map, filter) = if real_audio {
+        let (map, mut filter) = if real_audio {
             // Preserve decoded audio timestamps, including encoder delay and a late first sample.
             (format!("0:{}",prepared.audio_stream.expect("real audio")),format!("atrim=start=0:end={:.9},aformat=sample_fmts=flt:channel_layouts=stereo,aresample=48000:async=1:first_pts=0,volume={:.4},apad=whole_len={samples},atrim=end_sample={samples},asetpts=N/SR/TB",prepared.duration,f64::from(edits.gain_percent)/100.0))
         } else {
             ("1:a:0".into(),format!("aformat=sample_fmts=flt:channel_layouts=stereo,atrim=end_sample={samples},asetpts=N/SR/TB"))
         };
+        if segment.is_some() {
+            filter.push_str(&format!(
+                ",atrim=start_sample={}:end_sample={},asetpts=N/SR/TB",
+                selected.start * 48000 / u64::from(fps),
+                selected.end * 48000 / u64::from(fps)
+            ));
+        }
         args.extend([
             "-map".into(),
             map.into(),
@@ -372,16 +474,33 @@ fn part_args(
         format!("{duration:.9}").into(),
         "-fps_mode".into(),
         "cfr".into(),
-        "-c:v".into(),
-        "libopenh264".into(),
-        "-bf".into(),
-        "0".into(),
-        "-b:v".into(),
-        bitrate.to_string().into(),
-        "-force_key_frames:v".into(),
-        video_engine::H264_KEYFRAME_EXPRESSION.into(),
-        "-pix_fmt".into(),
-        "yuv420p".into(),
+    ]);
+    if selected.rgb {
+        args.extend([
+            "-c:v".into(),
+            "ffv1".into(),
+            "-level".into(),
+            "3".into(),
+            "-g".into(),
+            "1".into(),
+            "-pix_fmt".into(),
+            "bgr0".into(),
+        ]);
+    } else {
+        args.extend([
+            "-c:v".into(),
+            "libopenh264".into(),
+            "-bf".into(),
+            "0".into(),
+            "-b:v".into(),
+            bitrate.to_string().into(),
+            "-force_key_frames:v".into(),
+            video_engine::H264_KEYFRAME_EXPRESSION.into(),
+            "-pix_fmt".into(),
+            "yuv420p".into(),
+        ]);
+    }
+    args.extend([
         "-colorspace".into(),
         "bt709".into(),
         "-color_primaries".into(),
@@ -389,7 +508,7 @@ fn part_args(
         "-color_trc".into(),
         "bt709".into(),
         "-color_range".into(),
-        "tv".into(),
+        if selected.rgb { "pc" } else { "tv" }.into(),
     ]);
     progress_args(&mut args, output, "matroska", max_bytes);
     args
@@ -436,7 +555,11 @@ pub(crate) fn build_preview(
     video_render::decode_check(engine, &output, &cancel, |_| {})?;
     snapshot.revalidate(&cancel)?;
     compiled.close()?;
+    compiled.verify_authorization()?;
     Ok(crate::video_preview::PreviewAssets {
+        transition: snapshot.transition.clone(),
+        #[cfg(windows)]
+        source_ownership: compiled.source_pins.clone(),
         source: output.to_string_lossy().into_owned(),
         proxy: true,
         info,
@@ -452,16 +575,39 @@ pub fn compile(
     cancel: impl Fn() -> bool,
     progress: impl Fn(f64) + Send + Sync + 'static,
 ) -> Result<Compiled, String> {
-    snapshot.validate()?;
+    snapshot.validate_with_cancel(&cancel)?;
+    if snapshot
+        .transition
+        .as_ref()
+        .is_some_and(|binding| !binding.edges.is_empty())
+    {
+        #[cfg(windows)]
+        return compile_crossfade(engine, snapshot, output, options, cancel, progress);
+        #[cfg(not(windows))]
+        return Err("Crossfade rendering requires Windows file protection".into());
+    }
+    #[cfg(windows)]
+    let sources = if snapshot.transition.is_some() {
+        Some(pin_sequence_sources(snapshot, &cancel)?)
+    } else {
+        None
+    };
     if snapshot.project.clips.len() == 1
         && !snapshot.has_photos()
         && snapshot.project.titles.is_empty()
+        && snapshot.project.audio_tracks.is_empty()
+        && snapshot.transition.is_none()
     {
         let (root, p) = snapshot.single(0)?;
         return Ok(Compiled {
             plan: video_render::plan(engine, &root, &p, output, options, cancel)?,
             encoded_fraction: 0.0,
+            authorization: None,
+            #[cfg(windows)]
+            segment_pins: vec![],
             scratch: None,
+            #[cfg(windows)]
+            source_pins: None,
         });
     }
     let scratch = Scratch::new(output.parent().ok_or("Output folder unavailable")?)?;
@@ -471,6 +617,12 @@ pub fn compile(
         let total_frames: u64 = frames.iter().sum();
         let fps = snapshot.project.frame_rate;
         let duration = total_frames as f64 / f64::from(fps);
+        let title_spans = snapshot
+            .project
+            .titles
+            .iter()
+            .map(|title| crate::crossfade_layer_clock::title_span(title, fps, total_frames))
+            .collect::<Result<Vec<_>, String>>()?;
         let max_bytes = if options.preview {
             512 * 1024 * 1024
         } else {
@@ -493,55 +645,12 @@ pub fn compile(
             if cancel() {
                 return Err("Video render cancelled".into());
             }
-            let clip = &snapshot.project.clips[index];
-            let asset = snapshot
-                .project
-                .assets
-                .iter()
-                .find(|a| a.id == clip.asset_id)
-                .ok_or("Missing source")?;
-            let root = snapshot.roots.get(&asset.id).ok_or("Relink this source")?;
-            let prepared = if asset.is_photo() {
-                let source = crate::sequence_media::source(root, asset, &cancel)?;
-                let output = crate::video_presets::resolve(
-                    &snapshot.project.output,
-                    if options.preview {
-                        ExportSize::Project
-                    } else {
-                        options.size
-                    },
-                );
-                let (filter, width, height) =
-                    video_project::edit_filters(&clip.edits, &output, options.preview)?;
-                PartSource {
-                    source,
-                    photo: true,
-                    video_stream: 0,
-                    audio_stream: None,
-                    start: 0.0,
-                    duration: *frame_count as f64 / f64::from(fps),
-                    filter,
-                    width,
-                    height,
-                }
-            } else {
-                let (root, p) = snapshot.single(index)?;
-                let prepared = video_render::prepare(engine, &root, &p, options, &cancel)?;
-                if prepared
-                    .info
-                    .color_primaries
-                    .as_deref()
-                    .is_some_and(|p| p != "bt709")
-                    || prepared
-                        .info
-                        .color_transfer
-                        .as_deref()
-                        .is_some_and(|p| p != "bt709")
-                {
-                    return Err("Multi-clip output currently requires SDR Rec.709 sources; wide-gamut conversion needs separate validation".into());
-                }
-                PartSource::video(prepared)
-            };
+            let prepared =
+                prepare_sequence_part(engine, snapshot, index, *frame_count, options, &cancel)?;
+            #[cfg(windows)]
+            if let Some(sources) = &sources {
+                sources.verify_prepared(snapshot, index, &prepared)?;
+            }
             contexts.push(prepared);
         }
         let audio = !snapshot.project.audio_tracks.is_empty()
@@ -571,55 +680,17 @@ pub fn compile(
             if cancel() {
                 return Err("Video render cancelled".into());
             }
-            let normalized_photo = if prepared.photo {
-                let image = crate::sequence_media::decode_photo(&prepared.source)?;
-                let asset = snapshot
-                    .project
-                    .assets
-                    .iter()
-                    .find(|a| a.id == snapshot.project.clips[index].asset_id)
-                    .ok_or("Missing source")?;
-                if asset.media
-                    != (crate::sequence_media::Media::Photo {
-                        width: image.width(),
-                        height: image.height(),
-                    })
-                {
-                    return Err("Photo geometry differs from its verified project metadata".into());
-                }
-                let normalized = directory.join(format!("photo-{index:04}.png"));
-                crate::sequence_media::flatten_photo(image)
-                    .save_with_format(&normalized, image::ImageFormat::Png)
-                    .map_err(|e| e.to_string())?;
-                prepared.source = normalized.clone();
-                Some(normalized)
-            } else {
-                None
-            };
+            let normalized_photo =
+                prepare_sequence_photo(&mut prepared, snapshot, index, &directory)?;
             let part = directory.join(format!("clip-{index:04}.mkv"));
-            let clip_start = completed as f64 / f64::from(fps);
-            let clip_end = clip_start + *count as f64 / f64::from(fps);
-            let mut titles_filter = String::new();
-            for (title_index, title) in snapshot.project.titles.iter().enumerate() {
-                let start = (title.start_seconds - clip_start).max(0.0);
-                let end = (title.end_seconds - clip_start).min(clip_end - clip_start);
-                if end <= start {
-                    continue;
-                }
-                // Text is carried in a private local text file, never interpolated into FFmpeg syntax.
-                let text_path = directory.join(format!("title-{index:04}-{title_index:03}.txt"));
-                fs::write(&text_path, &title.text).map_err(|e| e.to_string())?;
-                let filename = text_path
-                    .file_name()
-                    .ok_or("Title file name unavailable")?
-                    .to_string_lossy();
-                // Relative paths avoid Windows drive-colon escaping in FFmpeg's filter parser.
-                let x = f64::from(title.x_percent) / 100.0;
-                let y = f64::from(title.y_percent) / 100.0;
-                titles_filter.push_str(&format!(
-                    ",drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf':textfile={filename}:expansion=none:fontcolor=white:fontsize=h/18:x=(w-text_w)*{x:.3}:y=(h-text_h)*{y:.3}:borderw=2:bordercolor=black:enable='between(t,{start:.6},{end:.6})'"
-                ));
-            }
+            let mut titles_filter = sequence_title_filter(
+                snapshot,
+                &directory,
+                &format!("title-{index:04}"),
+                completed,
+                *count,
+                &title_spans,
+            )?;
             // Dip-to-black fades are applied to normalized clip frames before concat.
             // Each side fades for half the saved duration; no overlapping frames or timing shift.
             // This first transition type is video-only: linked and layered audio remain untouched.
@@ -638,6 +709,7 @@ pub fn compile(
                 .map(|transition| transition.duration_seconds / 2.0)
                 .unwrap_or(0.0);
             let normalized_seconds = *count as f64 / f64::from(fps);
+            let overlays = std::mem::take(&mut titles_filter);
             if entering + exiting + 1.0 / f64::from(fps) > normalized_seconds {
                 return Err("Normalized clip is too short for video dip-to-black".into());
             }
@@ -648,6 +720,8 @@ pub fn compile(
                 let start = normalized_seconds - exiting;
                 titles_filter.push_str(&format!(",fade=t=out:st={start:.6}:d={exiting:.6}"));
             }
+            // Global titles remain visible over a video dip, matching composed previews.
+            titles_filter.push_str(&overlays);
             let args = part_args(
                 &prepared,
                 &snapshot.project.clips[index].edits,
@@ -659,8 +733,19 @@ pub fn compile(
                     output: &part,
                     max_bytes,
                     titles_filter,
+                    segment: None,
                 },
             );
+            #[cfg(windows)]
+            let caption_pins = pin_caption_files(
+                snapshot,
+                &directory,
+                &format!("title-{index:04}"),
+                completed,
+                *count,
+                &title_spans,
+                &cancel,
+            )?;
             let length = *count as f64 / f64::from(fps);
             let before = completed as f64 / f64::from(fps);
             let notify = progress.clone();
@@ -676,6 +761,8 @@ pub fn compile(
                 },
                 Some(&directory),
             )?;
+            #[cfg(windows)]
+            drop(caption_pins);
             if let Some(path) = normalized_photo {
                 fs::remove_file(path).map_err(|e| e.to_string())?;
             }
@@ -706,213 +793,32 @@ pub fn compile(
         fs::File::create(&list)
             .and_then(|mut f| f.write_all(manifest.as_bytes()))
             .map_err(|e| e.to_string())?;
-        let mut args: Vec<OsString> = [
-            "-nostdin",
-            "-v",
-            "error",
-            "-xerror",
-            "-y",
-            "-max_alloc",
-            "268435456",
-            "-threads",
-            "2",
-            "-protocol_whitelist",
-            "file,pipe",
-            "-format_whitelist",
-            "concat,matroska",
-            "-safe",
-            "1",
-            "-f",
-            "concat",
-            "-i",
-        ]
-        .into_iter()
-        .map(Into::into)
-        .collect();
-        // FFmpeg URL joining misreads Windows verbatim paths. Keep this list local to the job.
-        args.push("sequence.ffconcat".into());
-        let mut extra_audio = Vec::new();
-        for track in &snapshot.project.audio_tracks {
-            let (source, stream_index, format) = if let Some(asset) = snapshot
-                .project
-                .assets
-                .iter()
-                .find(|asset| asset.id == track.asset_id)
-            {
-                let root = snapshot
-                    .roots
-                    .get(&asset.id)
-                    .ok_or("Relink every audio track source before rendering")?;
-                let source = crate::sequence_media::source(root, asset, &cancel)?;
-                let info = video_probe::probe(engine, &source, &cancel)?;
-                let stream = info
-                    .audio
-                    .first()
-                    .ok_or("Audio source contains no audio stream")?;
-                if track.source_in_seconds + track.duration_seconds
-                    > info.duration_seconds + 0.000001
-                {
-                    return Err("Audio trim exceeds source duration".into());
-                }
-                (source, stream.stream, "mov,matroska,webm,avi")
-            } else {
-                let asset = snapshot
-                    .project
-                    .audio_sources
-                    .iter()
-                    .find(|asset| asset.id == track.asset_id)
-                    .ok_or("Audio track source missing")?;
-                let root = snapshot
-                    .roots
-                    .get(&asset.id)
-                    .ok_or("Relink independent audio source before rendering")?;
-                let source = video_probe::safe_audio_path(
-                    root,
-                    &Path::new(root).join(&asset.relative_path).to_string_lossy(),
-                )?;
-                let (bytes, hash) = video_project::fingerprint(&source, &cancel)?;
-                if bytes != asset.bytes || hash != asset.sha256 {
-                    return Err("Independent audio source differs from the saved original".into());
-                }
-                let info = video_probe::probe_audio_only(engine, &source, &cancel)?;
-                if info != asset.info
-                    || track.source_in_seconds + track.duration_seconds
-                        > info.duration_seconds + 0.000001
-                {
-                    return Err("Independent audio metadata or trim has changed".into());
-                }
-                (source, info.stream, "mp3,wav,flac,mov")
-            };
-            let input_index = extra_audio.len() + 1;
-            args.extend([
-                "-format_whitelist".into(),
-                format.into(),
-                "-i".into(),
-                source.into(),
-            ]);
-            extra_audio.push((input_index, stream_index, track));
-        }
-        args.extend([
-            "-map".into(),
-            "0:v:0".into(),
-            "-c:v".into(),
-            "copy".into(),
-            "-bsf:v".into(),
-            format!(
-                "setts=pts=N*{}:dts=N*{}:duration={}:time_base=1/90000:prescale=1",
-                90000 / fps,
-                90000 / fps,
-                90000 / fps
-            )
-            .into(),
-        ]);
-        if !extra_audio.is_empty() {
-            let mut filters = vec![String::from(
-                "[0:a:0]aformat=sample_fmts=flt:channel_layouts=stereo,aresample=48000:async=1:first_pts=0[original]",
-            )];
-            let mut inputs = String::from("[original]");
-            for (index, (input, stream, track)) in extra_audio.iter().enumerate() {
-                let label = format!("track{index}");
-                let fade_start = track.duration_seconds - track.fade_out_seconds;
-                let delay = (track.start_seconds * 1000.0).round() as u64;
-                let mut filter = format!(
-                    "[{input}:{stream}]atrim=start={:.6}:duration={:.6},asetpts=PTS-STARTPTS,aformat=sample_fmts=flt:channel_layouts=stereo,aresample=48000:async=1:first_pts=0,volume={:.4}",
-                    track.source_in_seconds,
-                    track.duration_seconds,
-                    f64::from(track.gain_percent) / 100.0
-                );
-                if track.fade_in_seconds > 0.0 {
-                    filter.push_str(&format!(",afade=t=in:st=0:d={:.6}", track.fade_in_seconds));
-                }
-                if track.fade_out_seconds > 0.0 {
-                    filter.push_str(&format!(
-                        ",afade=t=out:st={fade_start:.6}:d={:.6}",
-                        track.fade_out_seconds
-                    ));
-                }
-                filter.push_str(&format!(",adelay={delay}|{delay}[{label}]"));
-                filters.push(filter);
-                inputs.push_str(&format!("[{label}]"));
-            }
-            filters.push(format!(
-                "{inputs}amix=inputs={}:duration=longest:normalize=0,atrim=end_sample={},asetpts=N/SR/TB[mixed]",
-                extra_audio.len() + 1,
-                total_frames * 48000 / u64::from(fps)
-            ));
-            args.extend([
-                "-filter_complex".into(),
-                filters.join(";").into(),
-                "-map".into(),
-                "[mixed]".into(),
-                "-c:a".into(),
-                "aac".into(),
-                "-b:a".into(),
-                "192k".into(),
-                "-ar".into(),
-                "48000".into(),
-                "-ac".into(),
-                "2".into(),
-            ]);
-        } else if audio {
-            args.extend([
-                "-map".into(),
-                "0:a:0".into(),
-                "-af".into(),
-                format!(
-                    "atrim=end_sample={},asetpts=N/SR/TB",
-                    total_frames * 48000 / u64::from(fps)
-                )
-                .into(),
-                "-c:a".into(),
-                "aac".into(),
-                "-b:a".into(),
-                "192k".into(),
-                "-ar".into(),
-                "48000".into(),
-                "-ac".into(),
-                "2".into(),
-            ]);
-        } else {
-            args.push("-an".into());
-        }
-        args.extend([
-            "-t".into(),
-            format!("{duration:.9}").into(),
-            "-movflags".into(),
-            "+faststart".into(),
-            "-video_track_timescale".into(),
-            "90000".into(),
-            "-movie_timescale".into(),
-            "90000".into(),
-        ]);
-        progress_args(&mut args, output, "mp4", max_bytes);
-        let mut info = info.ok_or("No timeline video")?;
-        info.frame_rate = Some(format!("{fps}/1"));
-        let warnings=vec![format!("Hard cuts use a shared {fps} fps SDR Rec.709 canvas. Source trims remain exact in the project; output cut positions use its frame clock."),"Video is encoded once per clip; continuous audio is encoded once as AAC stereo. Silent or muted intervals are filled with silence when the project has audio. Source metadata, subtitles and chapters are excluded.".into()];
         Ok(Compiled {
-            plan: Plan {
-                info,
-                width,
-                height,
-                video_span: Span {
-                    start: 0.0,
-                    end: duration,
+            plan: mux_plan(
+                engine,
+                SequenceMux {
+                    snapshot,
+                    directory: &directory,
+                    output,
+                    total_frames,
+                    width,
+                    height,
+                    info,
+                    audio,
+                    max_bytes,
+                    crossfade: false,
+                    #[cfg(windows)]
+                    verified_sources: sources.as_ref().map(|s| &s.paths),
                 },
-                audio_span: audio.then_some(Span {
-                    start: 0.0,
-                    end: duration,
-                }),
-                expect_audio: audio,
-                expected_frames: Some(total_frames),
-                working_directory: Some(directory.clone()),
-                duration,
-                max_bytes,
-                timeout: Duration::from_secs(21600),
-                args,
-                warnings,
-            },
+                &cancel,
+            )?,
             encoded_fraction: 0.75,
+            authorization: snapshot.transition.clone(),
+            #[cfg(windows)]
+            segment_pins: vec![],
             scratch: Some(scratch),
+            #[cfg(windows)]
+            source_pins: sources.map(|s| s.pins),
         })
     })();
     if result.is_err() && directory.exists() {
@@ -928,6 +834,7 @@ pub fn compile(
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+    include!("sequence_phase3_tests.rs");
     use crate::video_project::VideoTime;
     struct Fixture(PathBuf);
     impl Drop for Fixture {
@@ -943,6 +850,7 @@ mod tests {
             std::env::temp_dir().join(format!("sequence-render-短片-{}", video_project::id()));
         fs::create_dir(&dir).unwrap();
         let mut snapshot = Snapshot {
+            transition: None,
             project: Sequence {
                 schema_version: 3,
                 id: video_project::id(),
@@ -2076,6 +1984,7 @@ mod tests {
                     output: &output,
                     max_bytes: 64 * 1024 * 1024,
                     titles_filter: String::new(),
+                    segment: None,
                 },
             );
             video_engine::run(
@@ -2308,4 +2217,134 @@ mod tests {
         assert!(!scratch.exists());
         snapshot.revalidate(|| false).unwrap();
     }
+}
+
+fn prepare_sequence_part(
+    engine: &Path,
+    snapshot: &Snapshot,
+    index: usize,
+    frame_count: u64,
+    options: RenderOptions,
+    cancel: &impl Fn() -> bool,
+) -> Result<PartSource, String> {
+    let fps = snapshot.project.frame_rate;
+    let clip = &snapshot.project.clips[index];
+    let asset = snapshot
+        .project
+        .assets
+        .iter()
+        .find(|a| a.id == clip.asset_id)
+        .ok_or("Missing source")?;
+    let root = snapshot.roots.get(&asset.id).ok_or("Relink this source")?;
+    let prepared = if asset.is_photo() {
+        let source = crate::sequence_media::source(root, asset, cancel)?;
+        let output = crate::video_presets::resolve(
+            &snapshot.project.output,
+            if options.preview {
+                ExportSize::Project
+            } else {
+                options.size
+            },
+        );
+        let (filter, width, height) =
+            video_project::edit_filters(&clip.edits, &output, options.preview)?;
+        PartSource {
+            source,
+            photo: true,
+            video_stream: 0,
+            audio_stream: None,
+            start: 0.0,
+            duration: frame_count as f64 / f64::from(fps),
+            filter,
+            width,
+            height,
+        }
+    } else {
+        let (root, p) = snapshot.single(index)?;
+        let prepared = video_render::prepare(engine, &root, &p, options, cancel)?;
+        if prepared
+            .info
+            .color_primaries
+            .as_deref()
+            .is_some_and(|p| p != "bt709")
+            || prepared
+                .info
+                .color_transfer
+                .as_deref()
+                .is_some_and(|p| p != "bt709")
+        {
+            return Err("Multi-clip output currently requires SDR Rec.709 sources; wide-gamut conversion needs separate validation".into());
+        }
+        PartSource::video(prepared)
+    };
+    Ok(prepared)
+}
+
+fn prepare_sequence_photo(
+    prepared: &mut PartSource,
+    snapshot: &Snapshot,
+    index: usize,
+    directory: &Path,
+) -> Result<Option<PathBuf>, String> {
+    Ok(if prepared.photo {
+        let image = crate::sequence_media::decode_photo(&prepared.source)?;
+        let asset = snapshot
+            .project
+            .assets
+            .iter()
+            .find(|a| a.id == snapshot.project.clips[index].asset_id)
+            .ok_or("Missing source")?;
+        if asset.media
+            != (crate::sequence_media::Media::Photo {
+                width: image.width(),
+                height: image.height(),
+            })
+        {
+            return Err("Photo geometry differs from its verified project metadata".into());
+        }
+        let normalized = directory.join(format!("photo-{index:04}.png"));
+        crate::sequence_media::flatten_photo(image)
+            .save_with_format(&normalized, image::ImageFormat::Png)
+            .map_err(|e| e.to_string())?;
+        prepared.source = normalized.clone();
+        Some(normalized)
+    } else {
+        None
+    })
+}
+
+fn sequence_title_filter(
+    snapshot: &Snapshot,
+    directory: &Path,
+    prefix: &str,
+    global_start: u64,
+    frames: u64,
+    title_spans: &[crate::crossfade_layer_clock::Span],
+) -> Result<String, String> {
+    let mut titles_filter = String::new();
+    for (title_index, title) in snapshot.project.titles.iter().enumerate() {
+        let span = &title_spans[title_index];
+        let start = span.start.max(global_start).saturating_sub(global_start);
+        let end = span
+            .end
+            .min(global_start + frames)
+            .saturating_sub(global_start);
+        if end <= start {
+            continue;
+        }
+        // Text is carried in a private local text file, never interpolated into FFmpeg syntax.
+        let text_path = directory.join(format!("{prefix}-{title_index:03}.txt"));
+        fs::write(&text_path, &title.text).map_err(|e| e.to_string())?;
+        let filename = text_path
+            .file_name()
+            .ok_or("Title file name unavailable")?
+            .to_string_lossy();
+        // Relative paths avoid Windows drive-colon escaping in FFmpeg's filter parser.
+        let x = f64::from(title.x_percent) / 100.0;
+        let y = f64::from(title.y_percent) / 100.0;
+        titles_filter.push_str(&format!(
+                    ",drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf':textfile={filename}:expansion=none:fontcolor=white:fontsize=h/18:x=(w-text_w)*{x:.3}:y=(h-text_h)*{y:.3}:borderw=2:bordercolor=black:enable='gte(n,{start})*lt(n,{end})'"
+                ));
+    }
+    Ok(titles_filter)
 }

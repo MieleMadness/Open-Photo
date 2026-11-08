@@ -163,7 +163,9 @@ pub fn export_sequence_file(
     request: SequenceRequest<'_>,
     control: Arc<dyn Control>,
 ) -> Result<ExportReport, String> {
-    request.snapshot.validate()?;
+    request
+        .snapshot
+        .validate_with_cancel(&|| control.cancelled())?;
     let duration = request.snapshot.duration()?;
     let bitrate = request.snapshot.bitrate(request.size)?;
     let scratch_bytes = if request.snapshot.project.clips.len() > 1 || request.snapshot.has_photos()
@@ -290,6 +292,7 @@ fn export_pipeline(
         verify(control.as_ref())?;
         let warnings = compiled.plan.warnings.clone();
         compiled.close()?;
+        compiled.verify_authorization()?;
         check_cancel(control.as_ref())?;
         control.begin_publish()?;
         let path = staged.commit()?;
@@ -425,9 +428,33 @@ pub(crate) fn start_sequence_export(
         options,
     )
 }
+pub(crate) fn start_transition_export(
+    app: tauri::AppHandle,
+    jobs: tauri::State<'_, ExportJobs>,
+    previews: tauri::State<'_, crate::video_preview::PreviewJobs>,
+    request: crate::video_workspace::transitions::TransitionRenderRequest,
+    title: String,
+    options: Options,
+) -> Result<String, String> {
+    request.validate()?;
+    start_export(
+        app,
+        jobs,
+        previews,
+        SourceRequest::Transition(request, title),
+        options,
+    )
+}
 enum SourceRequest {
-    Single { root: String, project: Box<Project> },
+    Single {
+        root: String,
+        project: Box<Project>,
+    },
     Sequence(Box<crate::video_sequence_render::Snapshot>),
+    Transition(
+        crate::video_workspace::transitions::TransitionRenderRequest,
+        String,
+    ),
 }
 fn start_export(
     app: tauri::AppHandle,
@@ -442,6 +469,7 @@ fn start_export(
         acknowledge_first_audio,
     } = options;
     let title = match &source {
+        SourceRequest::Transition(_, title) => title.clone(),
         SourceRequest::Single { project, .. } => {
             video_project::validate(project)?;
             project.title.clone()
@@ -493,6 +521,23 @@ fn start_export(
                 std::thread::sleep(Duration::from_millis(20));
             };
             match source {
+                SourceRequest::Transition(request, _) => {
+                    job.update(Stage::VerifyingSource, None, 0);
+                    let snapshot =
+                        crate::video_workspace::transitions::snapshot_request(request, || {
+                            job.cancelled()
+                        })?;
+                    export_sequence_file(
+                        SequenceRequest {
+                            engine: &engine,
+                            snapshot: &snapshot,
+                            destination: Path::new(&destination),
+                            size,
+                            acknowledge_first_audio,
+                        },
+                        job.clone(),
+                    )
+                }
                 SourceRequest::Single { root, project } => export_file(
                     Request {
                         engine: &engine,

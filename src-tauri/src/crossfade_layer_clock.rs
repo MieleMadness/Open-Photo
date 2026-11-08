@@ -1,5 +1,5 @@
-//! Proposed mixed-media/layer timing contract, compiled only for tests.
-//! No rendering, persistence, source reads or production command registration.
+//! Shared integer frame/sample policy for workspace transition proposals and rendering.
+//! Clock construction performs no source IO or storage writes.
 use crate::{
     crossfade_clock::{self, Boundary, ClipClock},
     sequence_media::Media,
@@ -171,12 +171,7 @@ pub(crate) fn plan(project: &Sequence, edges: &[Boundary<'_>]) -> Result<Plan, S
         .map(|t| {
             Ok(TitlePlan {
                 id: t.id.clone(),
-                frames: range(
-                    t.start_seconds,
-                    t.end_seconds,
-                    project.frame_rate,
-                    clock.total_frames,
-                )?,
+                frames: title_span(t, project.frame_rate, clock.total_frames)?,
             })
         })
         .collect::<Result<Vec<_>, String>>()?;
@@ -185,52 +180,7 @@ pub(crate) fn plan(project: &Sequence, edges: &[Boundary<'_>]) -> Result<Plan, S
     let audio = project
         .audio_tracks
         .iter()
-        .map(|t| {
-            let samples = range(
-                t.start_seconds,
-                t.start_seconds + t.duration_seconds,
-                48_000,
-                total_samples,
-            )?;
-            let source_start = mark(t.source_in_seconds, 48_000)?;
-            let source_end = source_start
-                .checked_add(samples.end - samples.start)
-                .ok_or("Unsafe audio source clock")?;
-            let source_duration =
-                if let Some(a) = project.audio_sources.iter().find(|a| a.id == t.asset_id) {
-                    a.info.duration_seconds
-                } else {
-                    match &project
-                        .assets
-                        .iter()
-                        .find(|a| a.id == t.asset_id)
-                        .ok_or("Missing audio source")?
-                        .media
-                    {
-                        Media::Video { info } => info.duration_seconds,
-                        Media::Photo { .. } => return Err("Photos have no audio stream".into()),
-                    }
-                };
-            let fade_in = mark(t.fade_in_seconds, 48_000)?;
-            let fade_out = mark(t.fade_out_seconds, 48_000)?;
-            if source_end > mark(source_duration, 48_000)?
-                || fade_in + fade_out > samples.end - samples.start
-            {
-                return Err("Audio source or fades exceed the quantized track span".into());
-            }
-            Ok(AudioPlan {
-                id: t.id.clone(),
-                asset_id: t.asset_id.clone(),
-                samples,
-                source_samples: Span {
-                    start: source_start,
-                    end: source_end,
-                },
-                fade_in_samples: fade_in,
-                fade_out_samples: fade_out,
-                gain_percent: t.gain_percent,
-            })
-        })
+        .map(|track| audio_plan(project, track, total_samples))
         .collect::<Result<Vec<_>, String>>()?;
     Ok(Plan {
         fps: project.frame_rate,
@@ -240,4 +190,64 @@ pub(crate) fn plan(project: &Sequence, edges: &[Boundary<'_>]) -> Result<Plan, S
         titles,
         audio,
     })
+}
+
+/// The same 48 kHz quantization for preview seeks and encoded layered audio.
+pub(crate) fn audio_plan(
+    project: &Sequence,
+    t: &video_sequence::AudioTrack,
+    total_samples: u64,
+) -> Result<AudioPlan, String> {
+    let samples = range(
+        t.start_seconds,
+        t.start_seconds + t.duration_seconds,
+        48_000,
+        total_samples,
+    )?;
+    let source_start = mark(t.source_in_seconds, 48_000)?;
+    let source_end = source_start
+        .checked_add(samples.end - samples.start)
+        .ok_or("Unsafe audio source clock")?;
+    let source_duration = if let Some(a) = project.audio_sources.iter().find(|a| a.id == t.asset_id)
+    {
+        a.info.duration_seconds
+    } else {
+        match &project
+            .assets
+            .iter()
+            .find(|a| a.id == t.asset_id)
+            .ok_or("Missing audio source")?
+            .media
+        {
+            Media::Video { info } => info.duration_seconds,
+            Media::Photo { .. } => return Err("Photos have no audio stream".into()),
+        }
+    };
+    let fade_in = mark(t.fade_in_seconds, 48_000)?;
+    let fade_out = mark(t.fade_out_seconds, 48_000)?;
+    if source_end > mark(source_duration, 48_000)?
+        || fade_in + fade_out > samples.end - samples.start
+    {
+        return Err("Audio source or fades exceed the quantized track span".into());
+    }
+    Ok(AudioPlan {
+        id: t.id.clone(),
+        asset_id: t.asset_id.clone(),
+        samples,
+        source_samples: Span {
+            start: source_start,
+            end: source_end,
+        },
+        fade_in_samples: fade_in,
+        fade_out_samples: fade_out,
+        gain_percent: t.gain_percent,
+    })
+}
+
+pub(crate) fn title_span(
+    title: &video_sequence::TitleOverlay,
+    fps: u32,
+    total_frames: u64,
+) -> Result<Span, String> {
+    range(title.start_seconds, title.end_seconds, fps, total_frames)
 }

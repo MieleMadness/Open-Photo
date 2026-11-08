@@ -14,6 +14,8 @@ use std::{
 };
 
 type Bindings = BTreeMap<String, String>;
+#[path = "workspace_transitions.rs"]
+pub(crate) mod transitions;
 #[cfg(test)]
 include!("phase_j_workspace_admission.rs");
 struct Record {
@@ -33,6 +35,7 @@ pub struct Loaded {
     project: Sequence,
     revision: u64,
     sources: Vec<Source>,
+    transition_proposal: bool,
 }
 #[derive(Serialize)]
 pub struct PreviousSave {
@@ -203,6 +206,7 @@ fn loaded(roots: &[String], record: Record) -> Loaded {
         project: record.project,
         revision: record.revision,
         sources,
+        transition_proposal: false,
     }
 }
 fn root_for_file(roots: &[String], path: &str) -> Result<(PathBuf, PathBuf), String> {
@@ -585,8 +589,10 @@ pub async fn edit_workspace_video_project(
 ) -> Result<Loaded, String> {
     let engine = video_engine::directory(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
-        let roots = user_data::workspace_roots(&workspace_id)?;
+        let settings = user_data::database()?;
+        let roots = user_data::workspace_roots_from(&settings, &workspace_id)?;
         let db = database()?;
+        transitions::check_namespace(&db)?;
         let record = match action {
             Action::OpenSource { path } => {
                 migrate_legacy(&db, &workspace_id, &roots)?;
@@ -604,17 +610,24 @@ pub async fn edit_workspace_video_project(
                 let mut bytes = vec![];
                 fs::File::open(path)
                     .map_err(|e| e.to_string())?
-                    .take(1024 * 1024 + 1)
+                    .take((transitions::MAX_PORTABLE + 1) as u64)
                     .read_to_end(&mut bytes)
                     .map_err(|e| e.to_string())?;
-                let mut project = video_sequence::parse(&bytes)?;
-                project.id = video_project::id();
-                let bindings = bind_import(&roots, &project);
-                let revision = store(&db, &workspace_id, &project, &bindings, None)?;
-                Record {
-                    project,
-                    revision,
-                    bindings,
+                if bytes.len() > transitions::MAX_PORTABLE {
+                    return Err("Project copy exceeds its size budget".into());
+                }
+                if transitions::is_portable_project(&bytes)? {
+                    transitions::import_project_copy(&settings, &db, &workspace_id, &roots, &bytes)?
+                } else {
+                    let mut project = video_sequence::parse(&bytes)?;
+                    project.id = video_project::id();
+                    let bindings = bind_import(&roots, &project);
+                    let revision = store(&db, &workspace_id, &project, &bindings, None)?;
+                    Record {
+                        project,
+                        revision,
+                        bindings,
+                    }
                 }
             }
             Action::Recover {
@@ -647,6 +660,7 @@ pub async fn edit_workspace_video_project(
                     _ => unreachable!(),
                 };
                 let mut record = read(&db, &workspace_id, id)?;
+                transitions::has_saved_proposal(&db, &workspace_id, id)?;
                 if record.revision != expected {
                     return Err(
                         "Project changed elsewhere. Reopen before changing its sources.".into(),
@@ -749,7 +763,10 @@ pub async fn edit_workspace_video_project(
                 record
             }
         };
-        Ok(loaded(&roots, record))
+        let has_proposal = transitions::has_saved_proposal(&db, &workspace_id, &record.project.id)?;
+        let mut result = loaded(&roots, record);
+        result.transition_proposal = has_proposal;
+        Ok(result)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -764,6 +781,7 @@ pub async fn save_workspace_video_project(
         user_data::workspace_roots(&workspace_id)?;
         let db = database()?;
         let before = read(&db, &workspace_id, &project.id)?;
+        transitions::has_saved_proposal(&db, &workspace_id, &project.id)?;
         if before.project.assets != project.assets
             || before.project.audio_sources != project.audio_sources
         {
@@ -805,6 +823,14 @@ fn render_snapshot(
     if record.revision != expected {
         return Err("Project changed elsewhere. Reopen before rendering.".into());
     }
+    let snapshot = resolve_snapshot(record, roots)?;
+    snapshot.validate()?;
+    Ok(snapshot)
+}
+fn resolve_snapshot(
+    record: Record,
+    roots: &[String],
+) -> Result<crate::video_sequence_render::Snapshot, String> {
     let mut bindings = BTreeMap::new();
     for asset in &record.project.assets {
         if !record.project.clips.iter().any(|c| c.asset_id == asset.id)
@@ -836,10 +862,10 @@ fn render_snapshot(
         bindings.insert(source.id.clone(), root.to_string_lossy().into_owned());
     }
     let snapshot = crate::video_sequence_render::Snapshot {
+        transition: None,
         project: record.project,
         roots: bindings,
     };
-    snapshot.validate()?;
     Ok(snapshot)
 }
 /// Return an actual decoded, bounded peak envelope for a saved audio excerpt.

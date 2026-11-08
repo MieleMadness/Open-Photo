@@ -1,3 +1,7 @@
+## Local Phase J 0.56.88 review checkpoint
+
+Production integration is isolated locally for review. Release validation remains paused; default release rendering remains gated. This branch depends on draft PR #122 at 7b9fa55. No Phase K vault changes are included. See [Phase J](PHASE_J_PRODUCTION_INTEGRATION.md).
+
 ## November 3, 2026 — Active roadmap status (development, not release sign-off)
 
 **Source of truth:** the active development branch (`feature/desktop-v0.1.0`) includes the fast/full Windows CI optimization merged as PR #14. The latest documented application checkpoint is **0.56.63**. Later editor changes remain in draft pull requests; do not label them shipped.

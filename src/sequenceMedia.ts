@@ -8,3 +8,4 @@ export const assetTimeBase=(a:SequenceAsset)=>videoInfo(a)?.time_base||"1/100000
 export const assetDuration=(a:SequenceAsset)=>videoInfo(a)?.duration_seconds??3;
 export const hasAudio=(a:SequenceAsset)=>!!videoInfo(a)?.audio.length;
 export const usesFrameClock=(clips:{asset_id:string}[],assets:SequenceAsset[])=>clips.length>1||clips.some(c=>assets.find(a=>a.id===c.asset_id)?.media.kind==="photo");
+export const usesSequenceFrameClock=(project:{clips:{asset_id:string}[];assets:SequenceAsset[];titles?:unknown[];audio_tracks?:unknown[]})=>usesFrameClock(project.clips,project.assets)||!!project.titles?.length||!!project.audio_tracks?.length;

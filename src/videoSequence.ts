@@ -10,7 +10,7 @@ export type TitleOverlay={id:string;text:string;start_seconds:number;end_seconds
 export type AudioTrack={id:string;asset_id:string;start_seconds:number;source_in_seconds:number;duration_seconds:number;gain_percent:number;fade_in_seconds:number;fade_out_seconds:number};
 export type AudioOnlySource={id:string;relative_path:string;sha256:string;bytes:number;info:{duration_seconds:number;stream:number;codec:string;channels:number;sample_rate:number}};
 export type SequenceProject={transitions?:CutTransition[];titles?:TitleOverlay[];audio_tracks?:AudioTrack[];audio_sources?:AudioOnlySource[];schema_version:3;id:string;title:string;assets:SequenceAsset[];clips:VideoProject["clips"];output:VideoProject["output"];frame_rate:30|60};
-export type LoadedSequence={project:SequenceProject;revision:number;sources:{asset_id:string;path:string|null;root?:string|null;status:string}[]};
+export type LoadedSequence={project:SequenceProject;revision:number;sources:{asset_id:string;path:string|null;root?:string|null;status:string}[];transition_proposal?:boolean};
 export function validSequence(project:SequenceProject){
   if(!project.title.trim()||project.title.length>200)return "Enter a project name of up to 200 characters.";
   const titles=project.titles||[];
