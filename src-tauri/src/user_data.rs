@@ -108,7 +108,21 @@ pub fn load_user_data(
 }
 
 #[tauri::command]
-pub fn save_user_data(key: String, value: String) -> Result<(), String> {
+pub fn save_user_data(app: tauri::AppHandle, key: String, value: String) -> Result<(), String> {
+    let lock = matches!(
+        key.as_str(),
+        "openphoto.activeWorkspace" | "openphoto.workspaces"
+    );
+    if lock {
+        use tauri::{Emitter, Manager};
+        let notice = app
+            .state::<std::sync::Arc<crate::vault::VaultState>>()
+            .lock_notice();
+        let _ = app.emit("vault-locked", notice);
+    }
+    save(key, value)
+}
+pub(crate) fn save(key: String, value: String) -> Result<(), String> {
     validate(&key, &value)?;
     database()?
         .execute(

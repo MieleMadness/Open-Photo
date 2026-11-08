@@ -13,6 +13,7 @@ mod cache_disk;
 mod crossfade_visual_compositor;
 mod sequence_frame_seek;
 mod source_version;
+mod vault;
 // Crossfade frame-clock parity fixture only; no active renderer changes.
 #[cfg(test)]
 mod crossfade_audio_count;
@@ -130,6 +131,9 @@ fn cache() -> &'static Mutex<PreviewCache> {
 fn safe_media_path(root: &str, path: &str) -> Result<PathBuf, String> {
     let root = fs::canonicalize(root).map_err(|_| "Library folder not found".to_string())?;
     let file = fs::canonicalize(path).map_err(|_| "Photo not found".to_string())?;
+    if vault::excluded_path(&file) {
+        return Err("Private vault storage is unavailable to normal media commands".into());
+    }
     if !file.starts_with(root) || !file.is_file() {
         return Err("Photo is outside the selected library".into());
     }
@@ -934,6 +938,9 @@ fn read_capture_local(path: &Path, extension: &str) -> Option<String> {
 #[tauri::command]
 fn scan_library(root: String) -> Result<ScanResult, String> {
     let root_path = Path::new(&root);
+    if vault::excluded_path(root_path) {
+        return Err("Private vault storage cannot be scanned as a library folder".into());
+    }
     if !root_path.is_dir() {
         return Err("Please select an existing directory.".to_string());
     }
@@ -976,6 +983,9 @@ fn scan_library(root: String) -> Result<ScanResult, String> {
             }
             let path = entry.path();
             if kind.is_dir() {
+                if vault::excluded_path(&path) {
+                    continue;
+                }
                 pending.push(path);
                 continue;
             }
@@ -1225,7 +1235,7 @@ fn updater_channel_status() -> Result<UpdaterChannelStatus, String> {
 #[tauri::command]
 fn set_update_channel(channel: String) -> Result<UpdaterChannelStatus, String> {
     update_channel::endpoint(&channel)?;
-    user_data::save_user_data("openphoto.updateChannel".into(), channel)?;
+    user_data::save("openphoto.updateChannel".into(), channel)?;
     updater_channel_status()
 }
 
@@ -1323,6 +1333,43 @@ pub fn run() {
         .build();
 
     tauri::Builder::default()
+        .register_asynchronous_uri_scheme_protocol("vault", |context, request, responder| {
+            use tauri::{Emitter, Manager};
+            let app = context.app_handle().clone();
+            let gate = app
+                .state::<std::sync::Arc<vault::VaultState>>()
+                .stream_gate
+                .clone();
+            tauri::async_runtime::spawn(async move {
+                let Ok(_permit) = gate.acquire_owned().await else {
+                    responder.respond(
+                        tauri::http::Response::builder()
+                            .status(503)
+                            .header("Cache-Control", "no-store")
+                            .body(Vec::<u8>::new())
+                            .unwrap_or_default(),
+                    );
+                    return;
+                };
+                let failed_app = app.clone();
+                let response = tauri::async_runtime::spawn_blocking(move || {
+                    vault::transfer_protocol(&app, request)
+                })
+                .await
+                .unwrap_or_else(|_| {
+                    let notice = failed_app
+                        .state::<std::sync::Arc<vault::VaultState>>()
+                        .lock_notice();
+                    let _ = failed_app.emit("vault-locked", notice);
+                    tauri::http::Response::builder()
+                        .status(500)
+                        .header("Cache-Control", "no-store")
+                        .body(Vec::new())
+                        .unwrap_or_default()
+                });
+                responder.respond(response);
+            });
+        })
         .plugin(updater)
         .setup(|app| {
             use tauri::Manager;
@@ -1332,6 +1379,17 @@ pub fn run() {
                 app.path().resource_dir()?.join("bundled-ai")
             };
             ai_models::configure_bundled_directory(directory);
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                use tauri::{Emitter, Manager};
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    let vault = handle.state::<std::sync::Arc<vault::VaultState>>();
+                    if let Some(notice) = vault.watchdog_notice() {
+                        let _ = handle.emit("vault-locked", notice);
+                    }
+                }
+            });
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
@@ -1341,9 +1399,11 @@ pub fn run() {
         .manage(video_preview::PreviewJobs::default())
         .manage(video_poster::PosterJobs::default())
         .manage(video_export::ExportJobs::default())
+        .manage(std::sync::Arc::new(vault::VaultState::default()))
         .manage(search::SearchState::default())
         .manage(ai_index::AiIndexState::default())
         .invoke_handler(tauri::generate_handler![
+            vault::vault_command,
             search::search_workspace_evidence,
             search::cancel_workspace_search,
             ai_index::pause_ai_index,
@@ -1450,6 +1510,17 @@ pub fn run() {
             watch::set_watched_folders,
             similar::find_similar_photos
         ])
+        .on_window_event(|window, event| {
+            if matches!(
+                event,
+                tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
+            ) {
+                use tauri::{Emitter, Manager};
+                let state = window.state::<std::sync::Arc<vault::VaultState>>();
+                let notice = state.lock_notice();
+                let _ = window.emit("vault-locked", notice);
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running Open-Photo");
 }

@@ -1,3 +1,5 @@
+Integration note — 0.56.95: this branch combines the previously separate checkpoints below. Their source branches and historical test counts are preserved. Combined automated evidence is tracked in [the consolidation checkpoint](CONSOLIDATION_0_56_95.md). Hands-on/live acceptance is deferred until closer to V1; automated development verification continues. Release activation remains gated.
+
 ## Separated local review checkpoint — 2026-11-08
 
 This 0.56.88 checkpoint contains only the local Phase J production integration on parent 7b9fa5586becc9dbc27040e9a77ae3909936c6a8 (draft PR #122). Phase K vault work is excluded and has its own independent branch/PR. Local revalidation: 465 native tests passed, 8 opt-in modes skipped; 397 frontend tests passed across 76 files. Clippy, Rust formatting, TypeScript, production build and whitespace checks passed. Logs: `../../audit-output/phase-j-review-*.log`.

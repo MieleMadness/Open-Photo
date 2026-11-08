@@ -1,3 +1,11 @@
+## Consolidated development candidate — 0.56.95
+
+Library reliability/XMP safety, Phase J editor integration and the account-bound private vault now share one review branch. The merge preserves both native services, sidebar entry, recovery surfaces, styles and acceptance feature flags. Default release rendering/vault access remain gated.
+
+Hands-on/live application testing is deferred until closer to V1 at the user's request. Development continues with automated tests, mocked browser checks and exact-head CI. Earlier separate-branch installer results are historical evidence, not combined-candidate release sign-off. See [the consolidation checkpoint and queue](CONSOLIDATION_0_56_95.md).
+
+Next implementation milestone after consolidation: full-length cached audio waveforms; current native excerpts remain limited to 120 seconds. Older planning/status notes below retain their original context.
+
 # AI, media viewer and private vault roadmap
 
 ## Implementation checkpoint — 0.56.23

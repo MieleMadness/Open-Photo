@@ -1,6 +1,6 @@
 [package]
 name = "open-photo"
-version = "0.56.88"
+version = "0.56.95"
 description = "Offline-first Windows photo organizer"
 authors = ["Open-Photo contributors"]
 edition = "2021"
@@ -11,8 +11,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
 default = []
-# Explicit acceptance builds; release rendering remains gated.
+# Explicit acceptance builds only; normal release installers keep rendering gated.
 phase-j-preview = []
+private-vault = []
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -31,6 +32,7 @@ raw-files = "0.5"
 opener = "0.8"
 rusqlite = { version = "0.32", features = ["bundled"] }
 sha2 = "0.10"
+zeroize = "1.9.1"
 dirs = "5"
 notify = "8"
 ort = { version = "=2.0.0-rc.15", features = ["directml"] }
@@ -41,7 +43,7 @@ roxmltree = "0.21"
 tokio = { version = "1", features = ["sync"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_Security", "Wdk_Storage_FileSystem", "Win32_System_IO"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_Security", "Wdk_Storage_FileSystem", "Win32_System_IO", "Win32_Security_Cryptography", "Win32_System_RemoteDesktop"] }
 
 [target.'cfg(windows)'.dev-dependencies]
 windows-sys = { version = "0.61", features = ["Win32_System_ProcessStatus"] }

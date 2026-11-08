@@ -1,6 +1,10 @@
-## Local Phase J 0.56.88 review checkpoint
+## Consolidated development candidate — 0.56.95
 
-Production integration is isolated locally for review. Release validation remains paused; default release rendering remains gated. This branch depends on draft PR #122 at 7b9fa55. No Phase K vault changes are included. See [Phase J](PHASE_J_PRODUCTION_INTEGRATION.md).
+Library reliability/XMP safety, Phase J editor integration and the account-bound private vault now share one review branch. The merge preserves both native services, sidebar entry, recovery surfaces, styles and acceptance feature flags. Default release rendering/vault access remain gated.
+
+Hands-on/live application testing is deferred until closer to V1 at the user's request. Development continues with automated tests, mocked browser checks and exact-head CI. Earlier separate-branch installer results are historical evidence, not combined-candidate release sign-off. See [the consolidation checkpoint and queue](CONSOLIDATION_0_56_95.md).
+
+Earlier checkpoints below are historical and do not override the current queue/testing policy.
 
 ## November 3, 2026 — Active roadmap status (development, not release sign-off)
 

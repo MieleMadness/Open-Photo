@@ -1,3 +1,23 @@
+## Consolidated development candidate — 0.56.95
+
+Library reliability/XMP safety, Phase J editor integration and the account-bound private vault now share one review branch. The merge preserves both native services, sidebar entry, recovery surfaces, styles and acceptance feature flags. Default release rendering/vault access remain gated.
+
+Hands-on/live application testing is deferred until closer to V1 at the user's request. Development continues with automated tests, mocked browser checks and exact-head CI. Earlier separate-branch installer results are historical evidence, not combined-candidate release sign-off. See [the consolidation checkpoint and queue](docs/CONSOLIDATION_0_56_95.md).
+
+## Private vault local preview in 0.56.93
+
+A new account-bound private vault is implemented locally. Triple-click the app version, or focus that control and press Enter/Space, to open setup/unlock. Copy supported photos/videos into encrypted storage, view them through an authenticated no-store media channel, lock automatically, change the PIN/passphrase, and save/restore encrypted backups. Originals outside the vault stay accessible. Recovery requires the same Windows account and PIN/passphrase; there is no forgotten-PIN bypass.
+
+Local hardening binds queued authentication, revocations and lock notifications to native session generations. Locking cancels older requests; delayed responses cannot revoke a newer unlock.
+
+Encrypted backups now authenticate the complete closed staged archive before publication, including its exact header, every copied object/chunk and plaintext digest. Verification remains cancellable and bounded in memory; failed archives are not published.
+
+New image imports use the verified image header for their media type, including renamed files; disguised unsupported image formats are refused. Passphrase length validation now matches the native UTF-8 budget and explains oversized input before submission.
+
+Cold-process recovery tests now cover eleven partial-write/publication boundaries, plus persistent Windows metadata sharing denial. See the [disposable Windows acceptance matrix](docs/PHASE_K_WINDOWS_ACCEPTANCE.md) for the remaining installed checks.
+
+Windows debug and explicit `private-vault` acceptance builds expose the local preview. Default release activation remains gated on security review and disposable installed acceptance. The encrypted vault is retained during normal uninstall and ordinary app-data cleanup. See [the plan, threat model, limits and verification](docs/PHASE_K_VAULT.md). Phase J release validation remains paused; its local changes are retained.
+
 ## Local Phase J integration in 0.56.88
 
 The existing video editor now has a **Crossfade proposal** disclosure in Canvas. Proposals save independently of the source timeline with undo/redo, explicit rebase, immutable recovery, and complete portable project copies. Preview and export share the existing player, cancellation queue and no-overwrite output pipeline. Native authorization checks saved workspace ownership, exact document/binding receipts, canonical media roots and verified source handles.
@@ -10,7 +30,7 @@ Title text now uses the same Unicode counting and control-character policy as na
 
 ## Local Phase J production integration (in progress)
 
-Phase 3 now connects authoritative workspace admission and per-asset roots to composed visual/title/PCM previews. It retains original-source locks and rejects revoked or changed workspace access after composition and before consumption. This remains test-only; production storage, editor controls and export parity are unfinished. See [phase 3 progress and remaining gates](docs/PHASE_J_PRODUCTION_INTEGRATION.md).
+The earlier test-only bridge established authoritative workspace admission and per-asset roots for composed visual/title/PCM previews. Version 0.56.88 adds a separate production store and gated editor/render integration; the prototype tables are not production persistence. See [phase 3 progress and remaining gates](docs/PHASE_J_PRODUCTION_INTEGRATION.md).
 
 ## Local Phase J titles and audio (test-only)
 
@@ -669,7 +689,7 @@ Fresh installations now start video playback at normal volume. A deliberately sa
 - **Folders / Collections:** use **List / Tiles**. Each section remembers its view per workspace. **Find Exact Duplicates** and **Find Similar Photos** are under Folders → Library cleanup; review never deletes media. Existing manual AI/text indexing tools are under Settings → Local content indexes.
 - **Search:** after about 400ms without typing, the full query runs, including local semantic matches when AI is enabled. Enter/Search starts immediately. Previous results stay visible with an updating state until the new query finishes; changing workspace or AI state discards incompatible evidence. **Clear search** restores browsing. Provider failures leave metadata matches available.
 
-Automatic local AI indexing, counters/folder exclusions and expanded viewers are implemented. The private vault remains planned. Signed Preview updates still require channel publication and installed upgrade acceptance; see [the feedback roadmap](docs/AI_VIEWER_VAULT_ROADMAP.md).
+Automatic local AI indexing, counters/folder exclusions and expanded viewers are implemented. The account-bound private vault is implemented as a gated local preview; see [Phase K](docs/PHASE_K_VAULT.md). Signed Preview updates still require channel publication and installed upgrade acceptance; see [the feedback roadmap](docs/AI_VIEWER_VAULT_ROADMAP.md).
 
 Close and update installation wait for queued settings as well as project saves. If settings cannot be saved, keep the app open and use **Retry saving**; discarding project edits does not discard settings. Explicit uninstall data removal includes the AI indexing queue and its SQLite companion files.
 Embedded NEF/ARW previews use the shared 20,000-pixel edge, 50-megapixel and 256 MB decoder allocation limits, with a 75 MB encoded-preview cap. RAW orientation continues to come from the RAW metadata.
